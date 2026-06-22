@@ -1,0 +1,97 @@
+// Baked-in best-practice tips shown inside each node type.
+// These are informed by Higgsfield, Seedance, Kling, Veo, and Flux prompt engineering docs.
+
+export const tips = {
+  videoInput: [
+    "Trim to the relevant clip before uploading — models perform better on focused 3-30s clips than long footage.",
+    "Stable, well-lit footage gives the model more to work with. Shaky or dark source video produces weaker results.",
+    "Use the Subject Tagger node immediately after this one when you have multiple people or objects in the scene.",
+    "MP4 H.264 is the most compatible format. ProRes and HEVC may need transcoding first.",
+  ],
+  imageInput: [
+    "Assign a Role to this image so downstream nodes know its purpose: Reference, Style, Clothing, Face, or Mask.",
+    "For clothing swaps, use a clean flat-lay or mannequin photo — the garment isolated against white gives IP-Adapter the best signal.",
+    "Face reference images work best at 512×512 or higher with the face centered and evenly lit.",
+    "PNG with transparency works for mask inputs. JPEG is fine for everything else.",
+  ],
+  subjectTagger: [
+    "Run this on your first video frame or a key still from the scene — Claude Vision will identify every subject.",
+    "If two people look similar, add distinguishing notes in the description field so downstream nodes can target the right one.",
+    "You can manually edit the detected subjects — the AI is good but not perfect on occluded or partially visible figures.",
+    "Connect tagged subjects to the Clothing Swap or Character node to lock in who gets the effect.",
+  ],
+  promptBuilder: [
+    "Lead with your subject and their primary action: 'A man in his 30s walks confidently down a rain-slicked street...'",
+    "Camera language dramatically improves results: add 'shot on 35mm anamorphic, shallow depth of field, rack focus' for cinematic feel.",
+    "Lighting in the prompt always matters: 'golden hour backlight', 'overcast diffused', 'neon-lit night scene'.",
+    "For Seedance and Kling, specify motion explicitly: 'slow push-in', 'static locked-off shot', 'smooth tracking pan left'.",
+    "Keep prompts under 200 tokens — models degrade with bloated prompts. Hit Enhance to let Claude tighten it.",
+    "Put what you DON'T want in the Negative Prompt field, not the main prompt. Never write 'no blur' in the main prompt.",
+  ],
+  imageGen: [
+    "Flux 1.1 Pro excels at photorealism. GPT Image 2 is stronger on complex compositions with text.",
+    "Reference image + prompt together almost always beats prompt alone for character or product consistency.",
+    "For product shots, describe the surface and lighting setup as if directing a real photographer.",
+    "Aspect ratio matters — 16:9 for landscapes, 9:16 for social/vertical, 1:1 for product close-ups.",
+    "Hit 'Enhance Prompt' before generating — Claude will add camera, lighting, and style details you'd otherwise miss.",
+  ],
+  videoGen: [
+    "Seedance 1 Pro is the go-to for realistic motion and natural movement. Use Kling 3 for stylized or fantasy content.",
+    "Image-to-video (I2V) almost always produces better results than text-to-video alone — wire an Image Input or Image Gen node first.",
+    "For clothing swap workflows, describe the outfit change in the prompt AND connect the clothing Image Input node.",
+    "Duration sweet spot: 4-6 seconds. Longer clips drift more and cost more credits.",
+    "Describe the END state of the video, not just the beginning — 'the jacket settles and the subject turns toward camera.'",
+    "Negative prompt for video: 'blurry, flickering, morphing, watermark, text, low quality, distorted limbs'",
+  ],
+  characterNode: [
+    "Upload 3-5 reference photos of the same person from different angles for best Soul ID consistency.",
+    "Vary the lighting and expression across reference photos — don't upload 5 nearly-identical shots.",
+    "Once created, a Character node can be reused across any number of Video Gen nodes in this canvas.",
+    "Character ID locks the face — still describe clothing and setting in the Video Gen prompt separately.",
+  ],
+  styleTransfer: [
+    "Style transfer works best when the source and target share similar composition and lighting.",
+    "Strength 0.4-0.6 is the sweet spot — too high and you lose subject identity, too low and the style doesn't read.",
+    "For clothing specifically, isolate just the garment in your style image. Full-body style images can bleed into the face.",
+    "Combine with a Character node to keep the face stable while the clothing style transfers.",
+  ],
+  upscale: [
+    "Topaz Video is the quality king — use it for anything going to a client or final delivery.",
+    "ByteDance's 'AIGC' preset is tuned specifically for AI-generated video and handles the typical artifacts much better than 'common'.",
+    "60fps output doubles the credit cost on ByteDance — use 24fps unless you specifically need smooth slow-motion.",
+    "Upscale AFTER your full pipeline is done. Upscaling mid-workflow just makes every subsequent generation slower.",
+    "You need to provide the source video's pixel dimensions for ByteDance. Check the Video Input node's metadata or your file info.",
+  ],
+  motionTransfer: [
+    "The character image should be a clean portrait or full-body still — not a video frame screengrab, which tends to be blurry.",
+    "The motion reference video doesn't need to match the character's clothing or setting — only the motion is transferred.",
+    "For best results, the reference clip should have the subject clearly visible and not obscured. Simple background = cleaner transfer.",
+    "Scene control 'image' keeps your character in their original background. 'Video' transplants them into the motion clip's environment.",
+    "1080p costs roughly 2× the credits of 720p. Draft at 720p, then upscale with the Upscale node for final delivery.",
+    "This uses Kling 3.0 under the hood — great for dance, gesture, and walk-cycle transfers.",
+  ],
+  framePainter: [
+    "Switch to Pan mode (✥) before trying to scroll or zoom the canvas — otherwise you'll accidentally draw a region.",
+    "Draw tight, intentional boxes. A box over the entire torso for 'place jacket here' is too vague — crop to just the upper body.",
+    "Label every region clearly — Claude uses the label AND the instruction together to build the spatial prompt.",
+    "Attach a reference image to each region when you have one. A chip bag photo + 'hand holding' instruction is far more precise than a text description alone.",
+    "Connect the Spatial Prompt output handle to the Prompt Builder node's context input, then wire that into Video Gen.",
+    "Extract a frame from the exact moment you want the interaction to start — the model will use that frame as its reference composition.",
+    "You can stack multiple regions — e.g. 'right hand: holding chips', 'left hand: holding phone', 'wrist: wearing watch'.",
+  ],
+  cameraControls: [
+    "Combine at most 2 moves — e.g. Crane Up + Push In gives you a rising dolly that feels cinematic. Three moves = chaos.",
+    "Speed matters as much as direction. 'Slow pan' reads contemplative; 'fast pan' reads action. Match the mood of your scene.",
+    "Orbit shots need a clear subject in the center of frame. If your subject is off-center, use Track instead.",
+    "Hyperlapse works best on environment/establishing shots, not close-up subject shots — the time compression loses facial detail.",
+    "Rack Focus requires shallow depth of field in your prompt too — add 'f/1.8 aperture, bokeh' to the Prompt Builder to sell it.",
+    "Dutch Angle + Handheld together creates intense psychological unease — great for thriller or horror tones.",
+    "The camera language this node generates gets appended to your Prompt Builder — wire it into the 'context_in' handle.",
+    "Bird's Eye works best when the ground has texture or pattern — flat grey concrete won't read well overhead.",
+  ],
+  output: [
+    "Preview at 50% quality first to check the result before downloading the full resolution.",
+    "You can wire the Output node back into a Video Input or Image Input node to chain pipeline passes.",
+    "Right-click the output to copy the URL — useful for pasting into other nodes or sharing for review.",
+  ],
+}
