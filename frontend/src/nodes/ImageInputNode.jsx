@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react'
-import { Handle, Position, useReactFlow } from '@xyflow/react'
+import { Position, useReactFlow } from '@xyflow/react'
 import { Image } from 'lucide-react'
 import NodeShell from '../components/NodeShell'
+import NodeHandle from '../components/NodeHandle'
 import { tips } from '../tips/nodeTips'
 
 const ROLES = ['Reference', 'Style', 'Clothing', 'Face', 'Mask', 'Product']
@@ -31,18 +32,13 @@ export default function ImageInputNode({ id, data }) {
   }, [upload])
 
   return (
-    <NodeShell label="Image Input" icon={<Image size={14} />} color="#06b6d4" status={data.status} tips={tips.imageInput} width={260}>
-      {/* Role selector */}
+    <NodeShell id={id} label="Image Input" icon={<Image size={13} />} color="#06b6d4" status={data.status} tips={tips.imageInput} width={260}>
       <div className="flex flex-wrap gap-1">
         {ROLES.map(role => (
           <button
             key={role}
+            className={`pill-btn ${data.role === role ? 'active-cyan' : ''}`}
             onClick={() => updateNodeData(id, { role })}
-            className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
-              data.role === role
-                ? 'border-cyan-400 bg-cyan-400/15 text-cyan-300'
-                : 'border-nodeborder text-zinc-500 hover:border-zinc-500'
-            }`}
           >
             {role}
           </button>
@@ -53,8 +49,10 @@ export default function ImageInputNode({ id, data }) {
         onDrop={onDrop}
         onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
         onDragLeave={() => setDragging(false)}
-        className={`rounded-lg border-2 border-dashed transition-colors cursor-pointer text-center py-4 ${
-          dragging ? 'border-cyan-400 bg-cyan-400/10' : 'border-nodeborder hover:border-cyan-400/50'
+        className={`rounded-xl border border-dashed transition-all duration-300 cursor-pointer text-center py-5 ${
+          dragging
+            ? 'border-cyan-400/40 bg-cyan-400/[0.06]'
+            : 'border-white/[0.06] hover:border-white/10 hover:bg-white/[0.02]'
         }`}
         onClick={() => document.getElementById(`ii-${id}`).click()}
       >
@@ -66,12 +64,12 @@ export default function ImageInputNode({ id, data }) {
           onChange={e => e.target.files[0] && upload(e.target.files[0])}
         />
         {data.url
-          ? <img src={data.url} alt="" className="w-full rounded object-cover max-h-36" />
-          : <p className="text-xs text-zinc-500">Drop image or click to browse</p>
+          ? <img src={data.url} alt="" className="w-full rounded-lg object-cover max-h-36 px-2" />
+          : <p className="text-[10px] t-secondary font-light">Drop image or click to browse</p>
         }
       </div>
 
-      <Handle type="source" position={Position.Right} id="image" style={{ top: '50%' }} />
+      <NodeHandle type="source" position={Position.Right} id="image" style={{ top: '50%' }} />
     </NodeShell>
   )
 }

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Handle, Position, useReactFlow } from '@xyflow/react'
+import { Position, useReactFlow } from '@xyflow/react'
 import { Brush, Trash2, Upload, ChevronDown, ChevronUp, Wand2, Loader2 } from 'lucide-react'
 import NodeShell from '../components/NodeShell'
+import NodeHandle from '../components/NodeHandle'
 import { tips } from '../tips/nodeTips'
 
 const REGION_COLORS = ['#f97316','#22d3a0','#818cf8','#f43f5e','#facc15','#38bdf8']
@@ -21,11 +22,10 @@ export default function FramePainterNode({ id, data }) {
   const [extracting, setExtracting] = useState(false)
   const [enhancing, setEnhancing] = useState(false)
   const [expanded, setExpanded] = useState(true)
-  const [tool, setTool]         = useState('rect') // 'rect' | 'pan'
+  const [tool, setTool]         = useState('rect')
 
   const frameUrl = data.frameUrl || data.imageUrl
 
-  // Draw all regions onto the overlay canvas
   const redrawOverlay = useCallback((rects, current) => {
     const canvas = overlayRef.current
     if (!canvas) return
@@ -36,7 +36,7 @@ export default function FramePainterNode({ id, data }) {
       ctx.strokeStyle = r.color || REGION_COLORS[i % REGION_COLORS.length]
       ctx.lineWidth = 2
       ctx.strokeRect(r.x, r.y, r.w, r.h)
-      ctx.fillStyle = (r.color || REGION_COLORS[i % REGION_COLORS.length]) + '22'
+      ctx.fillStyle = (r.color || REGION_COLORS[i % REGION_COLORS.length]) + '15'
       ctx.fillRect(r.x, r.y, r.w, r.h)
       if (r.label) {
         ctx.fillStyle = r.color || REGION_COLORS[i % REGION_COLORS.length]
@@ -140,7 +140,7 @@ export default function FramePainterNode({ id, data }) {
     setEnhancing(true)
     try {
       const regionDescriptions = regions.map((r, i) =>
-        `Region ${i+1} (${r.label || 'unlabeled'}, position ${Math.round(r.x)},${Math.round(r.y)} size ${Math.round(r.w)}×${Math.round(r.h)}): ${r.instruction || 'no instruction'}`
+        `Region ${i+1} (${r.label || 'unlabeled'}, position ${Math.round(r.x)},${Math.round(r.y)} size ${Math.round(r.w)}x${Math.round(r.h)}): ${r.instruction || 'no instruction'}`
       ).join('\n')
       const r = await fetch('/analyze/spatial-prompt', {
         method: 'POST',
@@ -165,56 +165,56 @@ export default function FramePainterNode({ id, data }) {
   }, [])
 
   return (
-    <NodeShell label="Frame Painter" icon={<Brush size={14} />} color="#fb923c" status="idle" tips={tips.framePainter} width={360}>
-      <Handle type="target" position={Position.Left} id="video_in" style={{ top: '30%' }} />
-      <Handle type="target" position={Position.Left} id="image_in" style={{ top: '70%' }} />
+    <NodeShell id={id} label="Frame Painter" icon={<Brush size={13} />} color="#fb923c" status="idle" tips={tips.framePainter} width={360}>
+      <NodeHandle type="target" position={Position.Left} id="video_in" style={{ top: '30%' }} />
+      <NodeHandle type="target" position={Position.Left} id="image_in" style={{ top: '70%' }} />
 
-      {/* Source: video scrubber or direct image */}
       {data.sourceVideoUrl && (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <video ref={videoRef} src={data.sourceVideoUrl} className="w-full rounded hidden" />
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-zinc-500 whitespace-nowrap">Frame @ {frameTime.toFixed(1)}s</span>
+            <span className="text-[9px] t-secondary whitespace-nowrap font-medium">Frame @ {frameTime.toFixed(1)}s</span>
             <input type="range" min={0} max={30} step={0.1} value={frameTime}
               onChange={e => setFrameTime(Number(e.target.value))}
               className="flex-1 accent-orange-400" />
             <button onClick={extractFrame} disabled={extracting}
-              className="text-[10px] px-2 py-1 rounded bg-orange-500/15 border border-orange-500/30 text-orange-300 hover:bg-orange-500/25 flex items-center gap-1 whitespace-nowrap">
-              {extracting ? <Loader2 size={10} className="animate-spin" /> : null}
-              {extracting ? 'Extracting…' : 'Extract Frame'}
+              className="pill-btn flex items-center gap-1 whitespace-nowrap"
+              style={extracting ? {} : { background: 'rgba(249,115,22,0.06)', borderColor: 'rgba(249,115,22,0.15)', color: 'rgba(249,115,22,0.7)' }}>
+              {extracting ? <Loader2 size={9} className="animate-spin" /> : null}
+              {extracting ? 'Extracting...' : 'Extract Frame'}
             </button>
           </div>
         </div>
       )}
 
-      {/* Canvas area */}
       {frameUrl ? (
-        <div className="relative rounded-lg overflow-hidden border border-nodeborder select-none"
-          style={{ cursor: tool === 'rect' ? 'crosshair' : 'grab' }}>
+        <div className="relative rounded-xl overflow-hidden select-none nodrag nopan"
+          style={{ cursor: tool === 'rect' ? 'crosshair' : 'grab', border: '1px solid rgba(255,255,255,0.06)' }}>
           <img src={frameUrl} alt="frame" className="w-full block" ref={canvasRef} />
           <canvas
             ref={overlayRef}
             width={640} height={360}
-            className="absolute inset-0 w-full h-full"
+            className="absolute inset-0 w-full h-full nodrag nopan"
             onMouseDown={onMouseDown}
             onMouseMove={onMouseMove}
             onMouseUp={onMouseUp}
             onMouseLeave={onMouseUp}
           />
-          {/* Tool toggle */}
-          <div className="absolute top-1.5 right-1.5 flex gap-1">
+          <div className="absolute top-2 right-2 flex gap-1">
             <button onClick={() => setTool('rect')}
-              className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${tool === 'rect' ? 'bg-orange-500/25 border-orange-400 text-orange-200' : 'bg-black/50 border-zinc-700 text-zinc-400'}`}>
-              ☐ Draw
+              className={`pill-btn text-[9px] ${tool === 'rect' ? 'active-orange' : ''}`}
+              style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)' }}>
+              Draw
             </button>
             <button onClick={() => setTool('pan')}
-              className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${tool === 'pan' ? 'bg-orange-500/25 border-orange-400 text-orange-200' : 'bg-black/50 border-zinc-700 text-zinc-400'}`}>
-              ✥ Pan
+              className={`pill-btn text-[9px] ${tool === 'pan' ? 'active-orange' : ''}`}
+              style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)' }}>
+              Pan
             </button>
           </div>
         </div>
       ) : (
-        <div className="rounded-lg border-2 border-dashed border-nodeborder py-8 text-center"
+        <div className="rounded-xl border border-dashed border-white/[0.06] py-8 text-center cursor-pointer hover:border-white/10 hover:bg-white/[0.01] transition-all duration-200"
           onClick={() => document.getElementById(`fp-img-${id}`).click()}>
           <input id={`fp-img-${id}`} type="file" accept="image/*" className="hidden"
             onChange={e => {
@@ -223,57 +223,56 @@ export default function FramePainterNode({ id, data }) {
               const url = URL.createObjectURL(file)
               updateNodeData(id, { frameUrl: url })
             }} />
-          <Brush size={20} className="mx-auto mb-1 text-zinc-600" />
-          <p className="text-xs text-zinc-500">Connect a Video Input or drop an image to start painting</p>
+          <Brush size={18} className="mx-auto mb-2 t-secondary" />
+          <p className="text-[10px] t-tertiary font-light">Connect a Video Input or drop an image to start painting</p>
         </div>
       )}
 
-      {/* Regions panel */}
       {regions.length > 0 && (
         <div className="space-y-2">
           <button onClick={() => setExpanded(e => !e)}
-            className="w-full flex items-center justify-between text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors">
-            <span className="uppercase tracking-wide">{regions.length} painted region{regions.length > 1 ? 's' : ''}</span>
-            {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+            className="w-full flex items-center justify-between text-[9px] t-secondary hover:t-secondary transition-colors font-medium">
+            <span className="uppercase tracking-wider">{regions.length} painted region{regions.length > 1 ? 's' : ''}</span>
+            {expanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
           </button>
 
           {expanded && regions.map((r, i) => (
-            <div key={r.id} className="rounded-lg border p-2.5 space-y-2"
-              style={{ borderColor: r.color + '60', background: r.color + '08' }}>
+            <div key={r.id} className="rounded-xl p-3 space-y-2"
+              style={{ border: `1px solid ${r.color}18`, background: `${r.color}06` }}>
               <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: r.color }} />
+                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: r.color }} />
                 <input
-                  placeholder={`Region ${i+1} label (e.g. "person's right hand")`}
-                  className="flex-1 bg-transparent text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none"
+                  placeholder={`Region ${i+1} label`}
+                  className="flex-1 bg-transparent text-[10px] t-secondary placeholder:t-tertiary focus:outline-none font-light"
                   value={r.label}
                   onChange={e => updateRegion(r.id, { label: e.target.value })}
                 />
                 <button onClick={() => deleteRegion(r.id)}
-                  className="text-zinc-700 hover:text-danger transition-colors">
-                  <Trash2 size={11} />
+                  className="t-secondary hover:text-danger/60 transition-colors">
+                  <Trash2 size={10} />
                 </button>
               </div>
 
               <textarea
                 rows={2}
-                placeholder={`Instruction: "holding a bag of chips", "replaced with a coffee cup", "wearing a wristwatch"…`}
-                className="w-full bg-black/30 border border-white/5 rounded px-2 py-1.5 text-[10px] text-zinc-300 placeholder:text-zinc-600 resize-none focus:outline-none leading-relaxed"
+                placeholder="Instruction: what should appear here..."
+                className="glass-input w-full px-2.5 py-1.5 text-[10px] resize-none leading-relaxed"
                 value={r.instruction}
                 onChange={e => updateRegion(r.id, { instruction: e.target.value })}
               />
 
-              {/* Attach reference image to region */}
               <div
-                className="rounded border border-dashed border-white/10 p-2 flex items-center gap-2 cursor-pointer hover:border-white/20 transition-colors"
+                className="rounded-lg p-2 flex items-center gap-2 cursor-pointer transition-all duration-200"
+                style={{ border: '1px dashed rgba(255,255,255,0.06)' }}
                 onClick={() => document.getElementById(`fp-r-${r.id}`).click()}>
                 <input id={`fp-r-${r.id}`} type="file" accept="image/*" className="hidden"
                   onChange={e => e.target.files[0] && uploadRegionImage(r.id, e.target.files[0])} />
                 {r.attachedImageUrl
-                  ? <img src={r.attachedImageUrl} className="h-10 w-10 object-cover rounded flex-shrink-0" alt="" />
-                  : <Upload size={12} className="text-zinc-600 flex-shrink-0" />
+                  ? <img src={r.attachedImageUrl} className="h-10 w-10 object-cover rounded-lg flex-shrink-0" alt="" />
+                  : <Upload size={11} className="t-secondary flex-shrink-0" />
                 }
-                <span className="text-[10px] text-zinc-600">
-                  {r.attachedImageUrl ? 'Reference image attached' : 'Attach reference image for this region'}
+                <span className="text-[9px] t-tertiary font-light">
+                  {r.attachedImageUrl ? 'Reference attached' : 'Attach reference image'}
                 </span>
               </div>
             </div>
@@ -281,34 +280,34 @@ export default function FramePainterNode({ id, data }) {
         </div>
       )}
 
-      {/* Base scene note */}
       {regions.length > 0 && (
         <input
-          placeholder="Overall scene context (optional): background, mood, camera…"
-          className="w-full bg-black/30 border border-nodeborder rounded-lg px-2.5 py-1.5 text-[10px] text-zinc-300 placeholder:text-zinc-600 focus:outline-none"
+          placeholder="Overall scene context (optional)"
+          className="glass-input w-full px-3 py-2 text-[10px]"
           value={data.basePrompt || ''}
           onChange={e => updateNodeData(id, { basePrompt: e.target.value })}
         />
       )}
 
-      {/* Build spatial prompt */}
       {regions.length > 0 && (
         <button onClick={buildSpatialPrompt} disabled={enhancing}
-          className="w-full flex items-center justify-center gap-2 py-1.5 rounded-lg bg-orange-500/12 border border-orange-500/25 text-orange-300 text-[11px] hover:bg-orange-500/20 transition-colors disabled:opacity-40">
+          className="action-btn"
+          style={{ background: 'rgba(249,115,22,0.06)', borderColor: 'rgba(249,115,22,0.15)', color: 'rgba(249,115,22,0.7)' }}>
           {enhancing ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
-          {enhancing ? 'Claude is building spatial prompt…' : 'Build Spatial Prompt with Claude'}
+          {enhancing ? 'Claude is building spatial prompt...' : 'Build Spatial Prompt with Claude'}
         </button>
       )}
 
       {data.spatialPrompt && (
-        <div className="rounded-lg bg-black/30 border border-orange-500/20 px-2.5 py-2">
-          <p className="text-[9px] text-zinc-600 uppercase tracking-wide mb-1">Spatial prompt →</p>
-          <p className="text-[10px] text-orange-200/70 leading-relaxed">{data.spatialPrompt}</p>
+        <div className="rounded-xl px-3 py-2.5"
+          style={{ background: 'rgba(249,115,22,0.03)', border: '1px solid rgba(249,115,22,0.08)' }}>
+          <p className="text-[8px] t-tertiary uppercase tracking-wider mb-1 font-medium">Spatial prompt</p>
+          <p className="text-[10px] font-light leading-relaxed" style={{ color: 'rgba(249,115,22,0.5)' }}>{data.spatialPrompt}</p>
         </div>
       )}
 
-      <Handle type="source" position={Position.Right} id="prompt_out" style={{ top: '40%' }} />
-      <Handle type="source" position={Position.Right} id="frame_out" style={{ top: '65%' }} />
+      <NodeHandle type="source" position={Position.Right} id="prompt_out" style={{ top: '40%' }} />
+      <NodeHandle type="source" position={Position.Right} id="frame_out" style={{ top: '65%' }} />
     </NodeShell>
   )
 }

@@ -5,9 +5,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/generate': 'http://localhost:8000',
-      '/analyze': 'http://localhost:8000',
-      '/uploads': 'http://localhost:8000',
+      '/generate': 'http://127.0.0.1:8000',
+      '/analyze': 'http://127.0.0.1:8000',
+      '/uploads': 'http://127.0.0.1:8000',
     }
   }
 })

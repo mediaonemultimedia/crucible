@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react'
-import { Handle, Position, useReactFlow } from '@xyflow/react'
+import { Position, useReactFlow } from '@xyflow/react'
 import { Film, Upload } from 'lucide-react'
 import NodeShell from '../components/NodeShell'
+import NodeHandle from '../components/NodeHandle'
 import { tips } from '../tips/nodeTips'
 
 export default function VideoInputNode({ id, data }) {
@@ -29,13 +30,15 @@ export default function VideoInputNode({ id, data }) {
   }, [upload])
 
   return (
-    <NodeShell label="Video Input" icon={<Film size={14} />} color="#6366f1" status={data.status} tips={tips.videoInput} width={260}>
+    <NodeShell id={id} label="Video Input" icon={<Film size={13} />} color="#6366f1" status={data.status} tips={tips.videoInput} width={260}>
       <div
         onDrop={onDrop}
         onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
         onDragLeave={() => setDragging(false)}
-        className={`rounded-lg border-2 border-dashed transition-colors cursor-pointer text-center py-4 px-2 ${
-          dragging ? 'border-accent bg-accentsoft' : 'border-nodeborder hover:border-accent/50'
+        className={`rounded-xl border border-dashed transition-all duration-300 cursor-pointer text-center py-5 px-3 ${
+          dragging
+            ? 'border-indigo-400/40 bg-indigo-400/[0.06]'
+            : 'border-white/[0.06] hover:border-white/10 hover:bg-white/[0.02]'
         }`}
         onClick={() => document.getElementById(`vi-${id}`).click()}
       >
@@ -46,17 +49,17 @@ export default function VideoInputNode({ id, data }) {
           className="hidden"
           onChange={e => e.target.files[0] && upload(e.target.files[0])}
         />
-        <Upload size={18} className="mx-auto mb-1 text-zinc-500" />
+        <Upload size={16} className="mx-auto mb-2 t-tertiary" />
         {data.label
-          ? <p className="text-xs text-zinc-300 truncate px-2">{data.label}</p>
-          : <p className="text-xs text-zinc-500">Drop video or click to browse</p>
+          ? <p className="text-[11px] t-primary truncate px-2">{data.label}</p>
+          : <p className="text-[10px] t-secondary font-light">Drop video or click to browse</p>
         }
         {data.url && (
-          <video src={data.url} className="mt-2 w-full rounded" controls muted />
+          <video src={data.url} className="mt-3 w-full rounded-lg" controls muted />
         )}
       </div>
 
-      <Handle type="source" position={Position.Right} id="video" style={{ top: '50%' }} />
+      <NodeHandle type="source" position={Position.Right} id="video" style={{ top: '50%' }} />
     </NodeShell>
   )
 }

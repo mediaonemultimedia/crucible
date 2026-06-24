@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react'
-import { Handle, Position, useReactFlow } from '@xyflow/react'
+import { Position, useReactFlow } from '@xyflow/react'
 import { ArrowUpCircle, Loader2, Play } from 'lucide-react'
 import NodeShell from '../components/NodeShell'
+import NodeHandle from '../components/NodeHandle'
 import { tips } from '../tips/nodeTips'
 
 const PROVIDERS = [
@@ -78,16 +79,21 @@ export default function UpscaleNode({ id, data }) {
   }, [id, data, provider, resolution, updateNodeData])
 
   return (
-    <NodeShell label="Upscale" icon={<ArrowUpCircle size={14} />} color="#38bdf8" status={data.status} tips={tips.upscale} width={290}>
-      <Handle type="target" position={Position.Left} id="video_in" style={{ top: '50%' }} />
+    <NodeShell id={id} label="Upscale" icon={<ArrowUpCircle size={13} />} color="#38bdf8" status={data.status} tips={tips.upscale} width={290}>
+      <NodeHandle type="target" position={Position.Left} id="video_in" style={{ top: '50%' }} />
 
       {/* Provider */}
       <div className="grid grid-cols-2 gap-1.5">
         {PROVIDERS.map(p => (
           <button key={p.id} onClick={() => updateNodeData(id, { provider: p.id, resolution: RESOLUTIONS[p.id][0] })}
-            className={`p-2 rounded-lg border text-left transition-colors ${provider === p.id ? 'border-sky-400 bg-sky-400/12 text-sky-200' : 'border-nodeborder text-zinc-500 hover:border-zinc-400'}`}>
+            className="p-2.5 rounded-xl text-left transition-all duration-200"
+            style={{
+              background: provider === p.id ? 'rgba(56,189,248,0.06)' : 'rgba(255,255,255,0.02)',
+              border: `1px solid ${provider === p.id ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.04)'}`,
+              color: provider === p.id ? 'rgba(56,189,248,0.8)' : 'var(--text-tertiary)',
+            }}>
             <div className="text-[10px] font-medium">{p.label}</div>
-            <div className="text-[9px] opacity-60 leading-tight mt-0.5">{p.desc}</div>
+            <div className="text-[9px] opacity-50 leading-tight mt-0.5 font-light">{p.desc}</div>
           </button>
         ))}
       </div>
@@ -96,7 +102,7 @@ export default function UpscaleNode({ id, data }) {
       <div className="flex gap-1.5">
         {(RESOLUTIONS[provider] || []).map(r => (
           <button key={r} onClick={() => updateNodeData(id, { resolution: r })}
-            className={`flex-1 text-[10px] py-1 rounded-md border transition-colors ${resolution === r ? 'border-sky-400 bg-sky-400/12 text-sky-300' : 'border-nodeborder text-zinc-500 hover:border-zinc-400'}`}>
+            className={`pill-btn flex-1 ${resolution === r ? 'active-sky' : ''}`}>
             {r.toUpperCase()}
           </button>
         ))}
@@ -108,16 +114,16 @@ export default function UpscaleNode({ id, data }) {
           <div className="flex flex-wrap gap-1">
             {PRESETS.map(p => (
               <button key={p.id} onClick={() => updateNodeData(id, { preset: p.id })}
-                className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${(data.preset || 'common') === p.id ? 'border-sky-400 bg-sky-400/12 text-sky-300' : 'border-nodeborder text-zinc-500'}`}>
+                className={`pill-btn ${(data.preset || 'common') === p.id ? 'active-sky' : ''}`}>
                 {p.label}
               </button>
             ))}
           </div>
           <div className="flex gap-2 items-center">
-            <span className="text-[10px] text-zinc-500 whitespace-nowrap">FPS output</span>
+            <span className="text-[9px] t-tertiary whitespace-nowrap font-medium">FPS output</span>
             {[24, 30, 60].map(f => (
               <button key={f} onClick={() => updateNodeData(id, { fps: f })}
-                className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${(data.fps || 24) === f ? 'border-sky-400 text-sky-300' : 'border-nodeborder text-zinc-500'}`}>
+                className={`pill-btn ${(data.fps || 24) === f ? 'active-sky' : ''}`}>
                 {f}fps
               </button>
             ))}
@@ -130,7 +136,7 @@ export default function UpscaleNode({ id, data }) {
         <div className="flex flex-wrap gap-1">
           {ASPECT_RATIOS.map(ar => (
             <button key={ar} onClick={() => updateNodeData(id, { aspectRatio: ar })}
-              className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${(data.aspectRatio || 'auto') === ar ? 'border-sky-400 bg-sky-400/12 text-sky-300' : 'border-nodeborder text-zinc-500'}`}>
+              className={`pill-btn ${(data.aspectRatio || 'auto') === ar ? 'active-sky' : ''}`}>
               {ar}
             </button>
           ))}
@@ -138,20 +144,21 @@ export default function UpscaleNode({ id, data }) {
       )}
 
       {!data.sourceVideoId && !data.sourceFileId && (
-        <p className="text-[10px] text-zinc-600">Connect a Video Input or Video Gen output.</p>
+        <p className="text-[9px] t-tertiary font-light">Connect a Video Input or Video Gen output.</p>
       )}
 
       <button onClick={generate} disabled={running || (!data.sourceVideoId && !data.sourceFileId)}
-        className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-sky-600/15 border border-sky-500/30 text-sky-300 text-xs font-medium hover:bg-sky-600/25 transition-colors disabled:opacity-40">
+        className="action-btn"
+        style={{ background: 'rgba(56,189,248,0.06)', borderColor: 'rgba(56,189,248,0.2)', color: 'rgba(56,189,248,0.8)' }}>
         {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-        {running ? 'Upscaling…' : `Upscale to ${resolution.toUpperCase()}`}
+        {running ? 'Upscaling...' : `Upscale to ${resolution.toUpperCase()}`}
       </button>
 
       {data.outputUrl && (
-        <video src={data.outputUrl} className="w-full rounded-lg" controls muted loop />
+        <video src={data.outputUrl} className="w-full rounded-xl" controls muted loop />
       )}
 
-      <Handle type="source" position={Position.Right} id="video_out" style={{ top: '50%' }} />
+      <NodeHandle type="source" position={Position.Right} id="video_out" style={{ top: '50%' }} />
     </NodeShell>
   )
 }

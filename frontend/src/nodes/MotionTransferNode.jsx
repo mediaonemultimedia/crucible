@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react'
-import { Handle, Position, useReactFlow } from '@xyflow/react'
+import { Position, useReactFlow } from '@xyflow/react'
 import { Shuffle, Loader2, Play, Info } from 'lucide-react'
 import NodeShell from '../components/NodeShell'
+import NodeHandle from '../components/NodeHandle'
 import { tips } from '../tips/nodeTips'
 
 export default function MotionTransferNode({ id, data }) {
@@ -52,38 +53,51 @@ export default function MotionTransferNode({ id, data }) {
   const hasMotion = !!data.motionVideoId
 
   return (
-    <NodeShell label="Motion Transfer" icon={<Shuffle size={14} />} color="#a78bfa" status={data.status} tips={tips.motionTransfer} width={300}>
+    <NodeShell id={id} label="Motion Transfer" icon={<Shuffle size={13} />} color="#a78bfa" status={data.status} tips={tips.motionTransfer} width={300}>
 
-      {/* Input slots — visual indicators */}
+      {/* Input slots */}
       <div className="grid grid-cols-2 gap-2">
-        <div className={`rounded-lg border p-2.5 transition-colors ${hasChar ? 'border-violet-400/50 bg-violet-400/8' : 'border-nodeborder border-dashed'}`}>
-          <p className="text-[9px] uppercase tracking-wide text-zinc-600 mb-1">← Character Image</p>
+        <div className="rounded-xl p-2.5 transition-all duration-200"
+          style={{
+            background: hasChar ? 'rgba(139,92,246,0.04)' : 'transparent',
+            border: `1px ${hasChar ? 'solid' : 'dashed'} ${hasChar ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.05)'}`,
+          }}>
+          <p className="text-[8px] uppercase tracking-wider t-tertiary mb-1.5 font-medium">Character Image</p>
           {data.characterImageUrl
-            ? <img src={data.characterImageUrl} className="w-full h-14 object-cover rounded" alt="character" />
-            : <p className="text-[10px] text-zinc-600">Connect Image Input (left top handle)</p>
+            ? <img src={data.characterImageUrl} className="w-full h-14 object-cover rounded-lg" alt="character" />
+            : <p className="text-[9px] t-tertiary font-light">Connect Image Input</p>
           }
         </div>
-        <div className={`rounded-lg border p-2.5 transition-colors ${hasMotion ? 'border-violet-400/50 bg-violet-400/8' : 'border-nodeborder border-dashed'}`}>
-          <p className="text-[9px] uppercase tracking-wide text-zinc-600 mb-1">← Motion Video</p>
+        <div className="rounded-xl p-2.5 transition-all duration-200"
+          style={{
+            background: hasMotion ? 'rgba(139,92,246,0.04)' : 'transparent',
+            border: `1px ${hasMotion ? 'solid' : 'dashed'} ${hasMotion ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.05)'}`,
+          }}>
+          <p className="text-[8px] uppercase tracking-wider t-tertiary mb-1.5 font-medium">Motion Video</p>
           {data.motionVideoUrl
-            ? <video src={data.motionVideoUrl} className="w-full h-14 object-cover rounded" muted />
-            : <p className="text-[10px] text-zinc-600">Connect Video Input (left bottom handle)</p>
+            ? <video src={data.motionVideoUrl} className="w-full h-14 object-cover rounded-lg" muted />
+            : <p className="text-[9px] t-tertiary font-light">Connect Video Input</p>
           }
         </div>
       </div>
 
       {/* Scene control */}
-      <div className="space-y-1">
-        <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Background source</p>
+      <div className="space-y-1.5">
+        <p className="text-[9px] t-tertiary uppercase tracking-wider font-medium">Background source</p>
         <div className="grid grid-cols-2 gap-1.5">
           {[
             { id: 'image', label: 'From character image', desc: 'Keeps character\'s background' },
             { id: 'video', label: 'From motion video',   desc: 'Uses reference clip\'s background' },
           ].map(opt => (
             <button key={opt.id} onClick={() => updateNodeData(id, { sceneControl: opt.id })}
-              className={`p-2 rounded-lg border text-left transition-colors ${sceneControl === opt.id ? 'border-violet-400 bg-violet-400/12 text-violet-200' : 'border-nodeborder text-zinc-500 hover:border-zinc-400'}`}>
+              className="p-2.5 rounded-xl text-left transition-all duration-200"
+              style={{
+                background: sceneControl === opt.id ? 'rgba(139,92,246,0.06)' : 'rgba(255,255,255,0.02)',
+                border: `1px solid ${sceneControl === opt.id ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.04)'}`,
+                color: sceneControl === opt.id ? 'rgba(139,92,246,0.7)' : 'var(--text-tertiary)',
+              }}>
               <div className="text-[10px] font-medium leading-tight">{opt.label}</div>
-              <div className="text-[9px] opacity-60 mt-0.5">{opt.desc}</div>
+              <div className="text-[9px] opacity-50 mt-0.5 font-light">{opt.desc}</div>
             </button>
           ))}
         </div>
@@ -91,34 +105,35 @@ export default function MotionTransferNode({ id, data }) {
 
       {/* Resolution */}
       <div className="flex items-center gap-2">
-        <span className="text-[10px] text-zinc-500 w-20">Resolution</span>
+        <span className="text-[9px] t-tertiary font-medium w-20">Resolution</span>
         {['720p','1080p'].map(r => (
           <button key={r} onClick={() => updateNodeData(id, { resolution: r })}
-            className={`flex-1 text-[10px] py-1 rounded-md border transition-colors ${resolution === r ? 'border-violet-400 bg-violet-400/12 text-violet-300' : 'border-nodeborder text-zinc-500 hover:border-zinc-400'}`}>
-            {r} {r === '1080p' && <span className="opacity-50">(2× credits)</span>}
+            className={`pill-btn flex-1 ${resolution === r ? 'active-violet' : ''}`}>
+            {r} {r === '1080p' && <span className="opacity-40">(2x)</span>}
           </button>
         ))}
       </div>
 
-      <div className="flex items-start gap-1.5 text-[10px] text-zinc-600 bg-black/20 rounded-lg px-2.5 py-2">
-        <Info size={11} className="mt-0.5 flex-shrink-0 text-violet-400/50" />
-        <span>Motion from the reference clip is transferred to the character — no prompt needed. Uses Kling 3.0.</span>
+      <div className="flex items-start gap-2 rounded-xl px-3 py-2.5"
+        style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+        <Info size={10} className="mt-0.5 flex-shrink-0" style={{ color: 'rgba(139,92,246,0.3)' }} />
+        <span className="text-[9px] t-secondary font-light leading-relaxed">Motion from the reference clip is transferred to the character. No prompt needed. Uses Kling 3.0.</span>
       </div>
 
       <button onClick={generate} disabled={running || !hasChar || !hasMotion}
-        className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-violet-600/15 border border-violet-500/30 text-violet-300 text-xs font-medium hover:bg-violet-600/25 transition-colors disabled:opacity-40">
+        className="action-btn"
+        style={{ background: 'rgba(139,92,246,0.08)', borderColor: 'rgba(139,92,246,0.2)', color: 'rgba(139,92,246,0.8)' }}>
         {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-        {running ? 'Transferring motion…' : 'Transfer Motion'}
+        {running ? 'Transferring motion...' : 'Transfer Motion'}
       </button>
 
       {data.outputUrl && (
-        <video src={data.outputUrl} className="w-full rounded-lg" controls muted loop />
+        <video src={data.outputUrl} className="w-full rounded-xl" controls muted loop />
       )}
 
-      {/* Two distinct left handles */}
-      <Handle type="target" position={Position.Left} id="char_image_in" style={{ top: '32%' }} />
-      <Handle type="target" position={Position.Left} id="motion_video_in" style={{ top: '58%' }} />
-      <Handle type="source" position={Position.Right} id="video_out" style={{ top: '50%' }} />
+      <NodeHandle type="target" position={Position.Left} id="char_image_in" style={{ top: '32%' }} />
+      <NodeHandle type="target" position={Position.Left} id="motion_video_in" style={{ top: '58%' }} />
+      <NodeHandle type="source" position={Position.Right} id="video_out" style={{ top: '50%' }} />
     </NodeShell>
   )
 }

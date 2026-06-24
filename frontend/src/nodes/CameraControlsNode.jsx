@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Handle, Position, useReactFlow } from '@xyflow/react'
+import { Position, useReactFlow } from '@xyflow/react'
 import { Video } from 'lucide-react'
 import NodeShell from '../components/NodeShell'
+import NodeHandle from '../components/NodeHandle'
 import { tips } from '../tips/nodeTips'
 
 const CAMERA_GROUPS = [
@@ -111,19 +112,15 @@ export default function CameraControlsNode({ id, data }) {
   const prompt = data.cameraPrompt || ''
 
   return (
-    <NodeShell label="Camera Controls" icon={<Video size={14} />} color="#e879f9" status="idle" tips={tips.cameraControls} width={320}>
+    <NodeShell id={id} label="Camera Controls" icon={<Video size={13} />} color="#e879f9" status="idle" tips={tips.cameraControls} width={320}>
       {/* Speed */}
       <div className="flex gap-1.5 items-center">
-        <span className="text-[10px] text-zinc-500 uppercase tracking-wide w-10">Speed</span>
+        <span className="text-[9px] t-tertiary uppercase tracking-wider font-medium w-10">Speed</span>
         {SPEEDS.map(s => (
           <button
             key={s.id}
             onClick={() => onSpeedChange(s.id)}
-            className={`flex-1 text-[10px] py-1 rounded-md border transition-colors ${
-              speed === s.id
-                ? 'border-fuchsia-400 bg-fuchsia-400/15 text-fuchsia-300'
-                : 'border-nodeborder text-zinc-500 hover:border-zinc-500'
-            }`}
+            className={`pill-btn flex-1 ${speed === s.id ? 'active-fuchsia' : ''}`}
           >
             {s.label}
           </button>
@@ -131,32 +128,33 @@ export default function CameraControlsNode({ id, data }) {
       </div>
 
       {/* Group grid */}
-      <div className="space-y-1.5 max-h-72 overflow-y-auto pr-0.5">
+      <div className="space-y-1 max-h-72 overflow-y-auto pr-0.5">
         {CAMERA_GROUPS.map(group => (
           <div key={group.label}>
             <button
               onClick={() => setExpanded(expanded === group.label ? null : group.label)}
-              className="w-full flex items-center justify-between text-[10px] text-zinc-500 uppercase tracking-wide py-1 hover:text-zinc-400 transition-colors"
+              className="w-full flex items-center justify-between text-[9px] t-secondary uppercase tracking-wider py-1.5 hover:t-secondary transition-colors font-medium"
             >
               <span>{group.label}</span>
-              <span className="text-zinc-600">{expanded === group.label ? '▲' : '▼'}</span>
+              <span className="t-secondary text-[8px]">{expanded === group.label ? '▲' : '▼'}</span>
             </button>
 
             {expanded === group.label && (
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-2 gap-1.5 pb-1">
                 {group.moves.map(move => {
                   const isSelected = selected.find(s => s.id === move.id)
                   return (
                     <button
                       key={move.id}
                       onClick={() => toggleMove(move.id)}
-                      className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border text-left transition-colors ${
-                        isSelected
-                          ? 'border-fuchsia-400 bg-fuchsia-400/15 text-fuchsia-200'
-                          : 'border-nodeborder text-zinc-400 hover:border-zinc-500 hover:text-zinc-300'
-                      }`}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl text-left transition-all duration-200"
+                      style={{
+                        background: isSelected ? 'rgba(232,121,249,0.08)' : 'rgba(255,255,255,0.02)',
+                        border: `1px solid ${isSelected ? 'rgba(232,121,249,0.25)' : 'rgba(255,255,255,0.04)'}`,
+                        color: isSelected ? 'rgba(232,121,249,0.8)' : 'var(--text-tertiary)',
+                      }}
                     >
-                      <span className="text-base leading-none">{move.icon}</span>
+                      <span className="text-sm leading-none">{move.icon}</span>
                       <span className="text-[10px] font-medium leading-tight">{move.label}</span>
                     </button>
                   )
@@ -167,17 +165,17 @@ export default function CameraControlsNode({ id, data }) {
         ))}
       </div>
 
-      <p className="text-[10px] text-zinc-600 italic">Select up to 2 moves to combine</p>
+      <p className="text-[9px] t-tertiary font-light italic">Select up to 2 moves to combine</p>
 
-      {/* Generated camera language */}
       {prompt && (
-        <div className="rounded-lg bg-black/30 border border-fuchsia-500/20 px-2.5 py-2">
-          <p className="text-[9px] text-zinc-600 uppercase tracking-wide mb-1">Camera language →</p>
-          <p className="text-[10px] text-fuchsia-300/80 leading-relaxed">{prompt}</p>
+        <div className="rounded-xl px-3 py-2.5"
+          style={{ background: 'rgba(232,121,249,0.03)', border: '1px solid rgba(232,121,249,0.08)' }}>
+          <p className="text-[8px] t-tertiary uppercase tracking-wider mb-1 font-medium">Camera language</p>
+          <p className="text-[10px] font-light leading-relaxed" style={{ color: 'rgba(232,121,249,0.5)' }}>{prompt}</p>
         </div>
       )}
 
-      <Handle type="source" position={Position.Right} id="camera_prompt" style={{ top: '50%' }} />
+      <NodeHandle type="source" position={Position.Right} id="camera_prompt" style={{ top: '50%' }} />
     </NodeShell>
   )
 }

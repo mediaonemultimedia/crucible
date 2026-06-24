@@ -1,13 +1,14 @@
 import { useCallback, useState } from 'react'
-import { Handle, Position, useReactFlow } from '@xyflow/react'
+import { Position, useReactFlow } from '@xyflow/react'
 import { Clapperboard, Loader2, Play } from 'lucide-react'
 import NodeShell from '../components/NodeShell'
+import NodeHandle from '../components/NodeHandle'
 import { tips } from '../tips/nodeTips'
 
 const MODELS = [
   { id: 'seedance-1-pro', label: 'Seedance 1 Pro', desc: 'Realistic motion' },
   { id: 'kling-3.0', label: 'Kling 3.0', desc: 'Stylized / fantasy' },
-  { id: 'veo-3.1', label: 'Veo 3.1', desc: 'Google • cinematic' },
+  { id: 'veo-3.1', label: 'Veo 3.1', desc: 'Google cinematic' },
   { id: 'wan-2.7', label: 'Wan 2.7', desc: 'Fast & flexible' },
 ]
 
@@ -60,50 +61,49 @@ export default function VideoGenNode({ id, data }) {
   }, [id, data, updateNodeData])
 
   return (
-    <NodeShell label="Video Generation" icon={<Clapperboard size={14} />} color="#f97316" status={data.status} tips={tips.videoGen} width={310}>
-      <Handle type="target" position={Position.Left} id="prompt_in" style={{ top: '25%' }} />
-      <Handle type="target" position={Position.Left} id="image_in" style={{ top: '50%' }} />
-      <Handle type="target" position={Position.Left} id="video_in" style={{ top: '75%' }} />
+    <NodeShell id={id} label="Video Generation" icon={<Clapperboard size={13} />} color="#f97316" status={data.status} tips={tips.videoGen} width={310}>
+      <NodeHandle type="target" position={Position.Left} id="prompt_in" style={{ top: '25%' }} />
+      <NodeHandle type="target" position={Position.Left} id="image_in" style={{ top: '50%' }} />
+      <NodeHandle type="target" position={Position.Left} id="video_in" style={{ top: '75%' }} />
 
       {/* Model selector */}
-      <div className="grid grid-cols-2 gap-1">
+      <div className="grid grid-cols-2 gap-1.5">
         {MODELS.map(m => (
           <button
             key={m.id}
             onClick={() => updateNodeData(id, { model: m.id })}
-            className={`text-left px-2 py-1.5 rounded-lg border transition-colors ${
-              (data.model || 'seedance-1-pro') === m.id
-                ? 'border-orange-400 bg-orange-400/15 text-orange-200'
-                : 'border-nodeborder text-zinc-500 hover:border-zinc-400'
-            }`}
+            className="text-left px-3 py-2 rounded-xl transition-all duration-200"
+            style={{
+              background: (data.model || 'seedance-1-pro') === m.id ? 'rgba(249,115,22,0.08)' : 'rgba(255,255,255,0.02)',
+              border: `1px solid ${(data.model || 'seedance-1-pro') === m.id ? 'rgba(249,115,22,0.25)' : 'rgba(255,255,255,0.04)'}`,
+              color: (data.model || 'seedance-1-pro') === m.id ? 'rgba(249,115,22,0.8)' : 'var(--text-tertiary)',
+            }}
           >
             <div className="text-[10px] font-medium">{m.label}</div>
-            <div className="text-[9px] opacity-60">{m.desc}</div>
+            <div className="text-[9px] opacity-50 font-light">{m.desc}</div>
           </button>
         ))}
       </div>
 
-      {/* Prompt */}
       <textarea
         rows={3}
-        placeholder="Describe the video… subject, action, camera motion, lighting, mood."
-        className="w-full bg-black/30 border border-nodeborder rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 resize-none focus:outline-none focus:border-orange-500/50"
+        placeholder="Describe the video... subject, action, camera motion, lighting, mood."
+        className="glass-input w-full px-3 py-2.5 text-[11px] resize-none leading-relaxed"
         value={data.prompt || ''}
         onChange={e => updateNodeData(id, { prompt: e.target.value })}
       />
 
-      {/* Negative prompt */}
       <input
         type="text"
-        placeholder="Negative prompt (flickering, blur, watermark…)"
-        className="w-full bg-black/30 border border-nodeborder rounded-lg px-3 py-1.5 text-xs text-zinc-400 placeholder:text-zinc-600 focus:outline-none focus:border-danger/40"
+        placeholder="Negative prompt (flickering, blur, watermark...)"
+        className="glass-input w-full px-3 py-2 text-[10px]"
         value={data.negativePrompt || ''}
         onChange={e => updateNodeData(id, { negativePrompt: e.target.value })}
       />
 
       {/* Duration */}
       <div className="flex items-center gap-3">
-        <label className="text-[10px] text-zinc-500 whitespace-nowrap">Duration: {data.duration || 5}s</label>
+        <label className="text-[9px] t-secondary whitespace-nowrap font-medium">{data.duration || 5}s</label>
         <input
           type="range" min={3} max={15} step={1}
           value={data.duration || 5}
@@ -112,36 +112,32 @@ export default function VideoGenNode({ id, data }) {
         />
       </div>
 
-      <div className="flex items-center gap-2">
-        <label className="flex items-center gap-1.5 text-[10px] text-zinc-500 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={data.enhancePrompt !== false}
-            onChange={e => updateNodeData(id, { enhancePrompt: e.target.checked })}
-            className="accent-orange-400"
-          />
-          Enhance prompt with Claude
-        </label>
-      </div>
+      <label className="flex items-center gap-2 text-[10px] t-secondary cursor-pointer">
+        <input
+          type="checkbox"
+          checked={data.enhancePrompt !== false}
+          onChange={e => updateNodeData(id, { enhancePrompt: e.target.checked })}
+          className="accent-orange-400 rounded"
+        />
+        <span className="font-light">Enhance prompt with Claude</span>
+      </label>
 
-      <button
-        onClick={generate}
-        disabled={polling}
-        className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-orange-600/20 border border-orange-500/30 text-orange-300 text-xs font-medium hover:bg-orange-600/30 transition-colors disabled:opacity-40"
-      >
+      <button onClick={generate} disabled={polling}
+        className="action-btn"
+        style={{ background: 'rgba(249,115,22,0.08)', borderColor: 'rgba(249,115,22,0.2)', color: 'rgba(249,115,22,0.8)' }}>
         {polling ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-        {polling ? 'Generating video…' : 'Generate Video'}
+        {polling ? 'Generating video...' : 'Generate Video'}
       </button>
 
       {data.enhancedPrompt && (
-        <p className="text-[10px] text-zinc-600 italic leading-relaxed line-clamp-2">Enhanced: {data.enhancedPrompt}</p>
+        <p className="text-[9px] t-tertiary italic leading-relaxed font-light line-clamp-2">Enhanced: {data.enhancedPrompt}</p>
       )}
 
       {data.outputUrl && (
-        <video src={data.outputUrl} className="w-full rounded-lg" controls muted loop />
+        <video src={data.outputUrl} className="w-full rounded-xl" controls muted loop />
       )}
 
-      <Handle type="source" position={Position.Right} id="video_out" style={{ top: '50%' }} />
+      <NodeHandle type="source" position={Position.Right} id="video_out" style={{ top: '50%' }} />
     </NodeShell>
   )
 }

@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react'
-import { Handle, Position, useReactFlow } from '@xyflow/react'
+import { Position, useReactFlow } from '@xyflow/react'
 import { ImagePlus, Loader2, Play } from 'lucide-react'
 import NodeShell from '../components/NodeShell'
+import NodeHandle from '../components/NodeHandle'
 import { tips } from '../tips/nodeTips'
 
 const MODELS = [
@@ -37,7 +38,6 @@ export default function ImageGenNode({ id, data }) {
       const json = await r.json()
       const genId = json.id || json.generation_id
 
-      // Poll for completion
       let result = json
       if (genId && json.status !== 'completed') {
         while (true) {
@@ -61,75 +61,64 @@ export default function ImageGenNode({ id, data }) {
   }, [id, data, updateNodeData])
 
   return (
-    <NodeShell label="Image Generation" icon={<ImagePlus size={14} />} color="#10b981" status={data.status} tips={tips.imageGen} width={300}>
-      <Handle type="target" position={Position.Left} id="prompt_in" style={{ top: '35%' }} />
-      <Handle type="target" position={Position.Left} id="image_in" style={{ top: '65%' }} />
+    <NodeShell id={id} label="Image Generation" icon={<ImagePlus size={13} />} color="#10b981" status={data.status} tips={tips.imageGen} width={300}>
+      <NodeHandle type="target" position={Position.Left} id="prompt_in" style={{ top: '35%' }} />
+      <NodeHandle type="target" position={Position.Left} id="image_in" style={{ top: '65%' }} />
 
-      {/* Model */}
       <div className="flex gap-1 flex-wrap">
         {MODELS.map(m => (
           <button
             key={m.id}
+            className={`pill-btn ${(data.model || 'flux-1.1-pro') === m.id ? 'active-emerald' : ''}`}
             onClick={() => updateNodeData(id, { model: m.id })}
-            className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
-              (data.model || 'flux-1.1-pro') === m.id
-                ? 'border-emerald-400 bg-emerald-400/15 text-emerald-300'
-                : 'border-nodeborder text-zinc-500 hover:border-zinc-400'
-            }`}
           >
             {m.label}
           </button>
         ))}
       </div>
 
-      {/* Prompt */}
       <textarea
         rows={3}
-        placeholder="Prompt (or connect a Prompt Builder node)…"
-        className="w-full bg-black/30 border border-nodeborder rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 resize-none focus:outline-none focus:border-emerald-500/50"
+        placeholder="Prompt (or connect a Prompt Builder node)..."
+        className="glass-input w-full px-3 py-2.5 text-[11px] resize-none leading-relaxed"
         value={data.prompt || ''}
         onChange={e => updateNodeData(id, { prompt: e.target.value })}
       />
 
-      {/* Size */}
       <select
-        className="w-full bg-black/30 border border-nodeborder rounded-lg px-2 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-emerald-500/50"
+        className="glass-input w-full px-3 py-2 text-[10px] appearance-none cursor-pointer"
         value={data.size || '1024x1024'}
         onChange={e => updateNodeData(id, { size: e.target.value })}
       >
         {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
       </select>
 
-      <div className="flex items-center gap-2">
-        <label className="flex items-center gap-1.5 text-[10px] text-zinc-500 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={data.enhancePrompt !== false}
-            onChange={e => updateNodeData(id, { enhancePrompt: e.target.checked })}
-            className="accent-emerald-400"
-          />
-          Enhance prompt with Claude
-        </label>
-      </div>
+      <label className="flex items-center gap-2 text-[10px] t-secondary cursor-pointer">
+        <input
+          type="checkbox"
+          checked={data.enhancePrompt !== false}
+          onChange={e => updateNodeData(id, { enhancePrompt: e.target.checked })}
+          className="accent-emerald-400 rounded"
+        />
+        <span className="font-light">Enhance prompt with Claude</span>
+      </label>
 
-      <button
-        onClick={generate}
-        disabled={polling}
-        className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 text-xs font-medium hover:bg-emerald-600/30 transition-colors disabled:opacity-40"
-      >
+      <button onClick={generate} disabled={polling}
+        className="action-btn"
+        style={{ background: 'rgba(16,185,129,0.08)', borderColor: 'rgba(16,185,129,0.2)', color: 'rgba(16,185,129,0.8)' }}>
         {polling ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-        {polling ? 'Generating…' : 'Generate Image'}
+        {polling ? 'Generating...' : 'Generate Image'}
       </button>
 
       {data.enhancedPrompt && (
-        <p className="text-[10px] text-zinc-600 italic leading-relaxed">Enhanced: {data.enhancedPrompt}</p>
+        <p className="text-[9px] t-tertiary italic leading-relaxed font-light">Enhanced: {data.enhancedPrompt}</p>
       )}
 
       {data.outputUrl && (
-        <img src={data.outputUrl} alt="Generated" className="w-full rounded-lg object-cover" />
+        <img src={data.outputUrl} alt="Generated" className="w-full rounded-xl object-cover" />
       )}
 
-      <Handle type="source" position={Position.Right} id="image_out" style={{ top: '50%' }} />
+      <NodeHandle type="source" position={Position.Right} id="image_out" style={{ top: '50%' }} />
     </NodeShell>
   )
 }

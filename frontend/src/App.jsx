@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -9,6 +9,7 @@ import {
   useNodesState,
   useEdgesState,
   BackgroundVariant,
+  useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
@@ -26,6 +27,8 @@ import VideoGenNode from './nodes/VideoGenNode'
 import CharacterNode from './nodes/CharacterNode'
 import OutputNode from './nodes/OutputNode'
 import { useEdgeDataSync } from './hooks/useEdgeDataSync'
+import { useThemeStore } from './stores/themeStore'
+import { useProjectStore } from './stores/projectStore'
 
 const nodeTypes = {
   videoInput:      VideoInputNode,
@@ -42,7 +45,11 @@ const nodeTypes = {
   output:        OutputNode,
 }
 
-// Demo initial nodes showing the jacket-swap pipeline from the brief
+const EMPTY_OUTPUT_NODE = {
+  id: 'output-1', type: 'output', position: { x: 400, y: 200 },
+  data: {},
+}
+
 const initialNodes = [
   {
     id: 'demo-1', type: 'videoInput', position: { x: 60, y: 120 },
@@ -84,10 +91,33 @@ const initialEdges = [
 let nodeIdCounter = 100
 
 function Canvas() {
+  const theme = useThemeStore(s => s.theme)
+  const saveProject = useProjectStore(s => s.saveProject)
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const reactFlowWrapper = useRef(null)
+  const prevNodesRef = useRef(nodes)
   const { onConnect: onConnectSync } = useEdgeDataSync()
+  const { fitView } = useReactFlow()
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
+
+  // Auto-save when a generation completes (status transitions to 'done')
+  useEffect(() => {
+    const prev = prevNodesRef.current
+    for (const node of nodes) {
+      if (node.data?.status === 'done') {
+        const prevNode = prev.find(n => n.id === node.id)
+        if (prevNode && prevNode.data?.status !== 'done') {
+          saveProject({ nodes, edges })
+          break
+        }
+      }
+    }
+    prevNodesRef.current = nodes
+  }, [nodes, edges, saveProject])
 
   const onConnect = useCallback((params) => {
     setEdges(eds => addEdge({ ...params, animated: true }, eds))
@@ -105,7 +135,6 @@ function Canvas() {
     if (!type) return
 
     const bounds = reactFlowWrapper.current.getBoundingClientRect()
-    // Use the reactflow instance to convert screen coords to flow coords
     const position = {
       x: e.clientX - bounds.left - 140,
       y: e.clientY - bounds.top - 40,
@@ -115,9 +144,25 @@ function Canvas() {
     setNodes(nds => [...nds, { id, type, position, data: { status: 'idle' } }])
   }, [setNodes])
 
+  const handleNewProject = useCallback(() => {
+    setNodes([EMPTY_OUTPUT_NODE])
+    setEdges([])
+    setTimeout(() => fitView({ padding: 0.5 }), 50)
+  }, [setNodes, setEdges, fitView])
+
+  const handleLoadProject = useCallback((project) => {
+    setNodes(project.nodes)
+    setEdges(project.edges)
+    nodeIdCounter = Math.max(nodeIdCounter, ...project.nodes.map(n => {
+      const m = n.id.match(/\d+/)
+      return m ? parseInt(m[0], 10) : 0
+    })) + 1
+    setTimeout(() => fitView({ padding: 0.15 }), 50)
+  }, [setNodes, setEdges, fitView])
+
   return (
     <div className="flex h-screen w-screen">
-      <Sidebar />
+      <Sidebar onNewProject={handleNewProject} onLoadProject={handleLoadProject} />
       <div ref={reactFlowWrapper} className="flex-1">
         <ReactFlow
           nodes={nodes}
@@ -130,18 +175,23 @@ function Canvas() {
           nodeTypes={nodeTypes}
           fitView
           fitViewOptions={{ padding: 0.15 }}
-          defaultEdgeOptions={{ animated: true, style: { stroke: '#7c6aff', strokeWidth: 2 } }}
+          defaultEdgeOptions={{ animated: true, style: { stroke: 'var(--edge-color)', strokeWidth: 1.5 } }}
           proOptions={{ hideAttribution: true }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#2a2a3a" />
+          <Background
+            variant={BackgroundVariant.Lines}
+            gap={32}
+            lineWidth={0.5}
+            color="var(--canvas-grid)"
+          />
           <Controls />
           <MiniMap
             nodeColor={n => {
               const colors = { videoInput: '#6366f1', imageInput: '#06b6d4', subjectTagger: '#8b5cf6',
                 promptBuilder: '#f59e0b', imageGen: '#10b981', videoGen: '#f97316', character: '#ec4899', output: '#22d3a0' }
-              return colors[n.type] || '#444'
+              return colors[n.type] || '#888'
             }}
-            maskColor="rgba(15,15,19,0.7)"
+            maskColor="var(--minimap-mask)"
           />
         </ReactFlow>
       </div>
