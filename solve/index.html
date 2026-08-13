@@ -1,0 +1,1921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07080a">
+<title>Solve — a GPU compute fluid study</title>
+<meta name="description" content="A three-dimensional incompressible fluid solved every frame in WGSL compute pipelines — advection, vorticity confinement and an iterative Jacobi pressure projection — carrying six hundred thousand GPU-advected particles.">
+<style>
+:root{
+  --bg:#07080a;
+  --ink:#e8e3d8;
+  --dim:#7b8087;
+  --faint:#4a4e54;
+  --rule:rgba(232,227,216,.11);
+  --rule-2:rgba(232,227,216,.055);
+  --accent:#c8a877;
+  --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);overflow:hidden;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+canvas#stage{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+
+/* Vignette, plus scrims top and bottom. The plume is bright enough to swallow
+   the typography outright, and the type has to hold at every moment of the
+   simulation, not just the calm ones. */
+#veil{
+  position:fixed;inset:0;pointer-events:none;z-index:2;
+  background:
+    linear-gradient(to bottom,rgba(7,8,10,.80) 0%,rgba(7,8,10,.34) 7%,rgba(7,8,10,0) 15%),
+    linear-gradient(to top,rgba(7,8,10,.86) 0%,rgba(7,8,10,.42) 8%,rgba(7,8,10,0) 19%),
+    radial-gradient(126% 92% at 50% 46%,transparent 42%,rgba(0,0,0,.34) 84%,rgba(0,0,0,.64) 100%);
+}
+
+#ui{
+  position:fixed;inset:0;z-index:5;pointer-events:none;
+  opacity:0;transition:opacity 1.1s cubic-bezier(.4,0,.2,1) .25s;
+}
+body.is-live #ui{opacity:1}
+#ui > *{pointer-events:auto}
+
+.eyebrow{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.20em;
+  text-transform:uppercase;color:var(--faint);
+}
+
+/* a halo of the background colour keeps every label legible against the
+   brightest frames without putting a visible box anywhere on the layout */
+#mark,#readout,#method,#credit,#panel-toggle{
+  text-shadow:0 0 14px var(--bg),0 0 6px var(--bg),0 0 2px var(--bg);
+}
+
+/* wordmark --------------------------------------------------------------- */
+#mark{position:absolute;top:26px;left:30px;display:flex;align-items:flex-start;gap:12px}
+#mark .w{
+  font-size:15px;font-weight:300;letter-spacing:.52em;text-transform:uppercase;
+  line-height:1;padding-top:1px;white-space:nowrap;
+}
+#mark .ix{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--accent);
+  border:1px solid rgba(200,168,119,.32);padding:2px 4px 1px;line-height:1;white-space:nowrap;
+}
+#mark .sub{margin-top:9px;display:block}
+#mark .col{display:flex;flex-direction:column}
+
+/* readout ---------------------------------------------------------------- */
+#readout{
+  position:absolute;left:30px;bottom:74px;font-family:var(--mono);font-size:10px;
+  line-height:1.85;color:var(--dim);letter-spacing:.03em;
+}
+#readout dl{margin:0;display:grid;grid-template-columns:78px auto;column-gap:14px}
+#readout dt{color:var(--faint);text-transform:uppercase;letter-spacing:.16em;font-size:9px}
+#readout dd{margin:0;color:var(--dim);font-variant-numeric:tabular-nums}
+#readout dd#r-res{color:var(--accent)}
+
+/* method note ------------------------------------------------------------ */
+#method{
+  position:absolute;right:30px;bottom:74px;width:min(330px,29vw);text-align:right;
+  font-family:var(--mono);font-size:9.5px;line-height:1.95;color:var(--faint);
+  letter-spacing:.04em;
+}
+#method b{color:var(--dim);font-weight:400}
+#method .t{
+  display:block;margin-bottom:8px;font-size:9px;letter-spacing:.20em;
+  text-transform:uppercase;color:rgba(232,227,216,.24);
+}
+body.panel-open #method{opacity:0;transition:opacity .3s ease;pointer-events:none}
+
+/* credit ----------------------------------------------------------------- */
+#credit{
+  position:absolute;left:50%;transform:translateX(-50%);bottom:26px;text-align:center;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.20em;color:var(--faint);
+  text-transform:uppercase;line-height:2;white-space:nowrap;
+}
+#credit b{color:var(--dim);font-weight:400}
+#credit .keys{color:rgba(232,227,216,.2)}
+body.is-paused #credit .keys::after{content:" · held — press space to resume";color:var(--accent)}
+
+/* control panel ---------------------------------------------------------- */
+#panel-toggle{
+  position:absolute;top:24px;right:30px;
+  display:flex;align-items:center;gap:9px;
+  background:none;border:1px solid var(--rule);color:var(--dim);
+  font-family:var(--mono);font-size:9px;letter-spacing:.20em;text-transform:uppercase;
+  padding:7px 11px 6px;cursor:pointer;line-height:1;
+  transition:border-color .3s ease,color .3s ease;
+}
+#panel-toggle:hover{border-color:rgba(200,168,119,.42);color:var(--ink)}
+#panel-toggle .bars{display:flex;flex-direction:column;gap:2px;width:11px}
+#panel-toggle .bars i{display:block;height:1px;background:currentColor}
+#panel-toggle .bars i:nth-child(1){width:11px}
+#panel-toggle .bars i:nth-child(2){width:7px}
+#panel-toggle .bars i:nth-child(3){width:9px}
+body.panel-open #panel-toggle{opacity:0;pointer-events:none;transition:opacity .2s ease}
+
+#panel{
+  position:absolute;top:0;right:0;bottom:0;width:316px;
+  background:rgba(9,10,12,.90);
+  -webkit-backdrop-filter:blur(22px) saturate(.8);backdrop-filter:blur(22px) saturate(.8);
+  border-left:1px solid var(--rule);
+  display:flex;flex-direction:column;
+  transform:translateX(100%);opacity:0;pointer-events:none;
+  transition:transform .52s cubic-bezier(.4,0,.2,1),opacity .38s ease;
+  z-index:6;
+}
+body.panel-open #panel{transform:translateX(0);opacity:1;pointer-events:auto}
+
+#panel .head{
+  display:flex;align-items:baseline;justify-content:space-between;
+  padding:24px 22px 16px;border-bottom:1px solid var(--rule-2);flex:none;
+}
+#panel .head .h{font-family:var(--mono);font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink)}
+#panel .head .hx{font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;color:var(--faint)}
+#panel-close{
+  background:none;border:0;padding:2px 0 2px 12px;cursor:pointer;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--faint);transition:color .25s ease;
+}
+#panel-close:hover{color:var(--accent)}
+
+#panel .body{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:4px 22px 22px}
+#panel .body::-webkit-scrollbar{width:3px}
+#panel .body::-webkit-scrollbar-thumb{background:var(--rule)}
+#panel .body::-webkit-scrollbar-track{background:transparent}
+
+.grp{padding:18px 0 4px;border-bottom:1px solid var(--rule-2)}
+.grp:last-of-type{border-bottom:0}
+.grp > .gt{
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.24em;text-transform:uppercase;
+  color:rgba(232,227,216,.26);margin-bottom:14px;display:block;
+}
+
+.ctl{margin-bottom:15px}
+.ctl .row{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:7px;gap:10px}
+.ctl .lb{
+  font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--dim);white-space:nowrap;
+}
+.ctl .vl{
+  font-family:var(--mono);font-size:9.5px;color:var(--ink);
+  font-variant-numeric:tabular-nums;letter-spacing:.04em;white-space:nowrap;
+}
+
+input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:11px;
+  background:none;display:block;margin:0;cursor:ew-resize;
+}
+input[type=range]:focus{outline:none}
+input[type=range]::-webkit-slider-runnable-track{height:1px;background:var(--rule);border:0}
+input[type=range]::-moz-range-track{height:1px;background:var(--rule);border:0}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;width:2px;height:11px;margin-top:-5px;
+  background:var(--accent);border:0;border-radius:0;
+}
+input[type=range]::-moz-range-thumb{
+  width:2px;height:11px;background:var(--accent);border:0;border-radius:0;
+}
+input[type=range]:hover::-webkit-slider-thumb{height:15px;margin-top:-7px}
+input[type=range]:hover::-moz-range-thumb{height:15px}
+input[type=range]:focus-visible::-webkit-slider-runnable-track{background:rgba(200,168,119,.4)}
+
+.seg{display:flex;gap:0;border:1px solid var(--rule);width:100%}
+.seg button{
+  flex:1 1 0;min-width:0;background:none;border:0;border-right:1px solid var(--rule);
+  color:var(--faint);font-family:var(--mono);font-size:8.5px;letter-spacing:.10em;
+  text-transform:uppercase;padding:6px 2px 5px;cursor:pointer;line-height:1;
+  transition:color .25s ease,background .25s ease;white-space:nowrap;
+}
+.seg button:last-child{border-right:0}
+.seg button:hover{color:var(--dim)}
+.seg button[aria-pressed=true]{color:var(--bg);background:var(--accent)}
+
+#panel .foot{
+  flex:none;padding:14px 22px 20px;border-top:1px solid var(--rule-2);
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+#reset{
+  background:none;border:1px solid var(--rule);color:var(--dim);
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;
+  padding:7px 12px 6px;cursor:pointer;line-height:1;
+  transition:border-color .3s ease,color .3s ease;
+}
+#reset:hover{border-color:rgba(200,168,119,.42);color:var(--ink)}
+#panel .foot .fx{font-family:var(--mono);font-size:8px;letter-spacing:.16em;color:rgba(232,227,216,.18);text-transform:uppercase;text-align:right}
+
+/* loader ----------------------------------------------------------------- */
+#loader{
+  position:fixed;inset:0;z-index:20;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity .9s cubic-bezier(.4,0,.2,1);
+}
+#loader.done{opacity:0;pointer-events:none}
+#loader .idx{
+  font-family:var(--mono);font-size:10px;letter-spacing:.34em;color:var(--accent);margin-bottom:30px;
+}
+/* a lattice resolving cell by cell — the piece announcing its own subject */
+#lattice{display:grid;grid-template-columns:repeat(12,4px);grid-auto-rows:4px;gap:4px;margin-bottom:30px}
+#lattice i{display:block;width:4px;height:4px;background:var(--accent);opacity:0;animation:settle 1.6s cubic-bezier(.22,.61,.36,1) infinite}
+@keyframes settle{0%{opacity:0;transform:scale(.4)}22%{opacity:.85;transform:scale(1)}70%{opacity:.12;transform:scale(1)}100%{opacity:0;transform:scale(.4)}}
+#loader .word{
+  font-size:clamp(30px,6.6vw,68px);font-weight:200;letter-spacing:.38em;
+  text-transform:uppercase;text-indent:.38em;line-height:1;margin:0;text-align:center;
+}
+#loader .study{
+  margin-top:22px;font-family:var(--mono);font-size:9.5px;letter-spacing:.30em;
+  text-transform:uppercase;color:var(--dim);text-align:center;
+}
+#load-bar{margin-top:44px;width:min(290px,52vw);height:1px;background:rgba(232,227,216,.1);position:relative}
+#load-bar-fill{position:absolute;inset:0 auto 0 0;width:4%;background:var(--accent);transition:width .5s cubic-bezier(.4,0,.2,1)}
+#load-status{
+  margin-top:14px;font-family:var(--mono);font-size:8.5px;letter-spacing:.26em;
+  text-transform:uppercase;color:var(--faint);text-align:center;padding:0 20px;
+}
+#loader.is-error #load-status{color:#d97a6c;letter-spacing:.16em;line-height:1.9;max-width:480px}
+/* the headline stays a label; the explanation is a sentence and gets to read
+   like one rather than shouting in caps */
+#load-status .why{
+  display:block;margin-top:9px;text-transform:none;letter-spacing:.02em;
+  font-size:10.5px;line-height:1.75;color:rgba(232,227,216,.46);
+}
+#loader.is-error #load-bar-fill{background:#d97a6c;width:100%}
+#loader.is-error #lattice{animation:none;opacity:.25}
+#loader.is-error #lattice i{animation:none;opacity:.3;background:#d97a6c}
+#loader .rule{width:min(290px,52vw);height:1px;background:var(--rule-2);margin-top:30px}
+#loader .foot{
+  margin-top:14px;font-family:var(--mono);font-size:8px;letter-spacing:.2em;
+  text-transform:uppercase;color:rgba(232,227,216,.16);text-align:center;line-height:2;
+  padding:0 20px;
+}
+
+@media (prefers-reduced-motion: reduce){
+  #lattice i{animation-duration:.01ms}
+  #loader{transition-duration:.01ms}
+  #panel{transition-duration:.01ms}
+}
+
+@media (max-width:1240px){ #method{display:none} }
+@media (max-width:1340px){ #credit{font-size:8px;letter-spacing:.15em} }
+@media (max-width:880px){
+  #mark{top:18px;left:18px}
+  #panel-toggle{top:18px;right:18px}
+  #panel{width:min(300px,86vw)}
+  #readout{left:18px;bottom:92px;font-size:9px}
+  #readout dl{grid-template-columns:64px auto}
+  #credit{bottom:14px;font-size:7.5px;letter-spacing:.12em;white-space:normal;width:calc(100vw - 36px);line-height:1.9}
+}
+@media (max-height:620px){ #readout{display:none} }
+
+/* ── series navigation ─────────────────────────────────────────────── */
+#mark .sx-wrap{position:relative;display:inline-block}
+#mark a.ix{text-decoration:none;display:inline-block;cursor:pointer;
+  transition:border-color .28s ease,color .28s ease,background .28s ease}
+#mark a.ix:hover,#mark .sx-wrap:focus-within a.ix{
+  border-color:rgba(200,168,119,.62);background:rgba(200,168,119,.08)}
+#mark a.ix:focus-visible{outline:1px solid rgba(200,168,119,.7);outline-offset:2px}
+#mark .sx-menu{
+  position:absolute;top:calc(100% + 9px);left:0;z-index:20;min-width:228px;
+  background:rgba(9,10,12,.93);
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+  border:1px solid var(--rule);padding:7px 0;
+  opacity:0;visibility:hidden;transform:translateY(-5px);
+  transition:opacity .26s ease,transform .26s cubic-bezier(.4,0,.2,1),visibility 0s linear .26s;
+}
+#mark .sx-wrap:hover .sx-menu,
+#mark .sx-wrap:focus-within .sx-menu{
+  opacity:1;visibility:visible;transform:translateY(0);transition-delay:0s}
+#mark .sx-menu .sx-hd{
+  display:block;font-family:var(--mono);font-size:8px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--faint);padding:5px 13px 8px;
+  border-bottom:1px solid var(--rule-2,rgba(232,227,216,.055));margin-bottom:5px;
+  text-decoration:none;transition:color .24s ease}
+a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
+#mark .sx-menu a,#mark .sx-menu span.sx-i{
+  display:flex;align-items:baseline;gap:9px;padding:4px 13px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;
+  text-transform:uppercase;text-decoration:none;color:var(--dim);
+  transition:color .22s ease,background .22s ease}
+#mark .sx-menu a:hover,#mark .sx-menu a:focus-visible{
+  color:var(--ink);background:rgba(232,227,216,.05);outline:none}
+#mark .sx-menu .sx-n{color:var(--faint);flex:0 0 auto;transition:color .22s ease}
+#mark .sx-menu a:hover .sx-n,#mark .sx-menu a:focus-visible .sx-n{color:var(--accent)}
+#mark .sx-menu .sx-here{color:var(--accent)}
+#mark .sx-menu .sx-here .sx-n{color:var(--accent)}
+#mark .sx-menu span.sx-i{color:rgba(232,227,216,.20);cursor:default}
+#mark .sx-menu span.sx-i .sx-n{color:rgba(232,227,216,.14)}
+#mark .sx-menu span.sx-i em{
+  font-style:normal;margin-left:auto;padding-left:10px;font-size:7.5px;
+  letter-spacing:.14em;color:rgba(232,227,216,.17)}
+@media (prefers-reduced-motion:reduce){
+  #mark .sx-menu{transition:opacity .01s,visibility 0s}
+}
+</style>
+</head>
+<body>
+
+<canvas id="stage"></canvas>
+<div id="veil"></div>
+
+<div id="ui">
+  <div id="mark">
+    <div class="col">
+      <span class="w">Solve</span>
+      <span class="eyebrow sub">GPU compute fluid study</span>
+    </div>
+    <span class="sx-wrap"><a class="ix" href="../" aria-label="Study 08 — open series index">No. 08</a><nav class="sx-menu" aria-label="Series index"><a class="sx-hd" href="../">Crucible — index</a><span class="sx-i"><span class="sx-n">03</span><span>Mercury</span><em>Pending</em></span><span class="sx-i"><span class="sx-n">04</span><span>Torsion</span><em>Pending</em></span><span class="sx-i"><span class="sx-n">05</span><span>Torsion 2.0</span><em>Pending</em></span><span class="sx-i"><span class="sx-n">06</span><span>Weft</span><em>Pending</em></span><a href="../cast/"><span class="sx-n">07</span><span>Cast</span></a><a class="sx-here" href="../solve/" aria-current="page"><span class="sx-n">08</span><span>Solve</span></a><a href="../torsion-pineapple/"><span class="sx-n">09</span><span>Torsion Pineapple</span></a><a href="../anneal/"><span class="sx-n">10</span><span>Anneal</span></a></nav></span>
+  </div>
+
+  <button id="panel-toggle" aria-expanded="false" aria-controls="panel">
+    <span class="bars" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span>Controls</span>
+  </button>
+
+  <div id="readout">
+    <dl>
+      <dt>Grid</dt><dd id="r-grid">—</dd>
+      <dt>Cells</dt><dd id="r-cells">—</dd>
+      <dt>Particles</dt><dd id="r-part">—</dd>
+      <dt>Solver</dt><dd id="r-solver">—</dd>
+      <dt>Residual</dt><dd id="r-res">—</dd>
+      <dt>Rate</dt><dd id="r-fps">—</dd>
+    </dl>
+  </div>
+
+  <div id="method">
+    <span class="t">Method</span>
+    Nothing here is a function of time. A velocity field is held in GPU memory
+    and pushed forward every frame by a chain of <b>WGSL compute passes</b> —
+    forcing, semi-Lagrangian advection, curl, vorticity confinement. Advection
+    alone makes the field compressible: it invents matter. So each frame the
+    divergence is measured and an <b>iterative Jacobi solve</b> runs the
+    pressure field to convergence, twenty-four passes over every cell, and the
+    gradient is subtracted back out. What is left is <b>incompressible</b> —
+    and the residual printed at left is the proof. The particles are not
+    animated. They are integrated through that field, in a compute pass, and
+    they remember where they have been.
+  </div>
+
+  <div id="credit">
+    <b>Solve</b> — GPU compute fluid study 08 &nbsp;·&nbsp; 3D stable fluids in WGSL &nbsp;·&nbsp; Jacobi pressure projection &nbsp;·&nbsp; vorticity confinement &nbsp;·&nbsp; GPU-advected particles &nbsp;·&nbsp; raw WebGPU<br>
+    <span class="keys">drag to push the fluid &nbsp; c controls &nbsp; space pause &nbsp; r reset field</span>
+  </div>
+
+  <aside id="panel" aria-label="Simulation controls" aria-hidden="true">
+    <div class="head">
+      <span class="h">Controls</span>
+      <button id="panel-close">Close · esc</button>
+    </div>
+    <div class="body" id="panel-body"></div>
+    <div class="foot">
+      <button id="reset">Reset defaults</button>
+      <span class="fx">Study 08<br>Solve</span>
+    </div>
+  </aside>
+</div>
+
+<div id="loader">
+  <div class="idx">Study 08</div>
+  <div id="lattice"></div>
+  <h1 class="word">Solve</h1>
+  <div class="study">GPU compute fluid study</div>
+  <div id="load-bar"><div id="load-bar-fill"></div></div>
+  <div id="load-status">Requesting GPU adapter</div>
+  <div class="rule"></div>
+  <div class="foot">
+    three-dimensional incompressible fluid · wgsl compute pipelines<br>
+    iterative pressure projection · gpu-advected particles
+  </div>
+</div>
+
+<script>
+"use strict";
+(function(){
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Solve — study 08
+   A 3D stable-fluids solver living entirely in WebGPU compute pipelines,
+   carrying a large GPU-integrated particle system through its velocity field.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const $ = s => document.querySelector(s);
+const loader = $('#loader'), loadFill = $('#load-bar-fill'), loadStatus = $('#load-status');
+
+// loader lattice
+(function(){
+  const l = $('#lattice');
+  for (let i=0;i<36;i++){
+    const el = document.createElement('i');
+    const col = i % 12, row = (i/12)|0;
+    el.style.animationDelay = ((col*0.055) + (row*0.11)).toFixed(3) + 's';
+    l.appendChild(el);
+  }
+})();
+
+function stage(pct, msg){ loadFill.style.width = pct + '%'; if (msg) loadStatus.textContent = msg; }
+function fail(title, detail){
+  loader.classList.add('is-error');
+  loadStatus.textContent = title;
+  if (detail) {
+    const w = document.createElement('span');
+    w.className = 'why';
+    w.textContent = detail;
+    loadStatus.appendChild(w);
+  }
+}
+// Yield so the loader can paint between boot stages. rAF alone would stall
+// forever if the document starts hidden (background tab), so race a timer.
+const nextFrame = () => new Promise(r => {
+  let done = false;
+  const fin = () => { if (!done) { done = true; r(); } };
+  requestAnimationFrame(fin);
+  setTimeout(fin, 34);
+});
+
+/* ── settings ──────────────────────────────────────────────────────────── */
+
+const DEFAULTS = ({
+  grid:        64,     // cells per axis
+  iterations:  24,     // Jacobi pressure iterations
+  vorticity:   14.0,
+  velDecay:    0.995,
+  dyeDecay:    0.986,
+  timeScale:   1.0,
+
+  emission:    0.82,
+  buoyancy:    2.2,
+  gravity:     0.30,
+  turbulence:  1.9,
+  turbScale:   5.5,
+  sources:     3,
+
+  count:       600000,
+  drag:        0.34,
+  pSpeed:      1.0,
+  size:        1.15,
+  intensity:   0.80,
+
+  palette:     0,      // 0 ember, 1 ice, 2 bone, 3 spectral
+  exposure:    1.22,
+  bloom:       0.66,
+  persistence: 0.60,
+  grain:       0.15,
+  orbit:       0.26,
+});
+// A phone should not be handed a 64³ solve and 600k particles as its resting
+// state. Lower the *defaults themselves* on small or coarse-pointer devices so
+// that "reset" returns to something appropriate for the machine it is on; the
+// panel still exposes the full range.
+// Measured on the viewport, not on `screen` — `screen` describes the physical
+// display rather than the window, so a laptop running at 1280x800 (or any
+// headless/embedded context) would be downgraded for no reason.
+(function deviceProfile(){
+  const vmin = Math.min(window.innerWidth || 1280, window.innerHeight || 800);
+  const touchOnly = matchMedia('(hover: none) and (pointer: coarse)').matches;
+  if (touchOnly || vmin <= 680) {
+    DEFAULTS.grid = 48;
+    DEFAULTS.count = 250000;
+    DEFAULTS.iterations = 18;
+    DEFAULTS.persistence = 0.66;
+  }
+})();
+
+const S = Object.assign({}, DEFAULTS);
+
+/* ── WGSL ──────────────────────────────────────────────────────────────── */
+
+const SIM_PRELUDE = /* wgsl */`
+struct U {
+  g  : vec4<f32>,   // x: N   y: 1/N   z: cellCount   w: dt
+  a  : vec4<f32>,   // x: velDecay  y: dyeDecay  z: vorticity  w: buoyancy
+  b  : vec4<f32>,   // x: turbAmp   y: turbScale y: -  z: time  w: emission
+  c  : vec4<f32>,   // x: ptrActive y: pDrag     z: pSpeed     w: particleCount
+  p  : vec4<f32>,   // xyz: pointer position (domain)  w: pointer radius
+  q  : vec4<f32>,   // xyz: pointer velocity           w: unused
+  e0 : vec4<f32>,   // xyz: emitter position           w: strength (0 = off)
+  e1 : vec4<f32>,
+  e2 : vec4<f32>,
+  m  : vec4<f32>,   // x: frame  y: salt  z: emitterRadius  w: gravity
+};
+
+@group(0) @binding(0) var<uniform> u : U;
+@group(0) @binding(1) var<storage, read_write> velA : array<vec4<f32>>;
+@group(0) @binding(2) var<storage, read_write> velB : array<vec4<f32>>;
+@group(0) @binding(3) var<storage, read_write> prsR : array<f32>;
+@group(0) @binding(4) var<storage, read_write> prsW : array<f32>;
+@group(0) @binding(5) var<storage, read_write> dvg  : array<f32>;
+@group(0) @binding(6) var<storage, read_write> crl  : array<vec4<f32>>;
+@group(0) @binding(7) var<storage, read_write> par  : array<vec4<f32>>;
+@group(0) @binding(8) var<storage, read_write> stat : array<vec4<f32>>;
+
+fn NN() -> i32 { return i32(u.g.x); }
+
+fn idx3(cin : vec3<i32>) -> u32 {
+  let n = NN();
+  let c = clamp(cin, vec3<i32>(0), vec3<i32>(n - 1));
+  return u32(c.x + c.y * n + c.z * n * n);
+}
+
+fn oob(c : vec3<i32>) -> bool {
+  let n = NN();
+  return c.x >= n || c.y >= n || c.z >= n;
+}
+
+// trilinear sample of velA, in cell-index space (integer i == centre of cell i)
+fn sampleA(pin : vec3<f32>) -> vec4<f32> {
+  let n = NN();
+  let hi = f32(n) - 1.0;
+  let p  = clamp(pin, vec3<f32>(0.0), vec3<f32>(hi));
+  let b  = floor(p);
+  let f  = p - b;
+  let i0 = vec3<i32>(b);
+  let c000 = velA[idx3(i0 + vec3<i32>(0,0,0))];
+  let c100 = velA[idx3(i0 + vec3<i32>(1,0,0))];
+  let c010 = velA[idx3(i0 + vec3<i32>(0,1,0))];
+  let c110 = velA[idx3(i0 + vec3<i32>(1,1,0))];
+  let c001 = velA[idx3(i0 + vec3<i32>(0,0,1))];
+  let c101 = velA[idx3(i0 + vec3<i32>(1,0,1))];
+  let c011 = velA[idx3(i0 + vec3<i32>(0,1,1))];
+  let c111 = velA[idx3(i0 + vec3<i32>(1,1,1))];
+  let x00 = mix(c000, c100, f.x);
+  let x10 = mix(c010, c110, f.x);
+  let x01 = mix(c001, c101, f.x);
+  let x11 = mix(c011, c111, f.x);
+  return mix(mix(x00, x10, f.y), mix(x01, x11, f.y), f.z);
+}
+
+// ── cheap integer hash noise (no transcendentals) ─────────────────────────
+fn pcg3d(vin : vec3<u32>) -> vec3<u32> {
+  var v = vin * 1664525u + vec3<u32>(1013904223u);
+  v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
+  v ^= (v >> vec3<u32>(16u));
+  v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
+  return v;
+}
+fn rand3(seed : vec3<u32>) -> vec3<f32> {
+  return vec3<f32>(pcg3d(seed)) * (1.0 / 4294967296.0);
+}
+fn grad3(ci : vec3<f32>, salt : u32) -> vec3<f32> {
+  let k = bitcast<vec3<u32>>(vec3<i32>(ci)) + vec3<u32>(salt * 747796405u + 2891336453u);
+  return rand3(k) * 2.0 - 1.0;
+}
+fn gnoise(p : vec3<f32>, salt : u32) -> f32 {
+  let i = floor(p);
+  let f = p - i;
+  let w = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+  var acc = 0.0;
+  for (var k = 0; k < 8; k = k + 1) {
+    let o = vec3<f32>(f32(k & 1), f32((k >> 1) & 1), f32((k >> 2) & 1));
+    let g = grad3(i + o, salt);
+    let d = f - o;
+    let wt = (mix(1.0 - w.x, w.x, o.x)) * (mix(1.0 - w.y, w.y, o.y)) * (mix(1.0 - w.z, w.z, o.z));
+    acc += dot(g, d) * wt;
+  }
+  return acc * 1.85;
+}
+fn potential(p : vec3<f32>) -> vec3<f32> {
+  return vec3<f32>(gnoise(p, 1u), gnoise(p, 977u), gnoise(p, 31337u));
+}
+// curl of a noise vector-potential — divergence free by construction, so it
+// injects structure without fighting the projection that follows it
+fn curlNoise(p : vec3<f32>) -> vec3<f32> {
+  let e = 0.24;
+  let p0 = potential(p);
+  let px = potential(p + vec3<f32>(e, 0.0, 0.0));
+  let py = potential(p + vec3<f32>(0.0, e, 0.0));
+  let pz = potential(p + vec3<f32>(0.0, 0.0, e));
+  let dx = (px - p0) / e;
+  let dy = (py - p0) / e;
+  let dz = (pz - p0) / e;
+  return vec3<f32>(dy.z - dz.y, dz.x - dx.z, dx.y - dy.x);
+}
+`;
+
+// ── pass: forcing ────────────────────────────────────────────────────────
+const WGSL_INJECT = SIM_PRELUDE + /* wgsl */`
+fn emit(v : ptr<function, vec4<f32>>, e : vec4<f32>, pos : vec3<f32>, dt : f32) {
+  if (e.w <= 0.0) { return; }
+  let d  = pos - e.xyz;
+  let r  = u.m.z;
+  let w  = exp(-dot(d, d) / (r * r));
+  if (w < 0.0015) { return; }
+  let up    = vec3<f32>(0.0, 1.0, 0.0);
+  let swirl = cross(up, d) * 6.5;
+  (*v) = vec4<f32>(
+    (*v).xyz + (up * 1.35 + swirl) * (w * e.w * dt * u.b.w * 3.2),
+    (*v).w   + w * e.w * dt * u.b.w * 3.4
+  );
+}
+
+@compute @workgroup_size(4,4,4)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  let c = vec3<i32>(gid);
+  if (oob(c)) { return; }
+  let i  = idx3(c);
+  let dt = u.g.w;
+  let pos = (vec3<f32>(c) + 0.5) * u.g.y;   // 0..1 domain
+  var v = velA[i];
+
+  emit(&v, u.e0, pos, dt);
+  emit(&v, u.e1, pos, dt);
+  emit(&v, u.e2, pos, dt);
+
+  // pointer forcing
+  if (u.c.x > 0.5) {
+    let d = pos - u.p.xyz;
+    let w = exp(-dot(d, d) / (u.p.w * u.p.w));
+    v = vec4<f32>(v.xyz + u.q.xyz * (w * dt * 42.0), v.w + w * dt * 2.4);
+  }
+
+  // buoyancy from dye, and a constant weight
+  v.y += (v.w * u.a.w - u.m.w) * dt;
+
+  // animated divergence-free turbulence
+  if (u.b.x > 0.0001) {
+    let t  = u.b.z;
+    let np = pos * u.b.y + vec3<f32>(t * 0.035, -t * 0.085, t * 0.052);
+    v = vec4<f32>(v.xyz + curlNoise(np) * (u.b.x * dt), v.w);
+  }
+
+  velA[i] = v;
+}`;
+
+// ── pass: semi-Lagrangian advection ──────────────────────────────────────
+const WGSL_ADVECT = SIM_PRELUDE + /* wgsl */`
+@compute @workgroup_size(4,4,4)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  let c = vec3<i32>(gid);
+  if (oob(c)) { return; }
+  let i = idx3(c);
+  let n = f32(NN());
+  let v = velA[i];
+  // trace backwards along the field, in cell units
+  let src = vec3<f32>(c) - v.xyz * (u.g.w * n);
+  let s = sampleA(src);
+  var vel = s.xyz * u.a.x;
+  var dye = s.w * u.a.y;
+
+  // Boundary conditions are imposed here, on velB, *before* the divergence is
+  // measured — so whatever divergence they introduce is seen by the solver and
+  // removed by the projection, rather than being added back after it.
+  let ni = NN();
+  if (c.x == 0 || c.x == ni - 1) { vel.x = 0.0; }
+  if (c.y == 0 || c.y == ni - 1) { vel.y = 0.0; }
+  if (c.z == 0 || c.z == ni - 1) { vel.z = 0.0; }
+  let e = min(min(min(c.x, c.y), c.z), min(min(ni - 1 - c.x, ni - 1 - c.y), ni - 1 - c.z));
+  if (e < 3) { vel = vel * 0.90; dye = dye * 0.80; }
+
+  velB[i] = vec4<f32>(vel, dye);
+}`;
+
+// ── pass: curl of velB ───────────────────────────────────────────────────
+const WGSL_CURL = SIM_PRELUDE + /* wgsl */`
+@compute @workgroup_size(4,4,4)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  let c = vec3<i32>(gid);
+  if (oob(c)) { return; }
+  let s = 0.5 * f32(NN());
+  let xp = velB[idx3(c + vec3<i32>(1,0,0))]; let xm = velB[idx3(c - vec3<i32>(1,0,0))];
+  let yp = velB[idx3(c + vec3<i32>(0,1,0))]; let ym = velB[idx3(c - vec3<i32>(0,1,0))];
+  let zp = velB[idx3(c + vec3<i32>(0,0,1))]; let zm = velB[idx3(c - vec3<i32>(0,0,1))];
+  let w = vec3<f32>(
+    (yp.z - ym.z) - (zp.y - zm.y),
+    (zp.x - zm.x) - (xp.z - xm.z),
+    (xp.y - xm.y) - (yp.x - ym.x)
+  ) * s;
+  crl[idx3(c)] = vec4<f32>(w, length(w));
+}`;
+
+// ── pass: vorticity confinement ──────────────────────────────────────────
+const WGSL_VORT = SIM_PRELUDE + /* wgsl */`
+@compute @workgroup_size(4,4,4)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  let c = vec3<i32>(gid);
+  if (oob(c)) { return; }
+  if (u.a.z <= 0.0) { return; }
+  let i = idx3(c);
+  let s = 0.5 * f32(NN());
+  let eta = vec3<f32>(
+    crl[idx3(c + vec3<i32>(1,0,0))].w - crl[idx3(c - vec3<i32>(1,0,0))].w,
+    crl[idx3(c + vec3<i32>(0,1,0))].w - crl[idx3(c - vec3<i32>(0,1,0))].w,
+    crl[idx3(c + vec3<i32>(0,0,1))].w - crl[idx3(c - vec3<i32>(0,0,1))].w
+  ) * s;
+  let m = length(eta);
+  if (m < 1e-5) { return; }
+  let nrm = eta / m;
+  let f = cross(nrm, crl[i].xyz) * (u.a.z * u.g.y);
+  let v = velB[i];
+  velB[i] = vec4<f32>(v.xyz + f * u.g.w, v.w);
+}`;
+
+// ── pass: divergence of velB (pre-projection) ────────────────────────────
+//
+// Forward differences, deliberately. Divergence and the pressure gradient must
+// be adjoint on a collocated grid: forward-div composed with backward-grad is
+// exactly the compact 6-point Laplacian that the Jacobi pass inverts. Using
+// central differences for both instead yields the Laplacian of the 2h
+// sublattice, which decouples odd from even cells and leaves a checkerboard
+// mode the solver can never touch — the residual then plateaus no matter how
+// many iterations are spent on it.
+const WGSL_DIV_B = SIM_PRELUDE + /* wgsl */`
+@compute @workgroup_size(4,4,4)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  let c = vec3<i32>(gid);
+  if (oob(c)) { return; }
+  let n = f32(NN());
+  let v = velB[idx3(c)];
+  dvg[idx3(c)] = n * (
+    (velB[idx3(c + vec3<i32>(1,0,0))].x - v.x) +
+    (velB[idx3(c + vec3<i32>(0,1,0))].y - v.y) +
+    (velB[idx3(c + vec3<i32>(0,0,1))].z - v.z)
+  );
+}`;
+
+// ── pass: divergence of velA (post-projection — measurement only) ────────
+// Same operator as above, applied to the other buffer. This is the honest
+// comparison: identical kernel, genuinely different field.
+const WGSL_DIV_A = SIM_PRELUDE + /* wgsl */`
+@compute @workgroup_size(4,4,4)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  let c = vec3<i32>(gid);
+  if (oob(c)) { return; }
+  let n = f32(NN());
+  let v = velA[idx3(c)];
+  dvg[idx3(c)] = n * (
+    (velA[idx3(c + vec3<i32>(1,0,0))].x - v.x) +
+    (velA[idx3(c + vec3<i32>(0,1,0))].y - v.y) +
+    (velA[idx3(c + vec3<i32>(0,0,1))].z - v.z)
+  );
+}`;
+
+// ── pass: one Jacobi iteration of the pressure Poisson equation ──────────
+const WGSL_JACOBI = SIM_PRELUDE + /* wgsl */`
+@compute @workgroup_size(4,4,4)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  let c = vec3<i32>(gid);
+  if (oob(c)) { return; }
+  let n = f32(NN());
+  let sum =
+    prsR[idx3(c + vec3<i32>(1,0,0))] + prsR[idx3(c - vec3<i32>(1,0,0))] +
+    prsR[idx3(c + vec3<i32>(0,1,0))] + prsR[idx3(c - vec3<i32>(0,1,0))] +
+    prsR[idx3(c + vec3<i32>(0,0,1))] + prsR[idx3(c - vec3<i32>(0,0,1))];
+  // laplacian(p) = div   with h = 1/n
+  prsW[idx3(c)] = (sum - dvg[idx3(c)] / (n * n)) * (1.0 / 6.0);
+}`;
+
+// ── pass: subtract pressure gradient → divergence-free velA ─────────────
+const WGSL_PROJECT = SIM_PRELUDE + /* wgsl */`
+@compute @workgroup_size(4,4,4)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  let c = vec3<i32>(gid);
+  if (oob(c)) { return; }
+  let i = idx3(c);
+  let n = f32(NN());
+  // Backward difference — the adjoint of the forward divergence above.
+  let p0 = prsR[i];
+  let grad = vec3<f32>(
+    p0 - prsR[idx3(c - vec3<i32>(1,0,0))],
+    p0 - prsR[idx3(c - vec3<i32>(0,1,0))],
+    p0 - prsR[idx3(c - vec3<i32>(0,0,1))]
+  ) * n;
+  let src = velB[i];
+  // Nothing is done to the velocity after this point: boundary conditions were
+  // already imposed on velB before the divergence was measured, so the
+  // projection has the last word and its result stays divergence free.
+  velA[i] = vec4<f32>(src.xyz - grad, src.w);
+}`;
+
+// ── pass: particle integration through the solved field ─────────────────
+const WGSL_PARTICLES = SIM_PRELUDE + /* wgsl */`
+fn respawn(i : u32, frame : u32) -> vec3<f32> {
+  let r = rand3(vec3<u32>(i * 2654435761u, frame * 40503u + 17u, i ^ 0x9e3779b9u));
+  // most particles are seeded near an active source, the rest fill the volume
+  let pick = r.x;
+  var src = u.e0;
+  if (pick > 0.66 && u.e2.w > 0.0) { src = u.e2; }
+  else if (pick > 0.33 && u.e1.w > 0.0) { src = u.e1; }
+  if (r.z < 0.22 || src.w <= 0.0) {
+    return clamp(rand3(vec3<u32>(i + 7u, frame * 92837u, i * 31u + 5u)), vec3<f32>(0.06), vec3<f32>(0.94));
+  }
+  let o = (rand3(vec3<u32>(i * 7919u, frame * 6151u, i + 991u)) - 0.5) * (u.m.z * 2.4);
+  return clamp(src.xyz + o, vec3<f32>(0.03), vec3<f32>(0.97));
+}
+
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  let i = gid.x;
+  if (i >= u32(u.c.w)) { return; }
+  let a = 2u * i;
+  var P = par[a];
+  var V = par[a + 1u];
+  let n  = f32(NN());
+  let dt = u.g.w;
+
+  let field = sampleA(P.xyz * n - 0.5);
+  let k = clamp(u.c.y * dt * 60.0, 0.0, 1.0);
+  var vel = mix(V.xyz, field.xyz, k);
+  var pos = P.xyz + vel * (dt * u.c.z);
+
+  let seed = rand3(vec3<u32>(i * 2246822519u, 77u, i + 3u)).x;
+  var life = P.w - dt * (0.055 + seed * 0.115);
+
+  let outside = any(pos < vec3<f32>(0.0)) || any(pos > vec3<f32>(1.0));
+  if (outside || life <= 0.0) {
+    pos  = respawn(i, u32(u.m.x));
+    vel  = vec3<f32>(0.0);
+    life = 1.0;
+  }
+
+  par[a]      = vec4<f32>(pos, life);
+  par[a + 1u] = vec4<f32>(vel, field.w);
+}`;
+
+// ── pass: seed the particle buffer ──────────────────────────────────────
+const WGSL_SEED = SIM_PRELUDE + /* wgsl */`
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  let i = gid.x;
+  if (i >= u32(u.c.w)) { return; }
+  let a = 2u * i;
+  let r = rand3(vec3<u32>(i * 2654435761u, 9781u, i ^ 0x85ebca6bu));
+  let l = rand3(vec3<u32>(i + 13u, 4423u, i * 19u)).x;
+  par[a]      = vec4<f32>(clamp(r, vec3<f32>(0.04), vec3<f32>(0.96)), 0.05 + l * 0.95);
+  par[a + 1u] = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+}`;
+
+// ── pass: strided reduction for the live residual readout ───────────────
+const WGSL_REDUCE = SIM_PRELUDE + /* wgsl */`
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  let tid = gid.x;
+  let total = u32(u.g.z);
+  let stride = 4096u;
+  var acc = vec4<f32>(0.0);
+  for (var i = tid; i < total; i = i + stride) {
+    let d = abs(dvg[i]);
+    let v = velA[i];
+    acc.x += d;
+    acc.y += length(v.xyz);
+    acc.z += v.w;
+    acc.w = max(acc.w, d);
+  }
+  stat[tid] = acc;
+}`;
+
+/* ── render WGSL ───────────────────────────────────────────────────────── */
+
+const RENDER_PRELUDE = /* wgsl */`
+struct R {
+  view : mat4x4<f32>,
+  proj : mat4x4<f32>,
+  a : vec4<f32>,   // x: size  y: exposure  z: palette  w: time
+  b : vec4<f32>,   // x: bloom y: grain     z: speedScale  w: intensity
+  c : vec4<f32>,   // xy: resolution  zw: 1/resolution
+};
+@group(0) @binding(0) var<uniform> r : R;
+
+fn ramp(tin : f32, mode : i32) -> vec3<f32> {
+  let t = clamp(tin, 0.0, 1.0);
+  if (mode == 1) {                                   // ICE
+    let c0 = vec3<f32>(0.016, 0.043, 0.128);
+    let c1 = vec3<f32>(0.055, 0.286, 0.520);
+    let c2 = vec3<f32>(0.290, 0.760, 0.930);
+    let c3 = vec3<f32>(0.880, 0.980, 1.000);
+    if (t < 0.36) { return mix(c0, c1, t / 0.36); }
+    if (t < 0.74) { return mix(c1, c2, (t - 0.36) / 0.38); }
+    return mix(c2, c3, (t - 0.74) / 0.26);
+  }
+  if (mode == 2) {                                   // BONE
+    let c0 = vec3<f32>(0.035, 0.037, 0.043);
+    let c1 = vec3<f32>(0.230, 0.222, 0.205);
+    let c2 = vec3<f32>(0.640, 0.618, 0.572);
+    let c3 = vec3<f32>(0.980, 0.968, 0.940);
+    if (t < 0.34) { return mix(c0, c1, t / 0.34); }
+    if (t < 0.72) { return mix(c1, c2, (t - 0.34) / 0.38); }
+    return mix(c2, c3, (t - 0.72) / 0.28);
+  }
+  if (mode == 3) {                                   // SPECTRAL
+    let c0 = vec3<f32>(0.130, 0.020, 0.180);
+    let c1 = vec3<f32>(0.720, 0.090, 0.360);
+    let c2 = vec3<f32>(0.940, 0.640, 0.240);
+    let c3 = vec3<f32>(0.420, 0.960, 0.860);
+    if (t < 0.33) { return mix(c0, c1, t / 0.33); }
+    if (t < 0.70) { return mix(c1, c2, (t - 0.33) / 0.37); }
+    return mix(c2, c3, (t - 0.70) / 0.30);
+  }
+  let c0 = vec3<f32>(0.055, 0.017, 0.014);           // EMBER
+  let c1 = vec3<f32>(0.520, 0.108, 0.036);
+  let c2 = vec3<f32>(0.960, 0.520, 0.150);
+  let c3 = vec3<f32>(1.000, 0.960, 0.860);
+  if (t < 0.35) { return mix(c0, c1, t / 0.35); }
+  if (t < 0.73) { return mix(c1, c2, (t - 0.35) / 0.38); }
+  return mix(c2, c3, (t - 0.73) / 0.27);
+}
+`;
+
+const WGSL_POINTS = RENDER_PRELUDE + /* wgsl */`
+@group(0) @binding(1) var<storage, read> par : array<vec4<f32>>;
+
+struct VO {
+  @builtin(position) pos : vec4<f32>,
+  @location(0) uv  : vec2<f32>,
+  @location(1) col : vec3<f32>,
+  @location(2) amp : f32,
+};
+
+@vertex
+fn vs(@builtin(vertex_index) vi : u32, @builtin(instance_index) ii : u32) -> VO {
+  var corner = array<vec2<f32>, 6>(
+    vec2<f32>(-1.0,-1.0), vec2<f32>( 1.0,-1.0), vec2<f32>(-1.0, 1.0),
+    vec2<f32>(-1.0, 1.0), vec2<f32>( 1.0,-1.0), vec2<f32>( 1.0, 1.0)
+  );
+  let P = par[2u * ii];
+  let V = par[2u * ii + 1u];
+  let world = (P.xyz - 0.5) * 2.0;
+
+  var o : VO;
+  let q = corner[vi];
+  let vp = r.view * vec4<f32>(world, 1.0);
+  let s  = r.a.x * 0.0042;
+  o.pos = r.proj * vec4<f32>(vp.xyz + vec3<f32>(q * s, 0.0), 1.0);
+  o.uv  = q;
+
+  let speed = length(V.xyz);
+  let dye   = V.w;
+  let t = clamp(dye * 2.2 + speed * r.b.z * 0.8, 0.0, 1.0);
+  o.col = ramp(t, i32(r.a.z));
+
+  // fade in on birth, out on death, so respawns never pop
+  let env = smoothstep(0.0, 0.16, P.w) * smoothstep(1.0, 0.82, P.w);
+
+  // Brightness is carried almost entirely by the dye a particle is sitting in,
+  // with only a whisper of a floor. A large constant floor would light every
+  // particle equally and the whole volume would read as uniform fog instead of
+  // as the structure the solver is actually producing.
+  let carry = clamp(dye * 2.6 + speed * r.b.z * 0.34, 0.0, 1.0);
+
+  // soften the domain walls so the cube never announces itself
+  let m = min(min(P.x, P.y), min(P.z, min(1.0 - P.x, min(1.0 - P.y, 1.0 - P.z))));
+  let edge = smoothstep(0.0, 0.155, m);
+
+  o.amp = env * edge * r.b.w * (0.035 + 1.55 * pow(carry, 1.35));
+  return o;
+}
+
+@fragment
+fn fs(i : VO) -> @location(0) vec4<f32> {
+  let d = length(i.uv);
+  if (d > 1.0) { discard; }
+  let f = pow(1.0 - d, 2.6);
+  return vec4<f32>(i.col * (i.amp * f), 1.0);
+}`;
+
+const WGSL_FULLSCREEN = /* wgsl */`
+struct FO { @builtin(position) pos : vec4<f32>, @location(0) uv : vec2<f32> };
+@vertex
+fn vs(@builtin(vertex_index) vi : u32) -> FO {
+  var p = array<vec2<f32>, 3>(vec2<f32>(-1.0,-1.0), vec2<f32>(3.0,-1.0), vec2<f32>(-1.0, 3.0));
+  var o : FO;
+  o.pos = vec4<f32>(p[vi], 0.0, 1.0);
+  o.uv  = vec2<f32>((p[vi].x + 1.0) * 0.5, 1.0 - (p[vi].y + 1.0) * 0.5);
+  return o;
+}`;
+
+// fade pass — the whole fragment is dst *= blendConstant
+const WGSL_FADE = WGSL_FULLSCREEN + /* wgsl */`
+@fragment
+fn fs(i : FO) -> @location(0) vec4<f32> { return vec4<f32>(0.0); }`;
+
+const WGSL_BRIGHT = WGSL_FULLSCREEN + /* wgsl */`
+@group(0) @binding(0) var samp : sampler;
+@group(0) @binding(1) var tex  : texture_2d<f32>;
+@fragment
+fn fs(i : FO) -> @location(0) vec4<f32> {
+  let d = vec2<f32>(dpdxCoarse(i.uv.x), dpdyCoarse(i.uv.y));
+  var c = vec3<f32>(0.0);
+  c += textureSampleLevel(tex, samp, i.uv + vec2<f32>( d.x,  d.y), 0.0).rgb;
+  c += textureSampleLevel(tex, samp, i.uv + vec2<f32>(-d.x,  d.y), 0.0).rgb;
+  c += textureSampleLevel(tex, samp, i.uv + vec2<f32>( d.x, -d.y), 0.0).rgb;
+  c += textureSampleLevel(tex, samp, i.uv + vec2<f32>(-d.x, -d.y), 0.0).rgb;
+  c *= 0.25;
+  return vec4<f32>(max(c - vec3<f32>(0.14), vec3<f32>(0.0)), 1.0);
+}`;
+
+const WGSL_BLUR = WGSL_FULLSCREEN + /* wgsl */`
+struct BU { dir : vec4<f32> };   // xy: texel step
+@group(0) @binding(0) var samp : sampler;
+@group(0) @binding(1) var tex  : texture_2d<f32>;
+@group(0) @binding(2) var<uniform> bu : BU;
+@fragment
+fn fs(i : FO) -> @location(0) vec4<f32> {
+  let o = bu.dir.xy;
+  var c = textureSampleLevel(tex, samp, i.uv, 0.0).rgb * 0.2270270;
+  c += (textureSampleLevel(tex, samp, i.uv + o * 1.3846153, 0.0).rgb +
+        textureSampleLevel(tex, samp, i.uv - o * 1.3846153, 0.0).rgb) * 0.3162162;
+  c += (textureSampleLevel(tex, samp, i.uv + o * 3.2307692, 0.0).rgb +
+        textureSampleLevel(tex, samp, i.uv - o * 3.2307692, 0.0).rgb) * 0.0702702;
+  return vec4<f32>(c, 1.0);
+}`;
+
+const WGSL_COMPOSITE = WGSL_FULLSCREEN + RENDER_PRELUDE + /* wgsl */`
+@group(0) @binding(1) var samp  : sampler;
+@group(0) @binding(2) var hdr   : texture_2d<f32>;
+@group(0) @binding(3) var blm   : texture_2d<f32>;
+
+fn aces(x : vec3<f32>) -> vec3<f32> {
+  let a = 2.51; let b = 0.03; let c = 2.43; let d = 0.59; let e = 0.14;
+  return clamp((x * (a * x + b)) / (x * (c * x + d) + e), vec3<f32>(0.0), vec3<f32>(1.0));
+}
+fn h21(p : vec2<f32>) -> f32 {
+  var q = fract(vec2<f32>(p * 0.1031));
+  q += dot(q, q.yx + 33.33);
+  return fract((q.x + q.y) * q.x);
+}
+
+@fragment
+fn fs(i : FO) -> @location(0) vec4<f32> {
+  let uv = i.uv;
+  let q  = uv - 0.5;
+  let rr = dot(q, q);
+
+  // a whisper of lateral chromatic separation toward the corners
+  let ca = rr * 0.0026;
+  var col = vec3<f32>(
+    textureSampleLevel(hdr, samp, uv + q * ca, 0.0).r,
+    textureSampleLevel(hdr, samp, uv, 0.0).g,
+    textureSampleLevel(hdr, samp, uv - q * ca, 0.0).b
+  );
+  col += textureSampleLevel(blm, samp, uv, 0.0).rgb * r.b.x;
+  col *= r.a.y;
+  col = aces(col);
+  col *= 1.0 - rr * 0.42;                            // seat it in the frame
+
+  let g = (h21(i.pos.xy + vec2<f32>(r.a.w * 71.3, r.a.w * 37.1)) - 0.5) * r.b.y * 0.055;
+  col += vec3<f32>(g);
+
+  return vec4<f32>(pow(max(col, vec3<f32>(0.0)), vec3<f32>(1.0 / 2.2)), 1.0);
+}`;
+
+/* ── tiny mat4 ─────────────────────────────────────────────────────────── */
+
+function mPerspective(out, fovy, aspect, near, far){
+  const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+  out[0]=f/aspect; out[1]=0; out[2]=0; out[3]=0;
+  out[4]=0; out[5]=f; out[6]=0; out[7]=0;
+  out[8]=0; out[9]=0; out[10]=far*nf; out[11]=-1;
+  out[12]=0; out[13]=0; out[14]=far*near*nf; out[15]=0;
+  return out;
+}
+function mLookAt(out, eye, center, up){
+  let z0=eye[0]-center[0], z1=eye[1]-center[1], z2=eye[2]-center[2];
+  let l = 1/Math.hypot(z0,z1,z2); z0*=l; z1*=l; z2*=l;
+  let x0=up[1]*z2-up[2]*z1, x1=up[2]*z0-up[0]*z2, x2=up[0]*z1-up[1]*z0;
+  l = Math.hypot(x0,x1,x2); if (l){ l=1/l; x0*=l; x1*=l; x2*=l; } else { x0=x1=x2=0; }
+  const y0=z1*x2-z2*x1, y1=z2*x0-z0*x2, y2=z0*x1-z1*x0;
+  out[0]=x0; out[1]=y0; out[2]=z0; out[3]=0;
+  out[4]=x1; out[5]=y1; out[6]=z1; out[7]=0;
+  out[8]=x2; out[9]=y2; out[10]=z2; out[11]=0;
+  out[12]=-(x0*eye[0]+x1*eye[1]+x2*eye[2]);
+  out[13]=-(y0*eye[0]+y1*eye[1]+y2*eye[2]);
+  out[14]=-(z0*eye[0]+z1*eye[1]+z2*eye[2]);
+  out[15]=1;
+  return out;
+}
+
+/* ── boot ──────────────────────────────────────────────────────────────── */
+
+let device=null, ctx=null, format=null, canvas=$('#stage');
+let PL = {};                 // pipelines
+let simBGL=null, bgSim0=null, bgSim1=null;
+let uniSim=null, uniRender=null, uniBlurH=null, uniBlurV=null;
+let bufs = {};               // gpu buffers
+let rt = {};                 // render targets + their bind groups
+let cells=0, particleCount=0;
+let hdrNeedsClear = true;
+let statStaging = [], statBusy = false;
+let lastStats = { residual:0, maxDiv:0, speed:0, dye:0, preResidual:0 };
+
+const simU = new Float32Array(40);     // 10 vec4
+const renU = new Float32Array(16+16+12);
+
+async function makeModule(code, label){
+  const m = device.createShaderModule({ code, label });
+  if (m.getCompilationInfo) {
+    const info = await m.getCompilationInfo();
+    const errs = info.messages.filter(x => x.type === 'error');
+    if (errs.length) {
+      throw new Error(label + ' — ' + errs.map(e => `line ${e.lineNum}: ${e.message}`).join(' | '));
+    }
+  }
+  return m;
+}
+
+async function init(){
+  if (!('gpu' in navigator) || !navigator.gpu) {
+    fail('WebGPU unavailable',
+      'This study runs a fluid solver in GPU compute pipelines and has no meaningful fallback. ' +
+      'Open it in Chrome or Edge 113+, Safari 26+, or Firefox 141+ on a machine with hardware acceleration enabled.');
+    return;
+  }
+
+  stage(6, 'Requesting GPU adapter');
+  await nextFrame();
+
+  let adapter;
+  try { adapter = await navigator.gpu.requestAdapter({ powerPreference:'high-performance' }); }
+  catch(e){ adapter = null; }
+  if (!adapter) {
+    fail('No GPU adapter',
+      'The browser exposes WebGPU but could not supply an adapter. Hardware acceleration may be switched off, ' +
+      'or the GPU may be blocklisted on this platform.');
+    return;
+  }
+
+  stage(14, 'Acquiring device');
+  await nextFrame();
+  try {
+    device = await adapter.requestDevice({
+      requiredLimits: {
+        maxStorageBufferBindingSize: Math.min(adapter.limits.maxStorageBufferBindingSize, 268435456),
+        maxBufferSize: Math.min(adapter.limits.maxBufferSize, 268435456),
+      }
+    });
+  } catch(e){
+    try { device = await adapter.requestDevice(); }
+    catch(e2){ fail('Device request failed', String(e2.message || e2)); return; }
+  }
+
+  device.lost.then(info => {
+    if (info.reason !== 'destroyed') {
+      loader.classList.remove('done');
+      loader.style.opacity = '1';
+      loader.style.pointerEvents = 'auto';
+      fail('GPU device lost', String(info.message || 'The graphics device was reset.'));
+    }
+  });
+
+  ctx = canvas.getContext('webgpu');
+  if (!ctx) { fail('No WebGPU canvas context', 'The canvas could not be configured for WebGPU.'); return; }
+  format = navigator.gpu.getPreferredCanvasFormat();
+  ctx.configure({ device, format, alphaMode:'opaque' });
+
+  stage(24, 'Compiling WGSL compute modules');
+  await nextFrame();
+
+  simBGL = device.createBindGroupLayout({
+    entries: [
+      { binding:0, visibility:GPUShaderStage.COMPUTE, buffer:{ type:'uniform' } },
+      ...[1,2,3,4,5,6,7,8].map(b => ({ binding:b, visibility:GPUShaderStage.COMPUTE, buffer:{ type:'storage' } }))
+    ]
+  });
+  const simLayout = device.createPipelineLayout({ bindGroupLayouts:[simBGL] });
+
+  const compute = async (code, label) => device.createComputePipeline({
+    layout: simLayout, label,
+    compute: { module: await makeModule(code, label), entryPoint:'main' }
+  });
+
+  try {
+    PL.inject    = await compute(WGSL_INJECT,    'inject');
+    PL.advect    = await compute(WGSL_ADVECT,    'advect');
+    PL.curl      = await compute(WGSL_CURL,      'curl');
+    PL.vort      = await compute(WGSL_VORT,      'vorticity');
+    PL.divB      = await compute(WGSL_DIV_B,     'divergence(velB)');
+    PL.divA      = await compute(WGSL_DIV_A,     'divergence(velA)');
+    PL.jacobi    = await compute(WGSL_JACOBI,    'jacobi');
+    PL.project   = await compute(WGSL_PROJECT,   'project');
+    PL.particles = await compute(WGSL_PARTICLES, 'particles');
+    PL.seed      = await compute(WGSL_SEED,      'seed');
+    PL.reduce    = await compute(WGSL_REDUCE,    'reduce');
+  } catch(e){
+    fail('Shader compilation failed', String(e.message || e));
+    return;
+  }
+
+  stage(42, 'Compiling render pipelines');
+  await nextFrame();
+
+  // ── render pipelines ──
+  const HDR = 'rgba16float';
+
+  const ptsBGL = device.createBindGroupLayout({ entries:[
+    { binding:0, visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT, buffer:{ type:'uniform' } },
+    { binding:1, visibility:GPUShaderStage.VERTEX, buffer:{ type:'read-only-storage' } },
+  ]});
+  const texBGL = device.createBindGroupLayout({ entries:[
+    { binding:0, visibility:GPUShaderStage.FRAGMENT, sampler:{ type:'filtering' } },
+    { binding:1, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'float' } },
+  ]});
+  const blurBGL = device.createBindGroupLayout({ entries:[
+    { binding:0, visibility:GPUShaderStage.FRAGMENT, sampler:{ type:'filtering' } },
+    { binding:1, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'float' } },
+    { binding:2, visibility:GPUShaderStage.FRAGMENT, buffer:{ type:'uniform' } },
+  ]});
+  const compBGL = device.createBindGroupLayout({ entries:[
+    { binding:0, visibility:GPUShaderStage.FRAGMENT, buffer:{ type:'uniform' } },
+    { binding:1, visibility:GPUShaderStage.FRAGMENT, sampler:{ type:'filtering' } },
+    { binding:2, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'float' } },
+    { binding:3, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'float' } },
+  ]});
+
+  try {
+    const mPts  = await makeModule(WGSL_POINTS,     'points');
+    const mFade = await makeModule(WGSL_FADE,       'fade');
+    const mBrt  = await makeModule(WGSL_BRIGHT,     'brightpass');
+    const mBlur = await makeModule(WGSL_BLUR,       'blur');
+    const mComp = await makeModule(WGSL_COMPOSITE,  'composite');
+
+    PL.points = device.createRenderPipeline({
+      layout: device.createPipelineLayout({ bindGroupLayouts:[ptsBGL] }),
+      vertex:   { module:mPts, entryPoint:'vs' },
+      fragment: { module:mPts, entryPoint:'fs', targets:[{
+        format:HDR,
+        blend:{ color:{ srcFactor:'one', dstFactor:'one', operation:'add' },
+                alpha:{ srcFactor:'one', dstFactor:'one', operation:'add' } }
+      }]},
+      primitive:{ topology:'triangle-list' }
+    });
+
+    PL.fade = device.createRenderPipeline({
+      layout:'auto',
+      vertex:   { module:mFade, entryPoint:'vs' },
+      fragment: { module:mFade, entryPoint:'fs', targets:[{
+        format:HDR,
+        blend:{ color:{ srcFactor:'zero', dstFactor:'constant', operation:'add' },
+                alpha:{ srcFactor:'zero', dstFactor:'constant', operation:'add' } }
+      }]},
+      primitive:{ topology:'triangle-list' }
+    });
+
+    PL.bright = device.createRenderPipeline({
+      layout: device.createPipelineLayout({ bindGroupLayouts:[texBGL] }),
+      vertex:{ module:mBrt, entryPoint:'vs' },
+      fragment:{ module:mBrt, entryPoint:'fs', targets:[{ format:HDR }] },
+      primitive:{ topology:'triangle-list' }
+    });
+
+    PL.blur = device.createRenderPipeline({
+      layout: device.createPipelineLayout({ bindGroupLayouts:[blurBGL] }),
+      vertex:{ module:mBlur, entryPoint:'vs' },
+      fragment:{ module:mBlur, entryPoint:'fs', targets:[{ format:HDR }] },
+      primitive:{ topology:'triangle-list' }
+    });
+
+    PL.composite = device.createRenderPipeline({
+      layout: device.createPipelineLayout({ bindGroupLayouts:[compBGL] }),
+      vertex:{ module:mComp, entryPoint:'vs' },
+      fragment:{ module:mComp, entryPoint:'fs', targets:[{ format }] },
+      primitive:{ topology:'triangle-list' }
+    });
+  } catch(e){
+    fail('Render pipeline creation failed', String(e.message || e));
+    return;
+  }
+
+  PL._layouts = { ptsBGL, texBGL, blurBGL, compBGL, HDR };
+
+  stage(56, 'Allocating field buffers');
+  await nextFrame();
+
+  uniSim    = device.createBuffer({ size: simU.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  uniRender = device.createBuffer({ size: renU.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  uniBlurH  = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  uniBlurV  = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+
+  for (let i=0;i<2;i++){
+    statStaging.push(device.createBuffer({ size: 4096*16, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }));
+  }
+
+  allocSim(S.grid);
+  allocParticles(S.count);
+  resize();
+
+  stage(72, 'Seeding ' + fmt(S.count) + ' particles');
+  await nextFrame();
+  seedParticles();
+
+  stage(84, 'Priming the solver');
+  await nextFrame();
+  prime(70);
+  await device.queue.onSubmittedWorkDone();
+
+  stage(100, 'Ready');
+  await nextFrame();
+
+  device.onuncapturederror = (ev) => {
+    // surface rather than swallow; should never fire in normal operation
+    fail('GPU error', String(ev.error && ev.error.message || ev.error));
+  };
+
+  buildPanel();
+  bindInput();
+  updateReadout();
+
+  document.body.classList.add('is-live');
+  loader.classList.add('done');
+  setTimeout(() => { loader.style.display = 'none'; }, 1000);
+
+  running = true;
+  requestAnimationFrame(frame);
+}
+
+/* ── resources ─────────────────────────────────────────────────────────── */
+
+function allocSim(N){
+  ['velA','velB','prsA','prsB','dvg','crl'].forEach(k => { if (bufs[k]) bufs[k].destroy(); });
+  cells = N*N*N;
+  const ST = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST;
+  bufs.velA = device.createBuffer({ size: cells*16, usage: ST, label:'velA' });
+  bufs.velB = device.createBuffer({ size: cells*16, usage: ST, label:'velB' });
+  bufs.prsA = device.createBuffer({ size: cells*4,  usage: ST, label:'prsA' });
+  bufs.prsB = device.createBuffer({ size: cells*4,  usage: ST, label:'prsB' });
+  bufs.dvg  = device.createBuffer({ size: cells*4,  usage: ST, label:'dvg'  });
+  bufs.crl  = device.createBuffer({ size: cells*16, usage: ST, label:'crl'  });
+  if (!bufs.stat) bufs.stat = device.createBuffer({ size: 4096*16, usage: ST, label:'stat' });
+  rebuildSimBindGroups();
+  hdrNeedsClear = true;
+}
+
+function allocParticles(n){
+  if (bufs.par) bufs.par.destroy();
+  particleCount = n;
+  bufs.par = device.createBuffer({
+    size: n * 32,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    label:'particles'
+  });
+  rebuildSimBindGroups();
+  if (PL._layouts) {
+    rt.bgPoints = device.createBindGroup({
+      layout: PL._layouts.ptsBGL,
+      entries: [{ binding:0, resource:{ buffer:uniRender } }, { binding:1, resource:{ buffer:bufs.par } }]
+    });
+  }
+}
+
+function rebuildSimBindGroups(){
+  if (!bufs.velA || !bufs.par || !bufs.stat) return;
+  const mk = (pR, pW) => device.createBindGroup({ layout: simBGL, entries:[
+    { binding:0, resource:{ buffer:uniSim } },
+    { binding:1, resource:{ buffer:bufs.velA } },
+    { binding:2, resource:{ buffer:bufs.velB } },
+    { binding:3, resource:{ buffer:pR } },
+    { binding:4, resource:{ buffer:pW } },
+    { binding:5, resource:{ buffer:bufs.dvg } },
+    { binding:6, resource:{ buffer:bufs.crl } },
+    { binding:7, resource:{ buffer:bufs.par } },
+    { binding:8, resource:{ buffer:bufs.stat } },
+  ]});
+  bgSim0 = mk(bufs.prsA, bufs.prsB);
+  bgSim1 = mk(bufs.prsB, bufs.prsA);
+}
+
+let dpr = 1;
+function resize(){
+  const maxDpr = window.innerWidth > 1600 ? 1.75 : 2;
+  dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
+  const w = Math.max(2, Math.floor(canvas.clientWidth  * dpr));
+  const h = Math.max(2, Math.floor(canvas.clientHeight * dpr));
+  if (canvas.width === w && canvas.height === h && rt.hdr) return;
+  canvas.width = w; canvas.height = h;
+
+  const HDR = PL._layouts.HDR;
+  ['hdr','bloomA','bloomB'].forEach(k => { if (rt[k]) rt[k].destroy(); });
+
+  rt.hdr = device.createTexture({
+    size:[w,h], format:HDR,
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING
+  });
+  const bw = Math.max(2, w >> 2), bh = Math.max(2, h >> 2);
+  rt.bw = bw; rt.bh = bh;
+  rt.bloomA = device.createTexture({ size:[bw,bh], format:HDR,
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
+  rt.bloomB = device.createTexture({ size:[bw,bh], format:HDR,
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
+
+  rt.vHdr = rt.hdr.createView();
+  rt.vA = rt.bloomA.createView();
+  rt.vB = rt.bloomB.createView();
+
+  if (!rt.samp) rt.samp = device.createSampler({ magFilter:'linear', minFilter:'linear',
+    addressModeU:'clamp-to-edge', addressModeV:'clamp-to-edge' });
+
+  const L = PL._layouts;
+  rt.bgBright = device.createBindGroup({ layout:L.texBGL, entries:[
+    { binding:0, resource:rt.samp }, { binding:1, resource:rt.vHdr } ]});
+  rt.bgBlurH = device.createBindGroup({ layout:L.blurBGL, entries:[
+    { binding:0, resource:rt.samp }, { binding:1, resource:rt.vA },
+    { binding:2, resource:{ buffer:uniBlurH } } ]});
+  rt.bgBlurV = device.createBindGroup({ layout:L.blurBGL, entries:[
+    { binding:0, resource:rt.samp }, { binding:1, resource:rt.vB },
+    { binding:2, resource:{ buffer:uniBlurV } } ]});
+  rt.bgComp = device.createBindGroup({ layout:L.compBGL, entries:[
+    { binding:0, resource:{ buffer:uniRender } }, { binding:1, resource:rt.samp },
+    { binding:2, resource:rt.vHdr }, { binding:3, resource:rt.vA } ]});
+  rt.bgPoints = device.createBindGroup({ layout:L.ptsBGL, entries:[
+    { binding:0, resource:{ buffer:uniRender } }, { binding:1, resource:{ buffer:bufs.par } } ]});
+
+  device.queue.writeBuffer(uniBlurH, 0, new Float32Array([1/bw, 0, 0, 0]));
+  device.queue.writeBuffer(uniBlurV, 0, new Float32Array([0, 1/bh, 0, 0]));
+  hdrNeedsClear = true;
+}
+
+/* ── uniforms ──────────────────────────────────────────────────────────── */
+
+let simTime = 0, frameNo = 0;
+const pointer = { active:false, down:false, x:0, y:0, px:0, py:0, wx:0, wy:0, wz:0, vx:0, vy:0, vz:0, life:0 };
+
+function writeSimUniforms(dt){
+  const N = S.grid;
+  simU[0]=N; simU[1]=1/N; simU[2]=cells; simU[3]=dt;
+  simU[4]=S.velDecay; simU[5]=S.dyeDecay; simU[6]=S.vorticity; simU[7]=S.buoyancy;
+  simU[8]=S.turbulence; simU[9]=S.turbScale; simU[10]=simTime; simU[11]=S.emission;
+  simU[12]=pointer.life>0?1:0; simU[13]=S.drag; simU[14]=S.pSpeed; simU[15]=particleCount;
+  simU[16]=pointer.wx; simU[17]=pointer.wy; simU[18]=pointer.wz; simU[19]=0.13;
+  simU[20]=pointer.vx; simU[21]=pointer.vy; simU[22]=pointer.vz; simU[23]=0;
+
+  // three slow drifting sources in the lower half of the box
+  const t = simTime;
+  const em = [
+    [0.50 + 0.20*Math.sin(t*0.23),        0.18 + 0.05*Math.sin(t*0.41),  0.50 + 0.20*Math.cos(t*0.19)],
+    [0.50 + 0.26*Math.sin(t*0.17 + 2.1),  0.26 + 0.06*Math.cos(t*0.29),  0.50 + 0.26*Math.cos(t*0.31 + 1.3)],
+    [0.50 + 0.15*Math.cos(t*0.37 + 4.2),  0.14 + 0.04*Math.sin(t*0.22),  0.50 + 0.15*Math.sin(t*0.27 + 3.4)],
+  ];
+  for (let k=0;k<3;k++){
+    const o = 24 + k*4;
+    simU[o]=em[k][0]; simU[o+1]=em[k][1]; simU[o+2]=em[k][2];
+    simU[o+3] = (k < S.sources) ? 1 : 0;
+  }
+  simU[36]=frameNo; simU[37]=0; simU[38]=0.052; simU[39]=S.gravity;
+  device.queue.writeBuffer(uniSim, 0, simU);
+}
+
+const FOV = 0.52;   // radians, vertical — long-lens framing keeps the box calm
+const view = new Float32Array(16), proj = new Float32Array(16);
+let camAngle = 0.6, camPitch = 0.10;
+const camEye = [0,0,0];
+
+function writeRenderUniforms(dt){
+  camAngle += dt * S.orbit * 0.42;
+  // Vertical FOV is fixed, so in portrait the horizontal half-angle narrows and
+  // the box would be cropped left and right. Back off by the inverse aspect so
+  // the whole volume stays in frame on a phone.
+  const aspect = canvas.width / canvas.height;
+  // Fitting the width exactly would strand the volume in a sea of margin, so
+  // sit between fitting height and fitting width and let the corners run out.
+  const R = 4.8 * Math.min(1.72, Math.pow(Math.max(1, 1 / Math.max(aspect, 0.3)), 0.68));
+  const py = 0.34 + camPitch;
+  camEye[0] = Math.sin(camAngle) * R;
+  camEye[1] = py + Math.sin(camAngle * 0.37) * 0.22;
+  camEye[2] = Math.cos(camAngle) * R;
+  mLookAt(view, camEye, [0, 0.02, 0], [0,1,0]);
+  mPerspective(proj, FOV, canvas.width / canvas.height, 0.05, 24);
+
+  renU.set(view, 0);
+  renU.set(proj, 16);
+  renU[32]=S.size; renU[33]=S.exposure; renU[34]=S.palette; renU[35]=simTime;
+  renU[36]=S.bloom; renU[37]=S.grain; renU[38]=0.55; renU[39]=S.intensity;
+  renU[40]=canvas.width; renU[41]=canvas.height; renU[42]=1/canvas.width; renU[43]=1/canvas.height;
+  device.queue.writeBuffer(uniRender, 0, renU);
+}
+
+/* ── the frame ─────────────────────────────────────────────────────────── */
+
+function dispatch3(pass, pipeline, N, bg){
+  pass.setPipeline(pipeline);
+  pass.setBindGroup(0, bg || bgSim0);
+  const g = N >> 2;
+  pass.dispatchWorkgroups(g, g, g);
+}
+
+function encodeStep(enc, N, measure){
+  const pass = enc.beginComputePass();
+  dispatch3(pass, PL.inject,  N);
+  dispatch3(pass, PL.advect,  N);
+  dispatch3(pass, PL.curl,    N);
+  dispatch3(pass, PL.vort,    N);
+  dispatch3(pass, PL.divB,    N);
+
+  // Jacobi — even iteration count leaves the solution in prsA
+  const K = S.iterations & ~1;
+  for (let k=0;k<K;k++) dispatch3(pass, PL.jacobi, N, (k & 1) ? bgSim1 : bgSim0);
+
+  dispatch3(pass, PL.project, N);
+
+  pass.setPipeline(PL.particles);
+  pass.setBindGroup(0, bgSim0);
+  pass.dispatchWorkgroups(Math.ceil(particleCount / 64));
+
+  if (measure) {
+    // measure the divergence of the *projected* field (velA), which is a
+    // different buffer from the one the solve consumed (velB)
+    dispatch3(pass, PL.divA, N);
+    pass.setPipeline(PL.reduce);
+    pass.setBindGroup(0, bgSim0);
+    pass.dispatchWorkgroups(64);
+  }
+  pass.end();
+}
+
+function seedParticles(){
+  writeSimUniforms(1/60);
+  const enc = device.createCommandEncoder();
+  const p = enc.beginComputePass();
+  p.setPipeline(PL.seed);
+  p.setBindGroup(0, bgSim0);
+  p.dispatchWorkgroups(Math.ceil(particleCount / 64));
+  p.end();
+  device.queue.submit([enc.finish()]);
+}
+
+function prime(steps){
+  for (let i=0;i<steps;i++){
+    simTime += 1/60; frameNo++;
+    writeSimUniforms(1/60);
+    const enc = device.createCommandEncoder();
+    encodeStep(enc, S.grid, false);
+    device.queue.submit([enc.finish()]);
+  }
+}
+
+function clearFields(){
+  const enc = device.createCommandEncoder();
+  [bufs.velA, bufs.velB, bufs.prsA, bufs.prsB, bufs.dvg, bufs.crl].forEach(b => enc.clearBuffer(b));
+  device.queue.submit([enc.finish()]);
+  seedParticles();
+  hdrNeedsClear = true;
+}
+
+let running = false, paused = false, lastT = 0, fpsAcc = 0, fpsN = 0, fpsShown = 0;
+let pendingResize = false;
+
+function frame(now){
+  if (!running) return;
+  requestAnimationFrame(frame);
+
+  if (pendingResize) { pendingResize = false; resize(); }
+
+  const t = now * 0.001;
+  let dt = lastT ? Math.min(t - lastT, 0.05) : 1/60;
+  lastT = t;
+  if (dt > 0) { fpsAcc += dt; fpsN++; }
+  if (fpsAcc > 0.5) { fpsShown = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; updateReadout(); }
+
+  step(paused ? 0 : dt);
+}
+
+function step(dt){
+  const sdt = Math.min(dt * S.timeScale, 1/30);
+  const N = S.grid;
+
+  if (dt > 0) { simTime += sdt; frameNo++; }
+
+  // pointer impulse decays over a few frames so a flick still lands
+  if (pointer.life > 0) { pointer.life -= dt; if (pointer.life <= 0) { pointer.vx=pointer.vy=pointer.vz=0; } }
+
+  writeSimUniforms(dt > 0 ? sdt : 0);
+  writeRenderUniforms(dt);
+
+  const measure = (frameNo % 45 === 0) && !statBusy && dt > 0;
+  const enc = device.createCommandEncoder();
+
+  if (dt > 0) encodeStep(enc, N, measure);
+  if (measure) enc.copyBufferToBuffer(bufs.stat, 0, statStaging[0], 0, 4096*16);
+
+  // ── render ──
+  const pass = enc.beginRenderPass({ colorAttachments:[{
+    view: rt.vHdr,
+    loadOp: hdrNeedsClear ? 'clear' : 'load',
+    clearValue: { r:0, g:0, b:0, a:1 },
+    storeOp: 'store'
+  }]});
+  hdrNeedsClear = false;
+
+  const p = Math.max(0, Math.min(0.985, S.persistence));
+  pass.setPipeline(PL.fade);
+  pass.setBlendConstant([p,p,p,p]);
+  pass.draw(3);
+
+  pass.setPipeline(PL.points);
+  pass.setBindGroup(0, rt.bgPoints);
+  pass.draw(6, particleCount);
+  pass.end();
+
+  // bloom
+  const bp = enc.beginRenderPass({ colorAttachments:[{ view: rt.vA, loadOp:'clear', clearValue:{r:0,g:0,b:0,a:1}, storeOp:'store' }]});
+  bp.setPipeline(PL.bright); bp.setBindGroup(0, rt.bgBright); bp.draw(3); bp.end();
+
+  const b1 = enc.beginRenderPass({ colorAttachments:[{ view: rt.vB, loadOp:'clear', clearValue:{r:0,g:0,b:0,a:1}, storeOp:'store' }]});
+  b1.setPipeline(PL.blur); b1.setBindGroup(0, rt.bgBlurH); b1.draw(3); b1.end();
+
+  const b2 = enc.beginRenderPass({ colorAttachments:[{ view: rt.vA, loadOp:'clear', clearValue:{r:0,g:0,b:0,a:1}, storeOp:'store' }]});
+  b2.setPipeline(PL.blur); b2.setBindGroup(0, rt.bgBlurV); b2.draw(3); b2.end();
+
+  // composite
+  const cp = enc.beginRenderPass({ colorAttachments:[{
+    view: ctx.getCurrentTexture().createView(),
+    loadOp:'clear', clearValue:{r:0,g:0,b:0,a:1}, storeOp:'store'
+  }]});
+  cp.setPipeline(PL.composite); cp.setBindGroup(0, rt.bgComp); cp.draw(3); cp.end();
+
+  device.queue.submit([enc.finish()]);
+
+  if (measure) readStats();
+}
+
+function readStats(){
+  statBusy = true;
+  const buf = statStaging[0];
+  buf.mapAsync(GPUMapMode.READ).then(() => {
+    const a = new Float32Array(buf.getMappedRange().slice(0));
+    buf.unmap();
+    let sd=0, sv=0, sy=0, mx=0;
+    for (let i=0;i<4096;i++){
+      sd += a[i*4]; sv += a[i*4+1]; sy += a[i*4+2];
+      if (a[i*4+3] > mx) mx = a[i*4+3];
+    }
+    lastStats.residual = sd / cells;
+    lastStats.maxDiv   = mx;
+    lastStats.speed    = sv / cells;
+    lastStats.dye      = sy / cells;
+    statBusy = false;
+    updateReadout();
+  }).catch(() => { statBusy = false; });
+}
+
+/* ── readout ───────────────────────────────────────────────────────────── */
+
+function fmt(n){
+  if (n >= 1e6) return (n/1e6).toFixed(n % 1e6 === 0 ? 0 : 1) + 'M';
+  if (n >= 1e3) return Math.round(n/1e3) + 'K';
+  return String(n);
+}
+function updateReadout(){
+  $('#r-grid').textContent   = S.grid + '³';
+  $('#r-cells').textContent  = cells.toLocaleString('en-US');
+  $('#r-part').textContent   = particleCount.toLocaleString('en-US');
+  $('#r-solver').textContent = (S.iterations & ~1) + ' × Jacobi';
+  $('#r-res').textContent    = lastStats.residual ? lastStats.residual.toExponential(2) : '—';
+  $('#r-fps').textContent    = fpsShown ? fpsShown.toFixed(0) + ' fps' : '—';
+}
+
+/* ── panel ─────────────────────────────────────────────────────────────── */
+
+const SPEC = [
+  ['Solver', [
+    { k:'grid', t:'seg', l:'Grid', o:[[48,'48³'],[64,'64³'],[80,'80³'],[96,'96³']] },
+    { k:'iterations', t:'rng', l:'Pressure iters', min:4, max:48, step:2, f:v=>String(v) },
+    { k:'vorticity',  t:'rng', l:'Vorticity', min:0, max:40, step:0.5, f:v=>v.toFixed(1) },
+    { k:'velDecay',   t:'rng', l:'Velocity keep', min:0.94, max:1, step:0.001, f:v=>v.toFixed(3) },
+    { k:'dyeDecay',   t:'rng', l:'Dye keep', min:0.94, max:1, step:0.001, f:v=>v.toFixed(3) },
+    { k:'timeScale',  t:'rng', l:'Time scale', min:0.15, max:2.2, step:0.05, f:v=>v.toFixed(2)+'×' },
+  ]],
+  ['Forces', [
+    { k:'sources',    t:'seg', l:'Sources', o:[[1,'One'],[2,'Two'],[3,'Three']] },
+    { k:'emission',   t:'rng', l:'Emission', min:0, max:3, step:0.05, f:v=>v.toFixed(2) },
+    { k:'buoyancy',   t:'rng', l:'Buoyancy', min:0, max:7, step:0.1, f:v=>v.toFixed(1) },
+    { k:'gravity',    t:'rng', l:'Weight', min:0, max:3, step:0.05, f:v=>v.toFixed(2) },
+    { k:'turbulence', t:'rng', l:'Turbulence', min:0, max:9, step:0.1, f:v=>v.toFixed(1) },
+    { k:'turbScale',  t:'rng', l:'Turb. scale', min:1, max:16, step:0.25, f:v=>v.toFixed(2) },
+  ]],
+  ['Particles', [
+    { k:'count', t:'seg', l:'Count', o:[[250000,'250K'],[600000,'600K'],[1200000,'1.2M'],[2400000,'2.4M']] },
+    { k:'drag',      t:'rng', l:'Coupling', min:0.02, max:1, step:0.01, f:v=>v.toFixed(2) },
+    { k:'pSpeed',    t:'rng', l:'Advect speed', min:0.2, max:3, step:0.05, f:v=>v.toFixed(2)+'×' },
+    { k:'size',      t:'rng', l:'Size', min:0.2, max:4, step:0.05, f:v=>v.toFixed(2) },
+    { k:'intensity', t:'rng', l:'Intensity', min:0.05, max:1.6, step:0.01, f:v=>v.toFixed(2) },
+  ]],
+  ['Render', [
+    { k:'palette', t:'seg', l:'Palette', o:[[0,'Ember'],[1,'Ice'],[2,'Bone'],[3,'Spectral']] },
+    { k:'exposure',    t:'rng', l:'Exposure', min:0.2, max:3, step:0.05, f:v=>v.toFixed(2) },
+    { k:'bloom',       t:'rng', l:'Bloom', min:0, max:1.6, step:0.02, f:v=>v.toFixed(2) },
+    { k:'persistence', t:'rng', l:'Persistence', min:0, max:0.97, step:0.01, f:v=>v.toFixed(2) },
+    { k:'grain',       t:'rng', l:'Grain', min:0, max:0.8, step:0.02, f:v=>v.toFixed(2) },
+    { k:'orbit',       t:'rng', l:'Orbit', min:0, max:1, step:0.02, f:v=>v.toFixed(2) },
+  ]],
+];
+
+const widgets = {};
+
+function applyChange(k, v){
+  S[k] = v;
+  if (k === 'grid')  { allocSim(v); clearFields(); prime(40); }
+  if (k === 'count') { allocParticles(v); seedParticles(); }
+  if (k === 'grid' || k === 'count' || k === 'iterations') updateReadout();
+}
+
+function buildPanel(){
+  const body = $('#panel-body');
+  SPEC.forEach(([title, items]) => {
+    const g = document.createElement('div');
+    g.className = 'grp';
+    const gt = document.createElement('span'); gt.className='gt'; gt.textContent = title;
+    g.appendChild(gt);
+
+    items.forEach(spec => {
+      const c = document.createElement('div'); c.className = 'ctl';
+      const row = document.createElement('div'); row.className = 'row';
+      const lb = document.createElement('span'); lb.className='lb'; lb.textContent = spec.l;
+      const vl = document.createElement('span'); vl.className='vl';
+      row.appendChild(lb); row.appendChild(vl); c.appendChild(row);
+
+      if (spec.t === 'rng') {
+        const inp = document.createElement('input');
+        inp.type='range'; inp.min=spec.min; inp.max=spec.max; inp.step=spec.step;
+        inp.value = S[spec.k];
+        inp.setAttribute('aria-label', spec.l);
+        vl.textContent = spec.f(S[spec.k]);
+        inp.addEventListener('input', () => {
+          const v = parseFloat(inp.value);
+          vl.textContent = spec.f(v);
+          applyChange(spec.k, v);
+        });
+        c.appendChild(inp);
+        widgets[spec.k] = { spec, set(v){ inp.value = v; vl.textContent = spec.f(v); } };
+      } else {
+        vl.textContent = '';
+        const seg = document.createElement('div'); seg.className='seg'; seg.setAttribute('role','group');
+        const btns = spec.o.map(([val, lab]) => {
+          const b = document.createElement('button');
+          b.type='button'; b.textContent = lab;
+          b.setAttribute('aria-pressed', String(S[spec.k] === val));
+          b.addEventListener('click', () => {
+            applyChange(spec.k, val);
+            btns.forEach((x,i) => x.setAttribute('aria-pressed', String(spec.o[i][0] === val)));
+          });
+          seg.appendChild(b);
+          return b;
+        });
+        c.appendChild(seg);
+        widgets[spec.k] = { spec, set(v){ btns.forEach((x,i) => x.setAttribute('aria-pressed', String(spec.o[i][0] === v))); } };
+      }
+      g.appendChild(c);
+    });
+    body.appendChild(g);
+  });
+
+  $('#reset').addEventListener('click', () => {
+    Object.keys(DEFAULTS).forEach(k => {
+      if (S[k] !== DEFAULTS[k]) applyChange(k, DEFAULTS[k]);
+      if (widgets[k]) widgets[k].set(DEFAULTS[k]);
+    });
+    updateReadout();
+  });
+}
+
+function setPanel(open){
+  document.body.classList.toggle('panel-open', open);
+  $('#panel').setAttribute('aria-hidden', String(!open));
+  $('#panel-toggle').setAttribute('aria-expanded', String(open));
+  if (open) $('#panel-close').focus();
+}
+
+/* ── input ─────────────────────────────────────────────────────────────── */
+
+function bindInput(){
+  $('#panel-toggle').addEventListener('click', () => setPanel(true));
+  $('#panel-close').addEventListener('click', () => { setPanel(false); $('#panel-toggle').focus(); });
+
+  addEventListener('keydown', e => {
+    if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName) && e.key !== 'Escape') return;
+    const k = e.key.toLowerCase();
+    if (k === 'c') { e.preventDefault(); setPanel(!document.body.classList.contains('panel-open')); }
+    else if (e.key === 'Escape') { setPanel(false); }
+    else if (e.key === ' ') { e.preventDefault(); paused = !paused; document.body.classList.toggle('is-paused', paused); }
+    else if (k === 'r') { clearFields(); }
+  });
+
+  addEventListener('resize', () => { pendingResize = true; }, { passive:true });
+
+  // pointer → a force in the plane facing the camera
+  const toWorld = (cx, cy) => {
+    const rect = canvas.getBoundingClientRect();
+    const nx = ((cx - rect.left) / rect.width) * 2 - 1;
+    const ny = 1 - ((cy - rect.top) / rect.height) * 2;
+    // camera basis from the view matrix (row-major storage of a column-major mat)
+    const right = [view[0], view[4], view[8]];
+    const up    = [view[1], view[5], view[9]];
+    const tanH  = Math.tan(FOV / 2);
+    const aspect = canvas.width / canvas.height;
+    const dist = Math.hypot(camEye[0], camEye[1]-0.02, camEye[2]);
+    const sx = nx * tanH * aspect * dist, sy = ny * tanH * dist;
+    return [
+      right[0]*sx + up[0]*sy,
+      right[1]*sx + up[1]*sy + 0.02,
+      right[2]*sx + up[2]*sy
+    ];
+  };
+
+  const onMove = e => {
+    if (!pointer.down) return;
+    const w = toWorld(e.clientX, e.clientY);
+    const dx = w[0]-pointer.wx0, dy = w[1]-pointer.wy0, dz = w[2]-pointer.wz0;
+    pointer.wx = (w[0]*0.5+0.5); pointer.wy = (w[1]*0.5+0.5); pointer.wz = (w[2]*0.5+0.5);
+    pointer.vx = dx * 6; pointer.vy = dy * 6; pointer.vz = dz * 6;
+    pointer.wx0 = w[0]; pointer.wy0 = w[1]; pointer.wz0 = w[2];
+    pointer.life = 0.09;
+  };
+  canvas.addEventListener('pointerdown', e => {
+    pointer.down = true;
+    canvas.setPointerCapture(e.pointerId);
+    const w = toWorld(e.clientX, e.clientY);
+    pointer.wx0 = w[0]; pointer.wy0 = w[1]; pointer.wz0 = w[2];
+  });
+  canvas.addEventListener('pointermove', onMove, { passive:true });
+  const up = e => { pointer.down = false; try { canvas.releasePointerCapture(e.pointerId); } catch(_){} };
+  canvas.addEventListener('pointerup', up);
+  canvas.addEventListener('pointercancel', up);
+
+  document.addEventListener('visibilitychange', () => { lastT = 0; });
+}
+
+/* ── diagnostic surface (verification, not a debug UI) ─────────────────── */
+
+window.__solve = {
+  get settings(){ return Object.assign({}, S); },
+  get defaults(){ return Object.assign({}, DEFAULTS); },
+  get stats(){ return Object.assign({ cells, particleCount, fps: fpsShown, frame: frameNo,
+                                      camAngle, camEye: camEye.slice(), simTime }, lastStats); },
+  ready: () => !!device && running,
+  set(k, v){
+    if (!(k in DEFAULTS)) throw new Error('unknown setting ' + k);
+    applyChange(k, v);
+    if (widgets[k]) widgets[k].set(v);
+    return S[k];
+  },
+  panelOpen: () => document.body.classList.contains('panel-open'),
+  setPanel,
+  paused: () => paused,
+  forceStep(n){ for (let i=0;i<(n||1);i++) step(1/60); },
+  reseed: clearFields,
+  // read the divergence of an explicitly named buffer, measured by the same
+  // kernel, so "before" and "after" are genuinely different fields
+  async probe(which){
+    const enc = device.createCommandEncoder();
+    const p = enc.beginComputePass();
+    dispatch3(p, which === 'preprojection' ? PL.divB : PL.divA, S.grid);
+    p.setPipeline(PL.reduce); p.setBindGroup(0, bgSim0); p.dispatchWorkgroups(64);
+    p.end();
+    enc.copyBufferToBuffer(bufs.stat, 0, statStaging[1], 0, 4096*16);
+    device.queue.submit([enc.finish()]);
+    const b = statStaging[1];
+    await b.mapAsync(GPUMapMode.READ);
+    const a = new Float32Array(b.getMappedRange().slice(0));
+    b.unmap();
+    let sd=0, sv=0, sy=0, mx=0;
+    for (let i=0;i<4096;i++){ sd+=a[i*4]; sv+=a[i*4+1]; sy+=a[i*4+2]; if (a[i*4+3]>mx) mx=a[i*4+3]; }
+    // meanAbsDiv/maxAbsDiv describe the requested field. meanSpeed/meanDye are
+    // always read from velA by the reduction kernel, so they are identical
+    // across both probe modes by construction — do not read them as a
+    // comparison between the two fields.
+    return { divOf: which === 'preprojection' ? 'velB' : 'velA',
+             meanAbsDiv: sd/cells, maxAbsDiv: mx,
+             velA_meanSpeed: sv/cells, velA_meanDye: sy/cells, cells };
+  },
+  async readParticles(n){
+    const k = Math.min(n||8, particleCount);
+    const s = device.createBuffer({ size: k*32, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+    const e = device.createCommandEncoder();
+    e.copyBufferToBuffer(bufs.par, 0, s, 0, k*32);
+    device.queue.submit([e.finish()]);
+    await s.mapAsync(GPUMapMode.READ);
+    const a = new Float32Array(s.getMappedRange().slice(0));
+    s.unmap(); s.destroy();
+    const out = [];
+    for (let i=0;i<k;i++) out.push({ pos:[a[i*8],a[i*8+1],a[i*8+2]], life:a[i*8+3],
+                                     vel:[a[i*8+4],a[i*8+5],a[i*8+6]], dye:a[i*8+7] });
+    return out;
+  },
+  // NOTE: a WebGPU canvas is only readable within the same task as the draw
+  // that filled it. Call this synchronously after forceStep() — any await in
+  // between and it will report an all-black frame that means nothing.
+  pixelProbe(){
+    const w = canvas.width, h = canvas.height;
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    g.drawImage(canvas, 0, 0);
+    const d = g.getImageData(0,0,w,h).data;
+    let sum=0, max=0, nonzero=0;
+    const step = 4 * 7;   // sparse stride, prime, avoids row alignment
+    let n = 0;
+    for (let i=0;i<d.length;i+=step){
+      const l = (d[i]*0.2126 + d[i+1]*0.7152 + d[i+2]*0.0722);
+      sum += l; if (l > max) max = l; if (l > 3) nonzero++;
+      n++;
+    }
+    return { w, h, samples:n, meanLuma:sum/n, maxLuma:max, litFraction:nonzero/n };
+  }
+};
+
+init();
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,2303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SocialIntel — Social Media Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:    #08081a;
+  --bg2:   #0e0e24;
+  --card:  rgba(255,255,255,0.04);
+  --card-hover: rgba(255,255,255,0.07);
+  --border: rgba(255,255,255,0.09);
+  --border-bright: rgba(255,255,255,0.18);
+  --blue:   #4361ee;
+  --cyan:   #4cc9f0;
+  --green:  #06d6a0;
+  --purple: #b5179e;
+  --amber:  #ffd166;
+  --red:    #ef476f;
+  --text:   #e2e8f0;
+  --muted:  #64748b;
+  --soft:   #94a3b8;
+  --grad:   linear-gradient(135deg, #4cc9f0, #4361ee);
+  --grad2:  linear-gradient(135deg, #06d6a0, #4361ee);
+  --grad3:  linear-gradient(135deg, #b5179e, #4361ee);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: 16px; }
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* NAV */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 32px; height: 60px;
+  background: rgba(8,8,26,0.92);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-logo {
+  font-size: 17px; font-weight: 800; letter-spacing: -0.5px;
+  background: var(--grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.nav-links { display: flex; gap: 6px; list-style: none; }
+.nav-links a {
+  color: var(--soft); text-decoration: none;
+  font-size: 12.5px; font-weight: 500;
+  padding: 5px 10px; border-radius: 6px; transition: all 0.2s;
+}
+.nav-links a:hover, .nav-links a.active {
+  color: var(--cyan); background: rgba(76,201,240,0.1);
+}
+
+/* SECTIONS */
+section {
+  padding: 100px 48px 80px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.section-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 2.5px;
+  text-transform: uppercase; color: var(--cyan); margin-bottom: 12px;
+}
+.section-title {
+  font-size: clamp(28px, 4vw, 46px); font-weight: 800;
+  line-height: 1.1; letter-spacing: -1.5px; margin-bottom: 16px;
+}
+.section-title span { background: var(--grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.section-desc { color: var(--soft); font-size: 16px; max-width: 620px; line-height: 1.7; margin-bottom: 48px; }
+.section-divider { height: 1px; background: var(--border); max-width: 1280px; margin: 0 auto; }
+
+/* HERO */
+#hero {
+  min-height: 100vh; display: flex; flex-direction: column; justify-content: center;
+  padding-top: 100px; padding-bottom: 60px; position: relative; overflow: hidden;
+}
+.hero-bg {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 60% 50% at 70% 40%, rgba(67,97,238,0.15) 0%, transparent 70%),
+              radial-gradient(ellipse 40% 40% at 20% 60%, rgba(76,201,240,0.08) 0%, transparent 60%);
+}
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(76,201,240,0.1); border: 1px solid rgba(76,201,240,0.25);
+  border-radius: 100px; padding: 5px 14px;
+  font-size: 12px; font-weight: 600; color: var(--cyan); letter-spacing: 0.5px;
+  margin-bottom: 28px; width: fit-content;
+}
+.hero-eyebrow::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--cyan); animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(0.7); } }
+.hero-title { font-size: clamp(36px,6vw,72px); font-weight: 900; letter-spacing: -2.5px; line-height: 1.0; margin-bottom: 24px; }
+.hero-title .grad-text { background: var(--grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.hero-subtitle { color: var(--soft); font-size: 18px; max-width: 580px; line-height: 1.7; margin-bottom: 52px; }
+
+/* STAT CARDS */
+.stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 20px; }
+.stat-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+  padding: 24px; position: relative; overflow: hidden; transition: all 0.3s;
+}
+.stat-card:hover { background: var(--card-hover); border-color: var(--border-bright); transform: translateY(-2px); }
+.stat-card::after { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.stat-card.blue::after  { background: var(--grad); }
+.stat-card.green::after { background: var(--grad2); }
+.stat-card.purple::after{ background: var(--grad3); }
+.stat-card.amber::after { background: linear-gradient(90deg, var(--amber), var(--red)); }
+.stat-label { font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.stat-value { font-size: 36px; font-weight: 900; letter-spacing: -1.5px; line-height: 1; margin-bottom: 6px; }
+.stat-value.blue   { color: var(--cyan); }
+.stat-value.green  { color: var(--green); }
+.stat-value.purple { color: #c77dff; }
+.stat-value.amber  { color: var(--amber); }
+.stat-sub { font-size: 12px; color: var(--muted); }
+
+/* CARDS */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px; transition: all 0.25s; }
+.card:hover { background: var(--card-hover); border-color: var(--border-bright); }
+
+/* GRIDS */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; }
+
+/* HEATMAP */
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: 72px repeat(6, 1fr);
+  gap: 4px;
+}
+.heatmap-header {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.8px; color: var(--muted); padding: 6px 4px; text-align: center;
+}
+.heatmap-day {
+  font-size: 11px; font-weight: 600; color: var(--soft);
+  display: flex; align-items: center; padding-right: 8px;
+}
+.heatmap-cell {
+  border-radius: 6px; padding: 10px 4px; text-align: center;
+  font-size: 11px; font-weight: 700; font-family: 'DM Mono', monospace;
+  cursor: default; transition: transform 0.15s; position: relative;
+}
+.heatmap-cell:hover { transform: scale(1.1); z-index: 10; }
+.heatmap-legend { display: flex; align-items: center; gap: 8px; margin-top: 16px; font-size: 11px; color: var(--muted); }
+.legend-bar { flex:1; height: 8px; border-radius: 4px; max-width: 200px; background: linear-gradient(90deg, #1a1a3e, #4361ee, #4cc9f0, #06d6a0); }
+
+/* TOOLTIP */
+.tooltip-wrap { position: relative; }
+.tooltip-wrap:hover .tooltip-box { opacity: 1; pointer-events: all; transform: translateX(-50%) translateY(0); }
+.tooltip-box {
+  position: absolute; bottom: calc(100% + 8px); left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: #1e1e40; border: 1px solid var(--border-bright);
+  border-radius: 8px; padding: 8px 12px; font-size: 12px; color: var(--text);
+  white-space: nowrap; pointer-events: none; opacity: 0; transition: all 0.2s; z-index: 100;
+}
+
+/* PLATFORM PILLS */
+.platform-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+.platform-pill {
+  padding: 7px 18px; border-radius: 100px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--muted); font-family: 'Inter', sans-serif;
+  font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+}
+.platform-pill:hover { border-color: var(--border-bright); color: var(--soft); }
+.platform-pill.active { background: rgba(76,201,240,0.15); border-color: rgba(76,201,240,0.4); color: var(--cyan); }
+
+/* FORMS */
+.form-title { font-size: 16px; font-weight: 800; margin-bottom: 24px; letter-spacing: -0.3px; }
+.form-group { margin-bottom: 20px; }
+.form-label { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; }
+.form-input, .form-select {
+  width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+  border-radius: 10px; padding: 11px 14px; color: var(--text);
+  font-family: 'Inter', sans-serif; font-size: 14px; transition: all 0.2s; appearance: none;
+}
+.form-input:focus, .form-select:focus {
+  outline: none; border-color: var(--cyan);
+  background: rgba(76,201,240,0.05); box-shadow: 0 0 0 3px rgba(76,201,240,0.12);
+}
+.form-select option { background: #1a1a3e; }
+
+input[type=range] {
+  width: 100%; height: 4px; background: rgba(255,255,255,0.1);
+  border-radius: 2px; outline: none; cursor: pointer; accent-color: var(--cyan);
+}
+.range-wrap { position: relative; }
+.range-value {
+  position: absolute; right: 0; top: -24px;
+  font-size: 13px; font-weight: 700; color: var(--cyan); font-family: 'DM Mono', monospace;
+}
+
+/* CALCULATOR LAYOUT */
+.calc-layout { display: grid; grid-template-columns: 380px 1fr; gap: 32px; align-items: start; }
+.calc-form { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 32px; }
+
+/* RESULT CARDS */
+.results-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
+.result-card { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+.result-num { font-size: 32px; font-weight: 900; letter-spacing: -1px; font-family: 'DM Mono', monospace; margin-bottom: 4px; }
+.result-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+.result-note { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+/* MIX BARS */
+.mix-bar-row { margin-bottom: 18px; }
+.mix-bar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.mix-bar-label { font-size: 13px; font-weight: 600; }
+.mix-bar-pct { font-size: 13px; font-weight: 700; color: var(--cyan); font-family: 'DM Mono', monospace; }
+.mix-bar-track { height: 20px; background: rgba(255,255,255,0.07); border-radius: 6px; overflow: hidden; }
+.mix-bar-fill { height: 100%; border-radius: 6px; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+
+/* INSIGHT CALLOUT */
+.callout {
+  padding: 14px 18px; border-radius: 10px; font-size: 13px; line-height: 1.6;
+  border-left: 3px solid; margin-top: 16px;
+}
+.callout-cyan  { background: rgba(76,201,240,0.08);  border-color: var(--cyan);  color: var(--soft); }
+.callout-green { background: rgba(6,214,160,0.08);   border-color: var(--green); color: var(--soft); }
+.callout-amber { background: rgba(255,209,102,0.08); border-color: var(--amber); color: var(--soft); }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+/* CALENDAR */
+.cal-slot-list { margin-top: 24px; }
+.cal-slot-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; margin-bottom: 8px;
+  background: rgba(6,214,160,0.08); border: 1px solid rgba(6,214,160,0.2); border-radius: 10px;
+}
+.cal-slot-rank {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(6,214,160,0.2); border: 1px solid var(--green);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: var(--green);
+}
+.cal-slot-score { font-size: 22px; font-weight: 900; font-family: 'DM Mono', monospace; color: var(--green); }
+.cal-optimal { outline: 2px solid var(--green); outline-offset: -2px; }
+
+/* HASHTAGS */
+.htag-tier { margin-bottom: 20px; }
+.htag-tier-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.htag-tier-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+.htag-copy-btn {
+  padding: 3px 10px; border-radius: 6px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); font-family: 'Inter', sans-serif;
+  font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+}
+.htag-copy-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+.htag-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.htag-tag {
+  padding: 5px 12px; border-radius: 100px; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s; border: 1px solid transparent;
+}
+.htag-tag:hover { transform: scale(1.05); }
+
+/* BENCHMARKS */
+.bench-grade {
+  font-size: 72px; font-weight: 900; letter-spacing: -4px; line-height: 1;
+  font-family: 'DM Mono', monospace;
+}
+.bench-er-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.bench-er-box { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+.bench-er-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.bench-er-val { font-size: 36px; font-weight: 900; letter-spacing: -1.5px; font-family: 'DM Mono', monospace; }
+.bench-tip-item {
+  display: flex; align-items: flex-start; gap: 9px; margin-bottom: 10px;
+  font-size: 13px; color: var(--soft); line-height: 1.5;
+}
+.bench-tip-icon { flex-shrink: 0; font-size: 14px; }
+
+/* API KEY */
+.api-key-row { display: flex; gap: 8px; align-items: center; }
+.api-key-row .form-input { font-family: 'DM Mono', monospace; font-size: 13px; }
+.api-save-btn {
+  padding: 11px 14px; background: rgba(76,201,240,0.1); border: 1px solid rgba(76,201,240,0.3);
+  border-radius: 10px; color: var(--cyan); font-family: 'Inter', sans-serif;
+  font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.2s;
+}
+.api-save-btn:hover { background: rgba(76,201,240,0.2); }
+
+/* MODEL TOGGLE */
+.model-toggle { display: flex; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.model-btn {
+  flex: 1; padding: 9px 10px; border: none; background: transparent;
+  color: var(--muted); font-family: 'Inter', sans-serif;
+  font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center;
+}
+.model-btn.active { background: rgba(76,201,240,0.15); color: var(--cyan); }
+
+/* CAPTION CARDS */
+.caption-card {
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  border-radius: 14px; padding: 20px; margin-bottom: 14px; transition: all 0.25s;
+}
+.caption-card:hover { border-color: var(--border-bright); background: var(--card-hover); }
+.cap-hook-badge {
+  display: inline-block; padding: 3px 10px; border-radius: 100px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 10px;
+}
+.cap-body { font-size: 14px; line-height: 1.7; color: var(--text); margin-bottom: 12px; white-space: pre-wrap; }
+.cap-hashtags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px; }
+.cap-hashtag { font-size: 12px; font-weight: 600; color: var(--cyan); background: rgba(76,201,240,0.1); padding: 2px 8px; border-radius: 100px; }
+.cap-footer { display: flex; align-items: center; justify-content: space-between; }
+.cap-meta { font-size: 11px; color: var(--muted); }
+.copy-btn {
+  padding: 5px 14px; border-radius: 6px; border: 1px solid var(--border);
+  background: transparent; color: var(--soft); font-family: 'Inter', sans-serif;
+  font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+}
+.copy-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* SPINNER */
+.spinner-wrap { display: none; align-items: center; justify-content: center; padding: 60px 20px; flex-direction: column; gap: 16px; }
+.spinner { width: 36px; height: 36px; border: 3px solid rgba(76,201,240,0.2); border-top-color: var(--cyan); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner-text { font-size: 13px; color: var(--muted); animation: fadePulse 1.5s ease-in-out infinite; }
+@keyframes fadePulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+/* ERROR BOX */
+.error-box { background: rgba(239,71,111,0.08); border: 1px solid rgba(239,71,111,0.2); border-radius: 10px; padding: 13px 16px; font-size: 13px; color: var(--red); display: none; margin-bottom: 16px; line-height: 1.5; }
+
+/* UPLOAD ZONE */
+.upload-zone {
+  border: 2px dashed var(--border-bright); border-radius: 14px; padding: 28px 20px;
+  text-align: center; cursor: pointer; transition: all 0.25s; position: relative;
+}
+.upload-zone:hover, .upload-zone.drag-over { border-color: var(--cyan); background: rgba(76,201,240,0.05); }
+.upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.img-preview { width: 100%; max-height: 160px; object-fit: contain; border-radius: 10px; border: 1px solid var(--border); margin-top: 12px; display: none; }
+
+/* SCORE DISPLAY */
+.score-big { font-size: 72px; font-weight: 900; letter-spacing: -4px; line-height: 1; font-family: 'DM Mono', monospace; }
+.score-display { display: flex; align-items: flex-end; gap: 14px; margin-bottom: 8px; }
+.score-grade-lbl { font-size: 20px; font-weight: 800; padding-bottom: 8px; letter-spacing: -0.3px; }
+
+/* DIMENSION BARS */
+.dims-wrap { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin: 16px 0; }
+.dims-title { font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+.dim-row { margin-bottom: 12px; }
+.dim-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.dim-label { font-size: 12px; font-weight: 600; color: var(--soft); }
+.dim-score { font-size: 12px; font-weight: 700; font-family: 'DM Mono', monospace; }
+.dim-track { background: rgba(255,255,255,0.07); border-radius: 100px; height: 6px; overflow: hidden; margin-bottom: 3px; }
+.dim-fill { height: 100%; border-radius: 100px; transition: width 1.2s cubic-bezier(0.4,0,0.2,1); width: 0; }
+.dim-note { font-size: 11px; color: var(--muted); line-height: 1.4; }
+
+/* FEEDBACK */
+.feedback-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+.feedback-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.feedback-title { font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 10px; }
+.fb-item { display: flex; align-items: flex-start; gap: 7px; font-size: 12.5px; margin-bottom: 7px; line-height: 1.5; color: var(--soft); }
+.fb-win::before  { content: '✓'; color: var(--green); font-weight: 800; flex-shrink: 0; }
+.fb-fix::before  { content: '→'; color: var(--amber); font-weight: 800; flex-shrink: 0; }
+.quick-win-box { padding: 14px 18px; background: rgba(76,201,240,0.07); border-left: 3px solid var(--cyan); border-radius: 0 10px 10px 0; margin-bottom: 16px; }
+.quick-win-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--cyan); margin-bottom: 6px; }
+.quick-win-text { font-size: 13px; color: var(--text); font-weight: 600; line-height: 1.5; }
+
+/* RESPONSIVE */
+@media (max-width: 900px) {
+  .stat-row { grid-template-columns: repeat(2,1fr); }
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  .calc-layout { grid-template-columns: 1fr; }
+  .nav-links { display: none; }
+  section { padding: 80px 24px 60px; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <span class="nav-logo">SocialIntel</span>
+  <ul class="nav-links">
+    <li><a href="#hero">Overview</a></li>
+    <li><a href="#heatmap">Heatmap</a></li>
+    <li><a href="#reach">Reach Calc</a></li>
+    <li><a href="#mix">Content Mix</a></li>
+    <li><a href="#calendar">Calendar</a></li>
+    <li><a href="#hashtags">Hashtags</a></li>
+    <li><a href="#benchmarks">Benchmarks</a></li>
+    <li><a href="#captions">Captions</a></li>
+    <li><a href="#scorer">Post Score</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section id="hero" style="max-width:1280px;margin:0 auto;">
+  <div class="hero-bg"></div>
+  <div class="hero-eyebrow">Social Media Intelligence · BC + Alberta</div>
+  <h1 class="hero-title">Post smarter.<br><span class="grad-text">Grow faster.</span></h1>
+  <p class="hero-subtitle">Data-backed timing intelligence, reach forecasting, and content strategy tools — built for western Canadian social media teams.</p>
+  <div class="stat-row">
+    <div class="stat-card blue">
+      <div class="stat-label">Reels Avg Reach Boost</div>
+      <div class="stat-value blue">2.8×</div>
+      <div class="stat-sub">vs. static posts on Instagram</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">LinkedIn Best Window</div>
+      <div class="stat-value green">Tue–Thu</div>
+      <div class="stat-sub">7–9am Pacific for B2B</div>
+    </div>
+    <div class="stat-card purple">
+      <div class="stat-label">TikTok Avg ER</div>
+      <div class="stat-value purple">5–9%</div>
+      <div class="stat-sub">vs 1–3% on Instagram</div>
+    </div>
+    <div class="stat-card amber">
+      <div class="stat-label">Carousel Save Rate</div>
+      <div class="stat-value amber">3×</div>
+      <div class="stat-sub">More saves than static posts</div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- HEATMAP -->
+<section id="heatmap">
+  <div class="section-label">Timing Intelligence</div>
+  <h2 class="section-title">Engagement <span>Heatmap</span></h2>
+  <p class="section-desc">When does your audience actually engage? Select a platform and industry to see optimal posting windows based on aggregated engagement data.</p>
+
+  <!-- Platform Pills -->
+  <div class="platform-pills" id="platformPills">
+    <button class="platform-pill active" data-platform="instagram">📸 Instagram</button>
+    <button class="platform-pill" data-platform="linkedin">💼 LinkedIn</button>
+    <button class="platform-pill" data-platform="facebook">👥 Facebook</button>
+    <button class="platform-pill" data-platform="youtube">▶️ YouTube</button>
+    <button class="platform-pill" data-platform="tiktok">🎵 TikTok</button>
+  </div>
+
+  <!-- Industry Dropdown -->
+  <div style="display:flex; align-items:center; gap:16px; margin-bottom:28px;">
+    <label style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);white-space:nowrap;">Industry:</label>
+    <select class="form-select" id="industrySelect" style="max-width:280px;" onchange="buildHeatmap()">
+      <option value="general">General / Any Industry</option>
+      <option value="restaurant">Restaurant / Food &amp; Beverage</option>
+      <option value="b2b">B2B / Professional Services</option>
+      <option value="ecommerce">E-commerce / Retail</option>
+      <option value="fitness">Fitness / Wellness</option>
+      <option value="beauty">Beauty / Cosmetics</option>
+      <option value="entertainment">Entertainment / Media</option>
+      <option value="education">Education / Learning</option>
+      <option value="nonprofit">Non-profit / Charity</option>
+      <option value="finance">Finance / Crypto</option>
+      <option value="travel">Travel / Hospitality</option>
+    </select>
+  </div>
+
+  <!-- Grid Container -->
+  <div class="card" style="padding:32px; overflow-x:auto;">
+    <div id="heatmapGrid"></div>
+    <div class="heatmap-legend">
+      <span>Low</span>
+      <div class="legend-bar"></div>
+      <span>High</span>
+      <span style="margin-left:16px; color:var(--muted);">Score = estimated engagement index (0–100)</span>
+    </div>
+  </div>
+
+  <!-- Insight Cards -->
+  <div class="grid-3" style="margin-top:28px;" id="heatInsights"></div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- REACH CALCULATOR -->
+<section id="reach" style="background:var(--bg2); max-width:100%; padding:0;">
+  <div style="max-width:1280px; margin:0 auto; padding:100px 48px 80px;">
+    <div class="section-label">Forecasting</div>
+    <h2 class="section-title">Reach <span>Calculator</span></h2>
+    <p class="section-desc">Estimate your organic reach and impressions before you post. Adjust your format and engagement rate to see the impact.</p>
+
+    <div class="calc-layout">
+      <!-- LEFT: Form -->
+      <div class="calc-form">
+        <div class="form-title">Your Account</div>
+
+        <div class="form-group">
+          <label class="form-label">Platform</label>
+          <select class="form-select" id="rcPlatform" onchange="rcUpdateFormats(); rcCalculate();">
+            <option value="instagram">Instagram</option>
+            <option value="linkedin">LinkedIn</option>
+            <option value="facebook">Facebook</option>
+            <option value="youtube">YouTube</option>
+            <option value="tiktok">TikTok</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Content Format</label>
+          <select class="form-select" id="rcFormat" onchange="rcCalculate()"></select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Followers / Subscribers</label>
+          <div class="range-wrap">
+            <span class="range-value" id="rcFollowVal">10,000</span>
+            <input type="range" id="rcFollowers" min="0" max="7" value="2" oninput="rcCalculate()">
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:6px;">
+            <span>1K</span><span>5K</span><span>10K</span><span>25K</span><span>50K</span><span>100K</span><span>250K</span><span>500K+</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Your Average Engagement Rate</label>
+          <div class="range-wrap">
+            <span class="range-value" id="rcERVal">3.0%</span>
+            <input type="range" id="rcER" min="0.5" max="15" step="0.5" value="3" oninput="rcCalculate()">
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:6px;">
+            <span>0.5%</span><span>5%</span><span>10%</span><span>15%</span>
+          </div>
+        </div>
+
+        <div class="callout callout-cyan" style="margin-top:8px;">
+          <strong style="color:var(--cyan);">What is ER?</strong> Engagement Rate = (Likes + Comments) ÷ Reach × 100. Industry average for Instagram nano-accounts is 2.5–4%.
+        </div>
+      </div>
+
+      <!-- RIGHT: Results -->
+      <div>
+        <div class="results-grid" id="rcResults">
+          <div class="result-card">
+            <div class="result-num" id="rcReach" style="color:var(--cyan);">—</div>
+            <div class="result-label">Estimated Reach</div>
+            <div class="result-note" id="rcReachNote"></div>
+          </div>
+          <div class="result-card">
+            <div class="result-num" id="rcImpressions" style="color:var(--green);">—</div>
+            <div class="result-label">Est. Impressions</div>
+            <div class="result-note">Includes repeat views</div>
+          </div>
+          <div class="result-card">
+            <div class="result-num" id="rcEngagements" style="color:var(--purple);">—</div>
+            <div class="result-label">Est. Engagements</div>
+            <div class="result-note">Likes + Comments</div>
+          </div>
+          <div class="result-card">
+            <div class="result-num" id="rcVirality" style="color:var(--amber);">—</div>
+            <div class="result-label">Virality Score</div>
+            <div class="result-note" id="rcViralNote"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:20px;">
+          <div style="font-size:13px;font-weight:700;color:var(--cyan);margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;">Format Comparison</div>
+          <div id="rcFormatChart"></div>
+        </div>
+
+        <div class="callout callout-green" style="margin-top:16px;" id="rcTip">
+          Select your platform and format above to see your reach forecast.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- CONTENT MIX -->
+<section id="mix">
+  <div class="section-label">Content Strategy</div>
+  <h2 class="section-title">Content <span>Mix</span></h2>
+  <p class="section-desc">The right balance of content types drives sustained growth. These data-backed ratios are calibrated by platform and industry — use them as your editorial baseline.</p>
+
+  <div class="grid-2">
+    <!-- LEFT: Controls + Bars -->
+    <div class="card">
+      <div class="form-title">Recommended Distribution</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
+        <div>
+          <label class="form-label">Platform</label>
+          <select class="form-select" id="mixPlatform" onchange="buildMix()">
+            <option value="instagram">Instagram</option>
+            <option value="linkedin">LinkedIn</option>
+            <option value="facebook">Facebook</option>
+            <option value="youtube">YouTube</option>
+            <option value="tiktok">TikTok</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Industry</label>
+          <select class="form-select" id="mixIndustry" onchange="buildMix()">
+            <option value="general">General</option>
+            <option value="restaurant">Restaurant</option>
+            <option value="b2b">B2B / Services</option>
+            <option value="ecommerce">E-commerce</option>
+            <option value="fitness">Fitness</option>
+            <option value="beauty">Beauty</option>
+            <option value="entertainment">Entertainment</option>
+            <option value="education">Education</option>
+            <option value="nonprofit">Non-profit</option>
+            <option value="finance">Finance</option>
+            <option value="travel">Travel</option>
+          </select>
+        </div>
+      </div>
+      <div id="mixBars"></div>
+    </div>
+
+    <!-- RIGHT: Type Descriptions -->
+    <div>
+      <div class="card" style="margin-bottom:16px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:16px;">Content Type Guide</div>
+        <div id="mixGuide"></div>
+      </div>
+      <div class="callout callout-amber" id="mixTip"></div>
+    </div>
+  </div>
+</section>
+
+<!-- POST CALENDAR -->
+<section id="calendar" style="background:var(--bg2);max-width:100%;padding:0;">
+  <div style="max-width:1280px;margin:0 auto;padding:100px 48px 80px;">
+    <div class="section-label">Scheduling</div>
+    <h2 class="section-title">Post <span>Calendar</span></h2>
+    <p class="section-desc">Plan your weekly posting schedule around peak engagement windows. Set how many posts per week you can commit to and we'll highlight your best slots.</p>
+
+    <div class="calc-layout">
+      <!-- LEFT -->
+      <div class="calc-form">
+        <div class="form-title">Schedule Settings</div>
+
+        <div class="form-group">
+          <label class="form-label">Platform</label>
+          <select class="form-select" id="calPlatform" onchange="buildCalendar()">
+            <option value="instagram">Instagram</option>
+            <option value="linkedin">LinkedIn</option>
+            <option value="facebook">Facebook</option>
+            <option value="youtube">YouTube</option>
+            <option value="tiktok">TikTok</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Industry</label>
+          <select class="form-select" id="calIndustry" onchange="buildCalendar()">
+            <option value="general">General / Any Industry</option>
+            <option value="restaurant">Restaurant / Food &amp; Beverage</option>
+            <option value="b2b">B2B / Professional Services</option>
+            <option value="ecommerce">E-commerce / Retail</option>
+            <option value="fitness">Fitness / Wellness</option>
+            <option value="beauty">Beauty / Cosmetics</option>
+            <option value="entertainment">Entertainment / Media</option>
+            <option value="education">Education / Learning</option>
+            <option value="nonprofit">Non-profit / Charity</option>
+            <option value="finance">Finance / Crypto</option>
+            <option value="travel">Travel / Hospitality</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Posts Per Week — <span id="calPostsLabel" style="color:var(--cyan);font-family:'DM Mono',monospace;">3</span></label>
+          <input type="range" id="calPostsPerWeek" min="1" max="7" value="3" oninput="buildCalendar()">
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:6px;">
+            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span>
+          </div>
+        </div>
+
+        <div class="callout callout-cyan" style="margin-top:8px;">
+          <strong style="color:var(--cyan);">Green cells</strong> = your recommended posting slots. Ranked by engagement score for your platform and industry.
+        </div>
+
+        <div id="calScheduleList" class="cal-slot-list"></div>
+      </div>
+
+      <!-- RIGHT: Calendar Grid -->
+      <div>
+        <div class="card" style="padding:32px;overflow-x:auto;">
+          <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;">Weekly Engagement Map</div>
+          <div id="calendarGrid"></div>
+          <div class="heatmap-legend" style="margin-top:16px;">
+            <span>Low</span><div class="legend-bar"></div><span>High</span>
+            <span style="margin-left:16px;color:var(--green);font-weight:600;">★ = your optimal slot</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- HASHTAG PLANNER -->
+<section id="hashtags">
+  <div class="section-label">Discovery</div>
+  <h2 class="section-title">Hashtag <span>Planner</span></h2>
+  <p class="section-desc">Build tiered hashtag clusters that mix broad reach with niche relevance. A good cluster uses all four tiers — macro for exposure, nano for discovery.</p>
+
+  <div class="calc-layout">
+    <!-- LEFT -->
+    <div class="calc-form">
+      <div class="form-title">Build Your Cluster</div>
+
+      <div class="form-group">
+        <label class="form-label">Topic / Niche</label>
+        <input type="text" class="form-input" id="htagTopic" placeholder="e.g. Vancouver restaurant, Calgary fitness, B2B software..." oninput="buildHashtags()">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Platform</label>
+        <select class="form-select" id="htagPlatform" onchange="buildHashtags()">
+          <option value="instagram">Instagram</option>
+          <option value="tiktok">TikTok</option>
+          <option value="linkedin">LinkedIn</option>
+          <option value="facebook">Facebook</option>
+          <option value="youtube">YouTube</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Account Size</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12.5px;transition:all 0.2s;" id="sizeNano">
+            <input type="radio" name="htagSize" value="nano" checked onchange="buildHashtags()" style="accent-color:var(--cyan);"> Nano &lt;10K
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12.5px;transition:all 0.2s;" id="sizeMicro">
+            <input type="radio" name="htagSize" value="micro" onchange="buildHashtags()" style="accent-color:var(--cyan);"> Micro 10K–100K
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12.5px;transition:all 0.2s;" id="sizeMid">
+            <input type="radio" name="htagSize" value="mid" onchange="buildHashtags()" style="accent-color:var(--cyan);"> Mid 100K–500K
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12.5px;transition:all 0.2s;" id="sizeMacro">
+            <input type="radio" name="htagSize" value="macro" onchange="buildHashtags()" style="accent-color:var(--cyan);"> Macro 500K+
+          </label>
+        </div>
+      </div>
+
+      <div class="callout callout-amber" style="margin-top:16px;">
+        <strong style="color:var(--amber);">Instagram 2025:</strong> Use 3–5 highly relevant hashtags. The algorithm now weighs relevance over volume. Avoid banned or overused tags.
+      </div>
+    </div>
+
+    <!-- RIGHT: Tiers -->
+    <div>
+      <div class="card" id="htagResults">
+        <div style="text-align:center;padding:40px;color:var(--muted);">
+          <div style="font-size:36px;margin-bottom:12px;">#️⃣</div>
+          <div style="font-size:14px;font-weight:600;color:var(--soft);">Enter a topic to generate your hashtag cluster</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ENGAGEMENT BENCHMARKS -->
+<section id="benchmarks" style="background:var(--bg2);max-width:100%;padding:0;">
+  <div style="max-width:1280px;margin:0 auto;padding:100px 48px 80px;">
+    <div class="section-label">Performance</div>
+    <h2 class="section-title">Engagement <span>Benchmarks</span></h2>
+    <p class="section-desc">How does your engagement rate stack up against industry averages? Enter your recent post metrics to get your grade and personalized recommendations.</p>
+
+    <div class="calc-layout">
+      <!-- LEFT -->
+      <div class="calc-form">
+        <div class="form-title">Your Metrics</div>
+
+        <div class="form-group">
+          <label class="form-label">Platform</label>
+          <select class="form-select" id="benchPlatform" onchange="calcBench()">
+            <option value="instagram">Instagram</option>
+            <option value="linkedin">LinkedIn</option>
+            <option value="facebook">Facebook</option>
+            <option value="youtube">YouTube</option>
+            <option value="tiktok">TikTok</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Industry</label>
+          <select class="form-select" id="benchIndustry" onchange="calcBench()">
+            <option value="general">General / Any Industry</option>
+            <option value="restaurant">Restaurant / Food &amp; Beverage</option>
+            <option value="b2b">B2B / Professional Services</option>
+            <option value="ecommerce">E-commerce / Retail</option>
+            <option value="fitness">Fitness / Wellness</option>
+            <option value="beauty">Beauty / Cosmetics</option>
+            <option value="entertainment">Entertainment / Media</option>
+            <option value="education">Education / Learning</option>
+            <option value="nonprofit">Non-profit / Charity</option>
+            <option value="finance">Finance / Crypto</option>
+            <option value="travel">Travel / Hospitality</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Account Size</label>
+          <select class="form-select" id="benchSize" onchange="calcBench()">
+            <option value="nano">Nano — under 10K followers</option>
+            <option value="micro">Micro — 10K to 100K</option>
+            <option value="mid">Mid — 100K to 500K</option>
+            <option value="macro">Macro — 500K+</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Engagements on Last Post (Likes + Comments)</label>
+          <input type="number" class="form-input" id="benchEngagements" placeholder="e.g. 320" value="320" oninput="calcBench()">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Reach on Last Post</label>
+          <input type="number" class="form-input" id="benchReach" placeholder="e.g. 4200" value="4200" oninput="calcBench()">
+        </div>
+      </div>
+
+      <!-- RIGHT: Results -->
+      <div>
+        <div class="bench-er-compare">
+          <div class="bench-er-box" style="border-top:2px solid var(--cyan);">
+            <div class="bench-er-label">Your Engagement Rate</div>
+            <div class="bench-er-val" id="benchYourER" style="color:var(--cyan);">—</div>
+          </div>
+          <div class="bench-er-box" style="border-top:2px solid var(--green);">
+            <div class="bench-er-label">Industry Average</div>
+            <div class="bench-er-val" id="benchAvgER" style="color:var(--green);">—</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;" id="benchAvgNote"></div>
+          </div>
+        </div>
+
+        <div class="card" style="text-align:center;margin-bottom:16px;padding:32px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:8px;">Your Grade</div>
+          <div class="bench-grade" id="benchGrade" style="color:var(--amber);">—</div>
+          <div style="font-size:14px;color:var(--soft);margin-top:8px;" id="benchGradeNote"></div>
+        </div>
+
+        <div class="card" id="benchTips">
+          <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Enter your metrics to see recommendations</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CAPTION GENERATOR -->
+<section id="captions">
+  <div class="section-label">AI Copywriting</div>
+  <h2 class="section-title">Caption <span>Generator</span></h2>
+  <p class="section-desc">Generate 3 distinct caption variants tailored to your platform, goal, and brand voice — powered by Claude. Requires an Anthropic API key.</p>
+
+  <div class="calc-layout">
+    <!-- LEFT: Form -->
+    <div class="calc-form">
+      <div class="form-title">Caption Settings</div>
+
+      <div class="form-group">
+        <label class="form-label">Anthropic API Key</label>
+        <div class="api-key-row">
+          <input type="password" class="form-input" id="capApiKey" placeholder="sk-ant-..." oninput="saveApiKey(this.value)">
+          <button class="api-save-btn" onclick="saveApiKey(document.getElementById('capApiKey').value)">Save</button>
+        </div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:6px;">
+          Get a key at <a href="https://console.anthropic.com" target="_blank" style="color:var(--cyan);text-decoration:none;">console.anthropic.com</a> · Stored locally, never sent to our servers.
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Model</label>
+        <div class="model-toggle" id="capModelToggle">
+          <button class="model-btn active" onclick="setCapModel('haiku', this)">Haiku — Fast</button>
+          <button class="model-btn" onclick="setCapModel('sonnet', this)">Sonnet — Better</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Platform</label>
+        <select class="form-select" id="capPlatform">
+          <option value="Instagram">Instagram</option>
+          <option value="LinkedIn">LinkedIn</option>
+          <option value="Facebook">Facebook</option>
+          <option value="TikTok">TikTok</option>
+          <option value="YouTube">YouTube</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Goal</label>
+        <select class="form-select" id="capGoal">
+          <option value="Awareness — grow reach and followers">Awareness — grow reach</option>
+          <option value="Engagement — drive comments and saves">Engagement — drive comments</option>
+          <option value="Conversion — drive clicks or sales">Conversion — clicks or sales</option>
+          <option value="Community — spark conversation">Community — spark conversation</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Brand Voice / Tone</label>
+        <input type="text" class="form-input" id="capTone" placeholder="e.g. bold and direct, warm and local, expert but accessible">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Hook Style</label>
+        <select class="form-select" id="capHook">
+          <option value="Question">Question</option>
+          <option value="Bold Stat">Bold Stat</option>
+          <option value="Story">Story</option>
+          <option value="Contrarian">Contrarian</option>
+          <option value="Pure Value">Pure Value list</option>
+          <option value="Mix — let Claude decide">Mix — let Claude decide</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Caption Length</label>
+        <select class="form-select" id="capLen">
+          <option value="Short (1-3 lines)">Short (1–3 lines)</option>
+          <option value="Medium (4-6 lines)" selected>Medium (4–6 lines)</option>
+          <option value="Long (7-10 lines)">Long (7–10 lines)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Topic / What You're Posting About</label>
+        <textarea class="form-input" id="capTopic" rows="3" placeholder="e.g. We just opened our second location in Kelowna. Announcing it with a behind-the-scenes feel." style="resize:vertical;"></textarea>
+      </div>
+
+      <button class="calc-btn" id="capBtn" onclick="generateCaptions()">Generate 3 Captions →</button>
+    </div>
+
+    <!-- RIGHT: Output -->
+    <div>
+      <div class="error-box" id="capError"></div>
+      <div class="spinner-wrap" id="capSpinner">
+        <div class="spinner"></div>
+        <div class="spinner-text">Writing your captions…</div>
+      </div>
+      <div id="capCards">
+        <div style="text-align:center;padding:60px 20px;color:var(--muted);border:1px dashed var(--border);border-radius:16px;">
+          <div style="font-size:36px;margin-bottom:12px;">✍️</div>
+          <div style="font-size:14px;font-weight:600;color:var(--soft);">Your 3 caption variants will appear here</div>
+          <div style="font-size:12px;margin-top:6px;">Fill in the form and click Generate</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- POST SCORER -->
+<section id="scorer" style="background:var(--bg2);max-width:100%;padding:0;">
+  <div style="max-width:1280px;margin:0 auto;padding:100px 48px 80px;">
+    <div class="section-label">AI Analysis</div>
+    <h2 class="section-title">Post <span>Scorer</span></h2>
+    <p class="section-desc">Get an objective score on any post — caption, visuals, hook strength, CTA, and more. Upload an image for visual scoring, or paste a caption to score copy only.</p>
+
+    <div class="calc-layout">
+      <!-- LEFT: Form -->
+      <div class="calc-form">
+        <div class="form-title">Analyze a Post</div>
+
+        <div class="form-group">
+          <label class="form-label">Anthropic API Key</label>
+          <div class="api-key-row">
+            <input type="password" class="form-input" id="scoreApiKey" placeholder="sk-ant-..." oninput="saveApiKey(this.value)">
+            <button class="api-save-btn" onclick="saveApiKey(document.getElementById('scoreApiKey').value)">Save</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Model</label>
+          <div class="model-toggle" id="scoreModelToggle">
+            <button class="model-btn active" onclick="setScoreModel('sonnet', this)">Sonnet — Recommended</button>
+            <button class="model-btn" onclick="setScoreModel('opus', this)">Opus — Best</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Platform</label>
+          <select class="form-select" id="scorePlatform">
+            <option value="Instagram">Instagram</option>
+            <option value="LinkedIn">LinkedIn</option>
+            <option value="Facebook">Facebook</option>
+            <option value="TikTok">TikTok</option>
+            <option value="YouTube">YouTube</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Caption Text</label>
+          <textarea class="form-input" id="scoreCaption" rows="5" placeholder="Paste your caption here…" style="resize:vertical;"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Post Image (optional — enables visual scoring)</label>
+          <div class="upload-zone" id="uploadZone">
+            <input type="file" accept="image/*" id="imageInput" onchange="handleImageUpload(event)">
+            <div style="font-size:28px;margin-bottom:8px;">🖼️</div>
+            <div style="font-size:13px;font-weight:600;color:var(--soft);">Drop image here or click to upload</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">JPG, PNG, WebP — max 5MB</div>
+            <img id="imgPreview" class="img-preview" alt="Preview">
+          </div>
+        </div>
+
+        <button class="calc-btn" id="scoreBtn" onclick="scorePost()">Analyze Post →</button>
+      </div>
+
+      <!-- RIGHT: Results -->
+      <div>
+        <div class="error-box" id="scoreError"></div>
+        <div class="spinner-wrap" id="scoreSpinner">
+          <div class="spinner"></div>
+          <div class="spinner-text">Analyzing your post…</div>
+        </div>
+        <div id="scoreResults" style="display:none;">
+          <!-- Filled by JS -->
+        </div>
+        <div id="scoreEmpty" style="text-align:center;padding:60px 20px;color:var(--muted);border:1px dashed var(--border);border-radius:16px;">
+          <div style="font-size:36px;margin-bottom:12px;">🎯</div>
+          <div style="font-size:14px;font-weight:600;color:var(--soft);">Your post analysis will appear here</div>
+          <div style="font-size:12px;margin-top:6px;">Paste a caption and click Analyze</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<div style="height:60px;background:var(--bg);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;">
+  <span style="font-size:12px;color:var(--muted);">SocialIntel · Stage 1 · Built for western Canada social teams</span>
+</div>
+
+<script>
+
+// ─────────────────────────────────────────
+// DATA
+// ─────────────────────────────────────────
+
+// Base heatmap scores: [7 days][6 time slots]
+// Days: Mon Tue Wed Thu Fri Sat Sun
+// Times: 5-8am | 8-11am | 11am-2pm | 2-5pm | 5-8pm | 8pm+
+const HEAT_BASE = {
+  instagram: [
+    [28, 70, 64, 58, 82, 44],
+    [32, 78, 70, 62, 86, 46],
+    [34, 80, 72, 64, 86, 46],
+    [32, 76, 70, 62, 83, 44],
+    [28, 68, 64, 58, 78, 50],
+    [16, 40, 60, 62, 72, 58],
+    [14, 34, 56, 54, 66, 52],
+  ],
+  linkedin: [
+    [46, 84, 70, 56, 44, 14],
+    [50, 90, 76, 60, 46, 16],
+    [52, 92, 78, 62, 48, 16],
+    [50, 88, 74, 60, 46, 14],
+    [38, 70, 60, 48, 36, 10],
+    [6,  12, 10,  8,  6,  4],
+    [4,   8,  7,  6,  5,  3],
+  ],
+  facebook: [
+    [24, 58, 62, 68, 76, 46],
+    [28, 64, 68, 72, 80, 48],
+    [30, 66, 70, 74, 80, 50],
+    [28, 62, 68, 72, 78, 48],
+    [24, 56, 62, 68, 74, 54],
+    [16, 36, 56, 64, 70, 58],
+    [14, 30, 52, 60, 66, 54],
+  ],
+  youtube: [
+    [20, 42, 50, 54, 68, 60],
+    [22, 46, 52, 56, 72, 62],
+    [22, 46, 54, 58, 72, 62],
+    [22, 44, 52, 56, 70, 60],
+    [24, 46, 54, 58, 72, 64],
+    [32, 48, 58, 62, 76, 68],
+    [34, 46, 62, 66, 78, 70],
+  ],
+  tiktok: [
+    [22, 48, 54, 64, 80, 68],
+    [24, 52, 58, 68, 84, 70],
+    [26, 54, 60, 70, 84, 72],
+    [24, 52, 58, 68, 82, 70],
+    [24, 52, 60, 70, 82, 74],
+    [20, 38, 56, 66, 78, 74],
+    [18, 32, 52, 62, 74, 70],
+  ],
+};
+
+// Industry modifiers: added to base scores (clamped 0-100)
+const INDUSTRY_MOD = {
+  general:       { d: [ 0, 0, 0, 0, 0,  0,  0], t: [ 0,  0,  0,  0,  0,  0] },
+  restaurant:    { d: [-4,-4,-4,-4,-4, 10,  8], t: [-8, -5, 15,  5, 15, -5] },
+  b2b:           { d: [ 2, 6, 6, 6, 0,-15,-20], t: [10, 15, 10,  5, -5,-15] },
+  ecommerce:     { d: [-4, 0, 0, 0, 5, 14, 12], t: [-5, -5,  5, 10, 10,  5] },
+  fitness:       { d: [-4, 0, 0, 0, 0, 10,  8], t: [15,  5, -5, -5, 10,-10] },
+  beauty:        { d: [-4, 0, 4, 4, 4, 10,  8], t: [-5, -5,  5, 10, 15, -5] },
+  entertainment: { d: [-8,-4,-4,-4,10, 20, 18], t: [-5, -5, -5,  0, 15, 15] },
+  education:     { d: [ 4, 4, 4, 4,-4,-12,-18], t: [ 0,  5, 10,  5, -5,-10] },
+  nonprofit:     { d: [ 0, 4, 4, 0,-4, -5,-10], t: [-5,  0, 10,  5,  0, -5] },
+  finance:       { d: [ 4, 6, 6, 6,-4,-15,-18], t: [10, 15, 10,  5, -5,-15] },
+  travel:        { d: [-8,-4,-4,-4, 8, 18, 20], t: [-10,-5,  0,  5, 15, 10] },
+};
+
+// Insight copy per platform
+const HEAT_INSIGHTS = {
+  instagram: [
+    { icon: '⏰', title: 'Peak Window', body: 'Wed–Thu evenings 5–8pm Pacific. Reels hit peak completion rates when audiences are in passive scroll mode.', color: 'var(--cyan)' },
+    { icon: '💾', title: 'Save-Worthy Format', body: 'Carousels generate 3× more saves than static posts. Saves are the strongest reach-amplification signal in the 2025 algorithm.', color: 'var(--green)' },
+    { icon: '🌲', title: 'BC/AB Note', body: 'Engagement dips ~18% Jul–Aug as outdoor season peaks. Plan higher content density Sep–Nov and Jan–Mar.', color: 'var(--amber)' },
+  ],
+  linkedin: [
+    { icon: '⏰', title: 'Peak Window', body: 'Tue–Thu 7–9am Pacific (8–10am Mountain). Post at 6am PST to capture early indexing before peak traffic.', color: 'var(--cyan)' },
+    { icon: '⚡', title: 'Golden Hour', body: 'Strong engagement in the first 60 min after posting unlocks distribution to 2nd and 3rd-degree connections. Reply to every comment.', color: 'var(--green)' },
+    { icon: '🏔️', title: 'BC/AB B2B Note', body: 'AB energy/trades and BC tech corridor (Vancouver, Kelowna) are most active Wed–Thu. Industry-specific posts outperform generic by 3×.', color: 'var(--amber)' },
+  ],
+  facebook: [
+    { icon: '⏰', title: 'Peak Window', body: 'Weekday 1–3pm and 3–5pm Pacific. Lunch browsing and post-work scrolling drive peak engagement.', color: 'var(--cyan)' },
+    { icon: '🤖', title: 'AI Discovery Feed', body: 'Facebook fills 50% of feeds with AI-curated content from accounts users don\'t follow. Short-form video is the primary organic discovery lever.', color: 'var(--green)' },
+    { icon: '🏘️', title: 'BC/AB Note', body: 'Local Facebook Groups remain highly active in AB and BC communities. Posting in active local groups can 5–10× your organic reach vs page posts alone.', color: 'var(--amber)' },
+  ],
+  youtube: [
+    { icon: '⏰', title: 'Upload Timing', body: 'Upload 2–3 hours BEFORE peak (1–2pm Pacific) so YouTube indexes the video before your audience arrives at 3–5pm.', color: 'var(--cyan)' },
+    { icon: '▶', title: 'Retention is King', body: 'Aim for 70%+ watch-time retention. Shorts need 85%+ completion to go wide. First 7 seconds must establish value — no slow intros.', color: 'var(--green)' },
+    { icon: '🍁', title: 'BC/AB Local SEO', body: 'Include "Calgary", "Edmonton", "Vancouver", "BC", or "Alberta" in titles and descriptions for disproportionate regional discovery at low competition.', color: 'var(--amber)' },
+  ],
+  tiktok: [
+    { icon: '⏰', title: 'Peak Window', body: 'Tue–Thu and Fri evenings 5–8pm Pacific. TikTok\'s algorithm distributes content widely — timing matters less than on other platforms, but evenings still outperform.', color: 'var(--cyan)' },
+    { icon: '🔥', title: 'Hook in 0–2s', body: 'TikTok\'s For You Page shows 3–5 seconds before a user can scroll. Your first 2 seconds determine if you get watched — lead with your strongest visual or statement.', color: 'var(--green)' },
+    { icon: '📈', title: 'ER Benchmark', body: 'TikTok average ER is 5–9% — dramatically higher than Instagram (1–3%) or LinkedIn (1–2%). If you\'re under 3% on TikTok, test different hook styles.', color: 'var(--amber)' },
+  ],
+};
+
+// Reach calculator data
+const RC_FORMATS = {
+  instagram: [
+    { label: 'Reel',       mult: 2.8 },
+    { label: 'Carousel',   mult: 1.6 },
+    { label: 'Static Post',mult: 1.0 },
+    { label: 'Story',      mult: 0.5 },
+  ],
+  linkedin: [
+    { label: 'Native Video', mult: 2.4 },
+    { label: 'Article',      mult: 2.0 },
+    { label: 'Image Post',   mult: 1.2 },
+    { label: 'Text Post',    mult: 1.0 },
+  ],
+  facebook: [
+    { label: 'Reel',      mult: 2.6 },
+    { label: 'Image Post',mult: 1.2 },
+    { label: 'Event',     mult: 1.5 },
+    { label: 'Link Post', mult: 0.8 },
+  ],
+  youtube: [
+    { label: 'Shorts',        mult: 3.0 },
+    { label: 'Long-form',     mult: 2.2 },
+    { label: 'Community Post',mult: 0.8 },
+  ],
+  tiktok: [
+    { label: 'TikTok Video', mult: 3.5 },
+  ],
+};
+
+const RC_FOLLOWER_VALS = [1000, 5000, 10000, 25000, 50000, 100000, 250000, 500000];
+
+// Organic reach % by platform (what % of followers see an average post)
+const RC_ORGANIC_RATE = {
+  instagram: 0.08,
+  linkedin:  0.10,
+  facebook:  0.03,
+  youtube:   0.15,
+  tiktok:    0.25,
+};
+
+// Content mix data: [Educational, BTS, Promotional, Entertainment, Social Proof, Inspirational]
+const MIX_DATA = {
+  instagram: {
+    general:     [25, 20, 22, 18, 10,  5],
+    restaurant:  [14, 12, 25, 32, 12,  5],
+    b2b:         [38, 22, 20,  8,  8,  4],
+    ecommerce:   [14, 14, 32, 22, 14,  4],
+    fitness:     [28, 18, 20, 20, 10,  4],
+    beauty:      [20, 16, 26, 24, 10,  4],
+    entertainment:[12, 8, 14, 44, 16,  6],
+    education:   [48, 14, 14, 14,  5,  5],
+    nonprofit:   [38, 16, 10, 16, 14,  6],
+    finance:     [42, 18, 20, 10,  5,  5],
+    travel:      [18, 14, 20, 34, 10,  4],
+  },
+  linkedin: {
+    general:     [38, 22, 20, 10,  6,  4],
+    restaurant:  [20, 16, 22, 28, 10,  4],
+    b2b:         [45, 24, 18,  6,  5,  2],
+    ecommerce:   [26, 16, 30, 18,  7,  3],
+    fitness:     [32, 20, 24, 14,  6,  4],
+    beauty:      [22, 16, 26, 24,  8,  4],
+    entertainment:[18,14, 18, 32, 12,  6],
+    education:   [52, 16, 14, 10,  5,  3],
+    nonprofit:   [45, 16, 10, 16, 10,  3],
+    finance:     [46, 20, 18,  8,  5,  3],
+    travel:      [24, 14, 20, 30,  8,  4],
+  },
+  facebook: {
+    general:     [22, 18, 26, 20, 10,  4],
+    restaurant:  [12, 10, 22, 36, 16,  4],
+    b2b:         [32, 22, 24, 12,  7,  3],
+    ecommerce:   [14, 14, 36, 22, 12,  2],
+    fitness:     [26, 18, 22, 22,  8,  4],
+    beauty:      [18, 14, 28, 26, 10,  4],
+    entertainment:[10, 8, 14, 46, 18,  4],
+    education:   [44, 14, 16, 18,  5,  3],
+    nonprofit:   [40, 14, 10, 18, 14,  4],
+    finance:     [40, 18, 22, 10,  6,  4],
+    travel:      [16, 10, 22, 36, 12,  4],
+  },
+  youtube: {
+    general:     [35, 24, 18, 14,  6,  3],
+    restaurant:  [18, 12, 20, 36, 12,  2],
+    b2b:         [44, 24, 16, 10,  4,  2],
+    ecommerce:   [20, 14, 30, 22, 12,  2],
+    fitness:     [36, 20, 20, 16,  6,  2],
+    beauty:      [22, 14, 30, 24,  8,  2],
+    entertainment:[10, 8, 12, 52, 14,  4],
+    education:   [56, 14, 12, 12,  4,  2],
+    nonprofit:   [48, 16,  8, 18,  8,  2],
+    finance:     [48, 18, 18, 10,  4,  2],
+    travel:      [20, 10, 20, 38, 10,  2],
+  },
+  tiktok: {
+    general:     [18, 14, 20, 34, 10,  4],
+    restaurant:  [10,  8, 16, 44, 18,  4],
+    b2b:         [26, 18, 24, 20,  8,  4],
+    ecommerce:   [10, 10, 28, 34, 16,  2],
+    fitness:     [26, 16, 22, 24,  8,  4],
+    beauty:      [14, 10, 26, 34, 12,  4],
+    entertainment:[ 6, 6, 10, 60, 14,  4],
+    education:   [44, 14, 14, 20,  5,  3],
+    nonprofit:   [36, 14, 12, 26,  8,  4],
+    finance:     [32, 18, 22, 18,  6,  4],
+    travel:      [10,  8, 16, 46, 16,  4],
+  },
+};
+
+const MIX_TYPES = [
+  { label: 'Educational',   color: '#4cc9f0', icon: '🎓', desc: 'Tutorials, tips, how-tos, industry insights. Builds trust and authority.' },
+  { label: 'Behind-the-Scenes', color: '#06d6a0', icon: '🎬', desc: 'Process, team culture, day-in-the-life. Humanizes your brand.' },
+  { label: 'Promotional',   color: '#b5179e', icon: '🛍️', desc: 'Products, services, offers. Keep this under 30% to avoid feed fatigue.' },
+  { label: 'Entertainment', color: '#ffd166', icon: '🎉', desc: 'Humor, trends, relatable content. Drives shares and new followers.' },
+  { label: 'Social Proof',  color: '#ef476f', icon: '⭐', desc: 'Testimonials, results, reviews, UGC. The most persuasive content type.' },
+  { label: 'Inspirational', color: '#c77dff', icon: '✨', desc: 'Motivational quotes, success stories, values-driven content.' },
+];
+
+const MIX_TIPS = {
+  general:     'A balanced mix works for most accounts. Adjust toward your audience\'s preferences as you gather data.',
+  restaurant:  'Food content dominates — entertainment and promo drive the most action. Behind-the-scenes kitchen content builds loyalty.',
+  b2b:         'Educational content is your growth engine on LinkedIn and beyond. Minimize pure entertainment; focus on professional value.',
+  ecommerce:   'Promotional content can be higher but must be balanced with education and social proof to avoid feeling spammy.',
+  fitness:     'Early-morning educational content (tips, workouts) performs well. Inspirational content drives shares.',
+  beauty:      'Visual entertainment and tutorials dominate. Before/after content is your strongest social proof format.',
+  entertainment:'Entertainment-first. Lean into trends and humor. Social proof (awards, press) adds credibility.',
+  education:   'Educational content should be your primary pillar — that\'s why people follow you. Mix in behind-the-scenes for culture.',
+  nonprofit:   'Lead with mission and impact stories. Social proof (testimonials, outcomes) drives donations. Keep promotional minimal.',
+  finance:     'Education builds the trust needed for a high-stakes industry. Avoid heavy promotion — it triggers skepticism.',
+  travel:      'Visual entertainment (destinations, experiences) performs strongest. Social proof from real travelers drives conversions.',
+};
+
+// ─────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────
+let currentPlatform = 'instagram';
+
+// ─────────────────────────────────────────
+// HEATMAP
+// ─────────────────────────────────────────
+const DAYS  = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const TIMES = ['5–8am','8–11am','11am–2pm','2–5pm','5–8pm','8pm+'];
+
+function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
+function heatColor(val) {
+  if (val < 20) return { bg: 'rgba(8,8,26,0.95)',     text: '#334155' };
+  if (val < 40) return { bg: 'rgba(67,97,238,0.15)',  text: '#4361ee' };
+  if (val < 60) return { bg: 'rgba(67,97,238,0.30)',  text: '#6d8aff' };
+  if (val < 75) return { bg: 'rgba(76,201,240,0.25)', text: '#4cc9f0' };
+  if (val < 88) return { bg: 'rgba(6,214,160,0.25)',  text: '#06d6a0' };
+  return               { bg: 'rgba(6,214,160,0.45)',  text: '#06ffbb' };
+}
+
+function buildHeatmap() {
+  const industry = document.getElementById('industrySelect').value;
+  const base     = HEAT_BASE[currentPlatform];
+  const mod      = INDUSTRY_MOD[industry];
+  const container = document.getElementById('heatmapGrid');
+  container.innerHTML = '';
+
+  const grid = document.createElement('div');
+  grid.className = 'heatmap-grid';
+
+  // Header row
+  const corner = document.createElement('div');
+  grid.appendChild(corner);
+  TIMES.forEach(t => {
+    const h = document.createElement('div');
+    h.className = 'heatmap-header';
+    h.textContent = t;
+    grid.appendChild(h);
+  });
+
+  // Data rows
+  DAYS.forEach((day, di) => {
+    const dayCell = document.createElement('div');
+    dayCell.className = 'heatmap-day';
+    dayCell.textContent = day;
+    grid.appendChild(dayCell);
+
+    TIMES.forEach((time, ti) => {
+      const raw = base[di][ti];
+      const val = clamp(raw + mod.d[di] + mod.t[ti], 0, 100);
+      const { bg, text } = heatColor(val);
+
+      const cell = document.createElement('div');
+      cell.className = 'heatmap-cell tooltip-wrap';
+      cell.style.background = bg;
+      cell.style.color = text;
+      cell.textContent = val;
+
+      const tip = document.createElement('div');
+      tip.className = 'tooltip-box';
+      tip.textContent = day + ' ' + time + ' — ' + val + '/100';
+      cell.appendChild(tip);
+
+      grid.appendChild(cell);
+    });
+  });
+
+  container.appendChild(grid);
+  buildHeatInsights();
+}
+
+function buildHeatInsights() {
+  const insights = HEAT_INSIGHTS[currentPlatform];
+  const container = document.getElementById('heatInsights');
+  container.innerHTML = '';
+  insights.forEach(ins => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.borderTop = '2px solid ' + ins.color;
+    card.innerHTML = `
+      <div style="font-size:22px;margin-bottom:10px;">${ins.icon}</div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px;">${ins.title}</div>
+      <div style="font-size:13px;color:var(--soft);line-height:1.65;">${ins.body}</div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+// Platform pill click handlers
+document.getElementById('platformPills').addEventListener('click', function(e) {
+  const btn = e.target.closest('.platform-pill');
+  if (!btn) return;
+  document.querySelectorAll('.platform-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentPlatform = btn.dataset.platform;
+  buildHeatmap();
+  rcUpdateFormats();
+  rcCalculate();
+  buildMix();
+});
+
+// ─────────────────────────────────────────
+// REACH CALCULATOR
+// ─────────────────────────────────────────
+function fmtNum(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000)    return (n / 1000).toFixed(1) + 'K';
+  return Math.round(n).toString();
+}
+
+function rcUpdateFormats() {
+  const platform = document.getElementById('rcPlatform').value;
+  const sel = document.getElementById('rcFormat');
+  sel.innerHTML = '';
+  RC_FORMATS[platform].forEach(f => {
+    const opt = document.createElement('option');
+    opt.value = f.mult;
+    opt.textContent = f.label;
+    sel.appendChild(opt);
+  });
+}
+
+function rcCalculate() {
+  const platform  = document.getElementById('rcPlatform').value;
+  const formatMult= parseFloat(document.getElementById('rcFormat').value) || 1;
+  const folIdx    = parseInt(document.getElementById('rcFollowers').value);
+  const followers = RC_FOLLOWER_VALS[folIdx] || 10000;
+  const er        = parseFloat(document.getElementById('rcER').value) / 100;
+
+  // Update display values
+  document.getElementById('rcFollowVal').textContent = fmtNum(followers);
+  document.getElementById('rcERVal').textContent     = (er * 100).toFixed(1) + '%';
+
+  const baseOrganic = RC_ORGANIC_RATE[platform] || 0.08;
+  const reach       = Math.round(followers * baseOrganic * formatMult);
+  const impressions = Math.round(reach * 1.35);
+  const engagements = Math.round(reach * er);
+  const virality    = Math.min(100, Math.round((engagements / followers) * 100 * 8));
+
+  document.getElementById('rcReach').textContent       = fmtNum(reach);
+  document.getElementById('rcImpressions').textContent = fmtNum(impressions);
+  document.getElementById('rcEngagements').textContent = fmtNum(engagements);
+  document.getElementById('rcVirality').textContent    = virality + '/100';
+
+  document.getElementById('rcReachNote').textContent  = Math.round(baseOrganic * formatMult * 100) + '% of followers';
+  document.getElementById('rcViralNote').textContent  = virality >= 70 ? '🔥 High virality potential' : virality >= 40 ? '✓ Good distribution' : 'Low — try a higher-reach format';
+
+  // Format comparison bars
+  const formats = RC_FORMATS[platform];
+  const baseReach = Math.round(followers * baseOrganic);
+  let html = '';
+  formats.forEach(f => {
+    const fReach = Math.round(baseReach * f.mult);
+    const pct    = Math.round((f.mult / 4) * 100);
+    const isActive = Math.abs(f.mult - formatMult) < 0.01;
+    html += `
+      <div style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-size:12px;font-weight:${isActive ? '700' : '500'};color:${isActive ? 'var(--cyan)' : 'var(--soft)'};">${f.label} ${isActive ? '← selected' : ''}</span>
+          <span style="font-size:12px;font-weight:700;font-family:'DM Mono',monospace;color:${isActive ? 'var(--cyan)' : 'var(--muted)'};">${fmtNum(fReach)}</span>
+        </div>
+        <div style="height:8px;background:rgba(255,255,255,0.07);border-radius:4px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:${isActive ? 'var(--cyan)' : 'rgba(255,255,255,0.15)'};border-radius:4px;transition:width 0.4s;"></div>
+        </div>
+      </div>`;
+  });
+  document.getElementById('rcFormatChart').innerHTML = html;
+
+  // Tip
+  const tips = {
+    instagram: 'Reels get 2.8× the organic reach of static posts on Instagram. If growth is a priority, make Reels your primary format.',
+    linkedin:  'Native video outperforms all other LinkedIn formats. Articles build authority but have slower distribution.',
+    facebook:  'Facebook Reels are the primary organic reach lever in 2025. Link posts get severely throttled — avoid for reach goals.',
+    youtube:   'Shorts reach new audiences 3× faster than long-form. Use Shorts as a top-of-funnel strategy.',
+    tiktok:    'TikTok\'s algorithm distributes videos to non-followers — your format multiplier is based on hook strength and completion rate.',
+  };
+  document.getElementById('rcTip').innerHTML = '<strong style="color:var(--green);">💡 Format Tip:</strong> ' + tips[platform];
+}
+
+// Sync platform select with pills
+document.getElementById('rcPlatform').addEventListener('change', function() {
+  currentPlatform = this.value;
+  document.querySelectorAll('.platform-pill').forEach(b => {
+    b.classList.toggle('active', b.dataset.platform === this.value);
+  });
+  buildHeatmap();
+  buildMix();
+});
+
+// ─────────────────────────────────────────
+// CONTENT MIX
+// ─────────────────────────────────────────
+function buildMix() {
+  const platform = document.getElementById('mixPlatform').value;
+  const industry = document.getElementById('mixIndustry').value;
+  const data     = (MIX_DATA[platform] && MIX_DATA[platform][industry]) ? MIX_DATA[platform][industry] : MIX_DATA.instagram.general;
+
+  // Bars
+  let barsHtml = '';
+  MIX_TYPES.forEach((type, i) => {
+    const pct = data[i];
+    barsHtml += `
+      <div class="mix-bar-row">
+        <div class="mix-bar-header">
+          <span class="mix-bar-label">${type.icon} ${type.label}</span>
+          <span class="mix-bar-pct">${pct}%</span>
+        </div>
+        <div class="mix-bar-track">
+          <div class="mix-bar-fill" style="width:${pct}%;background:${type.color};"></div>
+        </div>
+      </div>`;
+  });
+  document.getElementById('mixBars').innerHTML = barsHtml;
+
+  // Guide
+  let guideHtml = '';
+  MIX_TYPES.forEach(type => {
+    guideHtml += `
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border);">
+        <div style="width:10px;height:10px;border-radius:50%;background:${type.color};flex-shrink:0;margin-top:4px;"></div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:2px;">${type.label}</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.5;">${type.desc}</div>
+        </div>
+      </div>`;
+  });
+  guideHtml += ''; // remove last border via CSS last-child if needed
+  document.getElementById('mixGuide').innerHTML = guideHtml;
+
+  // Tip
+  const tip = MIX_TIPS[industry] || MIX_TIPS.general;
+  document.getElementById('mixTip').innerHTML = '<strong style="color:var(--amber);">📌 Strategy Note:</strong> ' + tip;
+}
+
+// Sync mix platform with pills
+document.getElementById('mixPlatform').addEventListener('change', function() {
+  currentPlatform = this.value;
+  document.querySelectorAll('.platform-pill').forEach(b => {
+    b.classList.toggle('active', b.dataset.platform === this.value);
+  });
+  buildHeatmap();
+});
+
+// ─────────────────────────────────────────
+// POST CALENDAR
+// ─────────────────────────────────────────
+function buildCalendar() {
+  const platform    = document.getElementById('calPlatform').value;
+  const industry    = document.getElementById('calIndustry').value;
+  const postsPerWeek= parseInt(document.getElementById('calPostsPerWeek').value);
+  document.getElementById('calPostsLabel').textContent = postsPerWeek;
+
+  const base = HEAT_BASE[platform];
+  const mod  = INDUSTRY_MOD[industry];
+
+  // Score all 42 slots
+  const slots = [];
+  DAYS.forEach((day, di) => {
+    TIMES.forEach((time, ti) => {
+      const val = clamp(base[di][ti] + mod.d[di] + mod.t[ti], 0, 100);
+      slots.push({ day, di, time, ti, val });
+    });
+  });
+
+  // Pick top N by score
+  const sorted = [...slots].sort((a, b) => b.val - a.val);
+  const topN   = sorted.slice(0, postsPerWeek);
+
+  // Build grid
+  const container = document.getElementById('calendarGrid');
+  container.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'heatmap-grid';
+
+  // Header row
+  const corner = document.createElement('div');
+  grid.appendChild(corner);
+  TIMES.forEach(t => {
+    const h = document.createElement('div');
+    h.className = 'heatmap-header';
+    h.textContent = t;
+    grid.appendChild(h);
+  });
+
+  // Data rows
+  DAYS.forEach((day, di) => {
+    const dayCell = document.createElement('div');
+    dayCell.className = 'heatmap-day';
+    dayCell.textContent = day;
+    grid.appendChild(dayCell);
+
+    TIMES.forEach((time, ti) => {
+      const val  = clamp(base[di][ti] + mod.d[di] + mod.t[ti], 0, 100);
+      const rank = topN.findIndex(s => s.di === di && s.ti === ti);
+      const isTop= rank !== -1;
+
+      const cell = document.createElement('div');
+      cell.className = 'heatmap-cell tooltip-wrap';
+
+      if (isTop) {
+        cell.style.background = 'rgba(6,214,160,0.35)';
+        cell.style.color = '#06ffbb';
+        cell.classList.add('cal-optimal');
+        cell.textContent = (rank + 1) + '★';
+      } else {
+        const { bg, text } = heatColor(val);
+        cell.style.background = bg;
+        cell.style.color = text;
+        cell.textContent = val;
+      }
+
+      const tip = document.createElement('div');
+      tip.className = 'tooltip-box';
+      tip.textContent = day + ' · ' + time + ' — ' + val + '/100' + (isTop ? ' ★ Slot #' + (rank + 1) : '');
+      cell.appendChild(tip);
+      grid.appendChild(cell);
+    });
+  });
+
+  container.appendChild(grid);
+
+  // Recommended schedule list
+  let listHtml = '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:12px;">Your Recommended Schedule</div>';
+  topN.forEach((slot, i) => {
+    listHtml += `
+      <div class="cal-slot-item">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="cal-slot-rank">${i + 1}</div>
+          <div>
+            <div style="font-size:14px;font-weight:700;">${slot.day} · ${slot.time}</div>
+            <div style="font-size:11px;color:var(--muted);">Score: ${slot.val}/100</div>
+          </div>
+        </div>
+        <div class="cal-slot-score">${slot.val}</div>
+      </div>`;
+  });
+  document.getElementById('calScheduleList').innerHTML = listHtml;
+}
+
+// ─────────────────────────────────────────
+// HASHTAG PLANNER
+// ─────────────────────────────────────────
+const HTAG_POOLS = {
+  food: {
+    macro: ['#food','#foodie','#instafood','#foodphotography','#yum','#delicious','#foodlover'],
+    mid:   ['#foodblogger','#foodstagram','#cheflife','#homecooking','#mealprep','#foodiesofinstagram'],
+    micro: ['#canadianfood','#westcoasteats','#localfood','#supportlocal','#foodcommunity'],
+    nano:  ['#yvrfood','#yycfood','#calgaryeats','#vancouverfoodie','#abfood','#bcfoodie','#yegfood'],
+  },
+  restaurant: {
+    macro: ['#restaurant','#food','#foodie','#dining','#instafood','#eeeeeats','#foodporn'],
+    mid:   ['#restaurantlife','#localrestaurant','#foodblogger','#yum','#dinnertime','#lunchtime'],
+    micro: ['#canadianrestaurant','#westcoastfood','#supportlocalfood','#hiddengemrestaurant'],
+    nano:  ['#vancouverrestaurant','#calgaryrestaurant','#yvrrestaurant','#yycfood','#abrestaurant','#bcrestaurant'],
+  },
+  fitness: {
+    macro: ['#fitness','#gym','#workout','#fitlife','#motivation','#health','#exercise'],
+    mid:   ['#personaltrainer','#fitnessmotivation','#fitfam','#strengthtraining','#gymlife','#cardio'],
+    micro: ['#canadianfitness','#fitnesscommunity','#workoutoftheday','#gymmotivation','#healthyhabits'],
+    nano:  ['#yvrfitness','#yycfitness','#vancouvergym','#calgaryfitness','#bcfit','#abfitness'],
+  },
+  beauty: {
+    macro: ['#beauty','#makeup','#skincare','#beautytips','#glam','#makeupartist','#skincareroutine'],
+    mid:   ['#makeuptutorial','#cleanbeauty','#naturalskincare','#beautyproducts','#makeuplover'],
+    micro: ['#canadianbeauty','#beautyinfluencer','#beautyblogger','#skincarecommunity','#glowup'],
+    nano:  ['#yvrmakeup','#yycbeauty','#vancouverskincare','#calgarybeauty','#bcbeauty','#abbeauty'],
+  },
+  tech: {
+    macro: ['#tech','#startup','#innovation','#technology','#software','#saas','#ai'],
+    mid:   ['#techstartup','#b2b','#digitaltransformation','#entrepreneur','#productmanagement'],
+    micro: ['#canadiantech','#techfounder','#cloudsoftware','#softwaredevelopment','#startuplife'],
+    nano:  ['#yvrtech','#vantech','#calgarytech','#bctechnology','#abtech','#techfounders'],
+  },
+  business: {
+    macro: ['#business','#entrepreneur','#marketing','#leadership','#success','#smallbusiness'],
+    mid:   ['#businesstips','#digitalmarketing','#contentmarketing','#socialmediamarketing','#growthmarketing'],
+    micro: ['#canadianbusiness','#westerncanada','#businessowner','#marketingstrategy','#agencylife'],
+    nano:  ['#yvrsmallbiz','#yycbusiness','#bcsmallbusiness','#absmallbusiness','#calgarybusiness'],
+  },
+  travel: {
+    macro: ['#travel','#adventure','#wanderlust','#explore','#vacation','#travelphotography'],
+    mid:   ['#travelgram','#canadatravel','#travelblogger','#solotravel','#travelinspiration'],
+    micro: ['#britishcolumbia','#alberta','#explorecanada','#canadianrockies','#visitbc','#visitalberta'],
+    nano:  ['#yvr','#yyc','#yeg','#explorebc','#discoveralberta','#bchiking','#rockymountains'],
+  },
+  health: {
+    macro: ['#health','#wellness','#healthy','#selfcare','#mentalhealth','#mindfulness'],
+    mid:   ['#healthylifestyle','#wellnesstips','#holistichealth','#wellbeing','#healthyliving'],
+    micro: ['#canadianwellness','#healthcommunity','#wellnessjourney','#mindbodyspirit'],
+    nano:  ['#yvrwellness','#yycwellness','#bcwellness','#abwellness','#vancouverwellness'],
+  },
+  education: {
+    macro: ['#education','#learning','#teaching','#students','#school','#knowledge','#elearning'],
+    mid:   ['#onlinelearning','#edtech','#educators','#teachersofinstagram','#professionaldevelopment'],
+    micro: ['#canadianeducation','#learninganddevelopment','#educationcommunity','#studentlife'],
+    nano:  ['#yvreducation','#yyceducation','#bcschools','#abschools','#vancouvereducation'],
+  },
+  general: {
+    macro: ['#canada','#westerncanada','#britishcolumbia','#alberta','#smallbusiness'],
+    mid:   ['#supportlocal','#community','#locallife','#canadiansmallbusiness','#entrepreneur'],
+    micro: ['#westcoastlife','#yvr','#yyc','#yeg','#kelowna','#victoria'],
+    nano:  ['#yvrlocal','#yyclocal','#bclocal','#ablocal','#vancouverlocal','#calgarylocal'],
+  },
+};
+
+// Platform-specific hashtag notes
+const HTAG_PLATFORM_NOTES = {
+  instagram: 'Use 3–5 targeted hashtags. Instagram now prioritises relevance over volume — 30 generic tags hurts reach.',
+  tiktok:    'TikTok hashtags are optional but help categorisation. Use 3–5 max: one broad, two niche. #fyp has minimal algorithmic effect.',
+  linkedin:  'Use 3–5 professional hashtags. LinkedIn hashtags are less impactful than content quality, but help with topic indexing.',
+  facebook:  'Facebook hashtags have minimal reach impact. 1–3 relevant tags is enough. Focus on Groups over hashtags for discovery.',
+  youtube:   'Add 2–3 hashtags in the description or title. YouTube uses them for category sorting, not discovery ranking.',
+};
+
+const HTAG_SIZE_STRATEGY = {
+  nano:  { macroCount: 1, midCount: 2, microCount: 3, nanoCount: 4, tip: 'Nano accounts grow fastest by targeting micro/nano hashtags where you can actually rank in Top Posts.' },
+  micro: { macroCount: 2, midCount: 3, microCount: 3, nanoCount: 2, tip: 'Blend mid-tier and micro tags. You\'re large enough to compete in mid-tier hashtags.' },
+  mid:   { macroCount: 3, midCount: 3, microCount: 2, nanoCount: 2, tip: 'Focus on mid-tier hashtags. You have enough authority to rank, but macro is still competitive.' },
+  macro: { macroCount: 4, midCount: 3, microCount: 2, nanoCount: 1, tip: 'Macro hashtags are now accessible to you. Still include micro for niche community engagement.' },
+};
+
+const HTAG_TIER_COLORS = {
+  macro: { bg: 'rgba(181,23,158,0.12)', border: 'rgba(181,23,158,0.3)', text: '#d88bf0', label: 'Macro — 1M+ posts', icon: '🌐' },
+  mid:   { bg: 'rgba(76,201,240,0.12)', border: 'rgba(76,201,240,0.3)', text: 'var(--cyan)', label: 'Mid-tier — 100K–1M posts', icon: '📊' },
+  micro: { bg: 'rgba(6,214,160,0.12)',  border: 'rgba(6,214,160,0.3)',  text: 'var(--green)', label: 'Micro — 10K–100K posts', icon: '🎯' },
+  nano:  { bg: 'rgba(255,209,102,0.12)',border: 'rgba(255,209,102,0.3)',text: 'var(--amber)', label: 'Nano / Hyper-local — under 10K', icon: '📍' },
+};
+
+function matchCategory(topic) {
+  const t = topic.toLowerCase();
+  if (/food|eat|cook|chef|dining|meal|recipe|cafe|cafe|bakery|coffee|bistro/.test(t)) return 'food';
+  if (/restaurant|bar|pub|lounge|kitchen/.test(t)) return 'restaurant';
+  if (/fit|gym|workout|train|yoga|pilates|health|wellness|nutrition/.test(t)) return 'fitness';
+  if (/beauty|makeup|skin|hair|nail|cosmetic|lash|brow/.test(t)) return 'beauty';
+  if (/tech|software|saas|app|digital|code|dev|ai|startup/.test(t)) return 'tech';
+  if (/travel|trip|tour|hotel|resort|explore|adventure|hike/.test(t)) return 'travel';
+  if (/school|learn|teach|course|class|tutor|education|student/.test(t)) return 'education';
+  if (/business|marketing|agency|brand|consult|service|b2b/.test(t)) return 'business';
+  if (/health|mental|mind|meditat|therapy|counsel/.test(t)) return 'health';
+  return 'general';
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildHashtags() {
+  const topic    = document.getElementById('htagTopic').value.trim();
+  const platform = document.getElementById('htagPlatform').value;
+  const size     = document.querySelector('input[name="htagSize"]:checked')?.value || 'nano';
+
+  if (!topic) {
+    document.getElementById('htagResults').innerHTML = `
+      <div style="text-align:center;padding:40px;color:var(--muted);">
+        <div style="font-size:36px;margin-bottom:12px;">#️⃣</div>
+        <div style="font-size:14px;font-weight:600;color:var(--soft);">Enter a topic to generate your hashtag cluster</div>
+      </div>`;
+    return;
+  }
+
+  const cat      = matchCategory(topic);
+  const pool     = HTAG_POOLS[cat] || HTAG_POOLS.general;
+  const strategy = HTAG_SIZE_STRATEGY[size];
+
+  const tiers = [
+    { key: 'macro', tags: shuffle(pool.macro).slice(0, strategy.macroCount) },
+    { key: 'mid',   tags: shuffle(pool.mid).slice(0, strategy.midCount) },
+    { key: 'micro', tags: shuffle(pool.micro).slice(0, strategy.microCount) },
+    { key: 'nano',  tags: shuffle(pool.nano).slice(0, strategy.nanoCount) },
+  ];
+
+  // Add topic-based tags
+  const words = topic.split(/\s+/).filter(w => w.length > 2);
+  const topicTags = words.slice(0, 2).map(w => '#' + w.toLowerCase().replace(/[^a-z0-9]/g, ''));
+  tiers[2].tags = [...tiers[2].tags, ...topicTags].slice(0, strategy.microCount + 2);
+
+  const allTags = tiers.flatMap(t => t.tags).join(' ');
+
+  let html = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div>
+        <div style="font-size:15px;font-weight:800;margin-bottom:2px;">${topic}</div>
+        <div style="font-size:12px;color:var(--muted);">Category match: ${cat} · ${tiers.flatMap(t=>t.tags).length} hashtags</div>
+      </div>
+      <button class="htag-copy-btn" onclick="copyAllTags('${allTags.replace(/'/g,"\\'")}')">Copy All</button>
+    </div>`;
+
+  tiers.forEach(tier => {
+    if (!tier.tags.length) return;
+    const c = HTAG_TIER_COLORS[tier.key];
+    html += `
+      <div class="htag-tier">
+        <div class="htag-tier-header">
+          <span class="htag-tier-label" style="color:${c.text};">${c.icon} ${c.label}</span>
+          <button class="htag-copy-btn" onclick="copyTier('${tier.tags.join(' ').replace(/'/g,"\\'")}', this)">Copy</button>
+        </div>
+        <div class="htag-tags">
+          ${tier.tags.map(tag => `<span class="htag-tag" style="background:${c.bg};border-color:${c.border};color:${c.text};" onclick="copyTag('${tag}',this)">${tag}</span>`).join('')}
+        </div>
+      </div>`;
+  });
+
+  html += `
+    <div class="callout callout-cyan" style="margin-top:8px;">
+      <strong style="color:var(--cyan);">Platform note:</strong> ${HTAG_PLATFORM_NOTES[platform]}
+    </div>
+    <div class="callout callout-green" style="margin-top:8px;">
+      <strong style="color:var(--green);">Size strategy:</strong> ${strategy.tip}
+    </div>`;
+
+  document.getElementById('htagResults').innerHTML = html;
+}
+
+function copyAllTags(tags) {
+  navigator.clipboard.writeText(tags).then(() => showCopyFeedback('Copied all hashtags!'));
+}
+function copyTier(tags, btn) {
+  navigator.clipboard.writeText(tags).then(() => { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 1500); });
+}
+function copyTag(tag, el) {
+  navigator.clipboard.writeText(tag).then(() => { const orig = el.textContent; el.textContent = '✓'; setTimeout(() => el.textContent = orig, 1200); });
+}
+function showCopyFeedback(msg) {
+  const el = document.createElement('div');
+  el.textContent = msg;
+  el.style.cssText = 'position:fixed;bottom:24px;right:24px;background:var(--green);color:var(--bg);padding:10px 20px;border-radius:8px;font-weight:700;font-size:13px;z-index:9999;';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2000);
+}
+
+// ─────────────────────────────────────────
+// ENGAGEMENT BENCHMARKS
+// ─────────────────────────────────────────
+// Average ER % by platform → industry → account size
+const BENCH_AVG = {
+  instagram: {
+    general:     { nano: 3.2, micro: 1.8, mid: 1.2, macro: 0.8 },
+    restaurant:  { nano: 4.2, micro: 2.4, mid: 1.5, macro: 1.0 },
+    b2b:         { nano: 2.4, micro: 1.4, mid: 0.9, macro: 0.6 },
+    ecommerce:   { nano: 2.8, micro: 1.6, mid: 1.1, macro: 0.7 },
+    fitness:     { nano: 4.8, micro: 2.8, mid: 1.8, macro: 1.1 },
+    beauty:      { nano: 4.2, micro: 2.5, mid: 1.6, macro: 1.0 },
+    entertainment:{ nano: 5.5, micro: 3.2, mid: 2.0, macro: 1.3 },
+    education:   { nano: 2.6, micro: 1.5, mid: 1.0, macro: 0.6 },
+    nonprofit:   { nano: 3.0, micro: 1.8, mid: 1.2, macro: 0.8 },
+    finance:     { nano: 2.0, micro: 1.2, mid: 0.8, macro: 0.5 },
+    travel:      { nano: 4.5, micro: 2.6, mid: 1.7, macro: 1.1 },
+  },
+  linkedin: {
+    general:     { nano: 2.0, micro: 1.4, mid: 1.0, macro: 0.7 },
+    restaurant:  { nano: 1.8, micro: 1.2, mid: 0.8, macro: 0.5 },
+    b2b:         { nano: 2.8, micro: 1.9, mid: 1.3, macro: 0.9 },
+    ecommerce:   { nano: 1.5, micro: 1.0, mid: 0.7, macro: 0.5 },
+    fitness:     { nano: 2.4, micro: 1.6, mid: 1.1, macro: 0.7 },
+    beauty:      { nano: 2.0, micro: 1.4, mid: 0.9, macro: 0.6 },
+    entertainment:{ nano: 2.5, micro: 1.7, mid: 1.1, macro: 0.7 },
+    education:   { nano: 2.6, micro: 1.8, mid: 1.2, macro: 0.8 },
+    nonprofit:   { nano: 2.4, micro: 1.6, mid: 1.1, macro: 0.7 },
+    finance:     { nano: 2.5, micro: 1.7, mid: 1.2, macro: 0.8 },
+    travel:      { nano: 2.0, micro: 1.4, mid: 0.9, macro: 0.6 },
+  },
+  facebook: {
+    general:     { nano: 2.2, micro: 1.4, mid: 0.9, macro: 0.5 },
+    restaurant:  { nano: 3.5, micro: 2.2, mid: 1.4, macro: 0.9 },
+    b2b:         { nano: 1.8, micro: 1.1, mid: 0.7, macro: 0.5 },
+    ecommerce:   { nano: 2.5, micro: 1.6, mid: 1.0, macro: 0.6 },
+    fitness:     { nano: 3.8, micro: 2.4, mid: 1.5, macro: 0.9 },
+    beauty:      { nano: 3.2, micro: 2.0, mid: 1.3, macro: 0.8 },
+    entertainment:{ nano: 4.5, micro: 2.8, mid: 1.8, macro: 1.1 },
+    education:   { nano: 2.4, micro: 1.5, mid: 1.0, macro: 0.6 },
+    nonprofit:   { nano: 2.8, micro: 1.8, mid: 1.1, macro: 0.7 },
+    finance:     { nano: 1.6, micro: 1.0, mid: 0.6, macro: 0.4 },
+    travel:      { nano: 3.8, micro: 2.4, mid: 1.5, macro: 0.9 },
+  },
+  youtube: {
+    general:     { nano: 4.0, micro: 2.8, mid: 1.8, macro: 1.2 },
+    restaurant:  { nano: 4.5, micro: 3.0, mid: 2.0, macro: 1.3 },
+    b2b:         { nano: 3.5, micro: 2.4, mid: 1.5, macro: 1.0 },
+    ecommerce:   { nano: 4.0, micro: 2.7, mid: 1.7, macro: 1.1 },
+    fitness:     { nano: 5.5, micro: 3.8, mid: 2.4, macro: 1.5 },
+    beauty:      { nano: 5.0, micro: 3.4, mid: 2.2, macro: 1.4 },
+    entertainment:{ nano: 6.0, micro: 4.2, mid: 2.7, macro: 1.7 },
+    education:   { nano: 4.2, micro: 2.9, mid: 1.9, macro: 1.2 },
+    nonprofit:   { nano: 3.8, micro: 2.6, mid: 1.7, macro: 1.0 },
+    finance:     { nano: 3.5, micro: 2.4, mid: 1.5, macro: 1.0 },
+    travel:      { nano: 5.2, micro: 3.6, mid: 2.3, macro: 1.4 },
+  },
+  tiktok: {
+    general:     { nano: 6.0, micro: 4.5, mid: 3.2, macro: 2.2 },
+    restaurant:  { nano: 7.5, micro: 5.5, mid: 4.0, macro: 2.8 },
+    b2b:         { nano: 4.5, micro: 3.3, mid: 2.4, macro: 1.7 },
+    ecommerce:   { nano: 6.5, micro: 4.8, mid: 3.4, macro: 2.3 },
+    fitness:     { nano: 8.5, micro: 6.2, mid: 4.4, macro: 3.0 },
+    beauty:      { nano: 9.0, micro: 6.5, mid: 4.6, macro: 3.1 },
+    entertainment:{ nano: 10.0,micro: 7.2, mid: 5.0, macro: 3.4 },
+    education:   { nano: 6.5, micro: 4.7, mid: 3.3, macro: 2.3 },
+    nonprofit:   { nano: 6.0, micro: 4.4, mid: 3.1, macro: 2.1 },
+    finance:     { nano: 5.5, micro: 4.0, mid: 2.8, macro: 1.9 },
+    travel:      { nano: 8.0, micro: 5.8, mid: 4.1, macro: 2.8 },
+  },
+};
+
+function calcBench() {
+  const platform    = document.getElementById('benchPlatform').value;
+  const industry    = document.getElementById('benchIndustry').value;
+  const size        = document.getElementById('benchSize').value;
+  const engagements = parseFloat(document.getElementById('benchEngagements').value) || 0;
+  const reach       = parseFloat(document.getElementById('benchReach').value) || 1;
+
+  const yourER = reach > 0 ? (engagements / reach * 100) : 0;
+  const avgER  = (BENCH_AVG[platform]?.[industry]?.[size]) ?? BENCH_AVG[platform].general[size];
+
+  const ratio = yourER / avgER;
+  let grade, gradeNote, gradeColor;
+  if      (ratio >= 2.5)  { grade = 'A+'; gradeNote = 'Exceptional — top 5% of accounts'; gradeColor = '#06d6a0'; }
+  else if (ratio >= 1.75) { grade = 'A';  gradeNote = 'Excellent — well above average';    gradeColor = '#4cc9f0'; }
+  else if (ratio >= 1.25) { grade = 'B+'; gradeNote = 'Above average — solid performance'; gradeColor = '#4cc9f0'; }
+  else if (ratio >= 0.85) { grade = 'B';  gradeNote = 'Near average — room to grow';       gradeColor = 'var(--amber)'; }
+  else if (ratio >= 0.5)  { grade = 'C';  gradeNote = 'Below average — needs attention';   gradeColor = 'var(--amber)'; }
+  else                    { grade = 'D';  gradeNote = 'Significantly below — review strategy'; gradeColor = 'var(--red)'; }
+
+  document.getElementById('benchYourER').textContent = yourER.toFixed(2) + '%';
+  document.getElementById('benchAvgER').textContent  = avgER.toFixed(2) + '%';
+  document.getElementById('benchAvgNote').textContent = size + ' accounts · ' + industry;
+  document.getElementById('benchGrade').textContent  = grade;
+  document.getElementById('benchGrade').style.color  = gradeColor;
+  document.getElementById('benchGradeNote').textContent = gradeNote;
+
+  const pctVsAvg = ((ratio - 1) * 100).toFixed(0);
+  const direction = ratio >= 1 ? '+' : '';
+
+  const tips = buildBenchTips(platform, industry, size, ratio, yourER, avgER);
+  document.getElementById('benchTips').innerHTML = `
+    <div style="font-size:13px;font-weight:700;color:var(--cyan);margin-bottom:14px;text-transform:uppercase;letter-spacing:1px;">
+      ${direction}${pctVsAvg}% vs industry average
+    </div>
+    ${tips}`;
+}
+
+function buildBenchTips(platform, industry, size, ratio, yourER, avgER) {
+  const tips = [];
+
+  if (ratio >= 1.75) {
+    tips.push({ icon: '🏆', text: 'Your ER is exceptional. Document what\'s working — content pillars, posting times, hook styles — and systematize it.' });
+    tips.push({ icon: '📈', text: 'Consider increasing posting frequency while ER is strong. Algorithm rewards consistent high-engagement accounts.' });
+    tips.push({ icon: '💡', text: 'Strong ER is the right time to test new formats. Your audience is engaged enough to absorb experimentation.' });
+  } else if (ratio >= 1.0) {
+    tips.push({ icon: '✅', text: 'You\'re performing at or above the industry benchmark. Keep your current content rhythm consistent.' });
+    tips.push({ icon: '🎯', text: 'Focus on your top 3 performing posts this month — what do they have in common? Double down on those patterns.' });
+    tips.push({ icon: '📊', text: 'Test the Post Calendar tool to see if posting at different times could lift your ER further.' });
+  } else {
+    tips.push({ icon: '⏰', text: 'Check your posting times using the Heatmap tool. Off-peak posting can cut ER by 20–40% even with great content.' });
+    tips.push({ icon: '🪝', text: 'Audit your hooks. The first 2 seconds of video or first line of a caption determines 80% of engagement outcomes.' });
+    tips.push({ icon: '🎨', text: 'Review your content mix. If you\'re posting too much promotional content, reduce it to under 25% and increase educational or entertaining posts.' });
+    tips.push({ icon: '💬', text: 'Engagement breeds engagement. Spend 15 minutes after posting replying to every comment — this signals the algorithm to distribute wider.' });
+  }
+
+  // Platform-specific tip
+  const platformTips = {
+    instagram: 'Carousels and Reels drive the most ER on Instagram. If your feed is mostly static posts, shift the mix.',
+    linkedin:  'On LinkedIn, posting 3x per week max and engaging in comments on others\' posts lifts your own distribution.',
+    facebook:  'Facebook Group posts consistently outperform Page posts for ER. Identify active local groups in your niche.',
+    youtube:   'YouTube ER is measured differently — focus on Like rate and Comment rate per view, not per follower.',
+    tiktok:    'TikTok ER is naturally higher. If yours is under 3%, focus on the first 2 seconds of your videos — that\'s where retention drops.',
+  };
+  tips.push({ icon: '📱', text: platformTips[platform] });
+
+  return tips.map(t => `
+    <div class="bench-tip-item">
+      <span class="bench-tip-icon">${t.icon}</span>
+      <span>${t.text}</span>
+    </div>`).join('');
+}
+
+// ─────────────────────────────────────────
+// SHARED: API KEY
+// ─────────────────────────────────────────
+function saveApiKey(val) {
+  localStorage.setItem('siApiKey', val.trim());
+}
+function loadApiKey() {
+  const key = localStorage.getItem('siApiKey') || '';
+  document.querySelectorAll('#capApiKey, #scoreApiKey').forEach(el => el.value = key);
+}
+
+// ─────────────────────────────────────────
+// CAPTION GENERATOR
+// ─────────────────────────────────────────
+let capModel = 'claude-haiku-4-5-20251001';
+let lastCaptions = [];
+
+function setCapModel(m, btn) {
+  capModel = m === 'haiku' ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-6';
+  document.querySelectorAll('#capModelToggle .model-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+async function generateCaptions() {
+  const apiKey = localStorage.getItem('siApiKey') || '';
+  if (!apiKey) { showCapError('Enter and save your Anthropic API key above.'); return; }
+
+  const topic = document.getElementById('capTopic').value.trim();
+  if (!topic)  { showCapError('Enter a topic in the field above.'); return; }
+
+  const platform = document.getElementById('capPlatform').value;
+  const goal     = document.getElementById('capGoal').value;
+  const tone     = document.getElementById('capTone').value.trim() || 'professional and approachable';
+  const hook     = document.getElementById('capHook').value;
+  const len      = document.getElementById('capLen').value;
+
+  const btn = document.getElementById('capBtn');
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+  document.getElementById('capSpinner').style.display = 'flex';
+  document.getElementById('capCards').innerHTML = '';
+  document.getElementById('capError').style.display = 'none';
+
+  const sysPrompt = `You are an expert social media copywriter for western Canadian businesses (BC and Alberta). Brand voice: ${tone}. Return valid JSON only — no markdown, no explanation.`;
+
+  const userPrompt = `Write 3 distinct ${platform} caption variants.
+Goal: ${goal}
+Topic: ${topic}
+Hook style: ${hook}
+Length: ${len}
+
+Return ONLY this JSON (no markdown fences):
+[
+  {"hook_type":"Question","caption":"full caption here","hashtags":["#tag1","#tag2","#tag3"],"read_time_seconds":20},
+  {"hook_type":"Bold Stat","caption":"full caption here","hashtags":["#tag1","#tag2"],"read_time_seconds":15},
+  {"hook_type":"Story","caption":"full caption here","hashtags":["#tag1","#tag2","#tag3"],"read_time_seconds":25}
+]`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: capModel,
+        max_tokens: 1400,
+        system: sysPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || 'API error ' + res.status);
+    }
+
+    const data = await res.json();
+    let raw = data.content[0].text.trim();
+    // Strip markdown fences if model adds them
+    raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    const parsed = JSON.parse(raw);
+    lastCaptions = parsed;
+    renderCaptions(parsed);
+  } catch (err) {
+    showCapError('⚠️ ' + (err.message || 'Something went wrong. Check your API key.'));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate 3 Captions →';
+    document.getElementById('capSpinner').style.display = 'none';
+  }
+}
+
+const HOOK_COLORS = {
+  'question':    { bg: 'rgba(76,201,240,0.15)',  text: 'var(--cyan)' },
+  'bold stat':   { bg: 'rgba(255,209,102,0.15)', text: 'var(--amber)' },
+  'story':       { bg: 'rgba(181,23,158,0.15)',  text: '#d88bf0' },
+  'contrarian':  { bg: 'rgba(239,71,111,0.15)',  text: 'var(--red)' },
+  'pure value':  { bg: 'rgba(6,214,160,0.15)',   text: 'var(--green)' },
+};
+
+function hookStyle(type) {
+  const key = (type || '').toLowerCase().split(' ').slice(0, 2).join(' ');
+  return HOOK_COLORS[key] || { bg: 'rgba(255,255,255,0.08)', text: 'var(--soft)' };
+}
+
+function renderCaptions(data) {
+  const container = document.getElementById('capCards');
+  container.innerHTML = data.map((c, i) => {
+    const { bg, text } = hookStyle(c.hook_type);
+    const tags = (c.hashtags || []).map(h => `<span class="cap-hashtag">${h.startsWith('#') ? h : '#' + h}</span>`).join('');
+    return `
+      <div class="caption-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <span class="cap-hook-badge" style="background:${bg};color:${text};">${c.hook_type}</span>
+          <span style="font-size:11px;color:var(--muted);">Variant ${i + 1}</span>
+        </div>
+        <div class="cap-body">${escHtml(c.caption)}</div>
+        ${tags ? `<div class="cap-hashtags">${tags}</div>` : ''}
+        <div class="cap-footer">
+          <span class="cap-meta">~${Math.ceil((c.read_time_seconds || 15) / 60) * 60}s read</span>
+          <button class="copy-btn" onclick="copyCaption(${i})">Copy</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function copyCaption(i) {
+  const c = lastCaptions[i];
+  if (!c) return;
+  const tags = (c.hashtags || []).map(h => h.startsWith('#') ? h : '#' + h).join(' ');
+  const text = c.caption + (tags ? '\n\n' + tags : '');
+  navigator.clipboard.writeText(text).then(() => {
+    const btns = document.querySelectorAll('#capCards .copy-btn');
+    if (btns[i]) { btns[i].textContent = 'Copied!'; setTimeout(() => btns[i].textContent = 'Copy', 1800); }
+  });
+}
+
+function showCapError(msg) {
+  const el = document.getElementById('capError');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function escHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─────────────────────────────────────────
+// POST SCORER
+// ─────────────────────────────────────────
+let scoreModel = 'claude-sonnet-4-6';
+let uploadedImage = null;
+let uploadedImageType = 'image/jpeg';
+
+function setScoreModel(m, btn) {
+  scoreModel = m === 'sonnet' ? 'claude-sonnet-4-6' : 'claude-opus-4-5';
+  document.querySelectorAll('#scoreModelToggle .model-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function handleImageUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  uploadedImageType = file.type || 'image/jpeg';
+  const reader = new FileReader();
+  reader.onload = ev => {
+    uploadedImage = ev.target.result.split(',')[1];
+    const prev = document.getElementById('imgPreview');
+    prev.src = ev.target.result;
+    prev.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+// Drag-and-drop for upload zone
+(function() {
+  const zone = document.getElementById('uploadZone');
+  if (!zone) return;
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('image/')) {
+      document.getElementById('imageInput').files;
+      handleImageUpload({ target: { files: [f] } });
+    }
+  });
+})();
+
+async function scorePost() {
+  const apiKey  = localStorage.getItem('siApiKey') || '';
+  if (!apiKey)  { showScoreError('Enter and save your Anthropic API key above.'); return; }
+  const caption = document.getElementById('scoreCaption').value.trim();
+  if (!caption) { showScoreError('Paste a caption to analyze.'); return; }
+
+  const platform = document.getElementById('scorePlatform').value;
+  const btn = document.getElementById('scoreBtn');
+  btn.disabled = true;
+  btn.textContent = 'Analyzing…';
+  document.getElementById('scoreSpinner').style.display = 'flex';
+  document.getElementById('scoreResults').style.display = 'none';
+  document.getElementById('scoreEmpty').style.display = 'none';
+  document.getElementById('scoreError').style.display = 'none';
+
+  const content = [];
+  if (uploadedImage) {
+    content.push({ type: 'image', source: { type: 'base64', media_type: uploadedImageType, data: uploadedImage } });
+  }
+  content.push({ type: 'text', text: `Score this ${platform} post.${uploadedImage ? ' Use the image above.' : ''}
+Caption: "${caption}"
+
+Return ONLY valid JSON (no markdown):
+{"overall":75,"grade":"B+","dimensions":[{"label":"Hook Strength","score":80,"note":"One-line insight"},{"label":"Visual Stop-Power","score":70,"note":"One-line insight"},{"label":"Caption Clarity","score":75,"note":"One-line insight"},{"label":"CTA Strength","score":65,"note":"One-line insight"},{"label":"Hashtag Relevance","score":80,"note":"One-line insight"},{"label":"Brand Consistency","score":78,"note":"One-line insight"}],"wins":["Win 1","Win 2","Win 3"],"improve":["Fix 1","Fix 2","Fix 3"],"quick_win":"One specific, actionable improvement that would have the biggest impact.","summary":"Two-sentence overall assessment."}`
+  });
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: scoreModel,
+        max_tokens: 900,
+        system: `You are an expert ${platform} performance analyst. Score posts objectively based on platform best practices. Return valid JSON only.`,
+        messages: [{ role: 'user', content }],
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || 'API error ' + res.status);
+    }
+
+    const data = await res.json();
+    let raw = data.content[0].text.trim();
+    raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    const parsed = JSON.parse(raw);
+    renderScore(parsed);
+  } catch (err) {
+    showScoreError('⚠️ ' + (err.message || 'Something went wrong. Check your API key.'));
+    document.getElementById('scoreEmpty').style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Analyze Post →';
+    document.getElementById('scoreSpinner').style.display = 'none';
+  }
+}
+
+function renderScore(d) {
+  const overall = d.overall || 0;
+  const scoreColor = overall >= 80 ? 'var(--green)' : overall >= 60 ? 'var(--cyan)' : overall >= 45 ? 'var(--amber)' : 'var(--red)';
+
+  const dimBars = (d.dimensions || []).map(dim => {
+    const fillColor = dim.score >= 80 ? 'var(--green)' : dim.score >= 60 ? 'var(--cyan)' : dim.score >= 45 ? 'var(--amber)' : 'var(--red)';
+    return `
+      <div class="dim-row">
+        <div class="dim-header">
+          <span class="dim-label">${dim.label}</span>
+          <span class="dim-score" style="color:${fillColor};">${dim.score}/100</span>
+        </div>
+        <div class="dim-track"><div class="dim-fill" style="width:${dim.score}%;background:${fillColor};"></div></div>
+        <div class="dim-note">${escHtml(dim.note || '')}</div>
+      </div>`;
+  }).join('');
+
+  const wins    = (d.wins || []).map(w => `<div class="fb-item fb-win">${escHtml(w)}</div>`).join('');
+  const improve = (d.improve || []).map(f => `<div class="fb-item fb-fix">${escHtml(f)}</div>`).join('');
+
+  document.getElementById('scoreResults').style.display = 'block';
+  document.getElementById('scoreResults').innerHTML = `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="score-display">
+        <div class="score-big" style="color:${scoreColor};">${overall}</div>
+        <div class="score-grade-lbl" style="color:${scoreColor};">${d.grade || ''}</div>
+      </div>
+      <div style="font-size:13px;color:var(--muted);">${escHtml(d.summary || '')}</div>
+    </div>
+
+    <div class="dims-wrap">
+      <div class="dims-title">Score Breakdown</div>
+      ${dimBars}
+    </div>
+
+    <div class="quick-win-box">
+      <div class="quick-win-label">⚡ Quick Win</div>
+      <div class="quick-win-text">${escHtml(d.quick_win || '')}</div>
+    </div>
+
+    <div class="feedback-cols">
+      <div class="feedback-card">
+        <div class="feedback-title" style="color:var(--green);">✓ What's Working</div>
+        ${wins}
+      </div>
+      <div class="feedback-card">
+        <div class="feedback-title" style="color:var(--amber);">→ To Improve</div>
+        ${improve}
+      </div>
+    </div>`;
+}
+
+function showScoreError(msg) {
+  const el = document.getElementById('scoreError');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+// ─────────────────────────────────────────
+// NAV ACTIVE LINK
+// ─────────────────────────────────────────
+const navLinks = document.querySelectorAll('.nav-links a');
+window.addEventListener('scroll', () => {
+  let current = 'hero';
+  document.querySelectorAll('section[id]').forEach(s => {
+    if (window.scrollY >= s.offsetTop - 80) current = s.id;
+  });
+  navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + current));
+}, { passive: true });
+
+// ─────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────
+loadApiKey();
+rcUpdateFormats();
+rcCalculate();
+buildHeatmap();
+buildMix();
+buildCalendar();
+calcBench();
+
+</script>
+</body>
+</html>

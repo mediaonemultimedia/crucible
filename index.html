@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crucible — a series of real-time studies</title>
+<meta name="description" content="An ongoing series of self-contained real-time graphics studies. Three.js, WebGL and WebGPU, one HTML file each.">
+<meta name="color-scheme" content="dark">
+<style>
+:root{
+  --bg:#07080a;
+  --ink:#e8e3d8;
+  --dim:#7b8087;
+  --faint:#4a4e54;
+  --rule:rgba(232,227,216,.11);
+  --rule-2:rgba(232,227,216,.055);
+  --accent:#c8a877;
+  --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);font-weight:300;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  min-height:100vh;
+}
+
+/* ambient field ---------------------------------------------------------- */
+#field{
+  position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(120% 80% at 18% 0%,rgba(200,168,119,.055) 0%,transparent 58%),
+    radial-gradient(100% 90% at 100% 100%,rgba(120,150,190,.045) 0%,transparent 55%);
+}
+#grain{
+  position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.16;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='.5'/></svg>");
+}
+
+.eyebrow{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.20em;
+  text-transform:uppercase;color:var(--faint);
+}
+
+/* shell ------------------------------------------------------------------ */
+.wrap{
+  position:relative;z-index:2;
+  max-width:1080px;margin:0 auto;padding:0 clamp(22px,5vw,56px);
+}
+
+/* masthead --------------------------------------------------------------- */
+header.top{padding:clamp(52px,11vh,116px) 0 clamp(38px,7vh,66px)}
+.rule-top{height:1px;background:var(--rule);margin-bottom:26px}
+h1{
+  margin:0;font-size:clamp(30px,7.2vw,56px);font-weight:200;
+  letter-spacing:.34em;text-transform:uppercase;line-height:1.06;
+}
+.tag{margin-top:20px;display:block}
+.lede{
+  margin:30px 0 0;max-width:56ch;
+  font-size:clamp(14px,1.55vw,16px);line-height:1.82;color:var(--dim);
+  font-weight:300;letter-spacing:.012em;
+}
+.lede em{color:var(--ink);font-style:normal}
+
+/* meta strip ------------------------------------------------------------- */
+.meta{
+  margin-top:34px;display:flex;flex-wrap:wrap;gap:10px 30px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--faint);
+}
+.meta b{color:var(--dim);font-weight:400}
+
+/* index list ------------------------------------------------------------- */
+section.index{padding-bottom:clamp(46px,9vh,92px)}
+.index-head{
+  display:flex;justify-content:space-between;align-items:baseline;gap:14px;
+  padding-bottom:12px;border-bottom:1px solid var(--rule);
+}
+ol.studies{list-style:none;margin:0;padding:0}
+ol.studies li{border-bottom:1px solid var(--rule-2)}
+
+.row{
+  display:grid;
+  grid-template-columns:56px minmax(0,1fr) minmax(0,1.15fr) 74px;
+  align-items:baseline;gap:0 20px;
+  padding:19px 10px 18px 4px;
+  text-decoration:none;color:inherit;
+  position:relative;
+  transition:background .34s ease,padding-left .34s cubic-bezier(.4,0,.2,1);
+}
+.row::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:1px;
+  background:var(--accent);transform:scaleY(0);transform-origin:50% 0;
+  transition:transform .38s cubic-bezier(.4,0,.2,1);
+}
+a.row:hover,a.row:focus-visible{
+  background:rgba(232,227,216,.028);padding-left:14px;outline:none;
+}
+a.row:hover::before,a.row:focus-visible::before{transform:scaleY(1)}
+
+.n{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;
+  color:var(--faint);transition:color .34s ease;
+}
+a.row:hover .n,a.row:focus-visible .n{color:var(--accent)}
+
+.name{
+  font-size:clamp(17px,2.5vw,23px);font-weight:300;
+  letter-spacing:.20em;text-transform:uppercase;line-height:1.16;
+  transition:color .34s ease;
+}
+.desc{
+  font-family:var(--mono);font-size:8.5px;line-height:1.9;
+  letter-spacing:.055em;color:var(--faint);
+}
+.state{
+  font-family:var(--mono);font-size:8px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--faint);
+  justify-self:end;white-space:nowrap;
+  border:1px solid var(--rule);padding:3px 5px 2px;line-height:1;
+}
+a.row .state{color:rgba(200,168,119,.62);border-color:rgba(200,168,119,.26)}
+a.row:hover .state,a.row:focus-visible .state{color:var(--accent);border-color:rgba(200,168,119,.5)}
+
+/* pending rows */
+li.pending .row{cursor:default}
+li.pending .name{color:var(--faint)}
+li.pending .n{color:rgba(232,227,216,.16)}
+li.pending .state{color:var(--faint);border-style:dashed;border-color:var(--rule)}
+
+/* colophon --------------------------------------------------------------- */
+footer.colophon{
+  border-top:1px solid var(--rule);
+  padding:30px 0 clamp(42px,8vh,80px);
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:26px 40px;
+}
+.col h4{
+  margin:0 0 10px;font-family:var(--mono);font-size:9px;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--faint);font-weight:400;
+}
+.col p{
+  margin:0;font-family:var(--mono);font-size:8.5px;line-height:1.95;
+  letter-spacing:.05em;color:var(--faint);
+}
+.col p b{color:var(--dim);font-weight:400}
+.col a{color:var(--dim);text-decoration:none;border-bottom:1px solid var(--rule)}
+.col a:hover{color:var(--accent);border-bottom-color:rgba(200,168,119,.45)}
+
+/* quiet side door — deliberately de-emphasised, not a peer of the studies */
+.sidedoor{
+  padding:0 0 clamp(30px,6vh,54px);
+  font-family:var(--mono);font-size:8px;letter-spacing:.16em;
+  text-transform:uppercase;color:rgba(232,227,216,.13);
+}
+.sidedoor a{
+  color:inherit;text-decoration:none;border-bottom:1px solid transparent;
+  transition:color .4s ease,border-color .4s ease;
+}
+.sidedoor a:hover,.sidedoor a:focus-visible{
+  color:var(--faint);border-bottom-color:rgba(232,227,216,.14);outline:none;
+}
+
+@media (max-width:720px){
+  .row{grid-template-columns:44px minmax(0,1fr) 66px;gap:0 14px;padding:17px 6px 16px 4px}
+  .desc{grid-column:2/4;margin-top:7px}
+  .state{grid-column:3;grid-row:1}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important}
+}
+</style>
+</head>
+<body>
+<div id="field"></div>
+<div id="grain"></div>
+
+<div class="wrap">
+
+  <header class="top">
+    <div class="rule-top"></div>
+    <h1>Crucible</h1>
+    <span class="eyebrow tag">A series of real-time studies</span>
+
+    <p class="lede">
+      A playground, kept in the open. Each piece takes one narrow technical
+      question — how cloth settles, how a splat cloud resolves, how type behaves
+      as a cast object — and follows it far enough to learn something.
+      <em>These are studies, not products.</em> They are built to be looked at,
+      pulled apart, and abandoned when the question runs out.
+    </p>
+
+    <div class="meta">
+      <span><b>Three.js</b> · WebGL · WebGPU</span>
+      <span><b>Single file</b> each · no build step</span>
+      <span><b>10</b> studies · <b>4</b> live</span>
+    </div>
+  </header>
+
+  <section class="index">
+    <div class="index-head">
+      <span class="eyebrow">Index</span>
+      <span class="eyebrow">2025—</span>
+    </div>
+
+    <ol class="studies">
+
+      <li class="pending">
+        <div class="row">
+          <span class="n">No. 03</span>
+          <span class="name">Mercury</span>
+          <span class="desc">Rebuild in progress</span>
+          <span class="state">Pending</span>
+        </div>
+      </li>
+
+      <li class="pending">
+        <div class="row">
+          <span class="n">No. 04</span>
+          <span class="name">Torsion</span>
+          <span class="desc">Rebuild in progress</span>
+          <span class="state">Pending</span>
+        </div>
+      </li>
+
+      <li class="pending">
+        <div class="row">
+          <span class="n">No. 05</span>
+          <span class="name">Torsion 2.0</span>
+          <span class="desc">Rebuild in progress</span>
+          <span class="state">Pending</span>
+        </div>
+      </li>
+
+      <li class="pending">
+        <div class="row">
+          <span class="n">No. 06</span>
+          <span class="name">Weft</span>
+          <span class="desc">Real-time cloth study · rebuild in progress</span>
+          <span class="state">Pending</span>
+        </div>
+      </li>
+
+      <li>
+        <a class="row" href="cast/">
+          <span class="n">No. 07</span>
+          <span class="name">Cast</span>
+          <span class="desc">Kinetic typography as a cast, lit, physical object</span>
+          <span class="state">View</span>
+        </a>
+      </li>
+
+      <li>
+        <a class="row" href="solve/">
+          <span class="n">No. 08</span>
+          <span class="name">Solve</span>
+          <span class="desc">GPU compute fluid — pressure solve in WebGPU</span>
+          <span class="state">View</span>
+        </a>
+      </li>
+
+      <li>
+        <a class="row" href="torsion-pineapple/">
+          <span class="n">No. 09</span>
+          <span class="name">Torsion Pineapple</span>
+          <span class="desc">Imported mesh driven through a torsion field</span>
+          <span class="state">View</span>
+        </a>
+      </li>
+
+      <li>
+        <a class="row" href="anneal/">
+          <span class="n">No. 10</span>
+          <span class="name">Anneal</span>
+          <span class="desc">Gaussian splats resolving out of disorder</span>
+          <span class="state">View</span>
+        </a>
+      </li>
+
+    </ol>
+  </section>
+
+  <footer class="colophon">
+    <div class="col">
+      <h4>Method</h4>
+      <p>
+        Every study is one self-contained HTML file with its assets inlined.
+        Open it in a browser and it runs — <b>no build, no server, no install</b>.
+        Written against <b>Three.js</b>, with raw <b>WebGL</b> and <b>WebGPU</b>
+        where the study calls for it.
+      </p>
+    </div>
+    <div class="col">
+      <h4>Controls</h4>
+      <p>
+        Each piece carries its own panel. Press <b>C</b> to open it,
+        <b>space</b> to pause, <b>R</b> to reset, <b>← →</b> to scrub.
+        Drag to orbit.
+      </p>
+    </div>
+    <div class="col">
+      <h4>Attribution</h4>
+      <p>
+        <b>No. 09</b> and <b>No. 10</b> are built from the “Pineapple” mesh by
+        <b>Rainbow</b> — <a href="https://sketchfab.com/encoded01" rel="noopener noreferrer" target="_blank">sketchfab.com/encoded01</a> —
+        used under <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener noreferrer" target="_blank">CC&nbsp;BY&nbsp;4.0</a>.
+      </p>
+    </div>
+    <div class="col">
+      <h4>Status</h4>
+      <p>
+        Studies <b>03–06</b> were lost to a storage failure and are being
+        rebuilt. They will appear here as they land. Numbering follows
+        build order, not merit.
+      </p>
+    </div>
+  </footer>
+
+  <div class="sidedoor"><a href="archive/">Archive</a></div>
+
+</div>
+</body>
+</html>

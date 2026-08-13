@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MorphField</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#060608;overflow:hidden;font-family:'SF Mono',ui-monospace,monospace;color:#e0e0e0}
+canvas{position:fixed;top:0;left:0;width:100vw;height:100vh;display:block}
+
+/* ── Panel ── */
+#panel{
+  position:fixed;top:0;right:0;width:272px;height:100vh;
+  background:rgba(8,8,14,0.88);backdrop-filter:blur(16px);
+  border-left:1px solid rgba(255,255,255,0.07);
+  overflow-y:auto;padding:16px 14px 120px;
+  display:flex;flex-direction:column;gap:6px;
+}
+#panel::-webkit-scrollbar{width:3px}
+#panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.12);border-radius:2px}
+
+.app-title{
+  font-size:17px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  background:linear-gradient(135deg,#a78bfa 0%,#38bdf8 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin-bottom:2px;padding-top:2px;
+}
+.app-sub{font-size:9px;color:rgba(255,255,255,0.25);letter-spacing:.08em;margin-bottom:4px}
+
+.presets{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:2px}
+.preset-btn{
+  padding:5px 4px;background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.08);border-radius:6px;
+  font-size:9px;color:rgba(255,255,255,0.5);cursor:pointer;
+  letter-spacing:.05em;transition:all .15s;font-family:inherit;
+  text-transform:uppercase;
+}
+.preset-btn:hover{background:rgba(255,255,255,0.09);color:#fff;border-color:rgba(255,255,255,0.18)}
+.preset-btn.active{border-color:rgba(167,139,250,0.5);color:#c4b5fd}
+
+.sec{
+  font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:rgba(255,255,255,0.22);padding:8px 0 3px;
+  border-top:1px solid rgba(255,255,255,0.05);margin-top:2px;
+}
+
+.ctrl{display:flex;flex-direction:column;gap:3px;margin-bottom:2px}
+.ctrl-row{display:flex;justify-content:space-between;align-items:center}
+.ctrl-label{font-size:10px;color:rgba(255,255,255,0.55)}
+.ctrl-val{font-size:9px;color:rgba(255,255,255,0.3);min-width:32px;text-align:right;font-variant-numeric:tabular-nums}
+
+input[type=range]{
+  -webkit-appearance:none;width:100%;height:2px;
+  background:rgba(255,255,255,0.08);border-radius:2px;outline:none;cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:11px;height:11px;border-radius:50%;
+  background:linear-gradient(135deg,#a78bfa,#38bdf8);cursor:pointer;
+  box-shadow:0 0 7px rgba(167,139,250,0.5);
+}
+input[type=range]:disabled{opacity:.35;cursor:default}
+input[type=range]:disabled::-webkit-slider-thumb{box-shadow:none}
+
+.color-row{display:flex;gap:6px}
+.color-ctrl{flex:1;display:flex;flex-direction:column;gap:3px}
+.color-label{font-size:9px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:.06em}
+input[type=color]{
+  -webkit-appearance:none;width:100%;height:26px;
+  border:1px solid rgba(255,255,255,0.1);border-radius:6px;
+  cursor:pointer;padding:2px;background:transparent;
+}
+input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+input[type=color]::-webkit-color-swatch{border:none;border-radius:4px}
+
+.tog-row{display:flex;gap:6px;margin-top:2px}
+.tog{
+  flex:1;padding:6px;background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.08);border-radius:6px;
+  font-size:9px;color:rgba(255,255,255,0.4);cursor:pointer;
+  letter-spacing:.05em;transition:all .15s;font-family:inherit;
+  text-transform:uppercase;display:flex;align-items:center;gap:5px;
+}
+.tog:hover{background:rgba(255,255,255,0.08);color:#fff}
+.tog .dot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,0.2);flex-shrink:0;transition:all .15s}
+.tog.on .dot{background:#a78bfa;box-shadow:0 0 5px #a78bfa}
+.tog.on{border-color:rgba(167,139,250,0.3);color:#c4b5fd}
+
+/* ── Keyframe panel section ── */
+#kf-list{display:flex;flex-direction:column;gap:5px;margin-top:2px}
+.kf-item{
+  display:flex;align-items:center;gap:6px;
+  padding:6px 8px;border-radius:7px;
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);
+  cursor:pointer;transition:all .15s;
+}
+.kf-item:hover{background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.15)}
+.kf-item.current{border-color:rgba(167,139,250,0.5);background:rgba(167,139,250,0.07)}
+.kf-num{font-size:9px;color:rgba(255,255,255,0.3);min-width:16px}
+.kf-swatches{display:flex;gap:3px;flex:1}
+.kf-swatch{width:18px;height:18px;border-radius:4px;border:1px solid rgba(255,255,255,0.1)}
+.kf-label{font-size:9px;color:rgba(255,255,255,0.4);flex:1;letter-spacing:.04em}
+.kf-del{
+  font-size:10px;color:rgba(255,255,255,0.2);cursor:pointer;
+  padding:2px 5px;border-radius:4px;border:none;background:transparent;
+  font-family:inherit;transition:all .12s;line-height:1;
+}
+.kf-del:hover{color:#f87171;background:rgba(248,113,113,0.1)}
+.kf-add-btn{
+  padding:7px;background:rgba(167,139,250,0.08);
+  border:1px dashed rgba(167,139,250,0.3);border-radius:7px;
+  font-size:9px;color:rgba(167,139,250,0.7);cursor:pointer;
+  letter-spacing:.08em;transition:all .15s;font-family:inherit;
+  text-transform:uppercase;text-align:center;
+}
+.kf-add-btn:hover{background:rgba(167,139,250,0.15);border-color:rgba(167,139,250,0.6);color:#c4b5fd}
+.kf-hint{font-size:9px;color:rgba(255,255,255,0.2);text-align:center;padding:8px 0;line-height:1.5}
+
+.snap-settings{
+  display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;
+  padding:8px;background:rgba(255,255,255,0.03);border-radius:7px;
+  border:1px solid rgba(255,255,255,0.06);
+}
+.snap-field{display:flex;flex-direction:column;gap:3px}
+.snap-field label{font-size:8.5px;color:rgba(255,255,255,0.3);letter-spacing:.08em;text-transform:uppercase}
+.snap-field input[type=number]{
+  width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
+  border-radius:5px;color:#e0e0e0;font-size:11px;font-family:inherit;
+  padding:4px 6px;outline:none;transition:border-color .15s;
+  -moz-appearance:textfield;
+}
+.snap-field input[type=number]::-webkit-inner-spin-button{opacity:.4}
+.snap-field input[type=number]:focus{border-color:rgba(167,139,250,0.5)}
+
+/* ── Keyframe bottom bar ── */
+#kf-bar{
+  position:fixed;bottom:28px;left:0;right:272px;
+  display:flex;justify-content:center;align-items:center;gap:10px;
+  pointer-events:none;z-index:20;
+  transition:opacity .3s;
+}
+#kf-bar>*{pointer-events:all}
+#kf-bar.hidden{opacity:0;pointer-events:none}
+
+.kf-nav{
+  width:32px;height:32px;border-radius:50%;
+  background:rgba(10,10,18,0.85);backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,0.1);
+  color:rgba(255,255,255,0.5);font-size:13px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;
+}
+.kf-nav:hover{background:rgba(167,139,250,0.2);border-color:rgba(167,139,250,0.4);color:#fff}
+.kf-nav:disabled{opacity:.25;cursor:default;pointer-events:none}
+
+#kf-dots{display:flex;align-items:center;gap:7px}
+.kf-dot{
+  width:7px;height:7px;border-radius:50%;
+  background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.25);
+  cursor:pointer;transition:all .25s;position:relative;
+}
+.kf-dot:hover{background:rgba(255,255,255,0.45);transform:scale(1.2)}
+.kf-dot.active{
+  background:#a78bfa;border-color:#c4b5fd;
+  box-shadow:0 0 8px rgba(167,139,250,0.7);
+  transform:scale(1.25);
+}
+.kf-dot.transit{
+  background:rgba(167,139,250,0.4);
+  box-shadow:0 0 5px rgba(167,139,250,0.3);
+}
+.kf-dot.dirty{
+  background:#f59e0b;border-color:#fbbf24;
+  box-shadow:0 0 8px rgba(245,158,11,0.7);
+  transform:scale(1.25);
+}
+
+/* dirty state actions — appears above the dot bar */
+#kf-dirty-actions{
+  position:fixed;bottom:72px;left:0;right:272px;
+  display:flex;justify-content:center;gap:7px;
+  pointer-events:none;z-index:20;
+  opacity:0;transform:translateY(6px);
+  transition:opacity .2s,transform .2s;
+}
+#kf-dirty-actions.show{opacity:1;transform:translateY(0);pointer-events:all}
+
+.kf-dirty-btn{
+  padding:5px 13px;border-radius:20px;font-size:9px;
+  letter-spacing:.1em;text-transform:uppercase;cursor:pointer;font-family:inherit;
+  backdrop-filter:blur(10px);transition:all .15s;
+}
+#kf-update-btn{
+  background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.5);
+  color:#fbbf24;
+}
+#kf-update-btn:hover{background:rgba(245,158,11,0.28);border-color:#f59e0b;color:#fde68a}
+#kf-revert-btn{
+  background:rgba(10,10,18,0.8);border:1px solid rgba(255,255,255,0.1);
+  color:rgba(255,255,255,0.35);
+}
+#kf-revert-btn:hover{background:rgba(255,255,255,0.08);color:#fff;border-color:rgba(255,255,255,0.2)}
+
+/* panel dirty badge on the active keyframe row */
+.kf-item.dirty{border-color:rgba(245,158,11,0.45);background:rgba(245,158,11,0.06)}
+.kf-dirty-badge{
+  font-size:7.5px;color:#f59e0b;letter-spacing:.06em;text-transform:uppercase;
+  padding:1px 5px;border:1px solid rgba(245,158,11,0.35);border-radius:3px;
+  white-space:nowrap;
+}
+
+#kf-capture{
+  padding:6px 14px;
+  background:rgba(10,10,18,0.85);backdrop-filter:blur(10px);
+  border:1px solid rgba(167,139,250,0.35);border-radius:20px;
+  font-size:9px;color:rgba(167,139,250,0.85);cursor:pointer;
+  letter-spacing:.1em;text-transform:uppercase;font-family:inherit;
+  transition:all .15s;white-space:nowrap;
+}
+#kf-capture:hover{background:rgba(167,139,250,0.15);border-color:#a78bfa;color:#e2d9fb}
+
+#kf-progress-wrap{
+  position:fixed;bottom:0;left:0;right:272px;height:2px;
+  background:rgba(255,255,255,0.04);z-index:20;
+  pointer-events:none;
+}
+#kf-progress-bar{
+  height:100%;background:linear-gradient(90deg,#a78bfa,#38bdf8);
+  width:0%;transition:width .05s;
+}
+
+#kf-label-overlay{
+  position:fixed;top:16px;left:50%;transform:translateX(-50%);
+  font-size:9px;letter-spacing:.15em;color:rgba(255,255,255,0.25);
+  text-transform:uppercase;pointer-events:none;z-index:20;
+  opacity:0;transition:opacity .4s;
+}
+#kf-label-overlay.show{opacity:1}
+
+/* scroll indicator */
+#scroll-hint{
+  position:fixed;bottom:72px;left:0;right:272px;
+  display:flex;justify-content:center;pointer-events:none;z-index:20;
+  opacity:0;transition:opacity .6s;
+}
+#scroll-hint.show{opacity:1}
+.scroll-hint-inner{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 12px;border-radius:20px;
+  background:rgba(10,10,18,0.7);backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,0.07);
+  font-size:8.5px;color:rgba(255,255,255,0.3);letter-spacing:.1em;text-transform:uppercase;
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<!-- Bottom keyframe bar -->
+<div id="kf-bar" class="hidden">
+  <button class="kf-nav" id="kf-prev" disabled>‹</button>
+  <div id="kf-dots"></div>
+  <button class="kf-nav" id="kf-next" disabled>›</button>
+  <button id="kf-capture">+ Capture</button>
+</div>
+
+<div id="kf-dirty-actions">
+  <button class="kf-dirty-btn" id="kf-revert-btn">Revert</button>
+  <button class="kf-dirty-btn" id="kf-update-btn">Update State</button>
+</div>
+<div id="kf-progress-wrap"><div id="kf-progress-bar"></div></div>
+<div id="kf-label-overlay">Keyframe 1</div>
+
+<div id="scroll-hint">
+  <div class="scroll-hint-inner">scroll or ← → to navigate keyframes</div>
+</div>
+
+<!-- Right panel -->
+<div id="panel">
+  <div class="app-title">MorphField</div>
+  <div class="app-sub">Interactive 3D Blob Renderer</div>
+
+  <div class="sec">Presets</div>
+  <div class="presets">
+    <button class="preset-btn active" data-p="default">Default</button>
+    <button class="preset-btn" data-p="lava">Lava</button>
+    <button class="preset-btn" data-p="ice">Ice</button>
+    <button class="preset-btn" data-p="alien">Alien</button>
+    <button class="preset-btn" data-p="galaxy">Galaxy</button>
+    <button class="preset-btn" data-p="wisp">Wisp</button>
+  </div>
+
+  <div class="sec">Shape</div>
+  <div id="shape-controls"></div>
+
+  <div class="sec">Surface</div>
+  <div id="surface-controls"></div>
+
+  <div class="sec">Material</div>
+  <div class="color-row" style="margin-bottom:6px">
+    <div class="color-ctrl">
+      <div class="color-label">Color A</div>
+      <input type="color" id="colorA" value="#6b3fa0">
+    </div>
+    <div class="color-ctrl">
+      <div class="color-label">Color B</div>
+      <input type="color" id="colorB" value="#00d4ff">
+    </div>
+  </div>
+  <div id="material-controls"></div>
+
+  <div class="sec">Post FX</div>
+  <div id="postfx-controls"></div>
+
+  <div class="sec">Scale</div>
+  <div id="scale-controls"></div>
+
+  <div class="sec">Instances</div>
+  <div id="instance-controls"></div>
+  <button class="kf-add-btn" id="inst-randomize" style="margin-top:4px">↻ Re-randomize Positions</button>
+
+  <div class="sec">Mouse FX</div>
+  <div class="tog-row">
+    <button class="tog" id="tog-mouse"><span class="dot"></span>Mouse FX</button>
+    <button class="tog on" id="tog-mouse-mode"><span class="dot"></span>Pull</button>
+  </div>
+  <div id="mouse-controls"></div>
+
+  <div class="sec">Options</div>
+  <div class="tog-row">
+    <button class="tog on" id="tog-rotate"><span class="dot"></span>Auto Rotate</button>
+    <button class="tog" id="tog-wire"><span class="dot"></span>Wireframe</button>
+  </div>
+  <div class="tog-row">
+    <button class="tog on" id="tog-light"><span class="dot"></span>Orbit Light</button>
+    <button class="tog" id="tog-pause"><span class="dot"></span>Pause</button>
+  </div>
+
+  <div class="sec">Keyframes</div>
+  <div class="kf-hint" id="kf-panel-hint">
+    Dial in a look, then capture it.<br>Scroll or use ← → to snap between states.
+  </div>
+  <div id="kf-list"></div>
+  <button class="kf-add-btn" id="kf-panel-add" style="margin-top:4px">+ Capture Current State</button>
+  <div class="snap-settings">
+    <div class="snap-field">
+      <label>Min Scroll</label>
+      <input type="number" id="snap-min" value="30" min="0" max="1000" step="5" title="Minimum deltaY needed to trigger a snap">
+    </div>
+    <div class="snap-field">
+      <label>Cooldown (ms)</label>
+      <input type="number" id="snap-cooldown" value="600" min="0" max="3000" step="50" title="How long to ignore scroll after landing">
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+// ─── Shaders ──────────────────────────────────────────────────────────────────
+
+const vertexShader = /* glsl */`
+#define M_PI 3.14159265359
+vec3 _m289(vec3 x){return x-floor(x*(1./289.))*289.;}
+vec4 _m289(vec4 x){return x-floor(x*(1./289.))*289.;}
+vec4 _perm(vec4 x){return _m289(((x*34.)+10.)*x);}
+vec4 _tis(vec4 r){return 1.79284291400159-0.85373472095314*r;}
+float pnoise(vec3 P,vec3 rep){
+  vec3 Pi0=mod(floor(P),rep),Pi1=mod(Pi0+1.,rep);
+  Pi0=_m289(Pi0);Pi1=_m289(Pi1);
+  vec3 Pf0=fract(P),Pf1=Pf0-1.;
+  vec4 ix=vec4(Pi0.x,Pi1.x,Pi0.x,Pi1.x);
+  vec4 iy=vec4(Pi0.y,Pi0.y,Pi1.y,Pi1.y);
+  vec4 ixy=_perm(_perm(ix)+iy);
+  vec4 ixy0=_perm(ixy+vec4(Pi0.z)),ixy1=_perm(ixy+vec4(Pi1.z));
+  vec4 gx0=ixy0/7.,gy0=fract(floor(gx0)/7.)-.5;gx0=fract(gx0);
+  vec4 gz0=.5-abs(gx0)-abs(gy0),sz0=step(gz0,vec4(0.));
+  gx0-=sz0*(step(0.,gx0)-.5);gy0-=sz0*(step(0.,gy0)-.5);
+  vec4 gx1=ixy1/7.,gy1=fract(floor(gx1)/7.)-.5;gx1=fract(gx1);
+  vec4 gz1=.5-abs(gx1)-abs(gy1),sz1=step(gz1,vec4(0.));
+  gx1-=sz1*(step(0.,gx1)-.5);gy1-=sz1*(step(0.,gy1)-.5);
+  vec3 g000=vec3(gx0.x,gy0.x,gz0.x),g100=vec3(gx0.y,gy0.y,gz0.y);
+  vec3 g010=vec3(gx0.z,gy0.z,gz0.z),g110=vec3(gx0.w,gy0.w,gz0.w);
+  vec3 g001=vec3(gx1.x,gy1.x,gz1.x),g101=vec3(gx1.y,gy1.y,gz1.y);
+  vec3 g011=vec3(gx1.z,gy1.z,gz1.z),g111=vec3(gx1.w,gy1.w,gz1.w);
+  vec4 n0=_tis(vec4(dot(g000,g000),dot(g010,g010),dot(g100,g100),dot(g110,g110)));
+  g000*=n0.x;g010*=n0.y;g100*=n0.z;g110*=n0.w;
+  vec4 n1=_tis(vec4(dot(g001,g001),dot(g011,g011),dot(g101,g101),dot(g111,g111)));
+  g001*=n1.x;g011*=n1.y;g101*=n1.z;g111*=n1.w;
+  float n000=dot(g000,Pf0),n100=dot(g100,vec3(Pf1.x,Pf0.yz));
+  float n010=dot(g010,vec3(Pf0.x,Pf1.y,Pf0.z)),n110=dot(g110,vec3(Pf1.xy,Pf0.z));
+  float n001=dot(g001,vec3(Pf0.xy,Pf1.z)),n101=dot(g101,vec3(Pf1.x,Pf0.y,Pf1.z));
+  float n011=dot(g011,vec3(Pf0.x,Pf1.yz)),n111=dot(g111,Pf1);
+  vec3 f=Pf0*Pf0*Pf0*(Pf0*(Pf0*6.-15.)+10.);
+  vec4 nz=mix(vec4(n000,n100,n010,n110),vec4(n001,n101,n011,n111),f.z);
+  vec2 nyz=mix(nz.xy,nz.zw,f.y);
+  return 2.2*mix(nyz.x,nyz.y,f.x);
+}
+vec3 orthogonal(vec3 v){return normalize(abs(v.x)>abs(v.z)?vec3(-v.y,v.x,0.):vec3(0.,-v.z,v.y));}
+
+uniform float uTime,uSpeed,uDistort,uFrequency,uWarpStrength,uWaveCount,uWaveStrength,uOctaves,uPoleSmooth;
+uniform float uMouseEnabled,uMousePull,uMouseRadius,uMouseFalloff,uMouseRipple,uMouseRippleSpeed,uMouseNoise,uMousePushPull;
+uniform vec3 uMouseDir;
+varying vec3 vNormal,vWorldPos;
+varying float vDisp,vMouseInfluence;
+
+float displace(vec3 p){
+  float per=10.,t=mod(uTime*uSpeed,per);
+  // Per-instance noise offset so each instance deforms uniquely
+  vec3 instOff=vec3(modelMatrix[3].xyz)*.13;
+  vec3 q=p+instOff;
+  if(uWarpStrength>.001){
+    float wt=mod(uTime*uSpeed*.4,per);
+    q.x+=uWarpStrength*pnoise(p+vec3(0.,0.,wt),vec3(per));
+    q.y+=uWarpStrength*pnoise(p+vec3(5.2,1.3,wt),vec3(per));
+    q.z+=uWarpStrength*pnoise(p+vec3(2.3,8.1,wt),vec3(per));
+  }
+  float goo=0.,amp=.5,freq=1.;
+  int oct=int(clamp(uOctaves,1.,4.));
+  for(int i=0;i<4;i++){if(i>=oct)break;goo+=amp*pnoise(q/uFrequency*freq+vec3(0.,0.,t),vec3(per));amp*=.5;freq*=2.;}
+  goo*=uDistort;
+  float sn=pnoise(p*2.5+t*.4,vec3(per));
+  float waves=(p.x*sin((p.y+sn)*M_PI*uWaveCount)+p.z*cos((p.y+sn)*M_PI*uWaveCount))*.01*uWaveStrength;
+  float pole=sin(smoothstep(-1.,1.,p.y)*M_PI);
+  pole=mix(pole,1.,uPoleSmooth);
+  return(goo+waves)*pole;
+}
+float mouseFalloff(vec3 n){
+  if(uMouseEnabled<.5)return 0.;
+  float f=dot(n,normalize(uMouseDir));
+  float t=clamp((f-(1.-uMouseRadius*2.))/(uMouseRadius*2.+.001),0.,1.);
+  return pow(t,max(uMouseFalloff,.1));
+}
+float mouseDisplace(vec3 n){
+  if(uMouseEnabled<.5)return 0.;
+  float falloff=mouseFalloff(n);
+  float result=falloff*uMousePull*uMousePushPull;
+  if(uMouseRipple>.001){
+    float dist=1.-dot(n,normalize(uMouseDir));
+    result+=sin(dist*uMouseRippleSpeed-uTime*5.)*exp(-dist*5.)*uMouseRipple*falloff;
+  }
+  if(uMouseNoise>.001){
+    result+=pnoise(n*5.+uTime*.6,vec3(10.))*falloff*uMouseNoise;
+  }
+  return result;
+}
+float totalDisplace(vec3 n){return displace(n)+mouseDisplace(n);}
+
+void main(){
+  vec3 n=normalize(normal);
+  float d=totalDisplace(n);
+  vDisp=d;
+  vMouseInfluence=mouseFalloff(n);
+  vec3 newPos=n*(1.+d);
+  float eps=.002;
+  vec3 tang=orthogonal(n),bitan=normalize(cross(n,tang));
+  vec3 n1=normalize(n+tang*eps),n2=normalize(n+bitan*eps);
+  vec3 crossed=cross(n1*(1.+totalDisplace(n1))-newPos,n2*(1.+totalDisplace(n2))-newPos);
+  float clen=length(crossed);
+  vNormal=clen>0.0001?crossed/clen:n;
+  vec4 wp=modelMatrix*vec4(newPos,1.);
+  vWorldPos=wp.xyz;
+  gl_Position=projectionMatrix*viewMatrix*wp;
+}`;
+
+const fragmentShader = /* glsl */`
+#define M_PI 3.14159265359
+uniform vec3 uColorA,uColorB,uLightDir;
+uniform float uColorShift,uFresnelPower,uFresnelIntensity,uMetalness,uRoughness,uEmission,uIridescence;
+uniform float uMouseEnabled,uMouseGlow;
+varying vec3 vNormal,vWorldPos;
+varying float vDisp,vMouseInfluence;
+vec3 hsl2rgb(vec3 c){
+  vec3 rgb=clamp(abs(mod(c.x*6.+vec3(0.,4.,2.),6.)-3.)-1.,0.,1.);
+  return c.z+c.y*(rgb-.5)*(1.-abs(2.*c.z-1.));
+}
+void main(){
+  vec3 N=normalize(vNormal),V=normalize(cameraPosition-vWorldPos);
+  vec3 L=normalize(uLightDir),H=normalize(L+V);
+  float NdotV=max(dot(N,V),.001),NdotL=max(dot(N,L),0.),NdotH=max(dot(N,H),0.),HdotV=max(dot(H,V),0.);
+  float ct=clamp(vDisp*uColorShift+.5,0.,1.);
+  vec3 base=mix(uColorA,uColorB,ct);
+  float fresnel=pow(1.-NdotV,uFresnelPower);
+  if(uIridescence>.001){float hue=fract(NdotV*.8+ct*.4);base=mix(base,hsl2rgb(vec3(hue,.9,.58)),fresnel*uIridescence);}
+  vec3 R=reflect(-V,N);
+  vec3 env=mix(vec3(.01,.01,.04),vec3(.12,.22,.75),R.y*.5+.5);
+  vec3 col=base*.06;
+  col+=base*NdotL*mix(.72,.04,uMetalness);
+  float roughSq=max(uRoughness*uRoughness,.001),a2=roughSq*roughSq;
+  float denom=NdotH*NdotH*(a2-1.)+1.;
+  float D=a2/(M_PI*denom*denom+.00001);
+  vec3 F=mix(vec3(.04),base,uMetalness)+(1.-mix(vec3(.04),base,uMetalness))*pow(1.-HdotV,5.);
+  col+=F*D*.12*NdotL;
+  col+=env*fresnel*mix(.08,.9,uMetalness);
+  col+=mix(uColorA,uColorB,.65)*fresnel*uFresnelIntensity;
+  col+=uColorB*smoothstep(.28,.85,ct)*uEmission;
+  if(uMouseEnabled>.5&&uMouseGlow>.001){
+    vec3 glowColor=mix(uColorA,uColorB,.6)+vec3(.2,.2,.3);
+    col+=glowColor*vMouseInfluence*uMouseGlow;
+  }
+  gl_FragColor=vec4(col,1.);
+}`;
+
+// ─── Renderer ─────────────────────────────────────────────────────────────────
+
+const canvas = document.getElementById('c');
+const W = () => window.innerWidth, H = () => window.innerHeight;
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(W(), H());
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x060608);
+
+const camera = new THREE.PerspectiveCamera(45, W()/H(), 0.1, 100);
+camera.position.set(0, 0, 3.8);
+
+const orbitControls = new OrbitControls(camera, canvas);
+orbitControls.enableDamping = true;
+orbitControls.dampingFactor = 0.05;
+orbitControls.autoRotate = true;
+orbitControls.autoRotateSpeed = 0.6;
+orbitControls.enablePan = false;
+orbitControls.enableZoom = false; // scroll wheel reserved for keyframe nav
+orbitControls.minDistance = 1.8;
+orbitControls.maxDistance = 9;
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(W(), H()), 1.0, 0.4, 0.3);
+composer.addPass(bloomPass);
+composer.addPass(new OutputPass());
+
+// ─── Uniforms & Mesh ──────────────────────────────────────────────────────────
+
+const uniforms = {
+  uTime:            { value: 0 },
+  uSpeed:           { value: 0.4 },
+  uDistort:         { value: 0.4 },
+  uFrequency:       { value: 0.5 },
+  uWarpStrength:    { value: 0.2 },
+  uWaveCount:       { value: 4.0 },
+  uWaveStrength:    { value: 1.0 },
+  uOctaves:         { value: 2.0 },
+  uPoleSmooth:      { value: 0.0 },
+  uColorA:          { value: new THREE.Color('#6b3fa0') },
+  uColorB:          { value: new THREE.Color('#00d4ff') },
+  uColorShift:      { value: 1.2 },
+  uMetalness:       { value: 0.6 },
+  uRoughness:       { value: 0.2 },
+  uFresnelPower:    { value: 3.0 },
+  uFresnelIntensity:{ value: 0.8 },
+  uEmission:        { value: 0.3 },
+  uIridescence:     { value: 0.4 },
+  uLightDir:        { value: new THREE.Vector3(2, 3, 1) },
+  uMouseEnabled:    { value: 0.0 },
+  uMouseDir:        { value: new THREE.Vector3(0, 0, 1) },
+  uMousePull:       { value: 0.35 },
+  uMouseRadius:     { value: 0.55 },
+  uMouseFalloff:    { value: 2.0 },
+  uMouseRipple:     { value: 0.0 },
+  uMouseRippleSpeed:{ value: 10.0 },
+  uMouseNoise:      { value: 0.0 },
+  uMouseGlow:       { value: 0.7 },
+  uMousePushPull:   { value: 1.0 },
+};
+
+const geo = new THREE.SphereGeometry(1, 128, 128);
+const mat = new THREE.ShaderMaterial({ vertexShader, fragmentShader, uniforms });
+const mesh = new THREE.Mesh(geo, mat);
+scene.add(mesh);
+
+const wireMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.06 });
+const wireMesh = new THREE.Mesh(geo, wireMat);
+wireMesh.visible = false;
+scene.add(wireMesh);
+
+// ─── Presets ──────────────────────────────────────────────────────────────────
+
+const PRESETS = {
+  default: { uDistort:.4,uFrequency:.5,uSpeed:.4,uOctaves:2,uWarpStrength:.2,uWaveCount:4,uWaveStrength:1,uPoleSmooth:0,colorA:'#6b3fa0',colorB:'#00d4ff',uColorShift:1.2,uMetalness:.6,uRoughness:.2,uFresnelPower:3,uFresnelIntensity:.8,uEmission:.3,uIridescence:.4,bloom:1.0,bloomR:.4,bloomT:.3,exposure:1.0},
+  lava:    { uDistort:.7,uFrequency:.4,uSpeed:.3,uOctaves:3,uWarpStrength:.5,uWaveCount:2,uWaveStrength:2,uPoleSmooth:0,colorA:'#cc1100',colorB:'#ffaa00',uColorShift:2.0,uMetalness:.1,uRoughness:.65,uFresnelPower:2,uFresnelIntensity:1.4,uEmission:.9,uIridescence:.08,bloom:1.8,bloomR:.6,bloomT:.2,exposure:1.2},
+  ice:     { uDistort:.18,uFrequency:.3,uSpeed:.18,uOctaves:4,uWarpStrength:.08,uWaveCount:9,uWaveStrength:1.5,uPoleSmooth:.3,colorA:'#a8d8ff',colorB:'#ffffff',uColorShift:.8,uMetalness:.15,uRoughness:.04,uFresnelPower:4.5,uFresnelIntensity:2.2,uEmission:.08,uIridescence:.85,bloom:.7,bloomR:.25,bloomT:.45,exposure:1.3},
+  alien:   { uDistort:1.0,uFrequency:.7,uSpeed:.6,uOctaves:3,uWarpStrength:.85,uWaveCount:6,uWaveStrength:2.5,uPoleSmooth:.5,colorA:'#00ff88',colorB:'#ff00aa',uColorShift:1.8,uMetalness:.8,uRoughness:.1,uFresnelPower:2.5,uFresnelIntensity:1.2,uEmission:.55,uIridescence:.9,bloom:1.5,bloomR:.5,bloomT:.22,exposure:1.1},
+  galaxy:  { uDistort:.5,uFrequency:.6,uSpeed:.5,uOctaves:4,uWarpStrength:.6,uWaveCount:12,uWaveStrength:1.0,uPoleSmooth:0,colorA:'#1a0a4a',colorB:'#9955ff',uColorShift:1.5,uMetalness:.9,uRoughness:.05,uFresnelPower:3,uFresnelIntensity:2.0,uEmission:.65,uIridescence:.6,bloom:2.0,bloomR:.7,bloomT:.14,exposure:1.5},
+  wisp:    { uDistort:.28,uFrequency:.85,uSpeed:1.1,uOctaves:2,uWarpStrength:.3,uWaveCount:16,uWaveStrength:.5,uPoleSmooth:.8,colorA:'#ffe8ff',colorB:'#ff88cc',uColorShift:.6,uMetalness:.3,uRoughness:.38,uFresnelPower:5.5,uFresnelIntensity:3.0,uEmission:.45,uIridescence:1.0,bloom:2.5,bloomR:.8,bloomT:.08,exposure:.9},
+};
+
+// ─── Slider Builder ───────────────────────────────────────────────────────────
+
+const sliderRefs = {};
+let bloomRef, bloomRRef, bloomTRef, expRef;
+
+function slider(container, label, min, max, step, val, onChange) {
+  const wrap = document.createElement('div'); wrap.className = 'ctrl';
+  const row = document.createElement('div'); row.className = 'ctrl-row';
+  const lbl = document.createElement('span'); lbl.className = 'ctrl-label'; lbl.textContent = label;
+  const valEl = document.createElement('span'); valEl.className = 'ctrl-val';
+  valEl.textContent = val.toFixed(step < 1 ? 2 : 0);
+  row.append(lbl, valEl);
+  const inp = document.createElement('input');
+  inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step; inp.value = val;
+  inp.addEventListener('input', () => {
+    const v = parseFloat(inp.value);
+    valEl.textContent = v.toFixed(step < 1 ? 2 : 0);
+    onChange(v);
+    markDirty();
+  });
+  wrap.append(row, inp); container.appendChild(wrap);
+  return { inp, valEl };
+}
+
+function buildSection(id, defs) {
+  const el = document.getElementById(id);
+  defs.forEach(([label, min, max, step, key]) => {
+    sliderRefs[key] = slider(el, label, min, max, step, uniforms[key].value, v => { uniforms[key].value = v; });
+  });
+}
+
+buildSection('shape-controls', [
+  ['Distort',     0,   2,   .01, 'uDistort'],
+  ['Frequency',   .1,  2,   .01, 'uFrequency'],
+  ['Speed',       0,   3,   .01, 'uSpeed'],
+  ['Octaves',     1,   4,   1,   'uOctaves'],
+  ['Domain Warp', 0,   1.5, .01, 'uWarpStrength'],
+  ['Pole Smooth', 0,   1,   .01, 'uPoleSmooth'],
+]);
+buildSection('surface-controls', [
+  ['Wave Count',    0, 20, .5,  'uWaveCount'],
+  ['Wave Strength', 0,  3, .01, 'uWaveStrength'],
+]);
+buildSection('material-controls', [
+  ['Color Shift',       0, 3, .01, 'uColorShift'],
+  ['Metalness',         0, 1, .01, 'uMetalness'],
+  ['Roughness',         0, 1, .01, 'uRoughness'],
+  ['Fresnel Power',     1, 8, .1,  'uFresnelPower'],
+  ['Fresnel Intensity', 0, 3, .01, 'uFresnelIntensity'],
+  ['Emission',          0, 2, .01, 'uEmission'],
+  ['Iridescence',       0, 1, .01, 'uIridescence'],
+]);
+
+const postEl = document.getElementById('postfx-controls');
+bloomRef  = slider(postEl, 'Bloom Strength', 0, 3,   .01, 1.0, v => { bloomPass.strength = v;           markDirty(); });
+bloomRRef = slider(postEl, 'Bloom Radius',   0, 1,   .01, .4,  v => { bloomPass.radius = v;             markDirty(); });
+bloomTRef = slider(postEl, 'Bloom Threshold',0, 1,   .01, .3,  v => { bloomPass.threshold = v;          markDirty(); });
+expRef    = slider(postEl, 'Exposure',       .5, 3,  .01, 1.0, v => { renderer.toneMappingExposure = v; markDirty(); });
+
+// Color pickers
+document.getElementById('colorA').addEventListener('input', e => {
+  uniforms.uColorA.value.set(e.target.value);
+  markDirty();
+});
+document.getElementById('colorB').addEventListener('input', e => {
+  uniforms.uColorB.value.set(e.target.value);
+  markDirty();
+});
+
+// ─── State Capture / Apply ────────────────────────────────────────────────────
+
+const LERP_KEYS = ['uDistort','uFrequency','uSpeed','uOctaves','uWarpStrength',
+  'uWaveCount','uWaveStrength','uPoleSmooth','uColorShift','uMetalness',
+  'uRoughness','uFresnelPower','uFresnelIntensity','uEmission','uIridescence',
+  'bloom','bloomR','bloomT','exposure'];
+
+function captureState() {
+  return {
+    uDistort:         uniforms.uDistort.value,
+    uFrequency:       uniforms.uFrequency.value,
+    uSpeed:           uniforms.uSpeed.value,
+    uOctaves:         uniforms.uOctaves.value,
+    uWarpStrength:    uniforms.uWarpStrength.value,
+    uWaveCount:       uniforms.uWaveCount.value,
+    uWaveStrength:    uniforms.uWaveStrength.value,
+    uPoleSmooth:      uniforms.uPoleSmooth.value,
+    uColorShift:      uniforms.uColorShift.value,
+    uMetalness:       uniforms.uMetalness.value,
+    uRoughness:       uniforms.uRoughness.value,
+    uFresnelPower:    uniforms.uFresnelPower.value,
+    uFresnelIntensity:uniforms.uFresnelIntensity.value,
+    uEmission:        uniforms.uEmission.value,
+    uIridescence:     uniforms.uIridescence.value,
+    colorA: '#' + uniforms.uColorA.value.getHexString(),
+    colorB: '#' + uniforms.uColorB.value.getHexString(),
+    bloom:  bloomPass.strength,
+    bloomR: bloomPass.radius,
+    bloomT: bloomPass.threshold,
+    exposure: renderer.toneMappingExposure,
+  };
+}
+
+function lerpState(a, b, t) {
+  // smoothstep ease
+  const e = t * t * (3 - 2 * t);
+  const out = {};
+  LERP_KEYS.forEach(k => { out[k] = a[k] + (b[k] - a[k]) * e; });
+  // Color lerp
+  const ca = new THREE.Color(a.colorA), cb = new THREE.Color(b.colorA);
+  out.colorA = '#' + ca.lerp(cb, e).getHexString();
+  const ca2 = new THREE.Color(a.colorB), cb2 = new THREE.Color(b.colorB);
+  out.colorB = '#' + ca2.lerp(cb2, e).getHexString();
+  return out;
+}
+
+function applyState(s, updateUI = true) {
+  const uKeys = ['uDistort','uFrequency','uSpeed','uOctaves','uWarpStrength',
+    'uWaveCount','uWaveStrength','uPoleSmooth','uColorShift','uMetalness',
+    'uRoughness','uFresnelPower','uFresnelIntensity','uEmission','uIridescence'];
+  uKeys.forEach(k => { uniforms[k].value = s[k]; });
+  uniforms.uColorA.value.set(s.colorA);
+  uniforms.uColorB.value.set(s.colorB);
+  bloomPass.strength  = s.bloom;
+  bloomPass.radius    = s.bloomR;
+  bloomPass.threshold = s.bloomT;
+  renderer.toneMappingExposure = s.exposure;
+
+  if (updateUI) syncSlidersToState(s);
+}
+
+function syncSlidersToState(s) {
+  const uKeys = ['uDistort','uFrequency','uSpeed','uOctaves','uWarpStrength',
+    'uWaveCount','uWaveStrength','uPoleSmooth','uColorShift','uMetalness',
+    'uRoughness','uFresnelPower','uFresnelIntensity','uEmission','uIridescence'];
+  uKeys.forEach(k => {
+    const r = sliderRefs[k];
+    if (!r) return;
+    r.inp.value = s[k];
+    r.valEl.textContent = s[k].toFixed(parseFloat(r.inp.step) < 1 ? 2 : 0);
+  });
+  [[bloomRef, s.bloom], [bloomRRef, s.bloomR], [bloomTRef, s.bloomT], [expRef, s.exposure]].forEach(([r, v]) => {
+    r.inp.value = v; r.valEl.textContent = v.toFixed(2);
+  });
+  document.getElementById('colorA').value = s.colorA;
+  document.getElementById('colorB').value = s.colorB;
+}
+
+// ─── Keyframe System ──────────────────────────────────────────────────────────
+
+const keyframes = [];
+let kfActiveIdx = -1;         // currently displayed keyframe index (-1 = free)
+let kfFrom = null;            // transition start state
+let kfTo = null;              // transition target state
+let kfT = 1.0;                // 0→1 transition progress (1 = done)
+const KF_DUR = 0.9;           // transition duration in seconds
+let kfDelta = 0;              // time accumulator
+let scrollLocked = false;      // true while transition is playing
+let awaitingScrollReset = false; // true during post-transition cooldown
+let scrollResetTimer = null;
+let hintShown = false;
+let kfDirty = false;          // true when live state differs from saved keyframe
+
+function isTransitioning() { return kfT < 1.0; }
+
+function markDirty() {
+  if (kfActiveIdx < 0 || isTransitioning()) return;
+  kfDirty = true;
+  renderKFBar();
+  renderKFPanel();
+  document.getElementById('kf-dirty-actions').classList.add('show');
+}
+
+function clearDirty() {
+  kfDirty = false;
+  renderKFBar();
+  renderKFPanel();
+  document.getElementById('kf-dirty-actions').classList.remove('show');
+}
+
+function updateCurrentKeyframe() {
+  if (kfActiveIdx < 0) return;
+  keyframes[kfActiveIdx] = captureState();
+  clearDirty();
+}
+
+function revertKeyframe() {
+  if (kfActiveIdx < 0) return;
+  applyState(keyframes[kfActiveIdx], true);
+  clearDirty();
+}
+
+function addKeyframe() {
+  clearDirty();
+  const s = captureState();
+  keyframes.push(s);
+  kfActiveIdx = keyframes.length - 1;
+  renderKFBar();
+  renderKFPanel();
+  showKFLabel(kfActiveIdx);
+  flashHint();
+}
+
+function removeKeyframe(idx) {
+  keyframes.splice(idx, 1);
+  if (kfActiveIdx >= keyframes.length) kfActiveIdx = keyframes.length - 1;
+  renderKFBar();
+  renderKFPanel();
+}
+
+function goToKeyframe(idx) {
+  if (idx < 0 || idx >= keyframes.length) return;
+  if (idx === kfActiveIdx && !isTransitioning()) return;
+  scrollLocked = true;
+  clearTimeout(scrollResetTimer);
+  awaitingScrollReset = false;
+  clearDirty();
+  kfFrom = captureState();
+  kfTo = keyframes[idx];
+  kfT = 0;
+  kfDelta = 0;
+  kfActiveIdx = idx;
+  renderKFBar();
+  renderKFPanel();
+  showKFLabel(idx);
+}
+
+function showKFLabel(idx) {
+  const el = document.getElementById('kf-label-overlay');
+  el.textContent = `Keyframe ${idx + 1}`;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+function flashHint() {
+  if (hintShown || keyframes.length < 2) return;
+  hintShown = true;
+  const el = document.getElementById('scroll-hint');
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+// ─── Keyframe Bar & Panel UI ──────────────────────────────────────────────────
+
+function renderKFBar() {
+  const bar = document.getElementById('kf-bar');
+  const dotsEl = document.getElementById('kf-dots');
+  const prevBtn = document.getElementById('kf-prev');
+  const nextBtn = document.getElementById('kf-next');
+
+  bar.classList.toggle('hidden', keyframes.length === 0);
+
+  dotsEl.innerHTML = '';
+  keyframes.forEach((_, i) => {
+    const dot = document.createElement('div');
+    const isActive = i === kfActiveIdx;
+    const isDirtyDot = isActive && kfDirty;
+    dot.className = 'kf-dot' + (isDirtyDot ? ' dirty' : isActive ? ' active' : '');
+    dot.title = `Keyframe ${i + 1}` + (isDirtyDot ? ' (modified)' : '');
+    dot.addEventListener('click', () => goToKeyframe(i));
+    dotsEl.appendChild(dot);
+  });
+
+  prevBtn.disabled = kfActiveIdx <= 0 || isTransitioning();
+  nextBtn.disabled = kfActiveIdx >= keyframes.length - 1 || isTransitioning();
+
+  // Progress bar
+  const pct = keyframes.length > 1 ? (kfActiveIdx / (keyframes.length - 1)) * 100 : 0;
+  document.getElementById('kf-progress-bar').style.width = pct + '%';
+}
+
+function renderKFPanel() {
+  const list = document.getElementById('kf-list');
+  const hint = document.getElementById('kf-panel-hint');
+  hint.style.display = keyframes.length === 0 ? 'block' : 'none';
+  list.innerHTML = '';
+  keyframes.forEach((s, i) => {
+    const item = document.createElement('div');
+    item.className = 'kf-item' + (i === kfActiveIdx ? ' current' : '');
+    item.addEventListener('click', () => goToKeyframe(i));
+
+    const num = document.createElement('span'); num.className = 'kf-num'; num.textContent = i + 1;
+    const swatches = document.createElement('div'); swatches.className = 'kf-swatches';
+    const sw1 = document.createElement('div'); sw1.className = 'kf-swatch'; sw1.style.background = s.colorA;
+    const sw2 = document.createElement('div'); sw2.className = 'kf-swatch'; sw2.style.background = s.colorB;
+    swatches.append(sw1, sw2);
+
+    const lbl = document.createElement('span'); lbl.className = 'kf-label';
+    lbl.textContent = getPresetNameForState(s) || 'Custom';
+
+    const del = document.createElement('button'); del.className = 'kf-del'; del.textContent = '✕';
+    del.addEventListener('click', e => { e.stopPropagation(); removeKeyframe(i); });
+
+    item.append(num, swatches, lbl);
+    if (i === kfActiveIdx && kfDirty) {
+      item.classList.add('dirty');
+      const badge = document.createElement('span');
+      badge.className = 'kf-dirty-badge';
+      badge.textContent = 'modified';
+      item.appendChild(badge);
+    }
+    item.appendChild(del);
+    list.appendChild(item);
+  });
+}
+
+function getPresetNameForState(s) {
+  for (const [name, p] of Object.entries(PRESETS)) {
+    if (p.colorA === s.colorA && p.colorB === s.colorB &&
+        Math.abs(p.uDistort - s.uDistort) < .05) return name;
+  }
+  return null;
+}
+
+// ─── Apply Preset ─────────────────────────────────────────────────────────────
+
+function applyPreset(name) {
+  const p = PRESETS[name];
+  const uKeys = ['uDistort','uFrequency','uSpeed','uOctaves','uWarpStrength',
+    'uWaveCount','uWaveStrength','uPoleSmooth','uColorShift','uMetalness',
+    'uRoughness','uFresnelPower','uFresnelIntensity','uEmission','uIridescence'];
+  uKeys.forEach(k => { if(p[k]!==undefined) uniforms[k].value = p[k]; });
+  uniforms.uColorA.value.set(p.colorA);
+  uniforms.uColorB.value.set(p.colorB);
+  bloomPass.strength = p.bloom; bloomPass.radius = p.bloomR; bloomPass.threshold = p.bloomT;
+  renderer.toneMappingExposure = p.exposure;
+  syncSlidersToState({...p, bloom:p.bloom, bloomR:p.bloomR, bloomT:p.bloomT, exposure:p.exposure, colorA:p.colorA, colorB:p.colorB});
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.p === name));
+  kfActiveIdx = -1;
+  clearDirty();
+  renderKFPanel();
+}
+
+document.querySelectorAll('.preset-btn').forEach(b => b.addEventListener('click', () => applyPreset(b.dataset.p)));
+
+// Keyframe buttons
+document.getElementById('kf-capture').addEventListener('click', addKeyframe);
+document.getElementById('kf-panel-add').addEventListener('click', addKeyframe);
+document.getElementById('kf-update-btn').addEventListener('click', updateCurrentKeyframe);
+document.getElementById('kf-revert-btn').addEventListener('click', revertKeyframe);
+document.getElementById('kf-prev').addEventListener('click', () => { if(kfActiveIdx > 0) goToKeyframe(kfActiveIdx - 1); });
+document.getElementById('kf-next').addEventListener('click', () => { if(kfActiveIdx < keyframes.length-1) goToKeyframe(kfActiveIdx + 1); });
+
+// ─── Keyboard + Scroll Navigation ────────────────────────────────────────────
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { if(kfActiveIdx > 0) goToKeyframe(kfActiveIdx - 1); }
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown')  { if(kfActiveIdx < keyframes.length-1) goToKeyframe(kfActiveIdx + 1); }
+});
+
+// Scroll wheel snaps between keyframes
+window.addEventListener('wheel', e => {
+  if (keyframes.length < 2) return;
+  if (e.target.closest('#panel')) return;
+  e.preventDefault();
+  if (scrollLocked || awaitingScrollReset) return;
+
+  const minScroll = parseFloat(document.getElementById('snap-min').value) || 30;
+  if (Math.abs(e.deltaY) < minScroll) return;
+
+  const next = kfActiveIdx + (e.deltaY > 0 ? 1 : -1);
+  if (next >= 0 && next < keyframes.length) goToKeyframe(next);
+}, { passive: false });
+
+// ─── Toggles ──────────────────────────────────────────────────────────────────
+
+let paused = false, lightOrbit = true;
+
+function togSetup(id, initial, onChange) {
+  const btn = document.getElementById(id);
+  let state = initial;
+  btn.classList.toggle('on', state);
+  btn.addEventListener('click', () => { state = !state; btn.classList.toggle('on', state); onChange(state); });
+}
+
+togSetup('tog-rotate', true,  v => { orbitControls.autoRotate = v; });
+togSetup('tog-wire',   false, v => { wireMesh.visible = v; });
+togSetup('tog-light',  true,  v => { lightOrbit = v; });
+togSetup('tog-pause',  false, v => { paused = v; if(!v) clock.start(); });
+
+// ─── Scale ────────────────────────────────────────────────────────────────────
+
+let globalScale = 0.7;
+mesh.scale.setScalar(globalScale);
+wireMesh.scale.setScalar(globalScale);
+
+slider(document.getElementById('scale-controls'), 'Global Scale', 0.1, 3.0, 0.01, globalScale, v => {
+  globalScale = v;
+  mesh.scale.setScalar(v);
+  wireMesh.scale.setScalar(v);
+  updateInstanceTransforms();
+});
+
+// ─── Instances ────────────────────────────────────────────────────────────────
+
+let instCount      = 1;
+let instPosSpread  = 3.0;
+let instScaleRand  = 0.5;
+let instRotRand    = 0.5;
+
+const instanceSeeds = [];
+const instanceMeshes = [];
+
+function seedInstances() {
+  instanceSeeds.length = 0;
+  for (let i = 0; i < 12; i++) {
+    instanceSeeds.push({
+      px: (Math.random() - 0.5) * 2,
+      py: (Math.random() - 0.5) * 2,
+      pz: (Math.random() - 0.5) * 2,
+      rx: (Math.random() - 0.5) * 2,
+      ry: (Math.random() - 0.5) * 2,
+      rz: (Math.random() - 0.5) * 2,
+      s:  (Math.random() - 0.5) * 2,
+    });
+  }
+}
+
+function rebuildInstances() {
+  instanceMeshes.forEach(m => scene.remove(m));
+  instanceMeshes.length = 0;
+  for (let i = 0; i < instCount - 1; i++) {
+    const m = new THREE.Mesh(geo, mat);
+    scene.add(m);
+    instanceMeshes.push(m);
+  }
+  updateInstanceTransforms();
+}
+
+function updateInstanceTransforms() {
+  instanceMeshes.forEach((m, i) => {
+    const s = instanceSeeds[i] || instanceSeeds[0];
+    m.position.set(
+      s.px * instPosSpread,
+      s.py * instPosSpread,
+      s.pz * instPosSpread * 0.6
+    );
+    m.rotation.set(
+      s.rx * instRotRand * Math.PI,
+      s.ry * instRotRand * Math.PI,
+      s.rz * instRotRand * Math.PI
+    );
+    const scl = globalScale * Math.max(1 + s.s * instScaleRand, 0.15);
+    m.scale.setScalar(scl);
+  });
+}
+
+seedInstances();
+
+const instEl = document.getElementById('instance-controls');
+
+slider(instEl, 'Count', 1, 12, 1, instCount, v => {
+  instCount = Math.round(v);
+  rebuildInstances();
+});
+slider(instEl, 'Position Spread', 0, 10, 0.1, instPosSpread, v => {
+  instPosSpread = v; updateInstanceTransforms();
+});
+slider(instEl, 'Scale Randomness', 0, 1, 0.01, instScaleRand, v => {
+  instScaleRand = v; updateInstanceTransforms();
+});
+slider(instEl, 'Rotation Randomness', 0, 1, 0.01, instRotRand, v => {
+  instRotRand = v; updateInstanceTransforms();
+});
+
+document.getElementById('inst-randomize').addEventListener('click', () => {
+  seedInstances();
+  updateInstanceTransforms();
+});
+
+// Mouse FX controls
+buildSection('mouse-controls', [
+  ['Pull Strength',  0,   1.5, .01, 'uMousePull'],
+  ['Radius',         0.05,1,   .01, 'uMouseRadius'],
+  ['Falloff',        0.3, 8,   .1,  'uMouseFalloff'],
+  ['Ripple',         0,   1.5, .01, 'uMouseRipple'],
+  ['Ripple Speed',   1,   30,  .5,  'uMouseRippleSpeed'],
+  ['Noise Boost',    0,   1.5, .01, 'uMouseNoise'],
+  ['Hover Glow',     0,   2,   .01, 'uMouseGlow'],
+]);
+
+// Response delay — JS-side only (not a shader uniform)
+let mouseDelay = 0.88;
+const mouseDelayRef = slider(
+  document.getElementById('mouse-controls'),
+  'Response', 0, 0.98, .01, mouseDelay,
+  v => { mouseDelay = v; }
+);
+sliderRefs['mouseDelay'] = mouseDelayRef;
+
+togSetup('tog-mouse', false, v => {
+  uniforms.uMouseEnabled.value = v ? 1.0 : 0.0;
+});
+togSetup('tog-mouse-mode', true, v => {
+  uniforms.uMousePushPull.value = v ? 1.0 : -1.0;
+  document.getElementById('tog-mouse-mode').childNodes[1].textContent = v ? 'Pull' : 'Push';
+});
+
+// Mouse tracking
+const mouse2D   = new THREE.Vector2(0, 0);
+const mouseRayTarget = new THREE.Vector3(0, 0, 1);
+const mouseRaySmooth = new THREE.Vector3(0, 0, 1);
+const _raycaster = new THREE.Raycaster();
+
+window.addEventListener('mousemove', e => {
+  mouse2D.x =  (e.clientX / window.innerWidth)  * 2 - 1;
+  mouse2D.y = -(e.clientY / window.innerHeight) * 2 + 1;
+});
+
+// ─── Animation Loop ───────────────────────────────────────────────────────────
+
+const clock = new THREE.Clock();
+let elapsed = 0, lightAngle = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const delta = clock.getDelta();
+
+  if (!paused) {
+    elapsed += delta;
+    uniforms.uTime.value = elapsed;
+  }
+
+  // Keyframe transition
+  if (kfFrom && kfTo && kfT < 1.0) {
+    kfT = Math.min(kfT + delta / KF_DUR, 1.0);
+    const state = lerpState(kfFrom, kfTo, kfT);
+    applyState(state, kfT >= 1.0); // sync sliders only when done
+    if (kfT >= 1.0) {
+      applyState(kfTo, true);
+      kfFrom = null;
+      scrollLocked = false;
+      awaitingScrollReset = true;
+      clearTimeout(scrollResetTimer);
+      const cooldown = parseFloat(document.getElementById('snap-cooldown').value) || 600;
+      scrollResetTimer = setTimeout(() => { awaitingScrollReset = false; }, cooldown);
+      renderKFBar();
+    }
+    // Update progress dot fill during transit
+    const dots = document.querySelectorAll('.kf-dot');
+    dots.forEach((d, i) => d.classList.toggle('transit', i === kfActiveIdx && kfT < 1.0));
+  }
+
+  if (lightOrbit) {
+    lightAngle += 0.004;
+    uniforms.uLightDir.value.set(Math.sin(lightAngle)*3, 2+Math.sin(lightAngle*.4), Math.cos(lightAngle)*3);
+  }
+
+  // Mouse FX — frame-rate-independent lerp toward cursor ray
+  if (uniforms.uMouseEnabled.value > 0.5) {
+    _raycaster.setFromCamera(mouse2D, camera);
+    mouseRayTarget.copy(_raycaster.ray.direction).normalize();
+    const lerpAmt = 1.0 - Math.pow(Math.max(mouseDelay, 0.001), delta * 60);
+    mouseRaySmooth.lerp(mouseRayTarget, lerpAmt).normalize();
+    uniforms.uMouseDir.value.copy(mouseRaySmooth);
+  }
+
+  orbitControls.update();
+  composer.render();
+}
+
+animate();
+renderKFBar();
+renderKFPanel();
+
+// ─── Resize ───────────────────────────────────────────────────────────────────
+
+window.addEventListener('resize', () => {
+  camera.aspect = W()/H();
+  camera.updateProjectionMatrix();
+  renderer.setSize(W(), H());
+  composer.setSize(W(), H());
+  bloomPass.setSize(W(), H());
+});
+</script>
+</body>
+</html>
