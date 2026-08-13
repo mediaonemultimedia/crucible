@@ -26,6 +26,7 @@ body{
   -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
 }
 canvas#stage{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+body.is-orbiting canvas#stage{cursor:grabbing}
 
 /* Vignette, plus scrims top and bottom. The plume is bright enough to swallow
    the typography outright, and the type has to hold at every moment of the
@@ -195,6 +196,8 @@ input[type=range]:focus-visible::-webkit-slider-runnable-track{background:rgba(2
 .seg button:last-child{border-right:0}
 .seg button:hover{color:var(--dim)}
 .seg button[aria-pressed=true]{color:var(--bg);background:var(--accent)}
+/* five options in one strip need a slightly tighter face to stay on one line */
+.seg.seg-tight button{font-size:7.5px;letter-spacing:.04em;padding:6px 1px 5px}
 
 #panel .foot{
   flex:none;padding:14px 22px 20px;border-top:1px solid var(--rule-2);
@@ -363,7 +366,7 @@ a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
 
   <div id="credit">
     <b>Solve</b> — GPU compute fluid study 08 &nbsp;·&nbsp; 3D stable fluids in WGSL &nbsp;·&nbsp; Jacobi pressure projection &nbsp;·&nbsp; vorticity confinement &nbsp;·&nbsp; GPU-advected particles &nbsp;·&nbsp; raw WebGPU<br>
-    <span class="keys">drag to push the fluid &nbsp; c controls &nbsp; space pause &nbsp; r reset field</span>
+    <span class="keys">drag to push the fluid &nbsp; shift-drag orbit &nbsp; scroll dolly &nbsp; c controls &nbsp; space pause &nbsp; r reset field</span>
   </div>
 
   <aside id="panel" aria-label="Simulation controls" aria-hidden="true">
@@ -908,6 +911,17 @@ fn ramp(tin : f32, mode : i32) -> vec3<f32> {
     if (t < 0.70) { return mix(c1, c2, (t - 0.33) / 0.37); }
     return mix(c2, c3, (t - 0.70) / 0.30);
   }
+  if (mode == 4) {                                   // SMOKE
+    // Cool and desaturated, and deliberately short at the top: the ramp ends in
+    // a pale grey rather than the white-hot core the other four run towards.
+    let c0 = vec3<f32>(0.048, 0.053, 0.064);
+    let c1 = vec3<f32>(0.168, 0.180, 0.202);
+    let c2 = vec3<f32>(0.392, 0.408, 0.434);
+    let c3 = vec3<f32>(0.600, 0.624, 0.664);
+    if (t < 0.38) { return mix(c0, c1, t / 0.38); }
+    if (t < 0.76) { return mix(c1, c2, (t - 0.38) / 0.38); }
+    return mix(c2, c3, (t - 0.76) / 0.24);
+  }
   let c0 = vec3<f32>(0.055, 0.017, 0.014);           // EMBER
   let c1 = vec3<f32>(0.520, 0.108, 0.036);
   let c2 = vec3<f32>(0.960, 0.520, 0.150);
@@ -947,8 +961,14 @@ fn vs(@builtin(vertex_index) vi : u32, @builtin(instance_index) ii : u32) -> VO 
 
   let speed = length(V.xyz);
   let dye   = V.w;
-  let t = clamp(dye * 2.2 + speed * r.b.z * 0.8, 0.0, 1.0);
-  o.col = ramp(t, i32(r.a.z));
+  let mode  = i32(r.a.z);
+  let isSmoke = mode == 4;
+  // Fire is read through its speed as much as its density — the fast core is
+  // the hot core. Smoke has no such coupling; shading it by speed would draw
+  // bright streaks through it, so its colour comes from density alone.
+  var t = clamp(dye * 2.2 + speed * r.b.z * 0.8, 0.0, 1.0);
+  if (isSmoke) { t = clamp(0.09 + dye * 1.55, 0.0, 1.0); }
+  o.col = ramp(t, mode);
 
   // fade in on birth, out on death, so respawns never pop
   let env = smoothstep(0.0, 0.16, P.w) * smoothstep(1.0, 0.82, P.w);
@@ -963,7 +983,14 @@ fn vs(@builtin(vertex_index) vi : u32, @builtin(instance_index) ii : u32) -> VO 
   let m = min(min(P.x, P.y), min(P.z, min(1.0 - P.x, min(1.0 - P.y, 1.0 - P.z))));
   let edge = smoothstep(0.0, 0.155, m);
 
-  o.amp = env * edge * r.b.w * (0.035 + 1.55 * pow(carry, 1.35));
+  // Fire emits. Brightness climbs steeply with the dye a particle is sitting
+  // in, so the dense core glows of its own accord. Smoke does not emit at all —
+  // it is lit. Every smoke particle therefore carries nearly the same small
+  // quantity of light, and the density of the plume comes only from how many of
+  // them the eye is looking through.
+  var gain = 0.035 + 1.55 * pow(carry, 1.35);
+  if (isSmoke) { gain = 0.022 + 0.50 * carry; }
+  o.amp = env * edge * r.b.w * gain;
   return o;
 }
 
@@ -1459,6 +1486,27 @@ const FOV = 0.52;   // radians, vertical — long-lens framing keeps the box cal
 const view = new Float32Array(16), proj = new Float32Array(16);
 let camAngle = 0.6, camPitch = 0.10;
 const camEye = [0,0,0];
+const camTarget = [0, 0.02, 0];
+let camAzim = 0, camElev = 0, camDist = 0;
+
+const clampf = (v, a, b) => v < a ? a : (v > b ? b : v);
+
+// The piece already turns on its own. The user's orbit is therefore an *offset*
+// laid over that drift rather than a replacement for it: azimuth is added to the
+// drift angle, elevation tilts the eye about the target, and dolly scales the
+// framing radius. At rest (0, 0, 1) the reconstruction below returns exactly the
+// eye the piece computed for itself, so the default look is untouched.
+const ORBIT = {
+  az: 0, el: 0, dolly: 1,
+  EL_MIN: -1.02, EL_MAX: 1.30,        // absolute elevation of the eye, radians
+  DOLLY_MIN: 0.46, DOLLY_MAX: 2.20,
+  dragging: false, px: 0, py: 0,
+};
+
+function resetView(){
+  ORBIT.az = 0; ORBIT.el = 0; ORBIT.dolly = 1;
+  if (device) writeRenderUniforms(0);
+}
 
 function writeRenderUniforms(dt){
   camAngle += dt * S.orbit * 0.42;
@@ -1470,10 +1518,27 @@ function writeRenderUniforms(dt){
   // sit between fitting height and fitting width and let the corners run out.
   const R = 4.8 * Math.min(1.72, Math.pow(Math.max(1, 1 / Math.max(aspect, 0.3)), 0.68));
   const py = 0.34 + camPitch;
-  camEye[0] = Math.sin(camAngle) * R;
-  camEye[1] = py + Math.sin(camAngle * 0.37) * 0.22;
-  camEye[2] = Math.cos(camAngle) * R;
-  mLookAt(view, camEye, [0, 0.02, 0], [0,1,0]);
+  // the framing the piece chooses for itself, before the user has touched it
+  const bx = Math.sin(camAngle) * R;
+  const by = py + Math.sin(camAngle * 0.37) * 0.22;
+  const bz = Math.cos(camAngle) * R;
+
+  // Re-express that eye in spherical coordinates about the target so the user's
+  // three numbers are exact rotations and a scaling of it, not a second camera
+  // fighting the first. asin/atan2 followed by sin/cos is an identity here, so
+  // with no user input this hands back bx,by,bz unchanged.
+  const dx = bx - camTarget[0], dy = by - camTarget[1], dz = bz - camTarget[2];
+  const rad = Math.hypot(dx, dy, dz);
+  const az  = Math.atan2(dx, dz) + ORBIT.az;
+  const el  = clampf(Math.asin(dy / rad) + ORBIT.el, ORBIT.EL_MIN, ORBIT.EL_MAX);
+  const rr  = rad * ORBIT.dolly;
+  const ch  = Math.cos(el);
+  camEye[0] = camTarget[0] + Math.sin(az) * ch * rr;
+  camEye[1] = camTarget[1] + Math.sin(el) * rr;
+  camEye[2] = camTarget[2] + Math.cos(az) * ch * rr;
+  camAzim = az; camElev = el; camDist = rr;
+
+  mLookAt(view, camEye, camTarget, [0,1,0]);
   mPerspective(proj, FOV, canvas.width / canvas.height, 0.05, 24);
 
   renU.set(view, 0);
@@ -1691,7 +1756,7 @@ const SPEC = [
     { k:'intensity', t:'rng', l:'Intensity', min:0.05, max:1.6, step:0.01, f:v=>v.toFixed(2) },
   ]],
   ['Render', [
-    { k:'palette', t:'seg', l:'Palette', o:[[0,'Ember'],[1,'Ice'],[2,'Bone'],[3,'Spectral']] },
+    { k:'palette', t:'seg', l:'Palette', o:[[0,'Ember'],[1,'Ice'],[2,'Bone'],[3,'Spectral'],[4,'Smoke']] },
     { k:'exposure',    t:'rng', l:'Exposure', min:0.2, max:3, step:0.05, f:v=>v.toFixed(2) },
     { k:'bloom',       t:'rng', l:'Bloom', min:0, max:1.6, step:0.02, f:v=>v.toFixed(2) },
     { k:'persistence', t:'rng', l:'Persistence', min:0, max:0.97, step:0.01, f:v=>v.toFixed(2) },
@@ -1702,10 +1767,61 @@ const SPEC = [
 
 const widgets = {};
 
+/* ── palette looks ─────────────────────────────────────────────────────────
+   A palette is normally only a colour ramp, and Ember, Ice, Bone and Spectral
+   all sit happily on one simulation. Smoke does not: the buoyancy that makes a
+   flame roar upward makes smoke look like a flame that has lost its colour. So
+   a palette may carry a small *look* — a handful of parameters it nudges on
+   selection and hands back on the way out. Deliberately not folded into
+   DEFAULTS, because that would change what every other palette looks like on
+   load and what "reset" means for them.                                     */
+
+const PALETTE_NAMES = ['Ember','Ice','Bone','Spectral','Smoke'];
+
+const PALETTE_LOOK = {
+  4: {                    // Smoke
+    buoyancy:  0.90,      // drifts and spreads instead of climbing
+    vorticity: 8.0,       // fewer hard curls — smoke is smoother than fire
+    dyeDecay:  0.994,     // lingers and diffuses rather than burning off
+    bloom:     0.14,      // lit, not glowing: almost no halo
+    exposure:  1.30,
+  },
+};
+
+// What the look displaced, kept so it can be handed back. Only keys the user has
+// not moved since are restored: if a control still reads exactly what the look
+// wrote, the look still owns it; if it does not, the user does.
+let lookHeld = null;
+
+function setLive(k, v){
+  S[k] = v;
+  if (widgets[k]) widgets[k].set(v);
+}
+
+function releaseLook(){
+  if (!lookHeld) return;
+  const held = lookHeld;
+  lookHeld = null;
+  for (const k in held.was){
+    if (S[k] === held.wrote[k]) setLive(k, held.was[k]);
+  }
+}
+
+function applyLook(p){
+  if (lookHeld && lookHeld.palette === p) return;
+  releaseLook();
+  const look = PALETTE_LOOK[p];
+  if (!look) return;
+  const was = {}, wrote = {};
+  for (const k in look){ was[k] = S[k]; wrote[k] = look[k]; setLive(k, look[k]); }
+  lookHeld = { palette: p, was, wrote };
+}
+
 function applyChange(k, v){
   S[k] = v;
   if (k === 'grid')  { allocSim(v); clearFields(); prime(40); }
   if (k === 'count') { allocParticles(v); seedParticles(); }
+  if (k === 'palette') applyLook(v);
   if (k === 'grid' || k === 'count' || k === 'iterations') updateReadout();
 }
 
@@ -1739,7 +1855,9 @@ function buildPanel(){
         widgets[spec.k] = { spec, set(v){ inp.value = v; vl.textContent = spec.f(v); } };
       } else {
         vl.textContent = '';
-        const seg = document.createElement('div'); seg.className='seg'; seg.setAttribute('role','group');
+        const seg = document.createElement('div');
+        seg.className = 'seg' + (spec.o.length > 4 ? ' seg-tight' : '');
+        seg.setAttribute('role','group');
         const btns = spec.o.map(([val, lab]) => {
           const b = document.createElement('button');
           b.type='button'; b.textContent = lab;
@@ -1760,6 +1878,10 @@ function buildPanel(){
   });
 
   $('#reset').addEventListener('click', () => {
+    // A reset is absolute: there is nothing left for a look to hand back, and
+    // the camera returns to the framing the piece chose for itself.
+    lookHeld = null;
+    resetView();
     Object.keys(DEFAULTS).forEach(k => {
       if (S[k] !== DEFAULTS[k]) applyChange(k, DEFAULTS[k]);
       if (widgets[k]) widgets[k].set(DEFAULTS[k]);
@@ -1811,7 +1933,23 @@ function bindInput(){
     ];
   };
 
+  // Plain drag still pushes the fluid, untouched. Orbit is a second gesture on
+  // the same surface — shift-drag, or a right-button drag — and the two are
+  // mutually exclusive by construction: the mode is decided once, at
+  // pointerdown, and never changes for the life of that drag.
+  const wantsOrbit = e => e.shiftKey || e.button === 2;
+
   const onMove = e => {
+    if (ORBIT.dragging) {
+      ORBIT.az -= (e.clientX - ORBIT.px) * 0.0052;
+      ORBIT.el += (e.clientY - ORBIT.py) * 0.0034;
+      // Clamped here as well as at the point of use, so a long drag past the
+      // pole cannot wind the offset up into a value that takes an equally long
+      // drag to unwind.
+      ORBIT.el = clampf(ORBIT.el, ORBIT.EL_MIN, ORBIT.EL_MAX);
+      ORBIT.px = e.clientX; ORBIT.py = e.clientY;
+      return;
+    }
     if (!pointer.down) return;
     const w = toWorld(e.clientX, e.clientY);
     const dx = w[0]-pointer.wx0, dy = w[1]-pointer.wy0, dz = w[2]-pointer.wz0;
@@ -1821,15 +1959,40 @@ function bindInput(){
     pointer.life = 0.09;
   };
   canvas.addEventListener('pointerdown', e => {
+    if (wantsOrbit(e)) {
+      ORBIT.dragging = true;
+      ORBIT.px = e.clientX; ORBIT.py = e.clientY;
+      canvas.setPointerCapture(e.pointerId);
+      document.body.classList.add('is-orbiting');
+      e.preventDefault();
+      return;
+    }
     pointer.down = true;
     canvas.setPointerCapture(e.pointerId);
     const w = toWorld(e.clientX, e.clientY);
     pointer.wx0 = w[0]; pointer.wy0 = w[1]; pointer.wz0 = w[2];
   });
   canvas.addEventListener('pointermove', onMove, { passive:true });
-  const up = e => { pointer.down = false; try { canvas.releasePointerCapture(e.pointerId); } catch(_){} };
+  const up = e => {
+    pointer.down = false;
+    if (ORBIT.dragging) { ORBIT.dragging = false; document.body.classList.remove('is-orbiting'); }
+    try { canvas.releasePointerCapture(e.pointerId); } catch(_){}
+  };
   canvas.addEventListener('pointerup', up);
   canvas.addEventListener('pointercancel', up);
+  // a right-button orbit would otherwise end in a context menu
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  // Scroll was not spoken for, so it dollies. deltaMode is normalised because a
+  // notched wheel reports lines and a trackpad reports pixels, and multiplying
+  // is the right operation for a distance: a fixed number of notches is the same
+  // proportional move whether you are close in or standing well back.
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const unit = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? 400 : 1);
+    ORBIT.dolly = clampf(ORBIT.dolly * Math.exp(e.deltaY * unit * 0.00085),
+                         ORBIT.DOLLY_MIN, ORBIT.DOLLY_MAX);
+  }, { passive:false });
 
   document.addEventListener('visibilitychange', () => { lastT = 0; });
 }
@@ -1850,6 +2013,64 @@ window.__solve = {
   },
   panelOpen: () => document.body.classList.contains('panel-open'),
   setPanel,
+
+  // camera — the resolved spherical state, not just the raw offsets, so a test
+  // can assert on where the eye actually ended up after the clamps
+  get camera(){
+    return {
+      azimuth: camAzim, elevation: camElev, distance: camDist,
+      eye: camEye.slice(), target: camTarget.slice(),
+      drift: camAngle,
+      user: { az: ORBIT.az, el: ORBIT.el, dolly: ORBIT.dolly },
+      limits: { elevation: [ORBIT.EL_MIN, ORBIT.EL_MAX],
+                dolly:     [ORBIT.DOLLY_MIN, ORBIT.DOLLY_MAX] },
+      dragging: ORBIT.dragging,
+      view: Array.from(view), proj: Array.from(proj),
+    };
+  },
+  orbitBy(daz, del, dollyMul){
+    ORBIT.az += (daz || 0);
+    ORBIT.el = clampf(ORBIT.el + (del || 0), ORBIT.EL_MIN, ORBIT.EL_MAX);
+    if (dollyMul) ORBIT.dolly = clampf(ORBIT.dolly * dollyMul, ORBIT.DOLLY_MIN, ORBIT.DOLLY_MAX);
+    if (device) writeRenderUniforms(0);
+    return this.camera;
+  },
+  setOrbit(o){
+    o = o || {};
+    if ('az' in o) ORBIT.az = o.az;
+    if ('el' in o) ORBIT.el = clampf(o.el, ORBIT.EL_MIN, ORBIT.EL_MAX);
+    if ('dolly' in o) ORBIT.dolly = clampf(o.dolly, ORBIT.DOLLY_MIN, ORBIT.DOLLY_MAX);
+    if (device) writeRenderUniforms(0);
+    return this.camera;
+  },
+  resetView,
+
+  // which of the two canvas gestures is live, and what the push gesture last
+  // handed the solver — enough to prove they are mutually exclusive
+  get pointerState(){
+    return {
+      gesture: ORBIT.dragging ? 'orbit' : (pointer.down ? 'push' : 'none'),
+      pushing: pointer.down, orbiting: ORBIT.dragging,
+      world: [pointer.wx, pointer.wy, pointer.wz],
+      vel:   [pointer.vx, pointer.vy, pointer.vz],
+      life:  pointer.life,
+    };
+  },
+
+  // palette + look — which parameters the current palette is holding, what it
+  // displaced, and what it will hand back
+  get look(){
+    return {
+      palette: S.palette,
+      name: PALETTE_NAMES[S.palette] || String(S.palette),
+      emissive: S.palette !== 4,
+      holding: lookHeld ? lookHeld.palette : null,
+      applied:   lookHeld ? Object.assign({}, lookHeld.wrote) : null,
+      displaced: lookHeld ? Object.assign({}, lookHeld.was)   : null,
+      table: JSON.parse(JSON.stringify(PALETTE_LOOK)),
+      names: PALETTE_NAMES.slice(),
+    };
+  },
   paused: () => paused,
   forceStep(n){ for (let i=0;i<(n||1);i++) step(1/60); },
   reseed: clearFields,
