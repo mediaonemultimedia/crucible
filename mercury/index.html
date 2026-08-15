@@ -1,0 +1,1957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07080a">
+<title>Mercury — a raymarched signed-distance study</title>
+<meta name="description" content="Metaballs welded by polynomial smooth-minimum into one liquid-metal mass, raymarched against a real modelled studio room that the reflection ray actually intersects.">
+<style>
+:root{
+  --bg:#07080a;
+  --ink:#e8e3d8;
+  --dim:#7b8087;
+  --faint:#4a4e54;
+  --rule:rgba(232,227,216,.11);
+  --rule-2:rgba(232,227,216,.055);
+  --accent:#c8a877;
+  --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);overflow:hidden;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+canvas#stage{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+
+#veil{
+  position:fixed;inset:0;pointer-events:none;z-index:2;
+  background:radial-gradient(126% 92% at 50% 46%,transparent 38%,rgba(0,0,0,.34) 80%,rgba(0,0,0,.68) 100%);
+}
+
+#ui{
+  position:fixed;inset:0;z-index:5;pointer-events:none;
+  opacity:0;transition:opacity 1.1s cubic-bezier(.4,0,.2,1) .25s;
+}
+body.is-live #ui{opacity:1}
+#ui > *{pointer-events:auto}
+
+.eyebrow{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.20em;
+  text-transform:uppercase;color:var(--faint);
+}
+
+/* wordmark --------------------------------------------------------------- */
+#mark{position:absolute;top:26px;left:30px;display:flex;align-items:flex-start;gap:12px}
+#mark .w{
+  font-size:15px;font-weight:300;letter-spacing:.52em;text-transform:uppercase;
+  line-height:1;padding-top:1px;white-space:nowrap;
+}
+#mark .ix{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--accent);
+  border:1px solid rgba(200,168,119,.32);padding:2px 4px 1px;line-height:1;white-space:nowrap;
+}
+#mark .sub{margin-top:9px;display:block}
+#mark .col{display:flex;flex-direction:column}
+
+/* panel toggle ------------------------------------------------------------ */
+#panel-toggle{
+  position:absolute;top:24px;right:30px;z-index:7;
+  display:flex;align-items:center;gap:10px;
+  background:rgba(12,13,16,.55);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  border:1px solid var(--rule);color:var(--dim);
+  font-family:var(--mono);font-size:9px;letter-spacing:.20em;text-transform:uppercase;
+  padding:8px 11px;cursor:pointer;line-height:1;
+  transition:border-color .3s ease,color .3s ease,background .3s ease,opacity .35s ease;
+}
+#panel-toggle:hover{border-color:rgba(200,168,119,.45);color:var(--ink)}
+#panel-toggle .bars{display:flex;flex-direction:column;gap:2.5px;width:11px}
+#panel-toggle .bars i{display:block;height:1px;background:currentColor}
+#panel-toggle .bars i:nth-child(1){width:11px}
+#panel-toggle .bars i:nth-child(2){width:7px}
+#panel-toggle .bars i:nth-child(3){width:9px}
+#panel-toggle .key{
+  color:var(--accent);border:1px solid rgba(200,168,119,.28);
+  padding:2px 4px 1px;font-size:8px;letter-spacing:.06em;
+}
+body.panel-open #panel-toggle{opacity:0;pointer-events:none}
+
+/* control panel ----------------------------------------------------------- */
+#panel{
+  position:absolute;top:0;right:0;bottom:0;width:min(336px,90vw);z-index:8;
+  display:flex;flex-direction:column;
+  background:rgba(9,10,12,.90);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-left:1px solid var(--rule);
+  transform:translateX(101%);transition:transform .52s cubic-bezier(.4,0,.2,1);
+  will-change:transform;
+}
+body.panel-open #panel{transform:translateX(0)}
+#panel header{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+  padding:24px 22px 16px;border-bottom:1px solid var(--rule);flex:0 0 auto;
+}
+#panel header h2{
+  margin:8px 0 0;font-size:13px;font-weight:300;letter-spacing:.34em;text-transform:uppercase;
+}
+#panel-close{
+  background:none;border:1px solid var(--rule);color:var(--dim);
+  width:24px;height:24px;line-height:1;cursor:pointer;font-size:14px;
+  transition:border-color .25s ease,color .25s ease;
+}
+#panel-close:hover{border-color:rgba(200,168,119,.45);color:var(--ink)}
+
+#panel .body{overflow-y:auto;overscroll-behavior:contain;padding:0 22px 26px;flex:1 1 auto}
+#panel .body::-webkit-scrollbar{width:6px}
+#panel .body::-webkit-scrollbar-thumb{background:rgba(232,227,216,.12)}
+
+#panel section{padding:20px 0 6px;border-bottom:1px solid var(--rule-2)}
+#panel section:last-of-type{border-bottom:0}
+#panel h3{
+  margin:0 0 13px;font-family:var(--mono);font-size:9px;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--faint);font-weight:400;
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+}
+#panel h3 .ix{color:rgba(200,168,119,.5)}
+#panel .note{
+  margin:10px 0 2px;font-family:var(--mono);font-size:8.5px;line-height:1.85;
+  letter-spacing:.05em;color:var(--faint);
+}
+#panel .note b{color:var(--dim);font-weight:400}
+#panel .note.warn b{color:var(--accent)}
+
+/* sliders */
+.sld{display:block;margin:13px 0 0}
+.sld .row{
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);
+}
+.sld .row output{color:var(--dim);letter-spacing:.06em;font-variant-numeric:tabular-nums}
+.sld input[type=range]{
+  appearance:none;-webkit-appearance:none;width:100%;height:12px;background:none;cursor:pointer;display:block;
+}
+.sld input[type=range]::-webkit-slider-runnable-track{height:1px;background:var(--rule)}
+.sld input[type=range]::-moz-range-track{height:1px;background:var(--rule)}
+.sld input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:9px;height:9px;margin-top:-4px;background:var(--accent);
+  border:0;border-radius:0;transform:rotate(45deg);
+}
+.sld input[type=range]::-moz-range-thumb{
+  width:8px;height:8px;background:var(--accent);border:0;border-radius:0;
+}
+.sld input[type=range]:focus{outline:none}
+.sld input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(200,168,119,.25)}
+
+/* option grids */
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:13px}
+.opts button{
+  text-align:left;background:rgba(232,227,216,.028);border:1px solid var(--rule-2);
+  color:var(--dim);cursor:pointer;padding:8px 9px 7px;line-height:1.3;
+  transition:border-color .25s ease,color .25s ease,background .25s ease;
+}
+.opts button b{display:block;font-family:var(--sans);font-size:11px;font-weight:400;letter-spacing:.06em}
+.opts button i{
+  display:block;font-style:normal;font-family:var(--mono);font-size:7.5px;
+  letter-spacing:.09em;color:var(--faint);margin-top:3px;
+}
+.opts button:hover{border-color:rgba(200,168,119,.34);color:var(--ink)}
+.opts button[aria-pressed="true"]{
+  border-color:rgba(200,168,119,.62);background:rgba(200,168,119,.09);color:var(--ink);
+}
+.opts button[aria-pressed="true"] i{color:var(--accent)}
+
+/* wide action button */
+.act{
+  display:block;width:100%;margin-top:14px;background:none;border:1px solid var(--rule);
+  color:var(--dim);cursor:pointer;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;
+  padding:9px 8px 8px;transition:border-color .25s ease,color .25s ease,background .25s ease;
+}
+.act:hover{border-color:rgba(200,168,119,.45);color:var(--ink);background:rgba(200,168,119,.05)}
+.act:disabled{opacity:.34;cursor:default;border-color:var(--rule-2)}
+.act:disabled:hover{background:none;color:var(--dim);border-color:var(--rule-2)}
+
+/* environment plate ------------------------------------------------------- */
+.envplate{
+  margin-top:4px;border:1px dashed var(--rule);padding:13px 12px 12px;
+  transition:border-color .28s ease,background .28s ease;
+}
+.envplate.hot{border-color:rgba(200,168,119,.6);background:rgba(200,168,119,.06)}
+.envplate .lead{
+  font-family:var(--mono);font-size:8.5px;line-height:1.8;letter-spacing:.06em;color:var(--faint);
+}
+.envplate .lead b{color:var(--dim);font-weight:400}
+.envrow{display:flex;align-items:center;gap:9px;margin-top:11px}
+.envrow label.pick{
+  flex:0 0 auto;border:1px solid var(--rule);color:var(--dim);cursor:pointer;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;
+  padding:7px 10px 6px;transition:border-color .25s ease,color .25s ease,background .25s ease;
+}
+.envrow label.pick:hover{border-color:rgba(200,168,119,.5);color:var(--ink);background:rgba(200,168,119,.06)}
+.envrow input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+#env-name{
+  flex:1 1 auto;min-width:0;font-family:var(--mono);font-size:8px;letter-spacing:.08em;
+  color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+#env-thumb{
+  margin-top:11px;height:52px;width:100%;background-size:cover;background-position:center;
+  border:1px solid var(--rule-2);display:none;
+}
+#env-thumb.on{display:block}
+
+/* drop overlay ------------------------------------------------------------ */
+#drop{
+  position:fixed;inset:0;z-index:14;pointer-events:none;opacity:0;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(7,8,10,.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  transition:opacity .22s ease;
+}
+body.dragging #drop{opacity:1;pointer-events:auto}
+#drop .plate{
+  border:1px dashed rgba(200,168,119,.55);padding:44px 54px;text-align:center;
+  background:rgba(9,10,12,.6);
+}
+#drop .plate .t{
+  font-size:14px;font-weight:300;letter-spacing:.34em;text-transform:uppercase;color:var(--ink);
+}
+#drop .plate .s{
+  margin-top:14px;font-family:var(--mono);font-size:8.5px;letter-spacing:.20em;
+  text-transform:uppercase;color:var(--faint);line-height:2;
+}
+
+/* readout ---------------------------------------------------------------- */
+#readout{
+  position:absolute;left:30px;bottom:74px;font-family:var(--mono);font-size:10px;
+  line-height:1.85;color:var(--dim);letter-spacing:.03em;
+}
+#readout dl{margin:0;display:grid;grid-template-columns:78px auto;column-gap:14px}
+#readout dt{color:var(--faint);text-transform:uppercase;letter-spacing:.16em;font-size:9px}
+#readout dd{margin:0;color:var(--dim);font-variant-numeric:tabular-nums}
+#readout dd#r-env{color:var(--ink);letter-spacing:.12em;text-transform:uppercase;font-size:9px}
+
+/* method note ------------------------------------------------------------ */
+#method{
+  position:absolute;right:30px;bottom:74px;width:min(330px,31vw);text-align:right;
+  font-family:var(--mono);font-size:9.5px;line-height:1.95;color:var(--faint);
+  letter-spacing:.04em;transition:opacity .4s ease;
+}
+#method b{color:var(--dim);font-weight:400}
+#method .t{
+  display:block;margin-bottom:8px;font-size:9px;letter-spacing:.20em;
+  text-transform:uppercase;color:rgba(232,227,216,.24);
+}
+body.panel-open #method{opacity:0;pointer-events:none}
+
+/* credit ----------------------------------------------------------------- */
+#credit{
+  position:absolute;left:50%;transform:translateX(-50%);bottom:26px;text-align:center;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.20em;color:var(--faint);
+  text-transform:uppercase;line-height:2;white-space:nowrap;
+}
+#credit b{color:var(--dim);font-weight:400}
+#credit .keys{color:rgba(232,227,216,.2)}
+body.is-paused #credit .keys::after{content:" · held — press space to play";color:var(--accent)}
+
+/* loader ----------------------------------------------------------------- */
+#loader{
+  position:fixed;inset:0;z-index:20;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity .9s cubic-bezier(.4,0,.2,1);
+}
+#loader.done{opacity:0;pointer-events:none}
+#loader .idx{
+  font-family:var(--mono);font-size:10px;letter-spacing:.34em;color:var(--accent);margin-bottom:30px;
+}
+/* seven droplets drawn together into one body — the piece announcing its subject */
+#drops{position:relative;width:150px;height:16px;margin-bottom:30px}
+#drops i{
+  position:absolute;top:50%;left:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;
+  border-radius:50%;background:var(--accent);opacity:.8;
+  animation:coalesce 2.4s cubic-bezier(.5,0,.2,1) infinite;
+}
+#drops i:nth-child(1){--x:-66px;animation-delay:.00s}
+#drops i:nth-child(2){--x:-44px;animation-delay:.06s}
+#drops i:nth-child(3){--x:-22px;animation-delay:.12s}
+#drops i:nth-child(4){--x:0px;animation-delay:.18s}
+#drops i:nth-child(5){--x:22px;animation-delay:.24s}
+#drops i:nth-child(6){--x:44px;animation-delay:.30s}
+#drops i:nth-child(7){--x:66px;animation-delay:.36s}
+@keyframes coalesce{
+  0%{transform:translateX(var(--x)) scale(1);opacity:.34}
+  46%{transform:translateX(0) scale(1.5);opacity:.92}
+  70%{transform:translateX(0) scale(1.5);opacity:.92}
+  100%{transform:translateX(var(--x)) scale(1);opacity:.34}
+}
+#loader .word{
+  font-size:clamp(30px,6.6vw,68px);font-weight:200;letter-spacing:.38em;
+  text-transform:uppercase;text-indent:.38em;line-height:1;margin:0;text-align:center;
+}
+#loader .study{
+  margin-top:22px;font-family:var(--mono);font-size:9.5px;letter-spacing:.30em;
+  text-transform:uppercase;color:var(--dim);text-align:center;
+}
+#load-bar{margin-top:44px;width:min(290px,52vw);height:1px;background:rgba(232,227,216,.1);position:relative}
+#load-bar-fill{position:absolute;inset:0 auto 0 0;width:5%;background:var(--accent);transition:width .5s cubic-bezier(.4,0,.2,1)}
+#load-status{
+  margin-top:14px;font-family:var(--mono);font-size:8.5px;letter-spacing:.26em;
+  text-transform:uppercase;color:var(--faint);
+}
+#loader.is-error #load-status{color:#d97a6c}
+#loader.is-error #load-bar-fill{background:#d97a6c}
+#loader .rule{width:min(290px,52vw);height:1px;background:var(--rule-2);margin-top:30px}
+#loader .foot{
+  margin-top:14px;font-family:var(--mono);font-size:8px;letter-spacing:.2em;
+  text-transform:uppercase;color:rgba(232,227,216,.16);text-align:center;line-height:2;
+}
+
+@media (prefers-reduced-motion: reduce){
+  #drops i{animation-duration:.01ms}
+  #loader{transition-duration:.01ms}
+  #panel{transition-duration:.01ms}
+}
+@media (max-width:1180px){
+  #method{display:none}
+}
+@media (max-width:1360px){
+  #credit{font-size:8px;letter-spacing:.14em}
+}
+@media (max-width:880px){
+  #mark{top:18px;left:18px}
+  #panel-toggle{top:16px;right:18px}
+  #panel{width:min(336px,100vw)}
+  #readout{left:18px;right:18px;bottom:96px;font-size:9px}
+  #readout dl{grid-template-columns:62px auto}
+  #credit{bottom:14px;font-size:7.5px;letter-spacing:.12em;white-space:normal;width:calc(100vw - 36px);line-height:1.9}
+  #drop .plate{padding:30px 26px}
+}
+@media (max-height:560px){
+  #readout{display:none}
+}
+
+
+/* ── series navigation ─────────────────────────────────────────────── */
+#mark .sx-wrap{position:relative;display:inline-block}
+#mark a.ix{text-decoration:none;display:inline-block;cursor:pointer;
+  transition:border-color .28s ease,color .28s ease,background .28s ease}
+#mark a.ix:hover,#mark .sx-wrap:focus-within a.ix{
+  border-color:rgba(200,168,119,.62);background:rgba(200,168,119,.08)}
+#mark a.ix:focus-visible{outline:1px solid rgba(200,168,119,.7);outline-offset:2px}
+#mark .sx-menu{
+  position:absolute;top:calc(100% + 9px);left:0;z-index:20;min-width:228px;
+  background:rgba(9,10,12,.93);
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+  border:1px solid var(--rule);padding:7px 0;
+  opacity:0;visibility:hidden;transform:translateY(-5px);
+  transition:opacity .26s ease,transform .26s cubic-bezier(.4,0,.2,1),visibility 0s linear .26s;
+}
+#mark .sx-wrap:hover .sx-menu,
+#mark .sx-wrap:focus-within .sx-menu{
+  opacity:1;visibility:visible;transform:translateY(0);transition-delay:0s}
+#mark .sx-menu .sx-hd{
+  display:block;font-family:var(--mono);font-size:8px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--faint);padding:5px 13px 8px;
+  border-bottom:1px solid var(--rule-2,rgba(232,227,216,.055));margin-bottom:5px;
+  text-decoration:none;transition:color .24s ease}
+a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
+#mark .sx-menu a,#mark .sx-menu span.sx-i{
+  display:flex;align-items:baseline;gap:9px;padding:4px 13px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;
+  text-transform:uppercase;text-decoration:none;color:var(--dim);
+  transition:color .22s ease,background .22s ease}
+#mark .sx-menu a:hover,#mark .sx-menu a:focus-visible{
+  color:var(--ink);background:rgba(232,227,216,.05);outline:none}
+#mark .sx-menu .sx-n{color:var(--faint);flex:0 0 auto;transition:color .22s ease}
+#mark .sx-menu a:hover .sx-n,#mark .sx-menu a:focus-visible .sx-n{color:var(--accent)}
+#mark .sx-menu .sx-here{color:var(--accent)}
+#mark .sx-menu .sx-here .sx-n{color:var(--accent)}
+#mark .sx-menu span.sx-i{color:rgba(232,227,216,.20);cursor:default}
+#mark .sx-menu span.sx-i .sx-n{color:rgba(232,227,216,.14)}
+#mark .sx-menu span.sx-i em{
+  font-style:normal;margin-left:auto;padding-left:10px;font-size:7.5px;
+  letter-spacing:.14em;color:rgba(232,227,216,.17)}
+@media (prefers-reduced-motion:reduce){
+  #mark .sx-menu{transition:opacity .01s,visibility 0s}
+}
+</style>
+</head>
+<body>
+
+<canvas id="stage"></canvas>
+<div id="veil"></div>
+
+<div id="ui">
+  <div id="mark">
+    <div class="col">
+      <span class="w">Mercury</span>
+      <span class="eyebrow sub">Raymarched signed-distance study</span>
+    </div>
+    <span class="sx-wrap"><a class="ix" href="../" aria-label="Study 03 — open series index">No. 03</a><nav class="sx-menu" aria-label="Series index"><a class="sx-hd" href="../">Crucible — index</a><a class="sx-here" href="../mercury/" aria-current="page"><span class="sx-n">03</span><span>Mercury</span></a><span class="sx-i"><span class="sx-n">04</span><span>Torsion</span><em>Pending</em></span><span class="sx-i"><span class="sx-n">05</span><span>Torsion 2.0</span><em>Pending</em></span><span class="sx-i"><span class="sx-n">06</span><span>Weft</span><em>Pending</em></span><a href="../cast/"><span class="sx-n">07</span><span>Cast</span></a><a href="../solve/"><span class="sx-n">08</span><span>Solve</span></a><a href="../torsion-pineapple/"><span class="sx-n">09</span><span>Torsion Pineapple</span></a><a href="../anneal/"><span class="sx-n">10</span><span>Anneal</span></a></nav></span>
+  </div>
+
+  <button id="panel-toggle" type="button" aria-expanded="false" aria-controls="panel">
+    <span class="bars"><i></i><i></i><i></i></span>
+    <span class="lbl">Controls</span>
+    <span class="key">C</span>
+  </button>
+
+  <aside id="panel" aria-label="Controls">
+    <header>
+      <div>
+        <span class="eyebrow">Study 03</span>
+        <h2>Alloy</h2>
+      </div>
+      <button id="panel-close" type="button" aria-label="Close controls">×</button>
+    </header>
+
+    <div class="body">
+
+      <section>
+        <h3>Material <span class="ix">01</span></h3>
+
+        <label class="sld">
+          <span class="row"><span>Reflectivity F0</span><output id="o-f0">0.94</output></span>
+          <input id="p-f0" type="range" min="0.4" max="1" step="0.01" value="0.94">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Mirror sharpness</span><output id="o-rough">0.055 rough</output></span>
+          <input id="p-rough" type="range" min="0" max="0.45" step="0.005" value="0.055">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Fresnel</span><output id="o-fres">1.00</output></span>
+          <input id="p-fres" type="range" min="0" max="1.6" step="0.01" value="1">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Specular lobe</span><output id="o-spec">0.85</output></span>
+          <input id="p-spec" type="range" min="0" max="2" step="0.01" value="0.85">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Silver → champagne</span><output id="o-tint">0.32</output></span>
+          <input id="p-tint" type="range" min="0" max="1" step="0.01" value="0.32">
+        </label>
+
+        <p class="note">
+          <b>F0</b> is the normal-incidence reflectance the tint is multiplied
+          into — a conductor has no diffuse term, so everything you see is the
+          room coming back off the surface.
+        </p>
+      </section>
+
+      <section>
+        <h3>Motion <span class="ix">02</span></h3>
+
+        <label class="sld">
+          <span class="row"><span>Drift speed</span><output id="o-speed">1.00×</output></span>
+          <input id="p-speed" type="range" min="0" max="2.5" step="0.01" value="1">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Weld softness k</span><output id="o-k">0.260</output></span>
+          <input id="p-k" type="range" min="0.08" max="0.55" step="0.005" value="0.26">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Breathing rate</span><output id="o-krate">0.34</output></span>
+          <input id="p-krate" type="range" min="0" max="1.2" step="0.01" value="0.34">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Breathing range</span><output id="o-krange">0.110</output></span>
+          <input id="p-krange" type="range" min="0" max="0.34" step="0.005" value="0.11">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Orbit spread</span><output id="o-spread">1.00</output></span>
+          <input id="p-spread" type="range" min="0.4" max="1.8" step="0.01" value="1">
+        </label>
+
+        <button class="act" id="p-replay" type="button">Condense again</button>
+
+        <p class="note">
+          <b>k</b> breathes on a slow sine. As it widens the separate bodies
+          lose their boundaries and the mass reads as one form condensing;
+          as it narrows they differentiate again.
+        </p>
+      </section>
+
+      <section>
+        <h3>Structure <span class="ix">03</span></h3>
+
+        <label class="sld">
+          <span class="row"><span>Blob count</span><output id="o-count">8</output></span>
+          <input id="p-count" type="range" min="4" max="16" step="1" value="8">
+        </label>
+
+        <p class="note warn">
+          Cost is <b>count × march steps</b> per pixel — every step of every ray
+          evaluates every sphere. At <b><span id="o-cost">768</span></b> distance
+          evaluations per primary ray, doubling the count doubles the shader load.
+        </p>
+      </section>
+
+      <section>
+        <h3>Environment <span class="ix">04</span></h3>
+
+        <div class="envplate" id="envplate">
+          <p class="lead">
+            The default is a <b>modelled room</b> — the reflection ray really
+            intersects its ceiling grid, backdrop and black quarter. Drop an
+            image here or anywhere on the canvas to replace it with a
+            <b>spherical environment</b>, prefiltered across the roughness range.
+          </p>
+          <div class="envrow">
+            <label class="pick" for="p-envfile" tabindex="0" role="button">Choose image</label>
+            <input id="p-envfile" type="file" accept="image/*">
+            <span id="env-name">No image — procedural room</span>
+          </div>
+          <div id="env-thumb"></div>
+        </div>
+
+        <label class="sld">
+          <span class="row"><span>Intensity</span><output id="o-envint">1.00×</output></span>
+          <input id="p-envint" type="range" min="0.1" max="3" step="0.01" value="1">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Rotation</span><output id="o-envrot">0°</output></span>
+          <input id="p-envrot" type="range" min="0" max="360" step="1" value="0">
+        </label>
+
+        <button class="act" id="p-envrevert" type="button" disabled>Revert to procedural room</button>
+      </section>
+
+      <section>
+        <h3>Render <span class="ix">05</span></h3>
+
+        <label class="sld">
+          <span class="row"><span>March step</span><output id="o-step">0.80</output></span>
+          <input id="p-step" type="range" min="0.35" max="1" step="0.01" value="0.80">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Max steps</span><output id="o-steps">96</output></span>
+          <input id="p-steps" type="range" min="40" max="200" step="2" value="96">
+        </label>
+
+        <div class="opts" id="p-bounce" role="group" aria-label="Reflection bounces">
+          <button type="button" data-b="1" aria-pressed="false"><b>One bounce</b><i>flat mirror</i></button>
+          <button type="button" data-b="2" aria-pressed="true"><b>Two bounces</b><i>metal sees metal</i></button>
+        </div>
+
+        <p class="note">
+          A step below <b>1.0</b> under-relaxes the sphere-trace: slower, but it
+          stops the march overshooting thin welds where two bodies meet.
+        </p>
+      </section>
+
+      <section>
+        <h3>Session <span class="ix">06</span></h3>
+        <button class="act" id="p-reset" type="button">Reset all to defaults</button>
+      </section>
+
+    </div>
+  </aside>
+
+  <div id="readout">
+    <dl>
+      <dt>Bodies</dt><dd id="r-blobs">—</dd>
+      <dt>Steps</dt><dd id="r-steps">—</dd>
+      <dt>Weld k</dt><dd id="r-k">—</dd>
+      <dt>Environment</dt><dd id="r-env">—</dd>
+      <dt>Rate</dt><dd id="r-fps">—</dd>
+    </dl>
+  </div>
+
+  <div id="method">
+    <span class="t">Method</span>
+    There is no mesh. Every pixel sphere-traces a distance field of eight
+    bodies welded by a <b>polynomial smooth-minimum</b>, so the surface between
+    them is a real analytic blend rather than two spheres touching. What it
+    reflects is a <b>modelled room</b> — the reflection ray intersects an actual
+    ceiling grid with dark voids in it, a lit backdrop on one side and a black
+    quarter on the other. That asymmetry is the whole trick: a gradient gives
+    you a shiny ball, structured geometry gives you metal. The ray then
+    <b>bounces a second time</b>, so the mass sees itself.
+  </div>
+
+  <div id="credit">
+    <b>Mercury</b> — raymarched signed-distance study 03 &nbsp;·&nbsp; smooth-union metaballs &nbsp;·&nbsp; modelled studio room &nbsp;·&nbsp; two-bounce reflection &nbsp;·&nbsp; prefiltered env upload &nbsp;·&nbsp; webgl2<br>
+    <span class="keys">move cursor to lead the mass &nbsp; c controls &nbsp; drop an image to reflect it &nbsp; space pause &nbsp; r condense again</span>
+  </div>
+</div>
+
+<div id="drop" aria-hidden="true">
+  <div class="plate">
+    <div class="t">Release to reflect</div>
+    <div class="s">the image is treated as a spherical environment<br>and prefiltered across the roughness range</div>
+  </div>
+</div>
+
+<div id="loader">
+  <div class="idx">Study 03</div>
+  <div id="drops"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <h1 class="word">Mercury</h1>
+  <div class="study">A raymarched signed-distance study</div>
+  <div id="load-bar"><div id="load-bar-fill"></div></div>
+  <div id="load-status">Opening a context</div>
+  <div class="rule"></div>
+  <div class="foot">
+    no mesh · no rasteriser · one distance field<br>
+    smooth-union metaballs in a modelled room
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MERCURY — a raymarched signed-distance study
+   No. 03 of Crucible. Single file, raw WebGL2, no runtime network access.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const MAX_BLOBS = 16;
+
+/* ── defaults ──────────────────────────────────────────────────────────── */
+const DEFAULTS = Object.freeze({
+  f0:        0.94,
+  rough:     0.055,
+  fresnel:   1.00,
+  spec:      0.85,
+  tint:      0.32,   // 0 silver → 1 champagne
+
+  speed:     1.00,
+  k:         0.260,
+  kRate:     0.340,
+  kRange:    0.110,
+  spread:    1.000,
+
+  count:     8,
+
+  envInt:    1.00,
+  envRot:    0,      // degrees
+
+  step:      0.80,
+  maxSteps:  96,
+  bounces:   2
+});
+
+const S = Object.seal(Object.assign({}, DEFAULTS));
+
+/* ── dom ───────────────────────────────────────────────────────────────── */
+const $  = (id) => document.getElementById(id);
+const canvas   = $("stage");
+const loader   = $("loader");
+const barFill  = $("load-bar-fill");
+const statusEl = $("load-status");
+
+const setLoad = (pct, msg) => {
+  barFill.style.width = pct + "%";
+  if (msg) statusEl.textContent = msg;
+};
+const failLoad = (msg) => {
+  loader.classList.add("is-error");
+  setLoad(100, msg);
+};
+
+setLoad(6, "Opening a context");
+
+/* ── gl context ────────────────────────────────────────────────────────── */
+const gl = canvas.getContext("webgl2", {
+  alpha: false, antialias: false, depth: false, stencil: false,
+  premultipliedAlpha: false, preserveDrawingBuffer: false,
+  powerPreference: "high-performance"
+});
+
+if (!gl) {
+  failLoad("WebGL2 unavailable in this browser");
+  return;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SHADERS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const VERT = `#version 300 es
+precision highp float;
+void main(){
+  vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+}`;
+
+const FRAG = `#version 300 es
+precision highp float;
+precision highp sampler2D;
+
+out vec4 fragColor;
+
+uniform vec2  uRes;
+uniform vec3  uCamPos;
+uniform mat3  uCamBasis;      // columns: right, up, forward
+uniform float uFocal;
+
+uniform vec4  uBlobs[${MAX_BLOBS}];   // xyz centre, w radius
+uniform int   uCount;
+uniform float uK;             // smooth-min weld width, already breathed
+
+uniform float uF0;
+uniform float uRough;
+uniform float uFres;
+uniform float uSpec;
+uniform vec3  uTint;
+
+uniform int   uEnvMode;       // 0 procedural room, 1 uploaded equirect
+uniform float uEnvInt;
+uniform float uEnvRot;        // radians
+uniform float uEnvMaxLod;
+uniform sampler2D uEnvTex;
+
+uniform float uStepScale;
+uniform int   uMaxSteps;
+uniform int   uBounces;
+uniform float uExposure;
+uniform float uBgScale;
+
+const float PI   = 3.14159265359;
+const vec3  ROOM = vec3(7.0, 3.6, 7.0);
+
+/* key and fill directions, matched to where the room's emitters actually are */
+const vec3 KEY_DIR  = normalize(vec3(-0.28, 0.94, 0.22));   // ceiling grid
+const vec3 KEY_COL  = vec3(1.00, 0.965, 0.918) * 2.60;
+const vec3 FILL_DIR = normalize(vec3( 0.95, 0.24,-0.10));   // lit backdrop
+const vec3 FILL_COL = vec3(1.00, 0.950, 0.890) * 1.30;
+
+/* ── distance field ───────────────────────────────────────────────────── */
+
+// polynomial smooth minimum (quadratic) — the weld between bodies
+float smin(float a, float b, float k){
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+float map(vec3 p){
+  float d = length(p - uBlobs[0].xyz) - uBlobs[0].w;
+  for (int i = 1; i < ${MAX_BLOBS}; i++){
+    if (i >= uCount) break;
+    float di = length(p - uBlobs[i].xyz) - uBlobs[i].w;
+    d = smin(d, di, uK);
+  }
+  return d;
+}
+
+vec3 calcNormal(vec3 p){
+  const vec2 e = vec2(1.0, -1.0) * 0.0016;
+  return normalize(
+    e.xyy * map(p + e.xyy) +
+    e.yyx * map(p + e.yyx) +
+    e.yxy * map(p + e.yxy) +
+    e.xxx * map(p + e.xxx)
+  );
+}
+
+bool trace(vec3 ro, vec3 rd, int steps, float far, out float tOut){
+  float t = 0.02;
+  for (int i = 0; i < 256; i++){
+    if (i >= steps) break;
+    vec3 p = ro + rd * t;
+    float d = map(p);
+    if (d < 0.00045 * t + 0.00035){ tOut = t; return true; }
+    t += d * uStepScale;
+    if (t > far) break;
+  }
+  tOut = t;
+  return false;
+}
+
+float calcAO(vec3 p, vec3 n){
+  float occ = 0.0, sca = 1.0;
+  for (int i = 0; i < 5; i++){
+    float h = 0.014 + 0.115 * float(i);
+    float d = map(p + n * h);
+    occ += (h - d) * sca;
+    sca *= 0.76;
+  }
+  return clamp(1.0 - 2.35 * occ, 0.0, 1.0);
+}
+
+float softShadow(vec3 ro, vec3 rd){
+  float res = 1.0, t = 0.035;
+  for (int i = 0; i < 22; i++){
+    float h = map(ro + rd * t);
+    res = min(res, 11.0 * h / t);
+    t += clamp(h, 0.02, 0.34);
+    if (res < 0.004 || t > 5.0) break;
+  }
+  return clamp(res, 0.0, 1.0);
+}
+
+/* ── the room ─────────────────────────────────────────────────────────── */
+
+float rectMask(vec2 q, vec2 h, float e){
+  vec2 m = vec2(1.0) - smoothstep(h - e, h + e, abs(q));
+  return m.x * m.y;
+}
+
+float hash21(vec2 p){
+  return fract(sin(dot(floor(p), vec2(127.1, 311.7))) * 43758.5453);
+}
+
+/* Real geometry. The ray is intersected against six planes and the face it
+   lands on is evaluated: a light grid with structural voids overhead, a lit
+   backdrop on +x, a black quarter on -x, a strip on -z. The asymmetry is
+   deliberate — it is what gives the reflection something to be read against. */
+vec3 roomEnv(vec3 rd, float rough){
+  vec3 sgn = sign(rd);
+  vec3 ad  = max(abs(rd), vec3(1e-4));
+  vec3 tt  = ROOM / ad;
+  float tm = min(min(tt.x, tt.y), tt.z);
+  vec3 p   = rd * tm;
+  float e  = 0.020 + rough * 0.62;
+
+  vec3 col;
+
+  if (tm == tt.y){
+    if (sgn.y > 0.0){
+      /* ceiling — a studio light grid: lit panels, dark voids between them,
+         individual fixtures dead, and a service gap cut through the middle */
+      vec2 g = p.xz / 1.18;
+      vec2 f = abs(fract(g) - 0.5);
+      float panel = (1.0 - smoothstep(0.310 - e, 0.310 + e, f.x)) *
+                    (1.0 - smoothstep(0.370 - e, 0.370 + e, f.y));
+      float cid = hash21(g);
+      panel *= step(0.16, cid) * (0.62 + 0.66 * cid);          // some fixtures dark
+      panel *= smoothstep(0.34, 1.00, abs(p.z + 3.30));        // service gap, off-centre
+      float fall = mix(1.0, 0.34, smoothstep(-2.5, 5.5, p.x)); // driven harder on -x
+      // the truss the fixtures hang off — faint, but it gives the dark
+      // stretches between panels something to be read as structure
+      float rail = max(1.0 - smoothstep(0.026, 0.052 + e, abs(f.x - 0.445)),
+                       1.0 - smoothstep(0.026, 0.052 + e, abs(f.y - 0.445)));
+      col = vec3(0.026, 0.027, 0.030)
+          + vec3(1.0, 0.965, 0.918) * panel * 3.90 * fall
+          + vec3(0.88, 0.89, 0.92) * rail * 0.115 * fall;
+    } else {
+      /* floor — dark and polished, holding the pool of the grid above it */
+      float pool = 0.135 * exp(-length(p.xz) * 0.16);
+      float wash = 0.330 * smoothstep(2.0, 7.0, p.x);
+      col = vec3(0.011, 0.011, 0.013) + vec3(1.0, 0.93, 0.84) * (pool + wash);
+    }
+  } else if (tm == tt.x){
+    if (sgn.x > 0.0){
+      /* +x — the lit backdrop, with a hard-edged core the metal can cut on */
+      float core  = rectMask(vec2(p.z, p.y - 0.35), vec2(2.70, 1.95), e);
+      float spill = rectMask(vec2(p.z, p.y - 0.10), vec2(5.20, 3.20), e + 0.75);
+      col = vec3(0.018, 0.018, 0.020) + vec3(1.0, 0.955, 0.895) * (core * 3.60 + spill * 0.30);
+    } else {
+      /* -x — the black quarter. Nothing here but a little spill at the corner */
+      col = vec3(0.050, 0.052, 0.058) * smoothstep(2.20, 3.60, p.y);
+    }
+  } else {
+    if (sgn.z < 0.0){
+      /* -z — a single cool strip */
+      float strip = rectMask(vec2(p.x, p.y - 0.62), vec2(4.60, 0.20), e);
+      col = vec3(0.020, 0.021, 0.024) + vec3(0.86, 0.915, 1.0) * strip * 2.35;
+    } else {
+      /* +z — near dark, one low accent panel */
+      float acc = rectMask(vec2(p.x - 0.40, p.y + 2.05), vec2(1.35, 0.55), e);
+      col = vec3(0.011, 0.012, 0.015) + vec3(0.72, 0.80, 0.95) * acc * 0.62;
+    }
+  }
+
+  /* as roughness climbs, fold toward the room's directional average so the
+     surface loses the panels rather than losing its energy */
+  float up  = clamp(rd.y * 0.5 + 0.5, 0.0, 1.0);
+  vec3  amb = mix(vec3(0.012, 0.012, 0.015), vec3(0.52, 0.50, 0.47), up * up);
+  amb += vec3(0.30, 0.28, 0.25) * clamp(rd.x, 0.0, 1.0);
+  amb *= 1.0 - 0.85 * clamp(-rd.x, 0.0, 1.0);
+  return mix(col, amb, rough * rough * 0.55);
+}
+
+/* three fixed taps widen the lobe without introducing anything time-varying,
+   so a probe of this function is repeatable */
+vec3 roomBlurred(vec3 rd, float rough){
+  vec3 c = roomEnv(rd, rough);
+  if (rough > 0.02){
+    vec3 up = abs(rd.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    vec3 T = normalize(cross(rd, up));
+    vec3 B = cross(rd, T);
+    float r = rough * 0.50;
+    c += roomEnv(normalize(rd + T * r), rough);
+    c += roomEnv(normalize(rd + (T * -0.5 + B * 0.866) * r), rough);
+    c += roomEnv(normalize(rd + (T * -0.5 - B * 0.866) * r), rough);
+    c *= 0.25;
+  }
+  return c;
+}
+
+vec3 envSample(vec3 rd, float rough){
+  float c = cos(uEnvRot), s = sin(uEnvRot);
+  vec3 d = vec3(c * rd.x + s * rd.z, rd.y, -s * rd.x + c * rd.z);
+  vec3 col;
+  if (uEnvMode == 1){
+    vec2 uv = vec2(atan(d.z, d.x) * 0.15915494 + 0.5,
+                   acos(clamp(d.y, -1.0, 1.0)) * 0.31830989);
+    col = textureLod(uEnvTex, uv, clamp(rough, 0.0, 1.0) * uEnvMaxLod).rgb;
+    col = col * col * 2.60;            // sRGB-ish decode, lifted to room range
+  } else {
+    col = roomBlurred(d, rough);
+  }
+  return col * uEnvInt;
+}
+
+/* ── specular ─────────────────────────────────────────────────────────── */
+float ggx(vec3 n, vec3 v, vec3 l, float rough){
+  vec3  h  = normalize(v + l);
+  float a  = max(rough * rough, 0.018);
+  float a2 = a * a;
+  float nh = max(dot(n, h), 0.0);
+  float dn = nh * nh * (a2 - 1.0) + 1.0;
+  return (a2 / (PI * dn * dn)) * max(dot(n, l), 0.0);
+}
+
+vec3 fresnel(vec3 n, vec3 v, vec3 f0){
+  float ndv = clamp(dot(n, v), 0.0, 1.0);
+  return clamp(f0 + (1.0 - f0) * pow(1.0 - ndv, 5.0) * uFres, 0.0, 1.0);
+}
+
+vec3 aces(vec3 x){
+  return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
+}
+
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+  vec3 ro = uCamPos;
+  vec3 rd = normalize(uCamBasis * vec3(uv, uFocal));
+
+  vec3  F0v = uTint * uF0;
+  vec3  col;
+  float alpha;
+
+  float t;
+  if (trace(ro, rd, uMaxSteps, 22.0, t)){
+    vec3 p = ro + rd * t;
+    vec3 n = calcNormal(p);
+
+    vec3  F   = fresnel(n, -rd, F0v);
+    float ao  = calcAO(p, n);
+    float sh  = softShadow(p + n * 0.02, KEY_DIR);
+    float occ = ao * mix(0.52, 1.0, sh);
+
+    vec3 r0 = reflect(rd, n);
+
+    vec3 incoming;
+    if (uBounces > 1){
+      float t1;
+      if (trace(p + n * 0.035, r0, min(uMaxSteps, 72), 14.0, t1)){
+        // the mass sees itself: a real second reflection pass
+        vec3 p1 = p + n * 0.035 + r0 * t1;
+        vec3 n1 = calcNormal(p1);
+        vec3 F1 = fresnel(n1, -r0, F0v);
+        float ao1 = calcAO(p1, n1);
+        float sh1 = softShadow(p1 + n1 * 0.02, KEY_DIR);
+        vec3 r1 = reflect(r0, n1);
+        vec3 e1 = envSample(r1, min(uRough * 1.45 + 0.02, 1.0));
+        vec3 s1 = (ggx(n1, -r0, KEY_DIR,  uRough) * KEY_COL * sh1 +
+                   ggx(n1, -r0, FILL_DIR, uRough) * FILL_COL) * uSpec;
+        incoming = (e1 * F1 + s1) * (ao1 * mix(0.55, 1.0, sh1));
+      } else {
+        incoming = envSample(r0, uRough);
+      }
+    } else {
+      incoming = envSample(r0, uRough);
+    }
+
+    vec3 s0 = (ggx(n, -rd, KEY_DIR,  uRough) * KEY_COL * sh +
+               ggx(n, -rd, FILL_DIR, uRough) * FILL_COL) * uSpec;
+
+    col   = (incoming * F + s0) * occ;
+    alpha = 1.0;
+  } else {
+    col   = envSample(rd, 0.62) * uBgScale;
+    alpha = 0.0;
+  }
+
+  col *= uExposure;
+
+  // vignette — deeper on the field than on the mass, so the room stays a
+  // suggestion of depth and never competes with the subject or the type
+  vec2 q = (gl_FragCoord.xy / uRes - 0.5);
+  col *= 1.0 - mix(1.35, 0.62, alpha) * dot(q, q);
+
+  col = aces(col);
+  col = pow(col, vec3(1.0 / 2.2));
+
+  // static screen-space dither only — nothing time-varying, so probes repeat
+  float dth = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
+  col += (dth - 0.5) * 0.0035;
+
+  fragColor = vec4(col, alpha);
+}`;
+
+/* prefilter pass: convolves the uploaded equirect with a GGX lobe per mip */
+const FRAG_PREFILTER = `#version 300 es
+precision highp float;
+out vec4 fragColor;
+
+uniform sampler2D uSrc;
+uniform vec2  uSize;
+uniform float uRough;
+uniform float uSrcLod;
+
+const float PI = 3.14159265359;
+
+vec3 uvToDir(vec2 uv){
+  float phi   = (uv.x - 0.5) * 2.0 * PI;
+  float theta = uv.y * PI;
+  float st = sin(theta);
+  return vec3(st * cos(phi), cos(theta), st * sin(phi));
+}
+vec2 dirToUv(vec3 d){
+  return vec2(atan(d.z, d.x) * 0.15915494 + 0.5,
+              acos(clamp(d.y, -1.0, 1.0)) * 0.31830989);
+}
+
+float radicalInverse(uint bits){
+  bits = (bits << 16u) | (bits >> 16u);
+  bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
+  bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
+  bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
+  bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
+  return float(bits) * 2.3283064365386963e-10;
+}
+
+vec3 importanceGGX(vec2 xi, vec3 n, float a){
+  float phi = 2.0 * PI * xi.x;
+  float ct  = sqrt((1.0 - xi.y) / (1.0 + (a * a - 1.0) * xi.y));
+  float st  = sqrt(1.0 - ct * ct);
+  vec3 h = vec3(st * cos(phi), st * sin(phi), ct);
+  vec3 up = abs(n.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+  vec3 tx = normalize(cross(up, n));
+  vec3 ty = cross(n, tx);
+  return normalize(tx * h.x + ty * h.y + n * h.z);
+}
+
+void main(){
+  vec2 uv = gl_FragCoord.xy / uSize;
+  vec3 n  = uvToDir(uv);
+
+  if (uRough < 0.005){
+    fragColor = vec4(textureLod(uSrc, uv, 0.0).rgb, 1.0);
+    return;
+  }
+
+  float a = max(uRough * uRough, 0.001);
+  vec3  acc = vec3(0.0);
+  float wsum = 0.0;
+  const uint N = 96u;
+
+  for (uint i = 0u; i < N; i++){
+    vec2 xi = vec2(float(i) / float(N), radicalInverse(i));
+    vec3 h  = importanceGGX(xi, n, a);
+    vec3 l  = normalize(2.0 * dot(n, h) * h - n);
+    float ndl = dot(n, l);
+    if (ndl > 0.0){
+      acc  += textureLod(uSrc, dirToUv(l), uSrcLod).rgb * ndl;
+      wsum += ndl;
+    }
+  }
+
+  fragColor = vec4(wsum > 0.0 ? acc / wsum : textureLod(uSrc, uv, uSrcLod).rgb, 1.0);
+}`;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROGRAM BUILD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function compile(type, src){
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
+    const log = gl.getShaderInfoLog(sh);
+    gl.deleteShader(sh);
+    throw new Error("shader compile: " + log);
+  }
+  return sh;
+}
+
+function link(vsSrc, fsSrc){
+  const p  = gl.createProgram();
+  const vs = compile(gl.VERTEX_SHADER, vsSrc);
+  const fs = compile(gl.FRAGMENT_SHADER, fsSrc);
+  gl.attachShader(p, vs); gl.attachShader(p, fs);
+  gl.linkProgram(p);
+  gl.deleteShader(vs); gl.deleteShader(fs);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)){
+    const log = gl.getProgramInfoLog(p);
+    gl.deleteProgram(p);
+    throw new Error("program link: " + log);
+  }
+  return p;
+}
+
+setLoad(18, "Compiling the distance field");
+
+let prog, progPre, vao;
+try {
+  prog    = link(VERT, FRAG);
+  progPre = link(VERT, FRAG_PREFILTER);
+} catch (err){
+  console.error(err);
+  failLoad("Shader compilation failed");
+  return;
+}
+
+vao = gl.createVertexArray();   // attribute-less: gl_VertexID drives the triangle
+gl.bindVertexArray(vao);
+
+const U = {};
+[
+  "uRes","uCamPos","uCamBasis","uFocal","uBlobs[0]","uCount","uK",
+  "uF0","uRough","uFres","uSpec","uTint",
+  "uEnvMode","uEnvInt","uEnvRot","uEnvMaxLod","uEnvTex",
+  "uStepScale","uMaxSteps","uBounces","uExposure","uBgScale"
+].forEach(n => { U[n] = gl.getUniformLocation(prog, n); });
+
+const UP = {};
+["uSrc","uSize","uRough","uSrcLod"].forEach(n => { UP[n] = gl.getUniformLocation(progPre, n); });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ENVIRONMENT TEXTURES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+setLoad(34, "Modelling the room");
+
+const ENV_W = 1024, ENV_H = 512, ENV_LEVELS = 9;   // 1024×512 → 4×2
+
+// placeholder so unit 0 always has something bound, even in room mode
+const blankTex = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, blankTex);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+              new Uint8Array([12, 12, 14, 255]));
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+let envTex   = null;      // prefiltered destination chain
+let srcTex   = null;      // raw upload, mipmapped, used as the convolution source
+let envFbo   = null;
+let envMaxLod = ENV_LEVELS - 1;
+let envMode  = 0;         // 0 room, 1 uploaded
+let envLabel = "Procedural room";
+
+const scratch = document.createElement("canvas");
+scratch.width = ENV_W; scratch.height = ENV_H;
+const sctx = scratch.getContext("2d", { willReadFrequently: false });
+
+function disposeEnv(){
+  if (envTex){ gl.deleteTexture(envTex); envTex = null; }
+  if (srcTex){ gl.deleteTexture(srcTex); srcTex = null; }
+}
+
+/* Build a real prefiltered mip chain: each level is a GGX convolution of the
+   source at the roughness that level represents, rendered into that mip. */
+function buildEnvironment(image, label){
+  disposeEnv();
+
+  sctx.clearRect(0, 0, ENV_W, ENV_H);
+  sctx.drawImage(image, 0, 0, ENV_W, ENV_H);
+
+  // source: full auto mip chain, sampled with an explicit lod per level
+  srcTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, srcTex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, scratch);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  // destination: immutable storage so each level can be a render target
+  envTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, envTex);
+  gl.texStorage2D(gl.TEXTURE_2D, ENV_LEVELS, gl.RGBA8, ENV_W, ENV_H);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_BASE_LEVEL, 0);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAX_LEVEL, ENV_LEVELS - 1);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  if (!envFbo) envFbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, envFbo);
+
+  gl.useProgram(progPre);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, srcTex);
+  gl.uniform1i(UP.uSrc, 0);
+
+  for (let L = 0; L < ENV_LEVELS; L++){
+    const w = Math.max(1, ENV_W >> L), h = Math.max(1, ENV_H >> L);
+    const rough = L / (ENV_LEVELS - 1);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, envTex, L);
+    const st = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    if (st !== gl.FRAMEBUFFER_COMPLETE) throw new Error("env fbo incomplete at level " + L);
+    gl.viewport(0, 0, w, h);
+    gl.uniform2f(UP.uSize, w, h);
+    gl.uniform1f(UP.uRough, rough);
+    // pull from a progressively blurred source: kills fireflies at wide lobes
+    gl.uniform1f(UP.uSrcLod, Math.min(rough * 6.0, ENV_LEVELS - 1));
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+  envMaxLod = ENV_LEVELS - 1;
+  envMode   = 1;
+  envLabel  = label || "Uploaded image";
+  return true;
+}
+
+function revertEnvironment(){
+  disposeEnv();
+  envMode  = 0;
+  envLabel = "Procedural room";
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BLOBS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+setLoad(50, "Seeding the bodies");
+
+// stable per-index hash so a given blob index always has the same character,
+// which is what lets the count change without the existing mass reshuffling
+function h1(i){ const x = Math.sin(i * 127.1 + 31.7) * 43758.5453; return x - Math.floor(x); }
+
+function makeBlob(i){
+  return {
+    i,
+    r:    0.27 + 0.31 * h1(i * 7 + 1),
+    orb:  0.21 + 0.46 * h1(i * 7 + 2),
+    sp:   (0.20 + 0.48 * h1(i * 7 + 3)) * (h1(i * 7 + 8) > 0.62 ? -1 : 1),
+    ph:   6.2831853 * h1(i * 7 + 4),
+    tilt: (h1(i * 7 + 5) - 0.5) * 1.35,
+    bf:   0.36 + 0.92 * h1(i * 7 + 6),
+    ba:   0.16 + 0.30 * h1(i * 7 + 7),
+    x: 0, y: 0, z: 0
+  };
+}
+
+let blobs = [];
+function rebuildBlobs(n){
+  n = Math.max(4, Math.min(MAX_BLOBS, Math.round(n)));
+  if (blobs.length === n) return blobs.length;
+  if (n < blobs.length){
+    blobs.length = n;                       // trim, keep everything in flight
+  } else {
+    for (let i = blobs.length; i < n; i++){
+      // a new body starts at the centre of the mass and is carried out by the
+      // existing motion on the next step, so nothing pops into frame
+      blobs.push(makeBlob(i));
+    }
+  }
+  S.count = blobs.length;
+  return blobs.length;
+}
+rebuildBlobs(S.count);
+
+const blobData = new Float32Array(MAX_BLOBS * 4);
+
+/* Fewer bodies orbit tighter. Without this the sparse end of the range drifts
+   far enough apart to read as separate spheres instead of one welded mass. */
+function orbitScale(){
+  return 0.70 + 0.30 * ((blobs.length - 4) / 12);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+let clock     = 0;        // seconds of simulated drift
+let reveal    = 0;        // 0 → 1 condense-in
+let paused    = false;
+let cw = 1, ch = 1, dpr = 1;
+
+const pointer = { nx: 0, ny: 0, has: false };
+const cursorSmooth = { x: 0.42, y: 0.10, z: 0.26 };
+
+const TINT_SILVER    = [0.972, 0.960, 0.945];
+const TINT_CHAMPAGNE = [1.000, 0.855, 0.660];
+const tintRGB = new Float32Array(3);
+
+function updateTint(){
+  const t = S.tint;
+  tintRGB[0] = TINT_SILVER[0] + (TINT_CHAMPAGNE[0] - TINT_SILVER[0]) * t;
+  tintRGB[1] = TINT_SILVER[1] + (TINT_CHAMPAGNE[1] - TINT_SILVER[1]) * t;
+  tintRGB[2] = TINT_SILVER[2] + (TINT_CHAMPAGNE[2] - TINT_SILVER[2]) * t;
+}
+updateTint();
+
+/* ── camera ────────────────────────────────────────────────────────────── */
+const CAM_R = 5.95, FOCAL = 1.95;
+
+function cameraAt(time, mx, my){
+  const az = 0.62 + time * 0.052 + mx * 0.26;
+  const el = 0.205 + my * 0.15;
+  const ce = Math.cos(el), se = Math.sin(el);
+  const pos = [CAM_R * ce * Math.sin(az), CAM_R * se, CAM_R * ce * Math.cos(az)];
+
+  // forward = toward origin
+  let fx = -pos[0], fy = -pos[1], fz = -pos[2];
+  const fl = Math.hypot(fx, fy, fz); fx /= fl; fy /= fl; fz /= fl;
+  // right = normalize(cross(forward, worldUp))
+  let rx = -fz, ry = 0, rz = fx;
+  const rl = Math.hypot(rx, ry, rz); rx /= rl; ry /= rl; rz /= rl;
+  // up = cross(right, forward)
+  const ux = ry * fz - rz * fy;
+  const uy = rz * fx - rx * fz;
+  const uz = rx * fy - ry * fx;
+
+  // column-major mat3: right, up, forward
+  return {
+    pos,
+    basis: new Float32Array([rx, ry, rz, ux, uy, uz, fx, fy, fz]),
+    fwd: [fx, fy, fz]
+  };
+}
+
+/* project the pointer onto the plane through the origin facing the camera —
+   the mass then leads the cursor in world space, not screen space */
+function cursorWorld(cam){
+  const aspect = cw / ch;
+  const ux = pointer.nx * aspect * 0.5, uy = pointer.ny * 0.5;
+  const b = cam.basis;
+  let rx = b[0] * ux + b[3] * uy + b[6] * FOCAL;
+  let ry = b[1] * ux + b[4] * uy + b[7] * FOCAL;
+  let rz = b[2] * ux + b[5] * uy + b[8] * FOCAL;
+  const rl = Math.hypot(rx, ry, rz); rx /= rl; ry /= rl; rz /= rl;
+
+  const f = cam.fwd;
+  const denom = rx * f[0] + ry * f[1] + rz * f[2];
+  if (Math.abs(denom) < 1e-4) return null;
+  const t = (-(cam.pos[0] * f[0] + cam.pos[1] * f[1] + cam.pos[2] * f[2])) / denom;
+
+  let px = cam.pos[0] + rx * t, py = cam.pos[1] + ry * t, pz = cam.pos[2] + rz * t;
+  // the cursor body's reach scales with the mass, so leading it stretches a
+  // neck of metal rather than tearing a droplet clean off
+  const L = Math.hypot(px, py, pz), MAXR = 1.15 * orbitScale();
+  if (L > MAXR){ const s = MAXR / L; px *= s; py *= s; pz *= s; }
+  return [px, py, pz];
+}
+
+/* ── per-frame simulation ──────────────────────────────────────────────── */
+function stepBlobs(dt, time, rev, target){
+  const spread = S.spread * rev * orbitScale();
+
+  // body 0 is the one the cursor leads, in real time
+  const lerp = 1 - Math.exp(-dt * 6.2);
+  cursorSmooth.x += (target[0] - cursorSmooth.x) * lerp;
+  cursorSmooth.y += (target[1] - cursorSmooth.y) * lerp;
+  cursorSmooth.z += (target[2] - cursorSmooth.z) * lerp;
+
+  for (let i = 0; i < blobs.length; i++){
+    const b = blobs[i];
+    if (i === 0){
+      b.x = cursorSmooth.x * rev;
+      b.y = cursorSmooth.y * rev;
+      b.z = cursorSmooth.z * rev;
+    } else {
+      const a = b.ph + time * b.sp;
+      const o = b.orb * spread;
+      b.x = Math.cos(a) * o;
+      b.z = Math.sin(a) * o;
+      b.y = (Math.sin(time * b.bf + b.ph) * b.ba + b.tilt * 0.28) * spread;
+    }
+  }
+}
+
+function packBlobs(){
+  for (let i = 0; i < blobs.length; i++){
+    const b = blobs[i], o = i * 4;
+    blobData[o]     = b.x;
+    blobData[o + 1] = b.y;
+    blobData[o + 2] = b.z;
+    blobData[o + 3] = b.r;
+  }
+}
+
+function weldK(time, rev){
+  const breathe = S.k + S.kRange * 0.5 * (1 + Math.sin(time * S.kRate));
+  // during the reveal the weld is wide open, so the mass reads as one form
+  return breathe * (1 + 2.4 * Math.pow(1 - rev, 1.6));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DRAW
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function drawScene(view, fbo, w, h){
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.viewport(0, 0, w, h);
+  gl.useProgram(prog);
+  gl.bindVertexArray(vao);
+
+  gl.uniform2f(U.uRes, w, h);
+  gl.uniform3fv(U.uCamPos, view.cam.pos);
+  gl.uniformMatrix3fv(U.uCamBasis, false, view.cam.basis);
+  gl.uniform1f(U.uFocal, FOCAL);
+
+  gl.uniform4fv(U["uBlobs[0]"], view.blobData);
+  gl.uniform1i(U.uCount, view.count);
+  gl.uniform1f(U.uK, view.k);
+
+  gl.uniform1f(U.uF0, S.f0);
+  gl.uniform1f(U.uRough, S.rough);
+  gl.uniform1f(U.uFres, S.fresnel);
+  gl.uniform1f(U.uSpec, S.spec);
+  gl.uniform3fv(U.uTint, tintRGB);
+
+  gl.uniform1i(U.uEnvMode, envMode);
+  gl.uniform1f(U.uEnvInt, S.envInt);
+  gl.uniform1f(U.uEnvRot, S.envRot * Math.PI / 180);
+  gl.uniform1f(U.uEnvMaxLod, envMaxLod);
+
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, envMode === 1 && envTex ? envTex : blankTex);
+  gl.uniform1i(U.uEnvTex, 0);
+
+  gl.uniform1f(U.uStepScale, S.step);
+  gl.uniform1i(U.uMaxSteps, S.maxSteps | 0);
+  gl.uniform1i(U.uBounces, S.bounces | 0);
+  gl.uniform1f(U.uExposure, 1.0);
+  // an uploaded environment can be far brighter than the room; hold the
+  // backdrop down so the piece stays cinematic and the type stays legible
+  gl.uniform1f(U.uBgScale, envMode === 1 ? 0.105 : 0.135);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+/* ── canvas sizing ─────────────────────────────────────────────────────── */
+function resize(){
+  const wCss = canvas.clientWidth  || window.innerWidth;
+  const hCss = canvas.clientHeight || window.innerHeight;
+  const cap  = wCss > 1600 ? 1.15 : 1.4;
+  dpr = Math.min(window.devicePixelRatio || 1, cap);
+  const w = Math.max(2, Math.round(wCss * dpr));
+  const h = Math.max(2, Math.round(hCss * dpr));
+  if (w !== cw || h !== ch){
+    cw = w; ch = h;
+    canvas.width = w; canvas.height = h;
+  }
+}
+resize();
+window.addEventListener("resize", resize, { passive: true });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROBE — deterministic reflected-colour sampling
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const PROBE_W = 240, PROBE_H = 135, PROBE_T = 12.0;
+
+// uv measured from bottom-left, matching readPixels
+const PROBE_POINTS = [
+  { name: "mass-crown",   uv: [0.500, 0.548] },
+  { name: "mass-upper-l", uv: [0.452, 0.560] },
+  { name: "mass-lower-r", uv: [0.552, 0.442] },
+  { name: "mass-low",     uv: [0.500, 0.410] },
+  { name: "mass-left",    uv: [0.432, 0.492] },
+  { name: "field-upper-l",uv: [0.115, 0.790] },
+  { name: "field-lower-r",uv: [0.884, 0.212] }
+];
+
+let probeTex = null, probeFbo = null;
+
+function ensureProbe(){
+  if (probeFbo) return;
+  probeTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, probeTex);
+  gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, PROBE_W, PROBE_H);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  probeFbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, probeFbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, probeTex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+/* A frozen view: fixed time, fixed camera, fixed cursor body. Everything that
+   moves is pinned, so any delta between two probes is attributable to what
+   actually changed — environment, material, count — and not to the clock. */
+function probeView(){
+  const cam = cameraAt(PROBE_T, 0, 0);
+  const data = new Float32Array(MAX_BLOBS * 4);
+  const spread = S.spread * orbitScale();
+  for (let i = 0; i < blobs.length; i++){
+    const b = blobs[i], o = i * 4;
+    let x, y, z;
+    if (i === 0){
+      x = 0.42; y = 0.10; z = 0.26;
+    } else {
+      const a = b.ph + PROBE_T * b.sp, r = b.orb * spread;
+      x = Math.cos(a) * r;
+      z = Math.sin(a) * r;
+      y = (Math.sin(PROBE_T * b.bf + b.ph) * b.ba + b.tilt * 0.28) * spread;
+    }
+    data[o] = x; data[o + 1] = y; data[o + 2] = z; data[o + 3] = b.r;
+  }
+  const breathe = S.k + S.kRange * 0.5 * (1 + Math.sin(PROBE_T * S.kRate));
+  return { cam, blobData: data, count: blobs.length, k: breathe };
+}
+
+function sampleReflection(points){
+  ensureProbe();
+  drawScene(probeView(), probeFbo, PROBE_W, PROBE_H);
+
+  const px = new Uint8Array(4);
+  const out = (points || PROBE_POINTS).map(pt => {
+    const x = Math.min(PROBE_W - 1, Math.max(0, Math.round(pt.uv[0] * PROBE_W)));
+    const y = Math.min(PROBE_H - 1, Math.max(0, Math.round(pt.uv[1] * PROBE_H)));
+    gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    const r = px[0], g = px[1], b = px[2], a = px[3];
+    return {
+      name: pt.name,
+      uv: pt.uv.slice(),
+      px: [x, y],
+      onMetal: a > 127,
+      rgb: [r, g, b],
+      hex: "#" + [r, g, b].map(v => v.toString(16).padStart(2, "0")).join(""),
+      luma: +(0.2126 * r + 0.7152 * g + 0.0722 * b).toFixed(2)
+    };
+  });
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return out;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MAIN LOOP
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+let last = 0, running = false;
+let fpsAcc = 0, fpsN = 0, fpsShown = 0;
+let revealing = true;
+
+function step(dt){
+  dt = Math.min(dt, 0.05);
+  if (revealing){
+    reveal = Math.min(1, reveal + dt / 2.15);
+    if (reveal >= 1) revealing = false;
+  }
+  if (!paused) clock += dt * S.speed;
+
+  const cam = cameraAt(clock, pointer.nx, pointer.ny);
+  const tgt = cursorWorld(cam) || [cursorSmooth.x, cursorSmooth.y, cursorSmooth.z];
+  const rev = revealing ? (1 - Math.pow(1 - reveal, 3)) : 1;
+
+  stepBlobs(dt, clock, rev, tgt);
+  packBlobs();
+
+  return { cam, blobData, count: blobs.length, k: weldK(clock, rev) };
+}
+
+function renderOnce(dt){
+  resize();
+  const view = step(typeof dt === "number" ? dt : 1 / 60);
+  drawScene(view, null, cw, ch);
+  return view;
+}
+
+function frame(now){
+  if (!running) return;
+  const dt = last ? (now - last) / 1000 : 1 / 60;
+  last = now;
+
+  resize();
+  const view = step(dt);
+  drawScene(view, null, cw, ch);
+
+  fpsAcc += dt; fpsN++;
+  if (fpsAcc > 0.5){
+    fpsShown = Math.round(fpsN / fpsAcc);
+    fpsAcc = 0; fpsN = 0;
+    updateReadout(view.k);
+  }
+
+  requestAnimationFrame(frame);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UI
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const body = document.body;
+
+function updateReadout(k){
+  $("r-blobs").textContent = blobs.length;
+  $("r-steps").textContent = S.maxSteps;
+  $("r-k").textContent = (k !== undefined ? k : S.k).toFixed(3);
+  $("r-env").textContent = envMode === 1 ? "Uploaded" : "Room";
+  $("r-fps").textContent = fpsShown ? fpsShown + " fps" : "—";
+}
+
+/* panel open/close */
+const panelToggle = $("panel-toggle"), panelClose = $("panel-close");
+function setPanel(open){
+  body.classList.toggle("panel-open", open);
+  panelToggle.setAttribute("aria-expanded", open ? "true" : "false");
+}
+panelToggle.addEventListener("click", () => setPanel(true));
+panelClose.addEventListener("click", () => setPanel(false));
+
+/* slider wiring */
+const fmt = {
+  f0:      v => v.toFixed(2),
+  rough:   v => v.toFixed(3) + " rough",
+  fresnel: v => v.toFixed(2),
+  spec:    v => v.toFixed(2),
+  tint:    v => v.toFixed(2),
+  speed:   v => v.toFixed(2) + "×",
+  k:       v => v.toFixed(3),
+  kRate:   v => v.toFixed(2),
+  kRange:  v => v.toFixed(3),
+  spread:  v => v.toFixed(2),
+  count:   v => String(v | 0),
+  envInt:  v => v.toFixed(2) + "×",
+  envRot:  v => (v | 0) + "°",
+  step:    v => v.toFixed(2),
+  maxSteps:v => String(v | 0)
+};
+
+const SLIDERS = [
+  ["p-f0",     "o-f0",     "f0"],
+  ["p-rough",  "o-rough",  "rough"],
+  ["p-fres",   "o-fres",   "fresnel"],
+  ["p-spec",   "o-spec",   "spec"],
+  ["p-tint",   "o-tint",   "tint"],
+  ["p-speed",  "o-speed",  "speed"],
+  ["p-k",      "o-k",      "k"],
+  ["p-krate",  "o-krate",  "kRate"],
+  ["p-krange", "o-krange", "kRange"],
+  ["p-spread", "o-spread", "spread"],
+  ["p-count",  "o-count",  "count"],
+  ["p-envint", "o-envint", "envInt"],
+  ["p-envrot", "o-envrot", "envRot"],
+  ["p-step",   "o-step",   "step"],
+  ["p-steps",  "o-steps",  "maxSteps"]
+];
+
+const inputs = {};
+function applyKey(key, value, fromUI){
+  if (key === "count"){
+    rebuildBlobs(value);
+    value = blobs.length;
+  } else {
+    S[key] = value;
+  }
+  if (key === "tint") updateTint();
+  const spec = SLIDERS.find(s => s[2] === key);
+  if (spec){
+    const out = $(spec[1]);
+    if (out) out.textContent = fmt[key] ? fmt[key](value) : String(value);
+    if (!fromUI && inputs[key]) inputs[key].value = value;
+  }
+  if (key === "count" || key === "maxSteps") refreshCost();
+  return value;
+}
+
+function refreshCost(){
+  $("o-cost").textContent = (blobs.length * S.maxSteps).toLocaleString("en-US");
+}
+
+SLIDERS.forEach(([inId, , key]) => {
+  const el = $(inId);
+  inputs[key] = el;
+  el.addEventListener("input", () => {
+    applyKey(key, parseFloat(el.value), true);
+    updateReadout();
+  });
+});
+
+/* bounce toggle */
+const bounceBtns = Array.from($("p-bounce").querySelectorAll("button"));
+function setBounces(n, fromUI){
+  S.bounces = n | 0;
+  bounceBtns.forEach(b => b.setAttribute("aria-pressed", (+b.dataset.b === S.bounces) ? "true" : "false"));
+}
+bounceBtns.forEach(b => b.addEventListener("click", () => setBounces(+b.dataset.b, true)));
+
+/* reveal replay */
+function replay(){
+  reveal = 0;
+  revealing = true;
+}
+$("p-replay").addEventListener("click", replay);
+
+/* reset */
+function resetAll(){
+  Object.keys(DEFAULTS).forEach(k => {
+    if (k === "bounces") { setBounces(DEFAULTS.bounces); return; }
+    applyKey(k, DEFAULTS[k], false);
+  });
+  updateTint();
+  updateReadout();
+  refreshCost();
+}
+$("p-reset").addEventListener("click", resetAll);
+
+/* ── environment upload ────────────────────────────────────────────────── */
+const envName   = $("env-name");
+const envThumb  = $("env-thumb");
+const envPlate  = $("envplate");
+const envRevert = $("p-envrevert");
+
+function setEnvUI(label, thumbUrl){
+  envName.textContent = label;
+  if (thumbUrl){
+    envThumb.style.backgroundImage = 'url("' + thumbUrl + '")';
+    envThumb.classList.add("on");
+    envRevert.disabled = false;
+  } else {
+    envThumb.style.backgroundImage = "";
+    envThumb.classList.remove("on");
+    envRevert.disabled = true;
+  }
+  updateReadout();
+}
+
+function loadEnvFromSource(src, label){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        buildEnvironment(img, label);
+        setEnvUI(label, src);
+        resolve({ ok: true, label, width: img.naturalWidth, height: img.naturalHeight });
+      } catch (err){
+        console.error("environment build failed:", err);
+        reject(err);
+      }
+    };
+    img.onerror = () => reject(new Error("image decode failed"));
+    img.src = src;
+  });
+}
+
+function handleFile(file){
+  if (!file || !/^image\//.test(file.type)) return Promise.reject(new Error("not an image"));
+  const url = URL.createObjectURL(file);
+  return loadEnvFromSource(url, file.name);
+}
+
+$("p-envfile").addEventListener("change", (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (f) handleFile(f).catch(err => { envName.textContent = "Could not read that image"; console.warn(err); });
+});
+// keyboard access on the styled label
+document.querySelector("label.pick").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " "){ e.preventDefault(); $("p-envfile").click(); }
+});
+
+envRevert.addEventListener("click", () => {
+  revertEnvironment();
+  setEnvUI("No image — procedural room", null);
+});
+
+/* drag and drop, anywhere on the piece */
+let dragDepth = 0;
+window.addEventListener("dragenter", (e) => {
+  e.preventDefault();
+  dragDepth++;
+  body.classList.add("dragging");
+  envPlate.classList.add("hot");
+});
+window.addEventListener("dragover", (e) => { e.preventDefault(); });
+window.addEventListener("dragleave", (e) => {
+  e.preventDefault();
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0){ body.classList.remove("dragging"); envPlate.classList.remove("hot"); }
+});
+window.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dragDepth = 0;
+  body.classList.remove("dragging");
+  envPlate.classList.remove("hot");
+  const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) handleFile(f).catch(err => { envName.textContent = "Could not read that image"; console.warn(err); });
+});
+
+/* ── pointer ───────────────────────────────────────────────────────────── */
+function onPointer(e){
+  const r = canvas.getBoundingClientRect();
+  pointer.nx =  ((e.clientX - r.left) / r.width)  * 2 - 1;
+  pointer.ny = -(((e.clientY - r.top) / r.height) * 2 - 1);
+  pointer.has = true;
+}
+window.addEventListener("pointermove", onPointer, { passive: true });
+window.addEventListener("pointerdown", onPointer, { passive: true });
+
+/* ── keys ──────────────────────────────────────────────────────────────── */
+window.addEventListener("keydown", (e) => {
+  const tag = (e.target && e.target.tagName) || "";
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  const k = e.key.toLowerCase();
+  if (k === "c"){ setPanel(!body.classList.contains("panel-open")); }
+  else if (k === "escape"){ setPanel(false); }
+  else if (k === "r"){ replay(); }
+  else if (k === " "){ e.preventDefault(); paused = !paused; body.classList.toggle("is-paused", paused); }
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden){ running = false; }
+  else if (!running){ running = true; last = 0; requestAnimationFrame(frame); }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DIAGNOSTIC SURFACE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const TRACKED = {
+  uF0: "uF0", uRough: "uRough", uFres: "uFres", uSpec: "uSpec",
+  uK: "uK", uCount: "uCount", uEnvMode: "uEnvMode", uEnvInt: "uEnvInt",
+  uEnvRot: "uEnvRot", uEnvMaxLod: "uEnvMaxLod",
+  uStepScale: "uStepScale", uMaxSteps: "uMaxSteps", uBounces: "uBounces",
+  uExposure: "uExposure", uBgScale: "uBgScale"
+};
+
+window.__mercury = {
+  version: "1.0.0",
+  title: "Mercury — a raymarched signed-distance study",
+
+  /* live settings — mutate through set() so the UI stays honest */
+  settings: S,
+  defaults: Object.assign({}, DEFAULTS),
+
+  get blobs(){ return blobs; },
+  get blobCount(){ return blobs.length; },
+  get envMode(){ return envMode === 1 ? "uploaded" : "room"; },
+  get envLabel(){ return envLabel; },
+  get maxLod(){ return envMaxLod; },
+  get reveal(){ return reveal; },
+  get paused(){ return paused; },
+  get resolution(){ return [cw, ch]; },
+
+  /* set any tuning key; returns the value actually applied */
+  set(key, value){
+    if (key === "bounces"){ setBounces(value); return S.bounces; }
+    if (!(key in S)) throw new Error("unknown setting: " + key);
+    const v = applyKey(key, key === "count" ? (value | 0) : +value, false);
+    updateReadout();
+    return key === "count" ? blobs.length : S[key];
+  },
+  setCount(n){ return this.set("count", n); },
+  reset(){ resetAll(); return Object.assign({}, S); },
+  replay(){ replay(); return true; },
+  pause(v){ paused = (v === undefined) ? !paused : !!v; body.classList.toggle("is-paused", paused); return paused; },
+
+  /* force a simulation step + render, off the rAF loop */
+  step(dt){ return renderOnce(dt), true; },
+  render(){ resize(); drawScene(step(0), null, cw, ch); return true; },
+
+  /* read live shader uniform values straight back out of the program */
+  uniforms(){
+    gl.useProgram(prog);
+    const out = {};
+    for (const k in TRACKED){
+      const loc = gl.getUniformLocation(prog, TRACKED[k]);
+      out[k] = loc ? gl.getUniform(prog, loc) : null;
+    }
+    const tl = gl.getUniformLocation(prog, "uTint");
+    out.uTint = tl ? Array.from(gl.getUniform(prog, tl)) : null;
+    return out;
+  },
+
+  /* deterministic reflected-colour probe at fixed screen points */
+  probePoints: PROBE_POINTS.map(p => ({ name: p.name, uv: p.uv.slice() })),
+  sampleReflection,
+  sample: sampleReflection,
+  /* same probe, at any screen point you name */
+  sampleAt(uvList){
+    const pts = (Array.isArray(uvList[0]) ? uvList : [uvList])
+      .map((uv, i) => ({ name: "at-" + i, uv }));
+    return sampleReflection(pts);
+  },
+
+  /* environment control, callable without the DOM */
+  loadEnv(srcOrFile, label){
+    if (srcOrFile instanceof Blob) return handleFile(srcOrFile);
+    return loadEnvFromSource(srcOrFile, label || "programmatic");
+  },
+  revertEnv(){
+    revertEnvironment();
+    setEnvUI("No image — procedural room", null);
+    return true;
+  },
+
+  /* cursor injection, so the follow behaviour is testable */
+  setPointer(nx, ny){ pointer.nx = nx; pointer.ny = ny; pointer.has = true; return [nx, ny]; },
+  get cursorTarget(){ return [cursorSmooth.x, cursorSmooth.y, cursorSmooth.z]; },
+
+  info(){
+    return {
+      blobCount: blobs.length,
+      env: envMode === 1 ? "uploaded" : "room",
+      envLabel,
+      maxLod: envMaxLod,
+      fps: fpsShown,
+      resolution: [cw, ch],
+      dpr,
+      renderer: (() => {
+        const d = gl.getExtension("WEBGL_debug_renderer_info");
+        return d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : "unavailable";
+      })()
+    };
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOOT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+
+(async function boot(){
+  try {
+    setLoad(62, "Prefiltering the room");
+    await wait(220);
+
+    // warm the pipeline: one throwaway frame so first paint is not a hitch
+    setLoad(78, "Warming the march");
+    resize();
+    drawScene(step(0), null, cw, ch);
+    gl.finish();
+    await wait(200);
+
+    setLoad(92, "Condensing");
+    setBounces(DEFAULTS.bounces);
+    refreshCost();
+    updateReadout();
+    setEnvUI("No image — procedural room", null);
+    await wait(240);
+
+    setLoad(100, "Live");
+    await wait(280);
+
+    loader.classList.add("done");
+    body.classList.add("is-live");
+    setTimeout(() => { loader.style.display = "none"; }, 1000);
+
+    running = true;
+    last = 0;
+    requestAnimationFrame(frame);
+  } catch (err){
+    console.error(err);
+    failLoad("Could not start the study");
+  }
+})();
+
+})();
+</script>
+</body>
+</html>
