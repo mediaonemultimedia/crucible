@@ -1854,7 +1854,12 @@ function readStats(){
 }
 
 /* ── recording ─────────────────────────────────────────────────────────────
-   Live capture to a ProRes 4444 .mov with a real alpha channel.
+   Live capture to a .mov with a real alpha channel — hevc_videotoolbox by
+   default (~15x smaller than ProRes 4444 at equivalent quality, confirmed
+   both by direct pixel-level alpha comparison and by a real After Effects
+   import test), with prores_ks 4444 selectable via the companion's
+   codec:"prores" option for anyone who wants the maximum-compatibility
+   mezzanine file instead.
 
    The constraint that shapes all of this is that the take has to be *performed*
    — dragging the plume around, pushing sliders, orbiting — so nothing here may
@@ -2432,7 +2437,7 @@ function buildCaptureGroup(body){
 
   const note = document.createElement('div');
   note.id = 'rec-note';
-  note.innerHTML = 'ProRes 4444 with a real alpha channel, written by the ' +
+  note.innerHTML = 'HEVC with a real alpha channel, written by the ' +
                    'companion process. Shortcut <b>shift-R</b>.';
   c.appendChild(note);
   g.appendChild(c);
