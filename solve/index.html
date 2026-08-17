@@ -212,6 +212,82 @@ input[type=range]:focus-visible::-webkit-slider-runnable-track{background:rgba(2
 #reset:hover{border-color:rgba(200,168,119,.42);color:var(--ink)}
 #panel .foot .fx{font-family:var(--mono);font-size:8px;letter-spacing:.16em;color:rgba(232,227,216,.18);text-transform:uppercase;text-align:right}
 
+/* capture ---------------------------------------------------------------- */
+#rec-btn{
+  width:100%;background:none;border:1px solid var(--rule);color:var(--dim);
+  font-family:var(--mono);font-size:9px;letter-spacing:.20em;text-transform:uppercase;
+  padding:10px 12px 9px;cursor:pointer;line-height:1;
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  transition:border-color .3s ease,color .3s ease;
+}
+#rec-btn:hover{border-color:rgba(200,168,119,.42);color:var(--ink)}
+#rec-btn .bd{width:6px;height:6px;border-radius:50%;background:#d97a6c;flex:none}
+#rec-btn[disabled]{opacity:.38;cursor:default}
+#rec-btn[disabled]:hover{border-color:var(--rule);color:var(--dim)}
+body.is-recording #rec-btn{border-color:rgba(217,122,108,.5);color:#e0aca3}
+body.is-recording #rec-btn:hover{border-color:rgba(217,122,108,.9);color:var(--ink)}
+body.is-recording #rec-btn .bd{border-radius:0}
+
+#rec-note{
+  font-family:var(--mono);font-size:8px;letter-spacing:.06em;line-height:1.9;
+  color:rgba(232,227,216,.3);margin-top:11px;
+}
+#rec-note.err{color:#d97a6c}
+#rec-note.ok{color:var(--accent)}
+#rec-note b{font-weight:400;color:rgba(232,227,216,.5);word-break:break-all}
+
+/* the on-screen indicator — deliberately loud, and deliberately outside the
+   frame that is being captured: the recorded plate is a separate render pass,
+   so nothing in the interface can ever end up baked into the .mov */
+#rec-hud{
+  position:absolute;top:24px;left:50%;
+  transform:translateX(-50%) translateY(-16px);
+  display:flex;align-items:center;gap:12px;z-index:8;
+  border:1px solid rgba(217,122,108,.42);background:rgba(9,10,12,.86);
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+  padding:8px 15px 7px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--faint);white-space:nowrap;
+  opacity:0;pointer-events:none;
+  transition:opacity .32s ease,transform .32s cubic-bezier(.4,0,.2,1);
+}
+body.is-recording #rec-hud{opacity:1;transform:translateX(-50%) translateY(0)}
+#rec-hud .dot{
+  width:6px;height:6px;border-radius:50%;background:#d97a6c;flex:none;
+  animation:recpulse 1.4s ease-in-out infinite;
+}
+@keyframes recpulse{0%,100%{opacity:1}50%{opacity:.22}}
+#rec-hud .t{color:#e8e3d8;font-size:10.5px;letter-spacing:.1em;font-variant-numeric:tabular-nums}
+#rec-hud .sep{width:1px;height:11px;background:var(--rule);flex:none}
+#rec-hud .m{font-variant-numeric:tabular-nums}
+#rec-hud.warn{border-color:rgba(217,122,108,.85)}
+#rec-hud.warn .m{color:#d97a6c}
+
+/* a hairline around the viewport, so a take running in another window is still
+   obvious at a glance */
+#rec-edge{
+  position:fixed;inset:0;pointer-events:none;z-index:7;opacity:0;
+  transition:opacity .35s ease;
+  box-shadow:inset 0 0 0 1px rgba(217,122,108,.42),inset 0 0 70px rgba(217,122,108,.06);
+}
+body.is-recording #rec-edge{opacity:1}
+
+/* transparent preview — the checkerboard is the page behind a canvas that has
+   been reconfigured to composite with alpha, so what shows through the plume is
+   literally the matte that will be written to the file */
+body.alpha-preview{
+  background:
+    repeating-conic-gradient(#191b1f 0% 25%,#0a0b0d 0% 50%) 0 0/22px 22px;
+}
+body.alpha-preview #veil{opacity:0;transition:opacity .3s ease}
+
+@media (prefers-reduced-motion: reduce){
+  #rec-hud .dot{animation:none}
+}
+@media (max-width:880px){
+  #rec-hud{top:auto;bottom:60px;font-size:7.5px;gap:9px;padding:7px 11px 6px}
+}
+
 /* loader ----------------------------------------------------------------- */
 #loader{
   position:fixed;inset:0;z-index:20;background:var(--bg);
@@ -324,8 +400,17 @@ a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
 
 <canvas id="stage"></canvas>
 <div id="veil"></div>
+<div id="rec-edge"></div>
 
 <div id="ui">
+  <div id="rec-hud" role="status" aria-live="off">
+    <span class="dot" aria-hidden="true"></span>
+    <span>Rec</span>
+    <span class="t" id="rec-time">00:00</span>
+    <span class="sep" aria-hidden="true"></span>
+    <span class="m" id="rec-meta">—</span>
+  </div>
+
   <div id="mark">
     <div class="col">
       <span class="w">Solve</span>
@@ -366,7 +451,7 @@ a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
 
   <div id="credit">
     <b>Solve</b> — GPU compute fluid study 08 &nbsp;·&nbsp; 3D stable fluids in WGSL &nbsp;·&nbsp; Jacobi pressure projection &nbsp;·&nbsp; vorticity confinement &nbsp;·&nbsp; GPU-advected particles &nbsp;·&nbsp; raw WebGPU<br>
-    <span class="keys">drag to push the fluid &nbsp; shift-drag orbit &nbsp; scroll dolly &nbsp; c controls &nbsp; space pause &nbsp; r reset field</span>
+    <span class="keys">drag to push the fluid &nbsp; shift-drag orbit &nbsp; scroll dolly &nbsp; c controls &nbsp; space pause &nbsp; r reset field &nbsp; shift-r record</span>
   </div>
 
   <aside id="panel" aria-label="Simulation controls" aria-hidden="true">
@@ -1049,7 +1134,31 @@ fn fs(i : FO) -> @location(0) vec4<f32> {
   return vec4<f32>(c, 1.0);
 }`;
 
-const WGSL_COMPOSITE = WGSL_FULLSCREEN + RENDER_PRELUDE + /* wgsl */`
+/* The composite exists in two forms, from one body of code so the look cannot
+   drift between them.
+
+   On screen it is the finished frame: tone mapped, seated in a vignette, dusted
+   with grain, opaque, because it is being looked at.
+
+   For recording it is a *plate*. Same bloom, same exposure, same ACES curve,
+   same chromatic separation, same gamma — but the vignette and the grain are
+   dropped, because both are properties of a finished shot rather than of the
+   fluid, and an artist compositing this into something else will want to place
+   their own. In their place goes a real alpha channel.
+
+   That alpha is max(r,g,b) of the tone-mapped colour, with the colour itself
+   left exactly as it is. The pair is a premultiplied matte, and it is not an
+   approximation: this frame composited over black returns the on-screen frame
+   pixel for pixel, and over anything else it behaves the way a glowing,
+   semi-transparent volume should. Max rather than luminance because a deep
+   ember is dim and still solid — weighting it by luminance would make the
+   hottest part of the plume the only part with a matte.
+
+   In After Effects: Interpret Footage → Alpha → Premultiplied (Matted With
+   Black). Additive comps can ignore the matte entirely and use Add or Screen;
+   the RGB is already correct for that.                                       */
+function compositeWGSL(alphaOut){
+  return WGSL_FULLSCREEN + RENDER_PRELUDE + /* wgsl */`
 @group(0) @binding(1) var samp  : sampler;
 @group(0) @binding(2) var hdr   : texture_2d<f32>;
 @group(0) @binding(3) var blm   : texture_2d<f32>;
@@ -1080,13 +1189,20 @@ fn fs(i : FO) -> @location(0) vec4<f32> {
   col += textureSampleLevel(blm, samp, uv, 0.0).rgb * r.b.x;
   col *= r.a.y;
   col = aces(col);
+` + (alphaOut ? '' : /* wgsl */`
   col *= 1.0 - rr * 0.42;                            // seat it in the frame
 
   let g = (h21(i.pos.xy + vec2<f32>(r.a.w * 71.3, r.a.w * 37.1)) - 0.5) * r.b.y * 0.055;
   col += vec3<f32>(g);
-
-  return vec4<f32>(pow(max(col, vec3<f32>(0.0)), vec3<f32>(1.0 / 2.2)), 1.0);
-}`;
+`) + `
+  let out = pow(max(col, vec3<f32>(0.0)), vec3<f32>(1.0 / 2.2));
+` + (alphaOut ? /* wgsl */`
+  let a = max(out.r, max(out.g, out.b));
+  return vec4<f32>(out, a);
+` : /* wgsl */`
+  return vec4<f32>(out, 1.0);
+`) + `}`;
+}
 
 /* ── tiny mat4 ─────────────────────────────────────────────────────────── */
 
@@ -1126,6 +1242,13 @@ let cells=0, particleCount=0;
 let hdrNeedsClear = true;
 let statStaging = [], statBusy = false;
 let lastStats = { residual:0, maxDiv:0, speed:0, dye:0, preResidual:0 };
+
+// The capture target is RGBA8 regardless of what the swap chain prefers — the
+// encoder is fed raw RGBA, and asking the GPU for the channel order the file
+// wants is free, where swizzling a few million bytes per frame in JavaScript
+// on the interactive thread is not.
+const CAP_FORMAT = 'rgba8unorm';
+let alphaPreview = false;      // draw the plate to the screen instead of the frame
 
 const simU = new Float32Array(40);     // 10 vec4
 const renU = new Float32Array(16+16+12);
@@ -1255,7 +1378,8 @@ async function init(){
     const mFade = await makeModule(WGSL_FADE,       'fade');
     const mBrt  = await makeModule(WGSL_BRIGHT,     'brightpass');
     const mBlur = await makeModule(WGSL_BLUR,       'blur');
-    const mComp = await makeModule(WGSL_COMPOSITE,  'composite');
+    const mComp = await makeModule(compositeWGSL(false), 'composite');
+    const mCompA = await makeModule(compositeWGSL(true), 'composite(alpha)');
 
     PL.points = device.createRenderPipeline({
       layout: device.createPipelineLayout({ bindGroupLayouts:[ptsBGL] }),
@@ -1293,12 +1417,19 @@ async function init(){
       primitive:{ topology:'triangle-list' }
     });
 
-    PL.composite = device.createRenderPipeline({
-      layout: device.createPipelineLayout({ bindGroupLayouts:[compBGL] }),
-      vertex:{ module:mComp, entryPoint:'vs' },
-      fragment:{ module:mComp, entryPoint:'fs', targets:[{ format }] },
+    const compLayout = device.createPipelineLayout({ bindGroupLayouts:[compBGL] });
+    const compPipe = (mod, fmt) => device.createRenderPipeline({
+      layout: compLayout,
+      vertex:{ module:mod, entryPoint:'vs' },
+      fragment:{ module:mod, entryPoint:'fs', targets:[{ format:fmt }] },
       primitive:{ topology:'triangle-list' }
     });
+
+    PL.composite = compPipe(mComp, format);
+    // the same plate, drawn to the swap chain for the transparent preview...
+    PL.compositeAlpha = compPipe(mCompA, format);
+    // ...and to an RGBA8 target for capture, which is what the encoder is fed
+    PL.compositeCapture = compPipe(mCompA, CAP_FORMAT);
   } catch(e){
     fail('Render pipeline creation failed', String(e.message || e));
     return;
@@ -1684,11 +1815,20 @@ function step(dt){
   // composite
   const cp = enc.beginRenderPass({ colorAttachments:[{
     view: ctx.getCurrentTexture().createView(),
-    loadOp:'clear', clearValue:{r:0,g:0,b:0,a:1}, storeOp:'store'
+    loadOp:'clear', clearValue:{r:0,g:0,b:0,a: alphaPreview ? 0 : 1}, storeOp:'store'
   }]});
-  cp.setPipeline(PL.composite); cp.setBindGroup(0, rt.bgComp); cp.draw(3); cp.end();
+  cp.setPipeline(alphaPreview ? PL.compositeAlpha : PL.composite);
+  cp.setBindGroup(0, rt.bgComp); cp.draw(3); cp.end();
+
+  // A capture is a second composite, not a copy of the first: it is drawn at the
+  // recording resolution with the plate shader, so the frame on screen keeps its
+  // vignette and grain and stays exactly the reference the artist is working
+  // against, whatever the file is getting.
+  const grab = REC.wantsFrame();
+  if (grab) REC.encodeInto(enc, grab);
 
   device.queue.submit([enc.finish()]);
+  if (grab) REC.afterSubmit(grab);
 
   if (measure) readStats();
 }
@@ -1712,6 +1852,358 @@ function readStats(){
     updateReadout();
   }).catch(() => { statBusy = false; });
 }
+
+/* ── recording ─────────────────────────────────────────────────────────────
+   Live capture to a ProRes 4444 .mov with a real alpha channel.
+
+   The constraint that shapes all of this is that the take has to be *performed*
+   — dragging the plume around, pushing sliders, orbiting — so nothing here may
+   be allowed to stall the interactive thread, and nothing may accumulate. A
+   deterministic seek-and-render exporter has neither problem and is the wrong
+   tool; this is the other kind.
+
+   The chain is: a second composite pass draws the alpha plate into an RGBA8
+   texture at the recording resolution → copyTextureToBuffer into one of three
+   staging buffers → mapAsync (which is where the GPU latency is absorbed, off
+   the critical path) → one HTTP POST at a time to a companion process on the
+   loopback interface → ffmpeg's stdin.
+
+   Nothing is buffered for the length of the take. At most three frames are in
+   staging and two waiting to be posted, so a take is bounded by the size of the
+   .mov and nothing else. ffmpeg's stdin backpressure propagates all the way
+   back to here: when the encoder falls behind, frames are skipped rather than
+   queued, and the companion holds the previous frame to keep the file locked to
+   the wall clock.
+
+   Run the companion first:
+     ai-node-studio/tools/recorder/crucible-rec
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const REC_HOST = 'http://127.0.0.1:7878';
+
+const REC = (() => {
+  const cfg = { height: 1080, fps: 30 };
+
+  const MAX_OUTBOX = 2;   // frames read back but not yet posted
+  const RING = 3;         // gpu staging buffers
+
+  let state   = 'idle';   // idle | starting | recording | stopping
+  let sess    = null;
+  let capTex  = null, capView = null;
+  let capW = 0, capH = 0, stride = 0, startAspect = 1;
+  let ring = [], seq = 0;
+  let outbox = [];
+  let inFlight = false, srvBusy = false;
+  let t0 = 0, nextDue = 0;
+  let sent = 0, held = 0, dropped = 0, skipped = 0;
+  let note = null, hudTimer = 0, lastResult = null;
+
+  // Rolling means of where a frame's time actually goes. A take that comes back
+  // at a third of the requested rate is a question with three possible answers —
+  // the readback, the post, or the encoder — and guessing between them is much
+  // slower than measuring.
+  const T = { readback:0, post:0, calls:0, taken:0 };
+  const avg = (was, now) => was ? was * 0.9 + now * 0.1 : now;
+
+  /* ── study adapter ─────────────────────────────────────────────────────
+     The only three things below that know this is a raw WebGPU piece. A study
+     built on anything else supplies its own trio and the rest of this module is
+     unchanged — see tools/recorder/README.md. */
+
+  function alloc(w, h){
+    free();
+    capTex = device.createTexture({
+      size:[w, h], format: CAP_FORMAT,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+      label: 'capture'
+    });
+    capView = capTex.createView();
+    // WebGPU requires every row of a texture→buffer copy to begin on a 256-byte
+    // boundary. Rather than strip the padding here — a memcpy of the whole frame
+    // on the interactive thread, every frame — the padded rows are handed to the
+    // companion as though they were the real width, and ffmpeg crops them away
+    // in its filter graph, where it costs nothing.
+    stride = Math.ceil(w * 4 / 256) * 256;
+    ring = [];
+    for (let i = 0; i < RING; i++) {
+      ring.push({ buf: device.createBuffer({
+        size: stride * h,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+        label: 'capture staging ' + i
+      }), busy: false });
+    }
+  }
+
+  function free(){
+    for (const s of ring) { try { s.buf.destroy(); } catch {} }
+    ring = [];
+    if (capTex) { try { capTex.destroy(); } catch {} }
+    capTex = null; capView = null;
+  }
+
+  // Encoded into the frame's own command encoder, so the plate is drawn from
+  // exactly the simulation state that was just presented — never a frame behind.
+  function draw(enc, slot){
+    const p = enc.beginRenderPass({ colorAttachments:[{
+      view: capView, loadOp:'clear', clearValue:{ r:0, g:0, b:0, a:0 }, storeOp:'store'
+    }]});
+    p.setPipeline(PL.compositeCapture);
+    p.setBindGroup(0, rt.bgComp);
+    p.draw(3);
+    p.end();
+    enc.copyTextureToBuffer({ texture: capTex },
+                            { buffer: slot.buf, bytesPerRow: stride, rowsPerImage: capH },
+                            [capW, capH, 1]);
+  }
+
+  /* ── sizing ────────────────────────────────────────────────────────────── */
+
+  function dims(){
+    const h = cfg.height;
+    const aspect = (canvas.width / canvas.height) || (16/9);
+    let w = Math.round(h * aspect);
+    w = Math.min(3840, Math.max(64, w - (w % 2)));   // encoders want even
+    return { w, h, aspect };
+  }
+
+  /* ── ui ────────────────────────────────────────────────────────────────── */
+
+  function say(msg, kind){
+    if (!note) note = $('#rec-note');
+    if (!note) return;
+    note.className = kind || '';
+    note.innerHTML = msg;
+  }
+
+  function mmss(s){
+    const m = Math.floor(s / 60), r = Math.floor(s % 60);
+    return String(m).padStart(2,'0') + ':' + String(r).padStart(2,'0');
+  }
+
+  function paintHud(){
+    if (state !== 'recording') return;
+    const el = (performance.now() - t0) / 1000;
+    $('#rec-time').textContent = mmss(el);
+    const drift = Math.abs((canvas.width / canvas.height) / startAspect - 1);
+    const bits = [`${capW}×${capH}`, `${cfg.fps} fps`, `${sent} f`];
+    if (held)    bits.push(`${held} held`);
+    if (skipped) bits.push(`${skipped} skipped`);
+    // The recording resolution is fixed when ffmpeg starts, so a window resized
+    // mid-take changes the shape of the frame but not the shape of the file.
+    if (drift > 0.02) bits.push('aspect drift');
+    $('#rec-meta').textContent = bits.join(' · ');
+    $('#rec-hud').classList.toggle('warn', drift > 0.02 || srvBusy);
+  }
+
+  function setBtn(){
+    const b = $('#rec-btn');
+    if (!b) return;
+    b.disabled = (state === 'starting' || state === 'stopping');
+    const label =
+      state === 'recording' ? 'Stop · encode' :
+      state === 'starting'  ? 'Starting…'     :
+      state === 'stopping'  ? 'Encoding…'     : 'Record';
+    b.querySelector('.lbl').textContent = label;
+  }
+
+  /* ── transport ─────────────────────────────────────────────────────────── */
+
+  async function post(path, body, opts){
+    const r = await fetch(REC_HOST + path, Object.assign({ method:'POST', body }, opts||{}));
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || (path + ' → ' + r.status));
+    return j;
+  }
+
+  async function start(){
+    if (state !== 'idle') return;
+    state = 'starting'; setBtn();
+    say('Contacting the companion…');
+    const { w, h, aspect } = dims();
+    try {
+      sess = await post('/start', JSON.stringify({
+        study: 'solve', width: w, height: h, fps: cfg.fps,
+        stride: Math.ceil(w * 4 / 256) * 256,
+      }), { headers: { 'Content-Type': 'application/json' } });
+    } catch (e) {
+      state = 'idle'; setBtn();
+      say('No companion on <b>127.0.0.1:7878</b>. Start it with ' +
+          '<b>ai-node-studio/tools/recorder/crucible-rec</b> and try again.', 'err');
+      return;
+    }
+    capW = w; capH = h; startAspect = aspect;
+    try { alloc(w, h); }
+    catch (e) {
+      state = 'idle'; setBtn();
+      try { await post('/stop', JSON.stringify({ id: sess.id }), { headers:{'Content-Type':'application/json'} }); } catch {}
+      say('Could not allocate the capture target: ' + (e.message || e), 'err');
+      return;
+    }
+
+    seq = 0; sent = 0; held = 0; dropped = 0; skipped = 0;
+    outbox = []; inFlight = false; srvBusy = false;
+    t0 = performance.now(); nextDue = t0;
+    state = 'recording';
+    document.body.classList.add('is-recording');
+    setBtn(); paintHud();
+    hudTimer = setInterval(paintHud, 250);
+    say(`Recording to <b>${sess.file.replace(/^.*\//,'')}</b> — roughly ` +
+        `${(sess.estMBPerMinute/1024).toFixed(1)} GB per minute.`);
+  }
+
+  async function stop(reason){
+    if (state !== 'recording') return;
+    state = 'stopping'; setBtn();
+    clearInterval(hudTimer);
+    document.body.classList.remove('is-recording');
+    say('Flushing the encoder…');
+
+    // Let whatever is already on the wire land, so the tail of the take is not
+    // thrown away just because Stop was pressed between a readback and its post.
+    const deadline = performance.now() + 2500;
+    while ((inFlight || outbox.length) && performance.now() < deadline) {
+      await new Promise(r => setTimeout(r, 40));
+    }
+
+    let res = null;
+    try { res = await post('/stop', JSON.stringify({ id: sess.id }),
+                           { headers:{'Content-Type':'application/json'} }); }
+    catch (e) { say('The companion did not answer on stop: ' + (e.message||e), 'err'); }
+
+    free();
+    state = 'idle'; sess = null; setBtn();
+    lastResult = res;
+
+    if (res && res.ok) {
+      const mb = (res.bytes / 1048576).toFixed(1);
+      say(`<b>${res.file.replace(/^.*\//,'')}</b><br>` +
+          `${res.seconds.toFixed(2)} s · ${res.frames.written} frames · ${mb} MB<br>` +
+          `${res.probe.codec_name} ${res.probe.profile} · <b>${res.probe.pix_fmt}</b> — alpha verified.<br>` +
+          `In After Effects, interpret alpha as premultiplied (matted with black).` +
+          (reason ? `<br>Stopped automatically: ${reason}.` : ''), 'ok');
+    } else if (res) {
+      say('Encode finished without a usable alpha channel: ' +
+          (res.error || ('pix_fmt ' + (res.probe && res.probe.pix_fmt))), 'err');
+    }
+  }
+
+  /* One post at a time, in sequence order. Concurrency here would buy a little
+     throughput and cost frame ordering, and the companion has no way to put an
+     out-of-order frame back where it belongs. */
+  function pump(){
+    if (inFlight || !outbox.length || !sess) return;
+    outbox.sort((a,b) => a.seq - b.seq);
+    const f = outbox.shift();
+    inFlight = true;
+    const pt0 = performance.now();
+    fetch(`${REC_HOST}/frame?id=${sess.id}&t=${Math.round(f.t)}`, { method:'POST', body: f.data })
+      .then(r => r.json())
+      .then(j => {
+        T.post = avg(T.post, performance.now() - pt0);
+        if (j.stopped) {           // companion hit its own duration or disk limit
+          inFlight = false;
+          const r = j.stopped;
+          state = 'recording';     // so stop() will run its course
+          stop(r === 'disk-space' ? 'the output volume is nearly full'
+                                  : 'the take reached the duration limit');
+          return;
+        }
+        sent = j.n || sent; held = j.held || held; dropped = j.dropped || dropped;
+        /* Backpressure costs one frame interval, not the rest of the take. The
+           flag cannot be allowed to latch: the only way to learn it has cleared
+           is to post another frame, so a policy of "stop posting while busy"
+           deadlocks the moment it first trips. */
+        if (j.busy) { srvBusy = true; nextDue = performance.now() + 1000/cfg.fps; }
+        else srvBusy = false;
+        inFlight = false;
+        pump();
+      })
+      .catch(e => {
+        inFlight = false;
+        if (state === 'recording') { say('Lost the companion mid-take: ' + (e.message||e), 'err'); stop('the companion stopped answering'); }
+      });
+  }
+
+  return {
+    get config(){ return Object.assign({}, cfg); },
+    get state(){ return state; },
+    get last(){ return lastResult; },
+    get stats(){ return { sent, held, dropped, skipped, srvBusy,
+                          timing: { readbackMs: +T.readback.toFixed(1), postMs: +T.post.toFixed(1),
+                                    calls: T.calls, taken: T.taken },
+                          width:capW, height:capH, stride,
+                          seconds: state==='recording' ? (performance.now()-t0)/1000 : 0,
+                          file: sess && sess.file }; },
+
+    setHeight(h){ if (state === 'idle') cfg.height = h; },
+    setFps(f){ if (state === 'idle') cfg.fps = f; },
+
+    start, stop,
+    toggle(){ return state === 'recording' ? stop() : (state === 'idle' ? start() : undefined); },
+
+    /* Called from the frame. Returns a staging slot when this frame is due and
+       there is somewhere to put it, and null otherwise — which is the whole of
+       the drop policy: if the encoder, the network or the GPU are behind, the
+       frame is simply not taken, and the companion holds the previous one. */
+    wantsFrame(){
+      if (state !== 'recording' || !capView) return null;
+      T.calls++;
+      const now = performance.now();
+      if (now < nextDue) return null;
+      if (outbox.length >= MAX_OUTBOX) { skipped++; nextDue = now + 1000/cfg.fps; return null; }
+      const slot = ring.find(s => !s.busy);
+      if (!slot) { skipped++; nextDue = now + 1000/cfg.fps; return null; }
+
+      const step = 1000 / cfg.fps;
+      nextDue += step;
+      // After a stall, resume from now rather than sprinting to catch up on a
+      // schedule that has already passed.
+      if (nextDue < now - step) nextDue = now;
+
+      slot.busy = true;
+      slot.seq = seq++;
+      slot.t = now - t0;
+      slot.t0 = now;
+      T.taken++;
+      return slot;
+    },
+
+    encodeInto(enc, slot){ draw(enc, slot); },
+
+    afterSubmit(slot){
+      slot.buf.mapAsync(GPUMapMode.READ).then(() => {
+        T.readback = avg(T.readback, performance.now() - slot.t0);
+        /* A Blob, not a Uint8Array, and this is not a detail: fetch() uploads a
+           typed-array body by streaming it through the renderer, which measures
+           at a flat ~24 MB/s regardless of size — 330 ms for one 1080p frame,
+           which alone capped this whole pipeline at three frames a second. A
+           Blob is handed to the network stack by reference instead, and the same
+           eight megabytes post in about seven. Constructing it here also copies
+           the mapped range in one step, so it replaces the slice() this used to
+           need rather than adding to it. */
+        const data = new Blob([slot.buf.getMappedRange()]);
+        slot.buf.unmap();
+        slot.busy = false;
+        if (state !== 'recording') return;
+        outbox.push({ seq: slot.seq, t: slot.t, data });
+        while (outbox.length > MAX_OUTBOX) { outbox.shift(); dropped++; }
+        pump();
+      }).catch(() => { slot.busy = false; });
+    },
+
+    /* The preview is not part of the capture path — it reconfigures the swap
+       chain to composite with alpha and draws the same plate to it, so what the
+       checkerboard shows through the plume is the matte the file will carry. */
+    setPreview(on){
+      if (!ctx || !device) return;
+      alphaPreview = !!on;
+      ctx.configure({ device, format, alphaMode: alphaPreview ? 'premultiplied' : 'opaque' });
+      document.body.classList.toggle('alpha-preview', alphaPreview);
+      hdrNeedsClear = true;
+    },
+    get preview(){ return alphaPreview; },
+  };
+})();
 
 /* ── readout ───────────────────────────────────────────────────────────── */
 
@@ -1877,6 +2369,8 @@ function buildPanel(){
     body.appendChild(g);
   });
 
+  buildCaptureGroup(body);
+
   $('#reset').addEventListener('click', () => {
     // A reset is absolute: there is nothing left for a look to hand back, and
     // the camera returns to the framing the piece chose for itself.
@@ -1888,6 +2382,62 @@ function buildPanel(){
     });
     updateReadout();
   });
+}
+
+/* Capture is not a simulation parameter, so it is built by hand rather than
+   declared in SPEC: none of it belongs in S, none of it should be touched by
+   "reset defaults", and none of it should be readable as something that changes
+   what the piece is. It borrows the panel's markup wholesale so it still reads
+   as one instrument. */
+function buildCaptureGroup(body){
+  const g = document.createElement('div');
+  g.className = 'grp';
+  const gt = document.createElement('span'); gt.className = 'gt';
+  gt.textContent = 'Capture'; g.appendChild(gt);
+
+  const seg = (label, opts, initial, onPick) => {
+    const c = document.createElement('div'); c.className = 'ctl';
+    const row = document.createElement('div'); row.className = 'row';
+    const lb = document.createElement('span'); lb.className = 'lb'; lb.textContent = label;
+    row.appendChild(lb); row.appendChild(Object.assign(document.createElement('span'), { className:'vl' }));
+    c.appendChild(row);
+    const s = document.createElement('div');
+    s.className = 'seg'; s.setAttribute('role','group');
+    s.setAttribute('aria-label', label);
+    const btns = opts.map(([val, lab]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = lab;
+      b.setAttribute('aria-pressed', String(val === initial));
+      b.addEventListener('click', () => {
+        onPick(val);
+        btns.forEach((x,i) => x.setAttribute('aria-pressed', String(opts[i][0] === val)));
+      });
+      s.appendChild(b);
+      return b;
+    });
+    c.appendChild(s); g.appendChild(c);
+    return btns;
+  };
+
+  seg('Height', [[720,'720'],[1080,'1080'],[1440,'1440']], REC.config.height, v => REC.setHeight(v));
+  seg('Rate',   [[24,'24'],[30,'30'],[60,'60']],           REC.config.fps,    v => REC.setFps(v));
+  seg('Background', [[0,'Opaque'],[1,'Alpha']], 0, v => REC.setPreview(!!v));
+
+  const c = document.createElement('div'); c.className = 'ctl';
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.id = 'rec-btn';
+  btn.innerHTML = '<span class="bd" aria-hidden="true"></span><span class="lbl">Record</span>';
+  btn.addEventListener('click', () => REC.toggle());
+  c.appendChild(btn);
+
+  const note = document.createElement('div');
+  note.id = 'rec-note';
+  note.innerHTML = 'ProRes 4444 with a real alpha channel, written by the ' +
+                   'companion process. Shortcut <b>shift-R</b>.';
+  c.appendChild(note);
+  g.appendChild(c);
+
+  body.appendChild(g);
 }
 
 function setPanel(open){
@@ -1909,6 +2459,9 @@ function bindInput(){
     if (k === 'c') { e.preventDefault(); setPanel(!document.body.classList.contains('panel-open')); }
     else if (e.key === 'Escape') { setPanel(false); }
     else if (e.key === ' ') { e.preventDefault(); paused = !paused; document.body.classList.toggle('is-paused', paused); }
+    // shift-R before R: reseeding the field in the middle of a take would be a
+    // very expensive typo.
+    else if (k === 'r' && e.shiftKey) { e.preventDefault(); REC.toggle(); }
     else if (k === 'r') { clearFields(); }
   });
 
@@ -2071,6 +2624,25 @@ window.__solve = {
       names: PALETTE_NAMES.slice(),
     };
   },
+  // recording — enough to drive a take end to end without touching the panel,
+  // and to assert on what the companion said about the file it wrote
+  recorder: {
+    get state(){ return REC.state; },
+    get config(){ return REC.config; },
+    get stats(){ return REC.stats; },
+    get last(){ return REC.last; },
+    get preview(){ return REC.preview; },
+    setPreview: on => REC.setPreview(on),
+    height: h => REC.setHeight(h),
+    fps: f => REC.setFps(f),
+    start: () => REC.start(),
+    stop: () => REC.stop(),
+    async host(){
+      try { return await (await fetch(REC_HOST + '/health')).json(); }
+      catch (e) { return { ok:false, error:String(e.message || e) }; }
+    },
+  },
+
   paused: () => paused,
   forceStep(n){ for (let i=0;i<(n||1);i++) step(1/60); },
   reseed: clearFields,

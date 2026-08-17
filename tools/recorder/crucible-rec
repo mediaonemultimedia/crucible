@@ -1,0 +1,5 @@
+#!/bin/sh
+# crucible-rec — start the Crucible live-alpha recording companion.
+# Run this in a terminal alongside the study you are recording, then use the
+# RECORD control in the study's panel. Ctrl-C stops it.
+exec /opt/homebrew/bin/node "$(dirname "$0")/server.mjs" "$@"
