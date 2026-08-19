@@ -46,6 +46,21 @@ body.is-orbiting canvas#stage{cursor:grabbing}
 body.is-live #ui{opacity:1}
 #ui > *{pointer-events:auto}
 
+/* Reference-image overlay — a plain DOM element, deliberately outside the
+   WebGPU canvas entirely. See the REF section in the script for why that
+   separation is the actual mechanism keeping it out of recordings and
+   pixelProbe(), not a flag either of those checks. Above the veil so the
+   vignette does not dim the very thing being lined up against; below #ui
+   so the panel stays clickable through it. */
+#refimg{
+  position:fixed;z-index:3;pointer-events:none;display:none;
+  max-width:none;max-height:none;
+  left:50%;top:50%;
+  transform:translate(-50%,-50%) translate(var(--rx,0px),var(--ry,0px)) scale(var(--rs,1));
+  opacity:var(--ro,0.6);
+}
+body.has-refimg #refimg{display:block}
+
 .eyebrow{
   font-family:var(--mono);font-size:9.5px;letter-spacing:.20em;
   text-transform:uppercase;color:var(--faint);
@@ -236,6 +251,20 @@ body.is-recording #rec-btn .bd{border-radius:0}
 #rec-note.ok{color:var(--accent)}
 #rec-note b{font-weight:400;color:rgba(232,227,216,.5);word-break:break-all}
 
+/* reference image ---------------------------------------------------------- */
+#ref-note{
+  font-family:var(--mono);font-size:8px;letter-spacing:.06em;line-height:1.9;
+  color:rgba(232,227,216,.3);margin-bottom:13px;
+}
+.filebtn,.actionbtn{
+  display:flex;width:100%;align-items:center;justify-content:center;gap:9px;
+  background:none;border:1px solid var(--rule);color:var(--dim);cursor:pointer;
+  font-family:var(--mono);font-size:9px;letter-spacing:.20em;text-transform:uppercase;
+  padding:10px 12px 9px;line-height:1;box-sizing:border-box;
+  transition:border-color .3s ease,color .3s ease;
+}
+.filebtn:hover,.actionbtn:hover{border-color:rgba(200,168,119,.42);color:var(--ink)}
+
 /* the on-screen indicator — deliberately loud, and deliberately outside the
    frame that is being captured: the recorded plate is a separate render pass,
    so nothing in the interface can ever end up baked into the .mov */
@@ -400,6 +429,7 @@ a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
 
 <canvas id="stage"></canvas>
 <div id="veil"></div>
+<img id="refimg" alt="" aria-hidden="true">
 <div id="rec-edge"></div>
 
 <div id="ui">
@@ -2530,6 +2560,7 @@ function buildPanel(){
   });
 
   buildCaptureGroup(body);
+  buildReferenceGroup(body);
 
   $('#reset').addEventListener('click', () => {
     // A reset is absolute: there is nothing left for a look to hand back, and
@@ -2595,6 +2626,110 @@ function buildCaptureGroup(body){
   note.innerHTML = 'HEVC with a real alpha channel, written by the ' +
                    'companion process. Shortcut <b>shift-R</b>.';
   c.appendChild(note);
+  g.appendChild(c);
+
+  body.appendChild(g);
+}
+
+/* ── reference image ──────────────────────────────────────────────────────
+   A plain DOM <img> (#refimg, styled in the stylesheet above), deliberately
+   built entirely outside the WebGPU pipeline — it is never bound into a
+   command encoder, never touches capTex or rt.bgComp. That separation is
+   what keeps it out of every capture path, not a flag either of them has to
+   remember to check:
+
+     · REC's draw(enc, slot), above, reads only rt.bgComp into capTex — a
+       dedicated render pass and a dedicated texture that this element has
+       no connection to.
+     · pixelProbe(), on window.__solve, reads pixels via
+       `drawImage(canvas, 0, 0)` — a canvas source only ever yields its own
+       drawing-buffer contents, never whatever the compositor has stacked
+       on top of it in the page.
+
+   So there is nothing to switch off before a take. The image simply isn't
+   reachable from either path, on or off screen, recording or not. */
+const REF = { visible:false, x:0, y:0, scale:1, opacity:0.6, name:null, url:null };
+const refEl = $('#refimg');
+
+function refApply(){
+  document.body.classList.toggle('has-refimg', REF.visible && !!REF.url);
+  refEl.style.setProperty('--rx', REF.x + 'px');
+  refEl.style.setProperty('--ry', REF.y + 'px');
+  refEl.style.setProperty('--rs', String(REF.scale));
+  refEl.style.setProperty('--ro', String(REF.opacity));
+}
+
+function refLoad(file){
+  if (!file || !/^image\//.test(file.type)) return false;
+  if (REF.url) URL.revokeObjectURL(REF.url);
+  REF.url = URL.createObjectURL(file);
+  refEl.src = REF.url;
+  REF.name = file.name;
+  REF.visible = true;
+  refApply();
+  return true;
+}
+
+function refClear(){
+  if (REF.url) URL.revokeObjectURL(REF.url);
+  REF.url = null; REF.name = null; REF.visible = false;
+  refEl.removeAttribute('src');
+  refApply();
+}
+
+function buildReferenceGroup(body){
+  const g = document.createElement('div');
+  g.className = 'grp';
+  const gt = document.createElement('span'); gt.className = 'gt';
+  gt.textContent = 'Reference'; g.appendChild(gt);
+
+  const note = document.createElement('div');
+  note.id = 'ref-note';
+  note.innerHTML = 'A still to line the effect up against. On screen only — ' +
+                   'never in a recording or a probe, by construction, not a switch.';
+  g.appendChild(note);
+
+  const filerow = document.createElement('div'); filerow.className = 'ctl';
+  const label = document.createElement('label');
+  label.htmlFor = 'ref-file'; label.className = 'filebtn';
+  label.textContent = 'Load image';
+  const input = document.createElement('input');
+  input.type = 'file'; input.id = 'ref-file'; input.accept = 'image/*';
+  input.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;pointer-events:none';
+  input.addEventListener('change', () => {
+    const f = input.files && input.files[0];
+    if (f) refLoad(f);
+  });
+  filerow.appendChild(label); filerow.appendChild(input);
+  g.appendChild(filerow);
+
+  const rng = (label, key, min, max, step, fmt) => {
+    const c = document.createElement('div'); c.className = 'ctl';
+    const row = document.createElement('div'); row.className = 'row';
+    const lb = document.createElement('span'); lb.className = 'lb'; lb.textContent = label;
+    const vl = document.createElement('span'); vl.className = 'vl'; vl.textContent = fmt(REF[key]);
+    row.appendChild(lb); row.appendChild(vl); c.appendChild(row);
+    const inp = document.createElement('input');
+    inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step; inp.value = REF[key];
+    inp.setAttribute('aria-label', label);
+    inp.addEventListener('input', () => {
+      const v = parseFloat(inp.value);
+      REF[key] = v; vl.textContent = fmt(v); refApply();
+    });
+    c.appendChild(inp); g.appendChild(c);
+    return inp;
+  };
+
+  rng('Position X', 'x', -600, 600, 5, v => String(v|0));
+  rng('Position Y', 'y', -600, 600, 5, v => String(v|0));
+  rng('Scale',       'scale',   0.1, 4, 0.05, v => v.toFixed(2)+'×');
+  rng('Opacity',      'opacity', 0,   1, 0.02, v => v.toFixed(2));
+
+  const c = document.createElement('div'); c.className = 'ctl';
+  const clearBtn = document.createElement('button');
+  clearBtn.type = 'button'; clearBtn.className = 'actionbtn'; clearBtn.textContent = 'Clear reference';
+  clearBtn.addEventListener('click', refClear);
+  c.appendChild(clearBtn);
   g.appendChild(c);
 
   body.appendChild(g);
@@ -2910,7 +3045,29 @@ window.__solve = {
       n++;
     }
     return { w, h, samples:n, meanLuma:sum/n, maxLuma:max, litFraction:nonzero/n };
-  }
+  },
+
+  // reference-image overlay — real state, not the panel's idea of it. See the
+  // REF section above buildReferenceGroup() for why this element can never
+  // reach a recording or pixelProbe(): it's a plain <img> with no connection
+  // to the WebGPU command encoders either capture path reads from.
+  reference: {
+    get state(){ return Object.assign({}, REF, { visible: REF.visible && !!REF.url }); },
+    load(file){ return refLoad(file); },
+    set(k, v){
+      if (!(k in REF) || k === 'url' || k === 'name') throw new Error('unknown or read-only reference key ' + k);
+      REF[k] = v; refApply(); return REF[k];
+    },
+    clear(){ refClear(); },
+    // the element itself, so a check can confirm what's actually on screen
+    // rather than trusting the state object to describe it honestly
+    get element(){
+      const r = refEl.getBoundingClientRect();
+      return { hasSrc: !!refEl.getAttribute('src'), naturalW: refEl.naturalWidth, naturalH: refEl.naturalHeight,
+               displayed: getComputedStyle(refEl).display !== 'none', rect: { x:r.x, y:r.y, w:r.width, h:r.height },
+               computedOpacity: getComputedStyle(refEl).opacity };
+    },
+  },
 };
 
 init();
