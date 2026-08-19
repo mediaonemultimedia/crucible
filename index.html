@@ -125,6 +125,19 @@ a.row:hover .n,a.row:focus-visible .n{color:var(--accent)}
 a.row .state{color:rgba(200,168,119,.62);border-color:rgba(200,168,119,.26)}
 a.row:hover .state,a.row:focus-visible .state{color:var(--accent);border-color:rgba(200,168,119,.5)}
 
+/* companion tools — deliberately outside ol.studies: not a numbered study,
+   so it does not read as one. A dashed rule and a tag pill instead of a
+   number mark the difference at a glance. */
+.companions{margin-top:26px;padding-top:24px;border-top:1px dashed var(--rule)}
+.companions .eyebrow{display:block;margin-bottom:14px}
+.row.comp{grid-template-columns:56px minmax(0,1fr) minmax(0,1.15fr) 74px}
+.row.comp .tag{
+  font-family:var(--mono);font-size:8px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--faint);border:1px solid var(--rule);padding:2px 5px 1px;
+  line-height:1.4;justify-self:start;transition:color .34s ease,border-color .34s ease;
+}
+a.row.comp:hover .tag,a.row.comp:focus-visible .tag{color:var(--accent);border-color:rgba(200,168,119,.5)}
+
 /* pending rows */
 li.pending .row{cursor:default}
 li.pending .name{color:var(--faint)}
@@ -299,6 +312,16 @@ footer.colophon{
       </li>
 
     </ol>
+
+    <div class="companions">
+      <span class="eyebrow">Companion tools — not numbered studies</span>
+      <a class="row comp" href="chase/">
+        <span class="tag">Web</span>
+        <span class="name">Chase</span>
+        <span class="desc">Author a Glyph mark's rest and hover states, bake them to two PNGs and a CSS cross-fade — no 3D at runtime, drops straight into a page</span>
+        <span class="state">View</span>
+      </a>
+    </div>
   </section>
 
   <footer class="colophon">
