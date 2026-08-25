@@ -394,6 +394,331 @@ const state = {
 let device, adapter, ctx, canvasFormat;
 let canvas = $('#stage');
 
+/* ── WGSL: MPM compute ─────────────────────────────────────────────────
+   Particle buffer `P` is a flat array<f32>, indexed by hand-picked offsets
+   (see OFF above, mirrored below as *_O constants) — this is the direct fix
+   for the byte-alignment bug the previous attempt hit: no WGSL struct means
+   no implicit vec3f/scalar padding to get wrong on the JS side.
+   ────────────────────────────────────────────────────────────────────── */
+const WGSL_COMPUTE = `
+const GXu: u32 = ${GX}u; const GYu: u32 = ${GY}u; const GZu: u32 = ${GZ}u;
+const GXi: i32 = ${GX}; const GYi: i32 = ${GY}; const GZi: i32 = ${GZ};
+const GXf: f32 = ${GX}.0; const GYf: f32 = ${GY}.0; const GZf: f32 = ${GZ}.0;
+const GCELLSu: u32 = ${GCELLS}u;
+const NUMPu: u32 = ${MAX_PARTICLES}u;
+const PSTRIDEu: u32 = ${PSTRIDE}u;
+const DOMXf: f32 = ${DOMAIN[0]}; const DOMYf: f32 = ${DOMAIN[1]}; const DOMZf: f32 = ${DOMAIN[2]};
+const SCALE: f32 = 65536.0;
+
+@group(0) @binding(0) var<storage, read_write> P: array<f32>;
+@group(0) @binding(1) var<storage, read_write> gridMass: array<atomic<i32>>;
+@group(0) @binding(2) var<storage, read_write> gridVelX: array<atomic<i32>>;
+@group(0) @binding(3) var<storage, read_write> gridVelY: array<atomic<i32>>;
+@group(0) @binding(4) var<storage, read_write> gridVelZ: array<atomic<i32>>;
+@group(0) @binding(5) var<storage, read_write> moldSDF: array<f32>;
+@group(0) @binding(6) var<uniform> U: array<vec4<f32>, 10>;
+@group(0) @binding(7) var<storage, read_write> stats: array<atomic<i32>, 3>; // 0:solidSum(fixed) 1:peakTemp(fixed) 2:activeCount
+
+fn encFix(v: f32) -> i32 { return i32(clamp(v*SCALE, -2000000000.0, 2000000000.0)); }
+fn decFix(v: i32) -> f32 { return f32(v) / SCALE; }
+
+fn quadW(f: f32) -> array<f32,3> {
+  return array<f32,3>(
+    0.5*(1.5-f)*(1.5-f),
+    0.75-(f-1.0)*(f-1.0),
+    0.5*(f-0.5)*(f-0.5)
+  );
+}
+
+fn sdRoundRect(p: vec2f, b: vec2f, r: f32) -> f32 {
+  let q = abs(p) - b + vec2f(r);
+  return length(max(q, vec2f(0.0))) + min(max(q.x,q.y), 0.0) - r;
+}
+
+@compute @workgroup_size(64)
+fn clearGrid(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let idx = gid.x;
+  if (idx >= GCELLSu) { return; }
+  atomicStore(&gridMass[idx], 0);
+  atomicStore(&gridVelX[idx], 0);
+  atomicStore(&gridVelY[idx], 0);
+  atomicStore(&gridVelZ[idx], 0);
+}
+
+@compute @workgroup_size(64)
+fn bakeMoldSDF(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let idx = gid.x;
+  if (idx >= GCELLSu) { return; }
+  let i = idx % GXu; let j = (idx / GXu) % GYu; let k = idx / (GXu*GYu);
+  let dx = U[1].w;
+  let gp = (vec3f(f32(i),f32(j),f32(k)) + 0.5) * dx;
+
+  let center = U[4].xyz; let wallT = U[4].w;
+  let half = U[5].xyz; let corner = U[5].w;
+  let local = gp - center;
+
+  let distXZ = sdRoundRect(local.xz, half.xz - vec2f(wallT), corner);
+  let topY = center.y + half.y - wallT;
+  let cavityFloorY = (center.y - half.y) + wallT;
+
+  let band = smoothstep(topY, topY - 0.03, gp.y);
+  let wallSDF = mix(1.0, -distXZ, band);
+  let floorSDF = gp.y - cavityFloorY;
+  moldSDF[idx] = min(wallSDF, floorSDF);
+}
+
+@compute @workgroup_size(1)
+fn clearStats(@builtin(global_invocation_id) gid: vec3<u32>) {
+  atomicStore(&stats[0], 0);
+  atomicStore(&stats[1], 0);
+  atomicStore(&stats[2], 0);
+}
+
+@compute @workgroup_size(64)
+fn reduceStats(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let pi = gid.x;
+  if (pi >= NUMPu) { return; }
+  let base = pi*PSTRIDEu;
+  if (P[base+19u] < 0.5) { return; }
+  let solidFrac = P[base+18u];
+  let temp = P[base+17u];
+  atomicAdd(&stats[0], encFix(solidFrac));
+  atomicMax(&stats[1], encFix(temp));
+  atomicAdd(&stats[2], 1);
+}
+
+@compute @workgroup_size(64)
+fn p2g(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let pi = gid.x;
+  if (pi >= NUMPu) { return; }
+  let base = pi * PSTRIDEu;
+
+  var pos = vec3f(P[base+0u],P[base+1u],P[base+2u]);
+  var mass = P[base+3u];
+  var vel = vec3f(P[base+4u],P[base+5u],P[base+6u]);
+  var Jv = P[base+7u];
+  let c00=P[base+8u]; let c01=P[base+9u]; let c02=P[base+10u];
+  let c10=P[base+11u]; let c11=P[base+12u]; let c12=P[base+13u];
+  let c20=P[base+14u]; let c21=P[base+15u]; let c22=P[base+16u];
+  var temp = P[base+17u];
+  var solidFrac = P[base+18u];
+  var isActive = P[base+19u];
+  let seed = P[base+20u];
+
+  if (isActive < 0.5) {
+    if (f32(pi) < U[3].z) {
+      let jx = (fract(seed*17.13)-0.5)*0.05;
+      let jz = (fract(seed*29.71)-0.5)*0.05;
+      pos = vec3f(U[8].x+jx, U[8].y, U[8].z+jz);
+      let jvx = (fract(seed*53.7)-0.5)*0.25;
+      let jvz = (fract(seed*71.3)-0.5)*0.25;
+      vel = vec3f(jvx, -U[8].w, jvz);
+      mass = 1.0;
+      Jv = 1.0;
+      temp = U[7].z;
+      solidFrac = 0.0;
+      isActive = 1.0;
+      P[base+3u]=mass; P[base+7u]=Jv; P[base+8u]=0.0; P[base+9u]=0.0; P[base+10u]=0.0;
+      P[base+11u]=0.0; P[base+12u]=0.0; P[base+13u]=0.0; P[base+14u]=0.0; P[base+15u]=0.0; P[base+16u]=0.0;
+      P[base+17u]=temp; P[base+18u]=solidFrac; P[base+19u]=isActive;
+    } else {
+      return;
+    }
+  }
+
+  let dx = U[1].w;
+  let invdx = 1.0/dx;
+  let basePos = pos*invdx - 0.5;
+  let baseCell = floor(basePos);
+  let fx = basePos - baseCell;
+
+  let wx = quadW(fx.x); let wy = quadW(fx.y); let wz = quadW(fx.z);
+
+  let stiff = mix(U[2].x, U[2].y, solidFrac);
+  let gammaP = U[2].z;
+  let Jc = clamp(Jv, 0.4, 3.0);
+  let pressure = stiff * (pow(1.0/Jc, gammaP) - 1.0);
+  let pVol = U[3].x;
+  let dt = U[0].x;
+  let stressCoeff = -dt*4.0*pVol*invdx*invdx*pressure;
+
+  let a00 = mass*c00 + stressCoeff; let a01 = mass*c01; let a02 = mass*c02;
+  let a10 = mass*c10; let a11 = mass*c11 + stressCoeff; let a12 = mass*c12;
+  let a20 = mass*c20; let a21 = mass*c21; let a22 = mass*c22 + stressCoeff;
+
+  let baseI = i32(baseCell.x); let baseJ = i32(baseCell.y); let baseK = i32(baseCell.z);
+
+  for (var ii=0u; ii<3u; ii=ii+1u) {
+    let ci = baseI + i32(ii);
+    if (ci < 0 || ci >= GXi) { continue; }
+    for (var jj=0u; jj<3u; jj=jj+1u) {
+      let cj = baseJ + i32(jj);
+      if (cj < 0 || cj >= GYi) { continue; }
+      for (var kk=0u; kk<3u; kk=kk+1u) {
+        let ck = baseK + i32(kk);
+        if (ck < 0 || ck >= GZi) { continue; }
+        let w = wx[ii]*wy[jj]*wz[kk];
+        if (w <= 1e-9) { continue; }
+        let dpos = (vec3f(f32(ii),f32(jj),f32(kk)) - fx) * dx;
+        let cellIdx = u32(ci) + u32(cj)*GXu + u32(ck)*GXu*GYu;
+        let momx = w*(mass*vel.x + (a00*dpos.x + a01*dpos.y + a02*dpos.z));
+        let momy = w*(mass*vel.y + (a10*dpos.x + a11*dpos.y + a12*dpos.z));
+        let momz = w*(mass*vel.z + (a20*dpos.x + a21*dpos.y + a22*dpos.z));
+        atomicAdd(&gridMass[cellIdx], encFix(w*mass));
+        atomicAdd(&gridVelX[cellIdx], encFix(momx));
+        atomicAdd(&gridVelY[cellIdx], encFix(momy));
+        atomicAdd(&gridVelZ[cellIdx], encFix(momz));
+      }
+    }
+  }
+
+  P[base+0u]=pos.x; P[base+1u]=pos.y; P[base+2u]=pos.z;
+  P[base+4u]=vel.x; P[base+5u]=vel.y; P[base+6u]=vel.z;
+}
+
+@compute @workgroup_size(64)
+fn gridUpdate(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let idx = gid.x;
+  if (idx >= GCELLSu) { return; }
+  let mass = decFix(atomicLoad(&gridMass[idx]));
+  let i = idx % GXu; let j = (idx / GXu) % GYu; let k = idx / (GXu*GYu);
+
+  if (mass < 1e-6) {
+    atomicStore(&gridVelX[idx], 0);
+    atomicStore(&gridVelY[idx], 0);
+    atomicStore(&gridVelZ[idx], 0);
+    return;
+  }
+
+  var vx = decFix(atomicLoad(&gridVelX[idx])) / mass;
+  var vy = decFix(atomicLoad(&gridVelY[idx])) / mass;
+  var vz = decFix(atomicLoad(&gridVelZ[idx])) / mass;
+
+  let dt = U[0].x; let gravity = U[0].y;
+  vy = vy - gravity*dt;
+
+  if (i < 2u || i >= GXu-2u || k < 2u || k >= GZu-2u || j < 2u) { vx=0.0; vy=0.0; vz=0.0; }
+  if (j >= GYu-2u) { vy = min(vy, 0.0); }
+
+  let sdf = moldSDF[idx];
+  let band = U[9].y;
+  if (sdf < band) {
+    let im = select(i-1u, 0u, i==0u); let ip = min(i+1u, GXu-1u);
+    let jm = select(j-1u, 0u, j==0u); let jp = min(j+1u, GYu-1u);
+    let km = select(k-1u, 0u, k==0u); let kp = min(k+1u, GZu-1u);
+    let sdfx0 = moldSDF[im+j*GXu+k*GXu*GYu]; let sdfx1 = moldSDF[ip+j*GXu+k*GXu*GYu];
+    let sdfy0 = moldSDF[i+jm*GXu+k*GXu*GYu]; let sdfy1 = moldSDF[i+jp*GXu+k*GXu*GYu];
+    let sdfz0 = moldSDF[i+j*GXu+km*GXu*GYu]; let sdfz1 = moldSDF[i+j*GXu+kp*GXu*GYu];
+    var n = vec3f(sdfx1-sdfx0, sdfy1-sdfy0, sdfz1-sdfz0);
+    let nl = length(n);
+    if (nl > 1e-5) { n = n / nl; } else { n = vec3f(0.0,1.0,0.0); }
+    if (sdf < 0.0) {
+      var v = vec3f(vx,vy,vz);
+      let vn = dot(v,n);
+      if (vn < 0.0) { v = v - vn*n; }
+      let pushOut = clamp(-sdf, 0.0, 0.06) * 24.0;
+      v = v + n*pushOut;
+      v = v * 0.4;
+      vx=v.x; vy=v.y; vz=v.z;
+    }
+  }
+
+  atomicStore(&gridVelX[idx], encFix(vx));
+  atomicStore(&gridVelY[idx], encFix(vy));
+  atomicStore(&gridVelZ[idx], encFix(vz));
+}
+
+@compute @workgroup_size(64)
+fn g2p(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let pi = gid.x;
+  if (pi >= NUMPu) { return; }
+  let base = pi*PSTRIDEu;
+  if (P[base+19u] < 0.5) { return; }
+
+  var pos = vec3f(P[base+0u],P[base+1u],P[base+2u]);
+  var Jv = P[base+7u];
+  var temp = P[base+17u];
+
+  let dx = U[1].w;
+  let invdx = 1.0/dx;
+  let basePos = pos*invdx - 0.5;
+  let baseCell = floor(basePos);
+  let fx = basePos - baseCell;
+  let wx = quadW(fx.x); let wy = quadW(fx.y); let wz = quadW(fx.z);
+  let baseI=i32(baseCell.x); let baseJ=i32(baseCell.y); let baseK=i32(baseCell.z);
+
+  var nvx=0.0; var nvy=0.0; var nvz=0.0;
+  var nc00=0.0; var nc01=0.0; var nc02=0.0;
+  var nc10=0.0; var nc11=0.0; var nc12=0.0;
+  var nc20=0.0; var nc21=0.0; var nc22=0.0;
+  let coeff = 4.0*invdx*invdx;
+
+  for (var ii=0u; ii<3u; ii=ii+1u) {
+    let ci=baseI+i32(ii);
+    if (ci<0 || ci>=GXi) { continue; }
+    for (var jj=0u; jj<3u; jj=jj+1u) {
+      let cj=baseJ+i32(jj);
+      if (cj<0 || cj>=GYi) { continue; }
+      for (var kk=0u; kk<3u; kk=kk+1u) {
+        let ck=baseK+i32(kk);
+        if (ck<0 || ck>=GZi) { continue; }
+        let w = wx[ii]*wy[jj]*wz[kk];
+        if (w<=1e-9) { continue; }
+        let cellIdx = u32(ci)+u32(cj)*GXu+u32(ck)*GXu*GYu;
+        let gvx = decFix(atomicLoad(&gridVelX[cellIdx]));
+        let gvy = decFix(atomicLoad(&gridVelY[cellIdx]));
+        let gvz = decFix(atomicLoad(&gridVelZ[cellIdx]));
+        nvx += w*gvx; nvy += w*gvy; nvz += w*gvz;
+        let dpos = (vec3f(f32(ii),f32(jj),f32(kk)) - fx) * dx;
+        let cw = coeff*w;
+        nc00 += cw*gvx*dpos.x; nc01 += cw*gvx*dpos.y; nc02 += cw*gvx*dpos.z;
+        nc10 += cw*gvy*dpos.x; nc11 += cw*gvy*dpos.y; nc12 += cw*gvy*dpos.z;
+        nc20 += cw*gvz*dpos.x; nc21 += cw*gvz*dpos.y; nc22 += cw*gvz*dpos.z;
+      }
+    }
+  }
+
+  let dt = U[0].x;
+  let trace = nc00+nc11+nc22;
+  Jv = clamp(Jv*(1.0+dt*trace), 0.4, 3.0);
+
+  var vel = vec3f(nvx,nvy,nvz);
+  pos = pos + dt*vel;
+  let margin = 2.2*dx;
+  pos.x = clamp(pos.x, margin, DOMXf-margin);
+  pos.y = clamp(pos.y, margin, DOMYf-margin);
+  pos.z = clamp(pos.z, margin, DOMZf-margin);
+
+  let sdfIdxPos = clamp(pos*invdx, vec3f(0.0), vec3f(GXf-1.0,GYf-1.0,GZf-1.0));
+  let si = u32(sdfIdxPos.x); let sj=u32(sdfIdxPos.y); let sk=u32(sdfIdxPos.z);
+  let sdfHere = moldSDF[si+sj*GXu+sk*GXu*GYu];
+  let contactBand = U[9].y;
+  let contact = 1.0 - smoothstep(0.0, contactBand, abs(sdfHere));
+  let ambientT=U[7].x; let moldT=U[7].y;
+  let coolBase=U[6].z; let coolContact=U[6].w;
+  temp = temp + dt*( -coolBase*(temp-ambientT) - coolContact*contact*(temp-moldT) );
+
+  let liquidus=U[6].x; let solidus=U[6].y;
+  let solidFrac = 1.0 - smoothstep(solidus, liquidus, temp);
+
+  let damp = U[7].w;
+  vel = vel / (1.0 + solidFrac*damp*dt);
+
+  let visc = U[2].w;
+  let viscK = 1.0/(1.0+visc*dt);
+  nc01*=viscK; nc02*=viscK; nc10*=viscK; nc12*=viscK; nc20*=viscK; nc21*=viscK;
+
+  P[base+0u]=pos.x; P[base+1u]=pos.y; P[base+2u]=pos.z;
+  P[base+4u]=vel.x; P[base+5u]=vel.y; P[base+6u]=vel.z;
+  P[base+7u]=Jv;
+  P[base+8u]=nc00; P[base+9u]=nc01; P[base+10u]=nc02;
+  P[base+11u]=nc10; P[base+12u]=nc11; P[base+13u]=nc12;
+  P[base+14u]=nc20; P[base+15u]=nc21; P[base+16u]=nc22;
+  P[base+17u]=temp;
+  P[base+18u]=solidFrac;
+}
+`;
+
 async function init(){
   if (!('gpu' in navigator) || !navigator.gpu) {
     fail('WebGPU unavailable',
@@ -444,9 +769,354 @@ async function init(){
   stage(26, 'Allocating buffers');
   await nextFrame();
 
-  console.log('[riser] device ready, format', canvasFormat);
+  const particleBufSize = MAX_PARTICLES*PSTRIDE*4;
+  buf.P = device.createBuffer({ size: particleBufSize, usage: GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC|GPUBufferUsage.COPY_DST, label:'P' });
+  buf.gridMass = device.createBuffer({ size: GCELLS*4, usage: GPUBufferUsage.STORAGE, label:'gridMass' });
+  buf.gridVelX = device.createBuffer({ size: GCELLS*4, usage: GPUBufferUsage.STORAGE, label:'gridVelX' });
+  buf.gridVelY = device.createBuffer({ size: GCELLS*4, usage: GPUBufferUsage.STORAGE, label:'gridVelY' });
+  buf.gridVelZ = device.createBuffer({ size: GCELLS*4, usage: GPUBufferUsage.STORAGE, label:'gridVelZ' });
+  buf.moldSDF  = device.createBuffer({ size: GCELLS*4, usage: GPUBufferUsage.STORAGE, label:'moldSDF' });
+  buf.U = device.createBuffer({ size: 10*16, usage: GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST, label:'U' });
+  buf.stats = device.createBuffer({ size: 12, usage: GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC, label:'stats' });
+  buf.statsStaging = device.createBuffer({ size: 12, usage: GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ, label:'statsStaging' });
+  buf.staging = device.createBuffer({ size: PSTRIDE*4*8, usage: GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ, label:'staging' });
+
+  const initial = new Float32Array(MAX_PARTICLES*PSTRIDE);
+  for (let p=0; p<MAX_PARTICLES; p++) initial[p*PSTRIDE + OFF.SEED] = Math.random();
+  device.queue.writeBuffer(buf.P, 0, initial);
+
+  stage(40, 'Compiling WGSL compute pipelines');
+  await nextFrame();
+
+  const computeModule = device.createShaderModule({ code: WGSL_COMPUTE, label:'compute' });
+  const info = await computeModule.getCompilationInfo();
+  const errs = info.messages.filter(m => m.type === 'error');
+  if (errs.length) {
+    fail('WGSL compile error', errs.map(m => `line ${m.lineNum}: ${m.message}`).join('\n'));
+    console.error('[riser] WGSL compute errors', errs);
+    return;
+  }
+
+  computeBGL = device.createBindGroupLayout({
+    entries: [
+      { binding:0, visibility:GPUShaderStage.COMPUTE, buffer:{ type:'storage' } },
+      { binding:1, visibility:GPUShaderStage.COMPUTE, buffer:{ type:'storage' } },
+      { binding:2, visibility:GPUShaderStage.COMPUTE, buffer:{ type:'storage' } },
+      { binding:3, visibility:GPUShaderStage.COMPUTE, buffer:{ type:'storage' } },
+      { binding:4, visibility:GPUShaderStage.COMPUTE, buffer:{ type:'storage' } },
+      { binding:5, visibility:GPUShaderStage.COMPUTE, buffer:{ type:'storage' } },
+      { binding:6, visibility:GPUShaderStage.COMPUTE, buffer:{ type:'uniform' } },
+      { binding:7, visibility:GPUShaderStage.COMPUTE, buffer:{ type:'storage' } },
+    ]
+  });
+  const computeLayout = device.createPipelineLayout({ bindGroupLayouts:[computeBGL] });
+  computeBG = device.createBindGroup({
+    layout: computeBGL,
+    entries: [
+      { binding:0, resource:{ buffer: buf.P } },
+      { binding:1, resource:{ buffer: buf.gridMass } },
+      { binding:2, resource:{ buffer: buf.gridVelX } },
+      { binding:3, resource:{ buffer: buf.gridVelY } },
+      { binding:4, resource:{ buffer: buf.gridVelZ } },
+      { binding:5, resource:{ buffer: buf.moldSDF } },
+      { binding:6, resource:{ buffer: buf.U } },
+      { binding:7, resource:{ buffer: buf.stats } },
+    ]
+  });
+
+  const mkCompute = (entryPoint) => device.createComputePipeline({ layout: computeLayout, label: entryPoint, compute:{ module: computeModule, entryPoint } });
+  PL.clearGrid = mkCompute('clearGrid');
+  PL.bakeMoldSDF = mkCompute('bakeMoldSDF');
+  PL.p2g = mkCompute('p2g');
+  PL.gridUpdate = mkCompute('gridUpdate');
+  PL.g2p = mkCompute('g2p');
+  PL.clearStats = mkCompute('clearStats');
+  PL.reduceStats = mkCompute('reduceStats');
+
+  stage(58, 'Voxelizing mold SDF');
+  await nextFrame();
+  {
+    const enc = device.createCommandEncoder();
+    writeUniforms();
+    const pass = enc.beginComputePass();
+    pass.setBindGroup(0, computeBG);
+    pass.setPipeline(PL.bakeMoldSDF);
+    pass.dispatchWorkgroups(Math.ceil(GCELLS/64));
+    pass.end();
+    device.queue.submit([enc.finish()]);
+  }
+
+  console.log('[riser] device ready, format', canvasFormat, 'grid cells', GCELLS, 'max particles', MAX_PARTICLES);
   window.__riser_boot_ok = true;
+
+  stage(74, 'Building render targets');
+  await nextFrame();
+  buildRenderTargets();
+
+  installUI();
+  installDiagnostics();
+
+  stage(100, 'Ready');
+  await nextFrame();
+  loader.classList.add('done');
+  document.body.classList.add('is-live');
+
+  lastT = performance.now();
+  requestAnimationFrame(rafLoop);
 }
+
+const buf = {};
+const PL = {};
+let computeBGL, computeBG;
+const uArr = new Float32Array(40);
+function writeUniforms(){
+  const P = state.params;
+  const dt = SIM_DT;
+  uArr.set([dt, P.gravity, state.simTime, PHASE_IDX[state.phase]], 0);
+  uArr.set([GX, GY, GZ, DX], 4);
+  uArr.set([P.stiffLiquid, P.stiffSolid, P.gamma, P.viscosity], 8);
+  uArr.set([P_VOL, 1.0, state.spawned, 0], 12);
+  uArr.set([MOLD.center[0], MOLD.center[1], MOLD.center[2], MOLD.wallThickness], 16);
+  uArr.set([MOLD.halfExtents[0], MOLD.halfExtents[1], MOLD.halfExtents[2], MOLD.cornerRadius], 20);
+  uArr.set([P.liquidus, P.solidus, P.coolBase, P.coolContact], 24);
+  uArr.set([P.ambientTemp, P.moldTemp, P.pourTemp, P.damping], 28);
+  uArr.set([NOZZLE[0], NOZZLE[1], NOZZLE[2], P.pourSpeed], 32);
+  uArr.set([MOLD.floorY, CONTACT_BAND, 0, MAX_PARTICLES], 36);
+  device.queue.writeBuffer(buf.U, 0, uArr);
+}
+const SIM_DT = 1/120;
+const P_VOL = 0.42*DX*DX*DX;
+const CONTACT_BAND = DX*1.6;
+const PHASE_IDX = { idle:0, pouring:1, solidifying:2, solid:3 };
+
+function stepSim(){
+  writeUniforms();
+  const enc = device.createCommandEncoder();
+  const pass = enc.beginComputePass();
+  pass.setBindGroup(0, computeBG);
+  pass.setPipeline(PL.clearGrid); pass.dispatchWorkgroups(Math.ceil(GCELLS/64));
+  pass.setPipeline(PL.p2g); pass.dispatchWorkgroups(Math.ceil(MAX_PARTICLES/64));
+  pass.setPipeline(PL.gridUpdate); pass.dispatchWorkgroups(Math.ceil(GCELLS/64));
+  pass.setPipeline(PL.g2p); pass.dispatchWorkgroups(Math.ceil(MAX_PARTICLES/64));
+  pass.end();
+  device.queue.submit([enc.finish()]);
+  state.simTime += SIM_DT;
+
+  if (state.phase === 'pouring') {
+    state.spawned = Math.min(state.targetCount, state.spawned + state.params.pourRate*SIM_DT);
+    if (state.spawned >= state.targetCount) state.phase = 'solidifying';
+  }
+  state.activeCount = Math.round(state.spawned);
+}
+
+let statsPending = false;
+function pollStats(){
+  if (statsPending) return;
+  statsPending = true;
+  const enc = device.createCommandEncoder();
+  const pass = enc.beginComputePass();
+  pass.setBindGroup(0, computeBG);
+  pass.setPipeline(PL.clearStats); pass.dispatchWorkgroups(1);
+  pass.setPipeline(PL.reduceStats); pass.dispatchWorkgroups(Math.ceil(MAX_PARTICLES/64));
+  pass.end();
+  enc.copyBufferToBuffer(buf.stats, 0, buf.statsStaging, 0, 12);
+  device.queue.submit([enc.finish()]);
+  buf.statsStaging.mapAsync(GPUMapMode.READ).then(() => {
+    const arr = new Int32Array(buf.statsStaging.getMappedRange().slice(0));
+    buf.statsStaging.unmap();
+    const activeN = arr[2];
+    state.solidPct = activeN > 0 ? (arr[0]/65536)/activeN : 0;
+    state.peakTemp = arr[1]/65536;
+    statsPending = false;
+    if (state.phase === 'solidifying' && activeN > 0 && state.solidPct > 0.96) {
+      state.solidHoldT += 0.25; // ~ polling cadence in seconds
+      if (state.solidHoldT > 0.6) state.phase = 'solid';
+    } else {
+      state.solidHoldT = 0;
+    }
+  }).catch(()=>{ statsPending = false; });
+}
+
+async function readParticle(i){
+  const base = i*PSTRIDE*4;
+  const enc = device.createCommandEncoder();
+  enc.copyBufferToBuffer(buf.P, base, buf.staging, 0, PSTRIDE*4);
+  device.queue.submit([enc.finish()]);
+  await buf.staging.mapAsync(GPUMapMode.READ);
+  const arr = new Float32Array(buf.staging.getMappedRange().slice(0));
+  buf.staging.unmap();
+  return {
+    pos: [arr[OFF.POS], arr[OFF.POS+1], arr[OFF.POS+2]],
+    vel: [arr[OFF.VEL], arr[OFF.VEL+1], arr[OFF.VEL+2]],
+    temp: arr[OFF.TEMP],
+    solidFrac: arr[OFF.SOLID],
+    active: arr[OFF.ACTIVE],
+    J: arr[OFF.J],
+  };
+}
+
+function resetSim(){
+  const initial = new Float32Array(MAX_PARTICLES*PSTRIDE);
+  for (let p=0; p<MAX_PARTICLES; p++) initial[p*PSTRIDE + OFF.SEED] = Math.random();
+  device.queue.writeBuffer(buf.P, 0, initial);
+  state.phase = 'idle';
+  state.spawned = 0;
+  state.activeCount = 0;
+  state.simTime = 0;
+  state.moldOpacity = 1;
+  state.moldLift = 0;
+  state.solidHoldT = 0;
+  state.peakTemp = 0;
+  state.solidPct = 0;
+}
+
+function triggerPour(){
+  if (state.phase === 'pouring' || state.phase === 'solidifying') return;
+  resetSim();
+  state.phase = 'pouring';
+}
+
+let accumulator = 0, lastT = 0, statsClock = 0, frameCount = 0, fpsClock = 0, fpsCount = 0;
+function rafLoop(t){
+  requestAnimationFrame(rafLoop);
+  let dtMs = t - lastT; lastT = t;
+  if (!(dtMs > 0)) dtMs = 16.7;
+  dtMs = Math.min(dtMs, 80);
+
+  if (!state.paused) {
+    accumulator += dtMs/1000;
+    let steps = 0;
+    while (accumulator >= SIM_DT && steps < 6) {
+      stepSim();
+      accumulator -= SIM_DT;
+      steps++;
+    }
+    statsClock += dtMs/1000;
+    if (statsClock > 0.25 && state.activeCount > 0) { statsClock = 0; pollStats(); }
+
+    // demold animation once solid
+    if (state.phase === 'solid') {
+      state.moldOpacity = Math.max(0, state.moldOpacity - dtMs/1000*0.6);
+      state.moldLift = Math.min(0.35, state.moldLift + dtMs/1000*0.18);
+      if (state.moldOpacity <= 0 && state.params.loop) {
+        triggerPour();
+      }
+    }
+  }
+
+  updateCamera(canvas.clientWidth / Math.max(1,canvas.clientHeight));
+  renderFrame();
+
+  fpsCount++; fpsClock += dtMs;
+  if (fpsClock > 500) { state.fps = Math.round(fpsCount*1000/fpsClock); fpsCount=0; fpsClock=0; }
+  updateReadout();
+}
+
+function updateReadout(){
+  $('#r-phase').textContent = state.phase;
+  $('#r-part').textContent = state.activeCount.toLocaleString() + ' / ' + state.targetCount.toLocaleString();
+  $('#r-grid').textContent = `${GX}×${GY}×${GZ}`;
+  $('#r-temp').textContent = state.peakTemp > 1 ? Math.round(state.peakTemp) + '°' : '—';
+  $('#r-solid').textContent = state.activeCount > 0 ? Math.round(state.solidPct*100) + '%' : '—';
+  $('#r-fps').textContent = state.fps ? state.fps + ' fps' : '—';
+}
+
+function installUI(){
+  window.addEventListener('keydown', (e) => {
+    if (e.target && /input|textarea/i.test(e.target.tagName)) return;
+    if (e.key === 'c' || e.key === 'C') togglePanel();
+    else if (e.key === ' ') { e.preventDefault(); state.paused = !state.paused; document.body.classList.toggle('is-paused', state.paused); }
+    else if (e.key === 'r' || e.key === 'R') resetSim();
+    else if (e.key === 'p' || e.key === 'P') triggerPour();
+    else if (e.key === 'Escape') setPanel(false);
+  });
+  $('#panel-toggle').addEventListener('click', () => setPanel(true));
+  $('#panel-close').addEventListener('click', () => setPanel(false));
+  $('#reset').addEventListener('click', () => { Object.assign(state.params, DEFAULTS); resetSim(); refreshPanelValues(); });
+  buildPanel();
+  installOrbitControls();
+}
+function togglePanel(){ setPanel(!document.body.classList.contains('panel-open')); }
+function setPanel(open){
+  document.body.classList.toggle('panel-open', open);
+  $('#panel-toggle').setAttribute('aria-expanded', String(open));
+  $('#panel').setAttribute('aria-hidden', String(!open));
+}
+
+function buildPanel(){
+  const body = $('#panel-body');
+  const sliders = [
+    ['pourRate','Pour rate',200,2400,10],
+    ['gravity','Gravity',0.5,6,0.05],
+    ['viscosity','Viscosity',0,12,0.1],
+    ['coolBase','Cooling',0.01,0.25,0.005],
+    ['coolContact','Mold contact',0.2,4,0.05],
+    ['damping','Freeze lock',0.5,14,0.1],
+    ['exposure','Exposure',0.3,2.5,0.02],
+  ];
+  body.innerHTML = '<div class="grp"><div class="t">Pour</div>' +
+    sliders.map(([key,label,min,max,step]) =>
+      `<div class="row"><label>${label}</label><input type="range" data-k="${key}" min="${min}" max="${max}" step="${step}" value="${state.params[key]}"><span class="val" id="v-${key}"></span></div>`
+    ).join('') + '</div>' +
+    '<div class="grp"><div class="t">Transient</div><div class="btns">' +
+    '<button class="act" id="btn-pour">Pour</button>' +
+    '<button class="act" id="btn-loop">Loop</button>' +
+    '</div></div>';
+  body.querySelectorAll('input[type=range]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      state.params[inp.dataset.k] = parseFloat(inp.value);
+      refreshPanelValues();
+    });
+  });
+  $('#btn-pour').addEventListener('click', triggerPour);
+  $('#btn-loop').addEventListener('click', () => {
+    state.params.loop = state.params.loop ? 0 : 1;
+    $('#btn-loop').classList.toggle('on', !!state.params.loop);
+  });
+  refreshPanelValues();
+}
+function refreshPanelValues(){
+  Object.keys(state.params).forEach(k => {
+    const el = document.getElementById('v-'+k);
+    if (el) el.textContent = typeof state.params[k] === 'number' ? state.params[k].toFixed(k==='pourRate'?0:2) : state.params[k];
+    const inp = document.querySelector(`input[data-k="${k}"]`);
+    if (inp) inp.value = state.params[k];
+  });
+}
+
+function installOrbitControls(){
+  let dragging = false, lx=0, ly=0;
+  canvas.addEventListener('pointerdown', e => { dragging=true; lx=e.clientX; ly=e.clientY; canvas.setPointerCapture(e.pointerId); document.body.classList.add('is-orbiting'); });
+  canvas.addEventListener('pointerup', e => { dragging=false; document.body.classList.remove('is-orbiting'); });
+  canvas.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dx = e.clientX-lx, dy = e.clientY-ly; lx=e.clientX; ly=e.clientY;
+    camera.yaw -= dx*0.006;
+    camera.pitch += dy*0.006;
+  });
+  canvas.addEventListener('wheel', e => { e.preventDefault(); camera.dist *= Math.exp(e.deltaY*0.001); }, { passive:false });
+}
+
+function installDiagnostics(){
+  window.__riser = {
+    get phase(){ return state.phase; },
+    get particleCount(){ return state.activeCount; },
+    get targetCount(){ return state.targetCount; },
+    get maxParticles(){ return MAX_PARTICLES; },
+    get simTime(){ return state.simTime; },
+    get peakTemp(){ return state.peakTemp; },
+    get solidPct(){ return state.solidPct; },
+    get grid(){ return [GX,GY,GZ]; },
+    pour(){ triggerPour(); },
+    reset(){ resetSim(); },
+    setParticleTarget(n){ state.targetCount = Math.max(1, Math.min(MAX_PARTICLES, n|0)); },
+    sample(i){ return readParticle(i|0); },
+    pollStatsNow(){ pollStats(); },
+  };
+}
+
+function buildRenderTargets(){ /* filled in by the rendering pass */ }
+function renderFrame(){ /* filled in by the rendering pass */ }
 
 init();
 
