@@ -693,7 +693,10 @@ fn g2p(@builtin(global_invocation_id) gid: vec3<u32>) {
   let si = u32(sdfIdxPos.x); let sj=u32(sdfIdxPos.y); let sk=u32(sdfIdxPos.z);
   let sdfHere = moldSDF[si+sj*GXu+sk*GXu*GYu];
   let contactBand = U[9].y;
-  let contact = 1.0 - smoothstep(0.0, contactBand, abs(sdfHere));
+  // contact should only fire on genuine solid overlap (sdf<0), not near any
+  // sdf zero-crossing — the open-top blend band in bakeMoldSDF puts a
+  // transitional near-zero value just above the rim too, which is free air.
+  let contact = 1.0 - smoothstep(-contactBand, 0.0, sdfHere);
   let ambientT=U[7].x; let moldT=U[7].y;
   let coolBase=U[6].z; let coolContact=U[6].w;
   temp = temp + dt*( -coolBase*(temp-ambientT) - coolContact*contact*(temp-moldT) );
