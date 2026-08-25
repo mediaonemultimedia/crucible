@@ -194,7 +194,7 @@ body.panel-open #panel{transform:translateX(0);opacity:1;pointer-events:auto}
 
   <div id="credit">
     <b>Riser</b> — molten pour &amp; solidification study 13 &nbsp;·&nbsp; MPM liquid→solid phase change &nbsp;·&nbsp; screen-space fluid rendering &nbsp;·&nbsp; raw WebGPU compute<br>
-    <span class="keys" id="keys">drag orbit &nbsp; scroll dolly &nbsp; c controls &nbsp; space pause &nbsp; r reset &nbsp; ← → scrub &nbsp; p pour</span>
+    <span class="keys" id="keys">drag orbit &nbsp; scroll dolly &nbsp; c controls &nbsp; space pause &nbsp; r reset &nbsp; ← → scrub time-scale &nbsp; p pour</span>
   </div>
 
   <aside id="panel" aria-label="Simulation controls" aria-hidden="true">
@@ -388,6 +388,7 @@ const state = {
   peakTemp: 0,
   solidPct: 0,
   fps: 0,
+  timeScale: 1,
   params: Object.assign({}, DEFAULTS),
 };
 
@@ -1248,9 +1249,9 @@ function rafLoop(t){
   dtMs = Math.min(dtMs, 80);
 
   if (!state.paused) {
-    accumulator += dtMs/1000;
+    accumulator += (dtMs/1000) * state.timeScale;
     let steps = 0;
-    while (accumulator >= SIM_DT && steps < 6) {
+    while (accumulator >= SIM_DT && steps < 10) {
       stepSim();
       accumulator -= SIM_DT;
       steps++;
@@ -1292,6 +1293,8 @@ function installUI(){
     else if (e.key === ' ') { e.preventDefault(); state.paused = !state.paused; document.body.classList.toggle('is-paused', state.paused); }
     else if (e.key === 'r' || e.key === 'R') resetSim();
     else if (e.key === 'p' || e.key === 'P') triggerPour();
+    else if (e.key === 'ArrowRight') { state.timeScale = Math.min(4, +(state.timeScale*1.6).toFixed(2)); }
+    else if (e.key === 'ArrowLeft') { state.timeScale = Math.max(0.15, +(state.timeScale/1.6).toFixed(2)); }
     else if (e.key === 'Escape') setPanel(false);
   });
   $('#panel-toggle').addEventListener('click', () => setPanel(true));
