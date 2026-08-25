@@ -24,6 +24,7 @@ the same either way.
 | 08 | **Solve** | GPU compute fluid — pressure solve in WebGPU | [`/solve/`](./solve/) |
 | 09 | **Torsion Pineapple** | Imported mesh driven through a torsion field | [`/torsion-pineapple/`](./torsion-pineapple/) |
 | 10 | **Anneal** | Gaussian splats resolving out of disorder | [`/anneal/`](./anneal/) |
+| 13 | **Fulgurite** | Real-time Lichtenberg growth — a dielectric breakdown model | [`/fulgurite/`](./fulgurite/) |
 
 Studies 03–06 were lost to a storage failure and are being rebuilt. They'll be
 added here as they land. Numbering follows build order, not merit — it starts at
