@@ -719,6 +719,261 @@ fn g2p(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 `;
 
+/* ── WGSL: screen-space fluid render ──────────────────────────────────
+   Camera-facing particle spheres are splat to a linear-depth + material
+   buffer, bilateral-blurred so the point cloud reads as one continuous
+   surface, then relit from reconstructed view-space normals (screen-space
+   derivatives of the position rebuilt from that depth). The render uniform
+   below uses only mat4x4/vec4 fields deliberately — no vec3f — so there is
+   no struct-padding ambiguity to get wrong here either.
+   ────────────────────────────────────────────────────────────────────── */
+const FAR_SENTINEL = 1.0e6;
+const WGSL_RENDER = `
+const PSTRIDEu: u32 = ${PSTRIDE}u;
+const FAR: f32 = ${FAR_SENTINEL};
+
+struct RenderU {
+  view: mat4x4<f32>,
+  proj: mat4x4<f32>,
+  params0: vec4<f32>, // aspect, tanHalfFovY, particleRadius, exposure
+  params1: vec4<f32>, // resX, resY, moldOpacity, moldLift
+  params2: vec4<f32>, // liquidus, solidus, pourTemp, ambientTemp
+  light1: vec4<f32>,
+  light2: vec4<f32>,
+  moldC: vec4<f32>,   // moldCenter.xyz, wallThickness
+  moldH: vec4<f32>,   // moldHalfExtents.xyz, cornerRadius
+};
+@group(0) @binding(0) var<uniform> RU: RenderU;
+
+/* ── particle splat ── */
+@group(0) @binding(1) var<storage, read> P: array<f32>;
+
+struct SplatOut {
+  @builtin(position) pos: vec4<f32>,
+  @location(0) uv: vec2<f32>,
+  @location(1) viewCenterZ: f32,
+  @location(2) radius: f32,
+  @location(3) temp: f32,
+  @location(4) solidFrac: f32,
+};
+const QUAD = array<vec2<f32>,6>(vec2f(-1,-1),vec2f(1,-1),vec2f(1,1),vec2f(-1,-1),vec2f(1,1),vec2f(-1,1));
+
+@vertex
+fn vsSplat(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> SplatOut {
+  var o: SplatOut;
+  let base = ii * PSTRIDEu;
+  let isActive = P[base+19u];
+  if (isActive < 0.5) {
+    o.pos = vec4f(10.0,10.0,10.0,1.0); o.uv=vec2f(0.0); o.viewCenterZ=0.0; o.radius=0.0; o.temp=0.0; o.solidFrac=0.0;
+    return o;
+  }
+  let worldPos = vec3f(P[base+0u],P[base+1u],P[base+2u]);
+  let temp = P[base+17u];
+  let solidFrac = P[base+18u];
+  let viewPos4 = RU.view * vec4f(worldPos,1.0);
+  let corner = QUAD[vi];
+  let radius = RU.params0.z * mix(1.0, 0.93, solidFrac);
+  let viewPos = viewPos4.xyz + vec3f(corner*radius, 0.0);
+  o.pos = RU.proj * vec4f(viewPos,1.0);
+  o.uv = corner;
+  o.viewCenterZ = -viewPos4.z;
+  o.radius = radius;
+  o.temp = temp;
+  o.solidFrac = solidFrac;
+  return o;
+}
+
+struct SplatFragOut {
+  @location(0) depth: f32,
+  @location(1) mat: vec2<f32>,
+};
+
+@fragment
+fn fsSplat(input: SplatOut) -> SplatFragOut {
+  var o: SplatFragOut;
+  let r2 = dot(input.uv, input.uv);
+  if (r2 > 1.0 || input.radius <= 0.0) { discard; }
+  let zOff = sqrt(max(0.0, 1.0-r2)) * input.radius;
+  o.depth = input.viewCenterZ - zOff;
+  o.mat = vec2f(input.temp, input.solidFrac);
+  return o;
+}
+
+/* ── mold shell (translucent box, open top) ── */
+const CORNERS = array<vec3<f32>,8>(
+  vec3f(-1,-1,-1), vec3f(1,-1,-1), vec3f(1,-1,1), vec3f(-1,-1,1),
+  vec3f(-1,1,-1), vec3f(1,1,-1), vec3f(1,1,1), vec3f(-1,1,1)
+);
+const IDX = array<u32,30>(
+  0u,1u,2u, 0u,2u,3u,          // bottom
+  0u,4u,5u, 0u,5u,1u,          // front (z-)
+  3u,2u,6u, 3u,6u,7u,          // back (z+)
+  0u,3u,7u, 0u,7u,4u,          // left
+  1u,5u,6u, 1u,6u,2u           // right
+);
+const FACE_N = array<vec3<f32>,5>(
+  vec3f(0,-1,0), vec3f(0,0,-1), vec3f(0,0,1), vec3f(-1,0,0), vec3f(1,0,0)
+);
+
+struct MoldOut {
+  @builtin(position) pos: vec4<f32>,
+  @location(0) viewPosZ: f32,
+  @location(1) nDotV: f32,
+};
+
+@vertex
+fn vsMold(@builtin(vertex_index) vi: u32) -> MoldOut {
+  var o: MoldOut;
+  let ci = IDX[vi];
+  let corner = CORNERS[ci];
+  let faceIdx = vi / 6u;
+  let n = FACE_N[faceIdx];
+  let half = RU.moldH.xyz;
+  var world = RU.moldC.xyz + corner*half;
+  world.y = world.y + RU.params1.w;
+  let viewPos4 = RU.view * vec4f(world,1.0);
+  o.pos = RU.proj * viewPos4;
+  o.viewPosZ = -viewPos4.z;
+  let viewN = (RU.view * vec4f(n,0.0)).xyz;
+  let viewDir = normalize(-viewPos4.xyz);
+  o.nDotV = abs(dot(normalize(viewN), viewDir));
+  return o;
+}
+
+struct MoldFragOut {
+  @location(0) color: vec4<f32>,
+  @location(1) depth: f32,
+};
+
+@fragment
+fn fsMold(input: MoldOut) -> MoldFragOut {
+  var o: MoldFragOut;
+  let fres = pow(1.0-clamp(input.nDotV,0.0,1.0), 3.5);
+  let glass = vec3f(0.55,0.62,0.70);
+  let rim = vec3f(0.95,0.85,0.65);
+  let col = mix(glass, rim, fres*0.6);
+  let a = clamp(mix(0.06, 0.30, fres), 0.0, 1.0) * RU.params1.z;
+  o.color = vec4f(col, a);
+  o.depth = input.viewPosZ;
+  return o;
+}
+
+/* ── bilateral blur (separable) ── */
+struct BlurU { texel: vec2<f32>, dir: vec2<f32> };
+@group(0) @binding(0) var<uniform> BU: BlurU;
+@group(0) @binding(1) var depthIn: texture_2d<f32>;
+@group(0) @binding(2) var matIn: texture_2d<f32>;
+
+struct FullOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
+@vertex
+fn vsFull(@builtin(vertex_index) vi: u32) -> FullOut {
+  var p = array<vec2<f32>,3>(vec2f(-1,-1), vec2f(3,-1), vec2f(-1,3));
+  var o: FullOut;
+  o.pos = vec4f(p[vi], 0.0, 1.0);
+  o.uv = p[vi];
+  return o;
+}
+
+struct BlurOut { @location(0) depth: f32, @location(1) mat: vec2<f32> };
+const GAUSS = array<f32,7>(0.0060,0.0605,0.2417,0.3829,0.2417,0.0605,0.0060);
+
+@fragment
+fn fsBlur(input: FullOut) -> BlurOut {
+  var o: BlurOut;
+  let coord = vec2<i32>(input.pos.xy);
+  let center = textureLoad(depthIn, coord, 0).r;
+  if (center > FAR*0.5) { o.depth = FAR; o.mat = vec2f(0.0); return o; }
+  var sumW = 0.0; var sumD = 0.0; var sumM = vec2f(0.0);
+  let dims = vec2<i32>(textureDimensions(depthIn));
+  for (var t=-3; t<=3; t=t+1) {
+    let c = clamp(coord + vec2<i32>(BU.dir)*t, vec2<i32>(0), dims-vec2<i32>(1));
+    let d = textureLoad(depthIn, c, 0).r;
+    if (d > FAR*0.5) { continue; }
+    let rangeW = exp(-abs(d-center)*40.0);
+    let w = GAUSS[t+3] * rangeW;
+    sumW += w; sumD += d*w;
+    sumM += textureLoad(matIn, c, 0).rg * w;
+  }
+  if (sumW < 1e-5) { o.depth = center; o.mat = textureLoad(matIn, coord, 0).rg; }
+  else { o.depth = sumD/sumW; o.mat = sumM/sumW; }
+  return o;
+}
+
+/* ── composite: reconstruct + shade + combine with mold ── */
+@group(0) @binding(0) var<uniform> RU2: RenderU;
+@group(0) @binding(1) var moldColorTex: texture_2d<f32>;
+@group(0) @binding(2) var moldDepthTex: texture_2d<f32>;
+@group(0) @binding(3) var fluidDepthTex: texture_2d<f32>;
+@group(0) @binding(4) var fluidMatTex: texture_2d<f32>;
+
+fn tempColor(t: f32) -> vec3f {
+  let castCol = vec3f(0.58,0.44,0.29);
+  let orange = vec3f(1.0,0.42,0.07);
+  let white = vec3f(1.0,0.97,0.90);
+  var c = mix(castCol, orange, smoothstep(0.0,0.62,t));
+  c = mix(c, white, smoothstep(0.6,1.0,t));
+  return c;
+}
+
+@fragment
+fn fsComposite(input: FullOut) -> @location(0) vec4<f32> {
+  let coord = vec2<i32>(input.pos.xy);
+  let res = RU2.params1.xy;
+  var ndc = (vec2f(coord)+0.5)/res * 2.0 - 1.0;
+  ndc.y = -ndc.y;
+
+  let bgTop = vec3f(0.055,0.045,0.038);
+  let bgBot = vec3f(0.018,0.014,0.011);
+  var bg = mix(bgBot, bgTop, clamp(ndc.y*0.5+0.5,0.0,1.0));
+
+  let fluidDepth = textureLoad(fluidDepthTex, coord, 0).r;
+  let mv = textureLoad(fluidMatTex, coord, 0).rg;
+  let moldDepth = textureLoad(moldDepthTex, coord, 0).r;
+  let moldRGBA = textureLoad(moldColorTex, coord, 0);
+
+  let aspect = RU2.params0.x; let tanFov = RU2.params0.y; let exposure = RU2.params0.w;
+
+  // dpdx/dpdy must run in uniform control flow, so the reconstruction and
+  // its derivatives are computed unconditionally (with a safe fallback
+  // depth for background pixels) and only *used* behind the branch below.
+  let safeDepth = select(fluidDepth, 1.0, fluidDepth > FAR*0.5);
+  let viewPos = vec3f(ndc.x*safeDepth*aspect*tanFov, ndc.y*safeDepth*tanFov, -safeDepth);
+  let n = normalize(cross(dpdy(viewPos), dpdx(viewPos)));
+  let fluidValid = fluidDepth < FAR*0.5;
+  var fluidColor = vec3f(0.0);
+  if (fluidValid) {
+    let v = normalize(-viewPos);
+    let l1 = normalize(RU2.light1.xyz);
+    let l2 = normalize(RU2.light2.xyz);
+    let temp = mv.x; let solidFrac = mv.y;
+    let tNorm = clamp((temp-RU2.params2.y)/(max(RU2.params2.z-RU2.params2.y,1.0)), 0.0, 1.0);
+    let baseCol = tempColor(tNorm);
+    let ndl1 = max(dot(n,l1),0.0);
+    let ndl2 = max(dot(n,l2),0.0);
+    let fres = pow(1.0-clamp(dot(n,v),0.0,1.0), 5.0);
+    let hv = normalize(l1+v);
+    let specPow = mix(380.0, 18.0, solidFrac);
+    let spec = pow(max(dot(n,hv),0.0), specPow) * mix(1.4,0.35,solidFrac);
+    let envGrad = mix(vec3f(0.05,0.05,0.07), vec3f(0.30,0.28,0.24), n.y*0.5+0.5);
+    let emissive = tempColor(tNorm) * pow(clamp((temp-RU2.params2.y)/max(RU2.params2.z-RU2.params2.y,1.0),0.0,1.0), 1.6) * smoothstep(0.15,0.85,tNorm) * 1.6;
+    var col = baseCol*(0.30+0.85*ndl1) + baseCol*ndl2*0.22;
+    col = col + envGrad*fres*mix(0.5,0.18,solidFrac);
+    col = col + vec3f(1.0,0.92,0.80)*spec;
+    col = col + emissive;
+    fluidColor = col * exposure;
+  }
+
+  var outColor = bg;
+  if (moldDepth < FAR*0.5 && (!fluidValid || moldDepth < fluidDepth)) {
+    let behind = select(bg, fluidColor, fluidValid);
+    outColor = mix(behind, moldRGBA.rgb, clamp(moldRGBA.a,0.0,1.0));
+  } else if (fluidValid) {
+    outColor = fluidColor;
+  }
+  return vec4f(outColor, 1.0);
+}
+`;
+
 async function init(){
   if (!('gpu' in navigator) || !navigator.gpu) {
     fail('WebGPU unavailable',
@@ -849,9 +1104,15 @@ async function init(){
   console.log('[riser] device ready, format', canvasFormat, 'grid cells', GCELLS, 'max particles', MAX_PARTICLES);
   window.__riser_boot_ok = true;
 
-  stage(74, 'Building render targets');
+  stage(66, 'Compiling render pipelines');
+  await nextFrame();
+  const renderErrs = await initRenderPipelines();
+  if (renderErrs) { fail('WGSL compile error', renderErrs); return; }
+
+  stage(80, 'Building render targets');
   await nextFrame();
   buildRenderTargets();
+  window.addEventListener('resize', () => buildRenderTargets());
 
   installUI();
   installDiagnostics();
@@ -1115,8 +1376,230 @@ function installDiagnostics(){
   };
 }
 
-function buildRenderTargets(){ /* filled in by the rendering pass */ }
-function renderFrame(){ /* filled in by the rendering pass */ }
+/* ── render setup ─────────────────────────────────────────────────────── */
+const RT = {}; const RPL = {}; const RBG = {};
+let renderModule;
+const ruArr = new Float32Array(60);
+
+async function initRenderPipelines(){
+  renderModule = device.createShaderModule({ code: WGSL_RENDER, label:'render' });
+  const info = await renderModule.getCompilationInfo();
+  const errs = info.messages.filter(m => m.type === 'error');
+  if (errs.length) {
+    console.error('[riser] WGSL render errors', errs);
+    return errs.map(m => `line ${m.lineNum}: ${m.message}`).join('\n');
+  }
+
+  RT.ru = device.createBuffer({ size: 60*4, usage: GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST, label:'RU' });
+  RT.blurH = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST, label:'blurH' });
+  RT.blurV = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST, label:'blurV' });
+
+  const splatBGL = device.createBindGroupLayout({ entries:[
+    { binding:0, visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT, buffer:{ type:'uniform' } },
+    { binding:1, visibility:GPUShaderStage.VERTEX, buffer:{ type:'read-only-storage' } },
+  ]});
+  RPL.splatLayout = device.createPipelineLayout({ bindGroupLayouts:[splatBGL] });
+  RBG.splat = device.createBindGroup({ layout: splatBGL, entries:[
+    { binding:0, resource:{ buffer: RT.ru } },
+    { binding:1, resource:{ buffer: buf.P } },
+  ]});
+  RPL.splat = device.createRenderPipeline({
+    layout: RPL.splatLayout, label:'splat',
+    vertex:{ module: renderModule, entryPoint:'vsSplat' },
+    fragment:{ module: renderModule, entryPoint:'fsSplat', targets:[
+      { format:'r32float' }, { format:'rg32float' },
+    ]},
+    primitive:{ topology:'triangle-list' },
+    depthStencil:{ format:'depth24plus', depthWriteEnabled:true, depthCompare:'less' },
+  });
+
+  const moldBGL = device.createBindGroupLayout({ entries:[
+    { binding:0, visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT, buffer:{ type:'uniform' } },
+  ]});
+  RPL.moldLayout = device.createPipelineLayout({ bindGroupLayouts:[moldBGL] });
+  RBG.mold = device.createBindGroup({ layout: moldBGL, entries:[ { binding:0, resource:{ buffer: RT.ru } } ] });
+  RPL.mold = device.createRenderPipeline({
+    layout: RPL.moldLayout, label:'mold',
+    vertex:{ module: renderModule, entryPoint:'vsMold' },
+    fragment:{ module: renderModule, entryPoint:'fsMold', targets:[
+      { format:'rgba8unorm', blend:undefined }, { format:'r32float' },
+    ]},
+    primitive:{ topology:'triangle-list', cullMode:'none' },
+    depthStencil:{ format:'depth24plus', depthWriteEnabled:true, depthCompare:'less' },
+  });
+
+  const blurBGL = device.createBindGroupLayout({ entries:[
+    { binding:0, visibility:GPUShaderStage.FRAGMENT, buffer:{ type:'uniform' } },
+    { binding:1, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'unfilterable-float' } },
+    { binding:2, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'unfilterable-float' } },
+  ]});
+  RPL.blurLayout = device.createPipelineLayout({ bindGroupLayouts:[blurBGL] });
+  RPL.blur = device.createRenderPipeline({
+    layout: RPL.blurLayout, label:'blur',
+    vertex:{ module: renderModule, entryPoint:'vsFull' },
+    fragment:{ module: renderModule, entryPoint:'fsBlur', targets:[ { format:'r32float' }, { format:'rg32float' } ] },
+    primitive:{ topology:'triangle-list' },
+  });
+  RBG.blurBGL = blurBGL;
+
+  const compBGL = device.createBindGroupLayout({ entries:[
+    { binding:0, visibility:GPUShaderStage.FRAGMENT, buffer:{ type:'uniform' } },
+    { binding:1, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'unfilterable-float' } },
+    { binding:2, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'unfilterable-float' } },
+    { binding:3, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'unfilterable-float' } },
+    { binding:4, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'unfilterable-float' } },
+  ]});
+  RPL.compLayout = device.createPipelineLayout({ bindGroupLayouts:[compBGL] });
+  RPL.comp = device.createRenderPipeline({
+    layout: RPL.compLayout, label:'composite',
+    vertex:{ module: renderModule, entryPoint:'vsFull' },
+    fragment:{ module: renderModule, entryPoint:'fsComposite', targets:[ { format: canvasFormat } ] },
+    primitive:{ topology:'triangle-list' },
+  });
+  RBG.compBGL = compBGL;
+}
+
+let renderW = 0, renderH = 0;
+function buildRenderTargets(){
+  const dpr = Math.min(window.devicePixelRatio||1, 1.5);
+  let w = Math.round((canvas.clientWidth||960) * dpr);
+  let h = Math.round((canvas.clientHeight||600) * dpr);
+  w = Math.max(64, Math.min(w, 1600));
+  h = Math.max(64, Math.min(h, 960));
+  if (w === renderW && h === renderH && RT.final) return;
+  renderW = w; renderH = h;
+  canvas.width = w; canvas.height = h;
+
+  const mk = (format, extra) => device.createTexture({ size:[w,h], format, usage: GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING|(extra||0) });
+  for (const k of ['fluidDepthA','fluidDepthB']) RT[k] = mk('r32float');
+  for (const k of ['fluidMatA','fluidMatB']) RT[k] = mk('rg32float');
+  RT.moldColor = mk('rgba8unorm');
+  RT.moldDepth = mk('r32float');
+  RT.final = device.createTexture({ size:[w,h], format:canvasFormat, usage: GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC });
+  RT.splatDepthAtt = device.createTexture({ size:[w,h], format:'depth24plus', usage: GPUTextureUsage.RENDER_ATTACHMENT });
+  RT.moldDepthAtt = device.createTexture({ size:[w,h], format:'depth24plus', usage: GPUTextureUsage.RENDER_ATTACHMENT });
+
+  device.queue.writeBuffer(RT.blurH, 0, new Float32Array([1/w, 1/h, 1, 0]));
+  device.queue.writeBuffer(RT.blurV, 0, new Float32Array([1/w, 1/h, 0, 1]));
+
+  RBG.blurAtoB = device.createBindGroup({ layout: RBG.blurBGL, entries:[
+    { binding:0, resource:{ buffer: RT.blurH } },
+    { binding:1, resource: RT.fluidDepthA.createView() },
+    { binding:2, resource: RT.fluidMatA.createView() },
+  ]});
+  RBG.blurBtoA = device.createBindGroup({ layout: RBG.blurBGL, entries:[
+    { binding:0, resource:{ buffer: RT.blurV } },
+    { binding:1, resource: RT.fluidDepthB.createView() },
+    { binding:2, resource: RT.fluidMatB.createView() },
+  ]});
+  RBG.comp = device.createBindGroup({ layout: RBG.compBGL, entries:[
+    { binding:0, resource:{ buffer: RT.ru } },
+    { binding:1, resource: RT.moldColor.createView() },
+    { binding:2, resource: RT.moldDepth.createView() },
+    { binding:3, resource: RT.fluidDepthA.createView() },
+    { binding:4, resource: RT.fluidMatA.createView() },
+  ]});
+}
+
+const lightViewCache = new Float32Array(4);
+function transformDirToView(dir){
+  const v = camera.view;
+  return [
+    v[0]*dir[0]+v[4]*dir[1]+v[8]*dir[2],
+    v[1]*dir[0]+v[5]*dir[1]+v[9]*dir[2],
+    v[2]*dir[0]+v[6]*dir[1]+v[10]*dir[2],
+    0,
+  ];
+}
+
+function renderFrame(){
+  if (!RT.final) return;
+  const P = state.params;
+  ruArr.set(camera.view, 0);
+  ruArr.set(camera.proj, 16);
+  ruArr.set([camera.aspect, camera.tanHalfFovY, 0.017, P.exposure], 32);
+  ruArr.set([renderW, renderH, state.moldOpacity, state.moldLift], 36);
+  ruArr.set([P.liquidus, P.solidus, P.pourTemp, P.ambientTemp], 40);
+  ruArr.set(transformDirToView([0.42,0.78,0.32]), 44);
+  ruArr.set(transformDirToView([-0.5,0.25,-0.6]), 48);
+  ruArr.set([MOLD.center[0],MOLD.center[1],MOLD.center[2],MOLD.wallThickness], 52);
+  ruArr.set([MOLD.halfExtents[0],MOLD.halfExtents[1],MOLD.halfExtents[2],MOLD.cornerRadius], 56);
+  device.queue.writeBuffer(RT.ru, 0, ruArr);
+
+  const enc = device.createCommandEncoder();
+
+  // mold shell
+  {
+    const pass = enc.beginRenderPass({
+      colorAttachments:[
+        { view: RT.moldColor.createView(), clearValue:{r:0,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
+        { view: RT.moldDepth.createView(), clearValue:{r:FAR_SENTINEL,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
+      ],
+      depthStencilAttachment:{ view: RT.moldDepthAtt.createView(), depthClearValue:1.0, depthLoadOp:'clear', depthStoreOp:'discard' },
+    });
+    if (state.moldOpacity > 0.002) {
+      pass.setPipeline(RPL.mold);
+      pass.setBindGroup(0, RBG.mold);
+      pass.draw(30);
+    }
+    pass.end();
+  }
+
+  // particle depth+material splat
+  {
+    const pass = enc.beginRenderPass({
+      colorAttachments:[
+        { view: RT.fluidDepthA.createView(), clearValue:{r:FAR_SENTINEL,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
+        { view: RT.fluidMatA.createView(), clearValue:{r:0,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
+      ],
+      depthStencilAttachment:{ view: RT.splatDepthAtt.createView(), depthClearValue:1.0, depthLoadOp:'clear', depthStoreOp:'discard' },
+    });
+    if (state.activeCount > 0) {
+      pass.setPipeline(RPL.splat);
+      pass.setBindGroup(0, RBG.splat);
+      pass.draw(6, state.activeCount); // indices < activeCount are always active (strict spawn order)
+    }
+    pass.end();
+  }
+
+  // bilateral blur: A -> B -> A
+  {
+    const pass = enc.beginRenderPass({ colorAttachments:[
+      { view: RT.fluidDepthB.createView(), clearValue:{r:FAR_SENTINEL,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
+      { view: RT.fluidMatB.createView(), clearValue:{r:0,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
+    ]});
+    pass.setPipeline(RPL.blur);
+    pass.setBindGroup(0, RBG.blurAtoB);
+    pass.draw(3);
+    pass.end();
+  }
+  {
+    const pass = enc.beginRenderPass({ colorAttachments:[
+      { view: RT.fluidDepthA.createView(), clearValue:{r:FAR_SENTINEL,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
+      { view: RT.fluidMatA.createView(), clearValue:{r:0,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
+    ]});
+    pass.setPipeline(RPL.blur);
+    pass.setBindGroup(0, RBG.blurBtoA);
+    pass.draw(3);
+    pass.end();
+  }
+
+  // composite
+  {
+    const pass = enc.beginRenderPass({ colorAttachments:[
+      { view: RT.final.createView(), clearValue:{r:0,g:0,b:0,a:1}, loadOp:'clear', storeOp:'store' },
+    ]});
+    pass.setPipeline(RPL.comp);
+    pass.setBindGroup(0, RBG.comp);
+    pass.draw(3);
+    pass.end();
+  }
+
+  const canvasTex = ctx.getCurrentTexture();
+  enc.copyTextureToTexture({ texture: RT.final }, { texture: canvasTex }, [renderW, renderH, 1]);
+
+  device.queue.submit([enc.finish()]);
+}
 
 init();
 
