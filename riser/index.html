@@ -271,7 +271,185 @@ const OFF = {
   SEED: 20,
 };
 
-console.log('[riser] boot');
+/* ── sim constants ─────────────────────────────────────────────────────── */
+const GX = 64, GY = 92, GZ = 64;
+const GCELLS = GX*GY*GZ;
+const DX = 0.022;
+const DOMAIN = [GX*DX, GY*DX, GZ*DX]; // ≈ 1.408 × 2.024 × 1.408
+
+const MAX_PARTICLES = 24576;
+const DEFAULT_TARGET = 20480;
+const QUICK_TARGET = 4096; // used by verification harness via __riser.setParticleTarget
+
+const MOLD = {
+  halfExtents: [0.40, 0.56, 0.28],
+  wallThickness: 0.05,
+  cornerRadius: 0.07,
+  floorY: 3*DX,
+};
+MOLD.center = [DOMAIN[0]*0.5, MOLD.floorY + MOLD.halfExtents[1], DOMAIN[2]*0.5];
+const NOZZLE = [MOLD.center[0]-0.10, DOMAIN[1]-6*DX, MOLD.center[2]+0.02];
+
+const DEFAULTS = {
+  gravity: 2.6,
+  stiffLiquid: 5.0,
+  stiffSolid: 260.0,
+  gamma: 3.0,
+  viscosity: 3.5,
+  damping: 5.0,
+  pourRate: 900,     // particles/sec
+  pourSpeed: 1.55,
+  ambientTemp: 24,
+  moldTemp: 140,
+  pourTemp: 1420,
+  liquidus: 950,
+  solidus: 640,
+  coolBase: 0.06,
+  coolContact: 1.6,
+  exposure: 1.15,
+  loop: 0,
+};
+
+/* ── tiny mat4 / vec3 utilities (no external deps) ────────────────────── */
+const M4 = {
+  identity(){ return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); },
+  multiply(a,b){
+    const o = new Float32Array(16);
+    for (let c=0;c<4;c++) for (let r=0;r<4;r++){
+      let s=0;
+      for (let k=0;k<4;k++) s += a[k*4+r]*b[c*4+k];
+      o[c*4+r]=s;
+    }
+    return o;
+  },
+  perspective(fovY, aspect, near, far){
+    const f = 1/Math.tan(fovY/2);
+    const o = new Float32Array(16);
+    o[0]=f/aspect; o[5]=f;
+    o[10]=far/(near-far); o[11]=-1;
+    o[14]=(far*near)/(near-far);
+    return o;
+  },
+  lookAt(eye, target, up){
+    const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+    const norm=v=>{const l=Math.hypot(v[0],v[1],v[2])||1;return [v[0]/l,v[1]/l,v[2]/l];};
+    const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+    const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+    const zax = norm(sub(eye,target));
+    const xax = norm(cross(up,zax));
+    const yax = cross(zax,xax);
+    const o = new Float32Array(16);
+    o[0]=xax[0]; o[1]=yax[0]; o[2]=zax[0]; o[3]=0;
+    o[4]=xax[1]; o[5]=yax[1]; o[6]=zax[1]; o[7]=0;
+    o[8]=xax[2]; o[9]=yax[2]; o[10]=zax[2]; o[11]=0;
+    o[12]=-dot(xax,eye); o[13]=-dot(yax,eye); o[14]=-dot(zax,eye); o[15]=1;
+    return o;
+  },
+};
+
+/* ── camera (orbit) ───────────────────────────────────────────────────── */
+const camera = {
+  yaw: 0.55, pitch: -0.30, dist: 2.55,
+  target: [DOMAIN[0]*0.5, MOLD.center[1]*0.65, DOMAIN[2]*0.5],
+  fovY: 32*Math.PI/180,
+  view: M4.identity(), proj: M4.identity(),
+  tanHalfFovY: 0, aspect: 1,
+};
+function cameraEye(){
+  const cy=Math.cos(camera.pitch), sy=Math.sin(camera.pitch);
+  const cx=Math.cos(camera.yaw), sx=Math.sin(camera.yaw);
+  return [
+    camera.target[0] + camera.dist*cy*Math.sin(camera.yaw),
+    camera.target[1] + camera.dist*sy,
+    camera.target[2] + camera.dist*cy*Math.cos(camera.yaw),
+  ];
+}
+function updateCamera(aspect){
+  camera.pitch = Math.max(-1.35, Math.min(0.6, camera.pitch));
+  camera.dist = Math.max(1.1, Math.min(6.0, camera.dist));
+  const eye = cameraEye();
+  camera.view = M4.lookAt(eye, camera.target, [0,1,0]);
+  camera.aspect = aspect;
+  camera.tanHalfFovY = Math.tan(camera.fovY/2);
+  camera.proj = M4.perspective(camera.fovY, aspect, 0.05, 12.0);
+}
+
+/* ── state ─────────────────────────────────────────────────────────────── */
+const state = {
+  phase: 'idle',           // idle | pouring | solidifying | solid
+  activeCount: 0,
+  targetCount: DEFAULT_TARGET,
+  simTime: 0,
+  spawned: 0,
+  paused: false,
+  moldOpacity: 1,
+  moldLift: 0,
+  solidHoldT: 0,
+  peakTemp: 0,
+  solidPct: 0,
+  fps: 0,
+  params: Object.assign({}, DEFAULTS),
+};
+
+let device, adapter, ctx, canvasFormat;
+let canvas = $('#stage');
+
+async function init(){
+  if (!('gpu' in navigator) || !navigator.gpu) {
+    fail('WebGPU unavailable',
+      'This study runs an MPM solver in GPU compute pipelines and has no meaningful fallback. ' +
+      'Open it in Chrome or Edge 113+, or Safari 18+, on a machine with hardware acceleration enabled.');
+    return;
+  }
+
+  stage(6, 'Requesting GPU adapter');
+  await nextFrame();
+  try { adapter = await navigator.gpu.requestAdapter({ powerPreference:'high-performance' }); }
+  catch(e){ adapter = null; }
+  if (!adapter) {
+    fail('No GPU adapter', 'The browser exposes WebGPU but could not supply an adapter. Hardware acceleration may be off.');
+    return;
+  }
+
+  stage(16, 'Acquiring device');
+  await nextFrame();
+  try {
+    device = await adapter.requestDevice({
+      requiredLimits: {
+        maxStorageBufferBindingSize: Math.min(adapter.limits.maxStorageBufferBindingSize, 268435456),
+        maxBufferSize: Math.min(adapter.limits.maxBufferSize, 268435456),
+      }
+    });
+  } catch(e){
+    try { device = await adapter.requestDevice(); }
+    catch(e2){ fail('Device request failed', String(e2.message||e2)); return; }
+  }
+  device.lost.then(info => {
+    if (info.reason !== 'destroyed') {
+      loader.classList.remove('done');
+      loader.style.opacity = '1'; loader.style.pointerEvents = 'auto';
+      fail('GPU device lost', String(info.message || 'The graphics device was reset.'));
+    }
+  });
+
+  ctx = canvas.getContext('webgpu');
+  if (!ctx) { fail('No WebGPU canvas context', 'The canvas could not be configured for WebGPU.'); return; }
+  canvasFormat = navigator.gpu.getPreferredCanvasFormat();
+  // NOTE: this context is a copy DESTINATION only. Rendering straight into its
+  // swapchain texture crashes SwiftShader in headless verification with
+  // "device lost" — everything renders to an offscreen target below and is
+  // copied into the canvas texture once per frame via copyTextureToTexture.
+  ctx.configure({ device, format: canvasFormat, usage: GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_DST, alphaMode:'opaque' });
+
+  stage(26, 'Allocating buffers');
+  await nextFrame();
+
+  console.log('[riser] device ready, format', canvasFormat);
+  window.__riser_boot_ok = true;
+}
+
+init();
+
 })();
 </script>
 </body>
