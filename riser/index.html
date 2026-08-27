@@ -1,0 +1,1636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0806">
+<title>Riser — a molten-cast MPM study</title>
+<meta name="description" content="A real-time Material Point Method simulation — molten metal poured into a mold, filling the cavity and solidifying in place, rendered as a screen-space fluid surface in raw WebGPU compute.">
+<style>
+:root{
+  --bg:#0a0806;
+  --ink:#ece5d8;
+  --dim:#8a8178;
+  --faint:#4e473f;
+  --rule:rgba(236,229,216,.11);
+  --rule-2:rgba(236,229,216,.055);
+  --accent:#e08a3e;
+  --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);overflow:hidden;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+canvas#stage{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+body.is-orbiting canvas#stage{cursor:grabbing}
+
+#veil{
+  position:fixed;inset:0;pointer-events:none;z-index:2;
+  background:
+    linear-gradient(to bottom,rgba(10,8,6,.78) 0%,rgba(10,8,6,.30) 8%,rgba(10,8,6,0) 16%),
+    linear-gradient(to top,rgba(10,8,6,.84) 0%,rgba(10,8,6,.36) 9%,rgba(10,8,6,0) 20%),
+    radial-gradient(126% 92% at 50% 46%,transparent 42%,rgba(0,0,0,.30) 84%,rgba(0,0,0,.58) 100%);
+}
+
+#ui{position:fixed;inset:0;z-index:5;pointer-events:none;opacity:0;transition:opacity 1.1s cubic-bezier(.4,0,.2,1) .2s}
+body.is-live #ui{opacity:1}
+#ui > *{pointer-events:auto}
+
+.eyebrow{font-family:var(--mono);font-size:9.5px;letter-spacing:.20em;text-transform:uppercase;color:var(--faint)}
+
+#mark,#readout,#method,#credit,#panel-toggle{text-shadow:0 0 14px var(--bg),0 0 6px var(--bg),0 0 2px var(--bg)}
+
+#mark{position:absolute;top:26px;left:30px;display:flex;align-items:flex-start;gap:12px}
+#mark .w{font-size:15px;font-weight:300;letter-spacing:.52em;text-transform:uppercase;line-height:1;padding-top:1px;white-space:nowrap}
+#mark .ix{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--accent);border:1px solid rgba(224,138,62,.34);padding:2px 4px 1px;line-height:1;white-space:nowrap}
+#mark .sub{margin-top:9px;display:block}
+#mark .col{display:flex;flex-direction:column}
+
+#mark .sx-wrap{position:relative;display:inline-block}
+#mark a.ix{text-decoration:none;display:inline-block;cursor:pointer;transition:border-color .28s ease,color .28s ease,background .28s ease}
+#mark a.ix:hover,#mark .sx-wrap:focus-within a.ix{border-color:rgba(224,138,62,.62);background:rgba(224,138,62,.08)}
+#mark a.ix:focus-visible{outline:1px solid rgba(224,138,62,.7);outline-offset:2px}
+#mark .sx-menu{position:absolute;top:calc(100% + 9px);left:0;z-index:20;min-width:228px;background:rgba(11,9,7,.93);
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid var(--rule);padding:7px 0;
+  opacity:0;visibility:hidden;transform:translateY(-5px);
+  transition:opacity .26s ease,transform .26s cubic-bezier(.4,0,.2,1),visibility 0s linear .26s}
+#mark .sx-wrap:hover .sx-menu,#mark .sx-wrap:focus-within .sx-menu{opacity:1;visibility:visible;transform:translateY(0);transition-delay:0s}
+#mark .sx-menu .sx-hd{display:block;font-family:var(--mono);font-size:8px;letter-spacing:.22em;text-transform:uppercase;color:var(--faint);
+  padding:5px 13px 8px;border-bottom:1px solid var(--rule-2);margin-bottom:5px;text-decoration:none;transition:color .24s ease}
+a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
+#mark .sx-menu a{display:flex;align-items:baseline;gap:9px;padding:4px 13px;font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;
+  text-transform:uppercase;text-decoration:none;color:var(--dim);transition:color .22s ease,background .22s ease}
+#mark .sx-menu a:hover,#mark .sx-menu a:focus-visible{color:var(--ink);background:rgba(236,229,216,.05);outline:none}
+#mark .sx-menu .sx-n{color:var(--faint);flex:0 0 auto;transition:color .22s ease}
+#mark .sx-menu a:hover .sx-n,#mark .sx-menu a:focus-visible .sx-n{color:var(--accent)}
+#mark .sx-menu .sx-here{color:var(--accent)}
+#mark .sx-menu .sx-here .sx-n{color:var(--accent)}
+
+#readout{position:absolute;left:30px;bottom:74px;font-family:var(--mono);font-size:10px;line-height:1.85;color:var(--dim);letter-spacing:.03em}
+#readout dl{margin:0;display:grid;grid-template-columns:78px auto;column-gap:14px}
+#readout dt{color:var(--faint);text-transform:uppercase;letter-spacing:.16em;font-size:9px}
+#readout dd{margin:0;color:var(--dim);font-variant-numeric:tabular-nums}
+#readout dd#r-phase{color:var(--accent)}
+
+#method{position:absolute;right:30px;bottom:74px;width:min(320px,29vw);text-align:right;font-family:var(--mono);font-size:9.5px;
+  line-height:1.95;color:var(--faint);letter-spacing:.04em}
+#method b{color:var(--dim);font-weight:400}
+#method .t{display:block;margin-bottom:8px;font-size:9px;letter-spacing:.20em;text-transform:uppercase;color:rgba(236,229,216,.24)}
+body.panel-open #method{opacity:0;transition:opacity .3s ease;pointer-events:none}
+
+#credit{position:absolute;left:50%;transform:translateX(-50%);bottom:26px;text-align:center;font-family:var(--mono);font-size:8.5px;
+  letter-spacing:.20em;color:var(--faint);text-transform:uppercase;line-height:2;white-space:nowrap}
+#credit b{color:var(--dim);font-weight:400}
+#credit .keys{color:rgba(236,229,216,.2)}
+body.is-paused #credit .keys::after{content:" · held — press space to resume";color:var(--accent)}
+
+#panel-toggle{position:absolute;top:24px;right:30px;display:flex;align-items:center;gap:9px;background:none;border:1px solid var(--rule);
+  color:var(--dim);font-family:var(--mono);font-size:9px;letter-spacing:.20em;text-transform:uppercase;padding:7px 11px 6px;cursor:pointer;
+  line-height:1;transition:border-color .3s ease,color .3s ease}
+#panel-toggle:hover{border-color:rgba(224,138,62,.42);color:var(--ink)}
+#panel-toggle .bars{display:flex;flex-direction:column;gap:2px;width:11px}
+#panel-toggle .bars i{display:block;height:1px;background:currentColor}
+#panel-toggle .bars i:nth-child(1){width:11px}
+#panel-toggle .bars i:nth-child(2){width:7px}
+#panel-toggle .bars i:nth-child(3){width:9px}
+body.panel-open #panel-toggle{opacity:0;pointer-events:none;transition:opacity .2s ease}
+
+#panel{position:absolute;top:0;right:0;bottom:0;width:312px;background:rgba(12,10,8,.90);
+  -webkit-backdrop-filter:blur(22px) saturate(.8);backdrop-filter:blur(22px) saturate(.8);border-left:1px solid var(--rule);
+  display:flex;flex-direction:column;transform:translateX(100%);opacity:0;pointer-events:none;
+  transition:transform .52s cubic-bezier(.4,0,.2,1),opacity .38s ease;z-index:6}
+body.panel-open #panel{transform:translateX(0);opacity:1;pointer-events:auto}
+#panel .head{display:flex;align-items:center;justify-content:space-between;padding:22px 22px 14px;border-bottom:1px solid var(--rule)}
+#panel .head .h{font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim)}
+#panel-close{background:none;border:0;color:var(--faint);font-family:var(--mono);font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;cursor:pointer;padding:4px}
+#panel-close:hover{color:var(--ink)}
+#panel .body{flex:1;overflow-y:auto;padding:18px 22px}
+#panel .grp{margin-bottom:20px}
+#panel .grp .t{font-family:var(--mono);font-size:8.5px;letter-spacing:.20em;text-transform:uppercase;color:var(--faint);margin-bottom:10px}
+#panel .row{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+#panel .row label{flex:0 0 92px;font-family:var(--mono);font-size:9.5px;color:var(--dim);letter-spacing:.02em}
+#panel .row input[type=range]{flex:1;accent-color:var(--accent)}
+#panel .row .val{flex:0 0 40px;text-align:right;font-family:var(--mono);font-size:9px;color:var(--faint);font-variant-numeric:tabular-nums}
+#panel .btns{display:flex;gap:8px;flex-wrap:wrap}
+#panel button.act{flex:1;background:rgba(224,138,62,.08);border:1px solid rgba(224,138,62,.32);color:var(--ink);
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.10em;text-transform:uppercase;padding:9px 10px;cursor:pointer;
+  transition:background .2s ease,border-color .2s ease}
+#panel button.act:hover{background:rgba(224,138,62,.16);border-color:rgba(224,138,62,.55)}
+#panel button.act.on{background:rgba(224,138,62,.22);border-color:var(--accent)}
+#panel .foot{padding:14px 22px;border-top:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between}
+#panel .foot button{background:none;border:1px solid var(--rule);color:var(--dim);font-family:var(--mono);font-size:9px;
+  letter-spacing:.1em;text-transform:uppercase;padding:8px 10px;cursor:pointer}
+#panel .foot button:hover{color:var(--ink);border-color:rgba(224,138,62,.42)}
+#panel .foot .fx{font-family:var(--mono);font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);text-align:right;line-height:1.6}
+
+#loader{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;align-items:center;
+  justify-content:center;transition:opacity .6s ease;padding:20px;text-align:center}
+#loader.done{opacity:0;pointer-events:none}
+#loader .idx{font-family:var(--mono);font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--faint);margin-bottom:18px}
+#loader .word{font-size:34px;font-weight:300;letter-spacing:.42em;text-transform:uppercase;margin:0 0 8px;padding-left:.42em}
+#loader .study{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:30px}
+#load-bar{width:220px;height:1px;background:var(--rule);margin-bottom:14px;overflow:hidden}
+#load-bar-fill{height:100%;width:0%;background:var(--accent);transition:width .4s ease}
+#load-status{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;color:var(--dim);min-height:14px}
+#loader.is-error #load-status{color:#d97a5e}
+#load-status .why{display:block;margin-top:10px;max-width:420px;font-size:9px;color:var(--faint);line-height:1.7;letter-spacing:.02em}
+#loader .rule{width:60px;height:1px;background:var(--rule);margin:22px 0}
+#loader .foot{font-family:var(--mono);font-size:8.5px;letter-spacing:.12em;color:var(--faint);line-height:1.9;text-transform:uppercase}
+@media (max-width:640px){
+  #method{display:none}
+  #readout{bottom:64px}
+  #panel{width:100%}
+  #panel-toggle{top:18px;right:18px}
+}
+</style>
+</head>
+<body>
+
+<canvas id="stage"></canvas>
+<div id="veil"></div>
+
+<div id="ui">
+  <div id="mark">
+    <div class="col">
+      <span class="w">Riser</span>
+      <span class="eyebrow sub">Molten pour &amp; solidification study</span>
+    </div>
+    <span class="sx-wrap"><a class="ix" href="../" aria-label="Study 13 — open series index">No. 13</a><nav class="sx-menu" aria-label="Series index"><a class="sx-hd" href="../">Crucible — index</a><a href="../mercury/"><span class="sx-n">03</span><span>Mercury</span></a><a href="../torsion/"><span class="sx-n">04</span><span>Torsion</span></a><a href="../torsion-2/"><span class="sx-n">05</span><span>Torsion 2.0</span></a><a href="../weft/"><span class="sx-n">06</span><span>Weft</span></a><a href="../cast/"><span class="sx-n">07</span><span>Cast</span></a><a href="../solve/"><span class="sx-n">08</span><span>Solve</span></a><a href="../torsion-pineapple/"><span class="sx-n">09</span><span>Torsion Pineapple</span></a><a href="../anneal/"><span class="sx-n">10</span><span>Anneal</span></a><a href="../living-bokeh/"><span class="sx-n">11</span><span>Living Bokeh</span></a><a href="../glyph/"><span class="sx-n">12</span><span>Glyph</span></a><a class="sx-here" href="../riser/" aria-current="page"><span class="sx-n">13</span><span>Riser</span></a></nav></span>
+  </div>
+
+  <button id="panel-toggle" aria-expanded="false" aria-controls="panel">
+    <span class="bars" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span>Controls</span>
+  </button>
+
+  <div id="readout">
+    <dl>
+      <dt>Phase</dt><dd id="r-phase">—</dd>
+      <dt>Particles</dt><dd id="r-part">—</dd>
+      <dt>Grid</dt><dd id="r-grid">—</dd>
+      <dt>Peak temp</dt><dd id="r-temp">—</dd>
+      <dt>Solid</dt><dd id="r-solid">—</dd>
+      <dt>Rate</dt><dd id="r-fps">—</dd>
+    </dl>
+  </div>
+
+  <div id="method">
+    <span class="t">Method</span>
+    Every particle carries a temperature and a deformation state, not a fixed
+    shape. Each frame they scatter mass and momentum onto a <b>MAC grid</b> in
+    a WGSL compute pass, the grid resolves gravity and mold contact, and the
+    particles gather it back — <b>Material Point Method</b>, liquid and solid
+    living in the same solve. Cooling drifts a particle's stiffness from
+    viscous fluid toward locked solid as it crosses a threshold. Nothing here
+    is a mesh. The surface is reconstructed every frame from a cloud of points
+    — camera-facing spheres, their depth bilateral-blurred and relit as one
+    continuous body of metal.
+  </div>
+
+  <div id="credit">
+    <b>Riser</b> — molten pour &amp; solidification study 13 &nbsp;·&nbsp; MPM liquid→solid phase change &nbsp;·&nbsp; screen-space fluid rendering &nbsp;·&nbsp; raw WebGPU compute<br>
+    <span class="keys" id="keys">drag orbit &nbsp; scroll dolly &nbsp; c controls &nbsp; space pause &nbsp; r reset &nbsp; ← → scrub time-scale &nbsp; p pour</span>
+  </div>
+
+  <aside id="panel" aria-label="Simulation controls" aria-hidden="true">
+    <div class="head">
+      <span class="h">Controls</span>
+      <button id="panel-close">Close · esc</button>
+    </div>
+    <div class="body" id="panel-body"></div>
+    <div class="foot">
+      <button id="reset">Reset defaults</button>
+      <span class="fx">Study 13<br>Riser</span>
+    </div>
+  </aside>
+</div>
+
+<div id="loader">
+  <div class="idx">Study 13</div>
+  <h1 class="word">Riser</h1>
+  <div class="study">Molten pour &amp; solidification study</div>
+  <div id="load-bar"><div id="load-bar-fill"></div></div>
+  <div id="load-status">Requesting GPU adapter</div>
+  <div class="rule"></div>
+  <div class="foot">material point method · wgsl compute pipelines<br>liquid→solid phase change · screen-space fluid surface</div>
+</div>
+
+<script>
+"use strict";
+(function(){
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Riser — study 13
+   A real-time MPM pour-and-solidify simulation living entirely in WebGPU
+   compute pipelines. See RISER_NOTES below for the particle byte layout —
+   it is a flat f32 array with hand-picked offsets, deliberately NOT a WGSL
+   struct, to sidestep vec3f/scalar storage-buffer alignment surprises.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const $ = s => document.querySelector(s);
+const loader = $('#loader'), loadFill = $('#load-bar-fill'), loadStatus = $('#load-status');
+
+function stage(pct, msg){ loadFill.style.width = pct + '%'; if (msg) loadStatus.textContent = msg; }
+function fail(title, detail){
+  loader.classList.add('is-error');
+  loadStatus.textContent = title;
+  if (detail) {
+    const w = document.createElement('span');
+    w.className = 'why';
+    w.textContent = detail;
+    loadStatus.appendChild(w);
+  }
+}
+const nextFrame = () => new Promise(r => {
+  let done = false;
+  const fin = () => { if (!done) { done = true; r(); } };
+  requestAnimationFrame(fin);
+  setTimeout(fin, 34);
+});
+
+/* ── RISER_NOTES: particle buffer layout ──────────────────────────────────
+   Storage buffer `P` is `array<f32>`, NOT a struct — no implicit WGSL
+   struct padding to reason about. Each particle occupies PSTRIDE floats,
+   at fixed offsets defined once here and mirrored exactly in WGSL below.
+   ────────────────────────────────────────────────────────────────────── */
+const PSTRIDE = 32; // floats per particle (128 bytes)
+const OFF = {
+  POS: 0,   // vec3 (0,1,2)
+  MASS: 3,
+  VEL: 4,   // vec3 (4,5,6)
+  J: 7,
+  C: 8,     // mat3x3, row-major (8..16)
+  TEMP: 17,
+  SOLID: 18,  // solidFrac 0..1
+  ACTIVE: 19, // 0/1 spawn gate
+  SEED: 20,
+};
+
+/* ── sim constants ─────────────────────────────────────────────────────── */
+const GX = 64, GY = 92, GZ = 64;
+const GCELLS = GX*GY*GZ;
+const DX = 0.022;
+const DOMAIN = [GX*DX, GY*DX, GZ*DX]; // ≈ 1.408 × 2.024 × 1.408
+
+const MAX_PARTICLES = 24576;
+const DEFAULT_TARGET = 20480;
+const QUICK_TARGET = 4096; // used by verification harness via __riser.setParticleTarget
+
+const MOLD = {
+  halfExtents: [0.40, 0.56, 0.28],
+  wallThickness: 0.05,
+  cornerRadius: 0.07,
+  floorY: 3*DX,
+};
+MOLD.center = [DOMAIN[0]*0.5, MOLD.floorY + MOLD.halfExtents[1], DOMAIN[2]*0.5];
+const NOZZLE = [MOLD.center[0]-0.10, DOMAIN[1]-6*DX, MOLD.center[2]+0.02];
+
+// Interior (cavity) volume, wall thickness subtracted from each half-extent —
+// used to size particle splats so neighbors overlap on screen regardless of
+// particle count (see particleSplatRadius below).
+const CAVITY_VOLUME =
+  2*(MOLD.halfExtents[0]-MOLD.wallThickness) *
+  2*(MOLD.halfExtents[1]-MOLD.wallThickness) *
+  2*(MOLD.halfExtents[2]-MOLD.wallThickness);
+const SPLAT_RADIUS_K = 2.0; // hand-tuned: 1.5–2.5 gives solid neighbor overlap
+function particleSplatRadius(particleCount){
+  const perParticleVol = CAVITY_VOLUME / Math.max(1, particleCount);
+  return SPLAT_RADIUS_K * Math.cbrt(perParticleVol);
+}
+
+const DEFAULTS = {
+  gravity: 2.6,
+  stiffLiquid: 5.0,
+  stiffSolid: 260.0,
+  gamma: 3.0,
+  viscosity: 3.5,
+  damping: 5.0,
+  pourRate: 900,     // particles/sec
+  pourSpeed: 1.55,
+  ambientTemp: 24,
+  moldTemp: 140,
+  pourTemp: 1420,
+  liquidus: 950,
+  solidus: 640,
+  coolBase: 0.06,
+  coolContact: 1.6,
+  exposure: 1.15,
+  loop: 0,
+};
+
+/* ── tiny mat4 / vec3 utilities (no external deps) ────────────────────── */
+const M4 = {
+  identity(){ return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); },
+  multiply(a,b){
+    const o = new Float32Array(16);
+    for (let c=0;c<4;c++) for (let r=0;r<4;r++){
+      let s=0;
+      for (let k=0;k<4;k++) s += a[k*4+r]*b[c*4+k];
+      o[c*4+r]=s;
+    }
+    return o;
+  },
+  perspective(fovY, aspect, near, far){
+    const f = 1/Math.tan(fovY/2);
+    const o = new Float32Array(16);
+    o[0]=f/aspect; o[5]=f;
+    o[10]=far/(near-far); o[11]=-1;
+    o[14]=(far*near)/(near-far);
+    return o;
+  },
+  lookAt(eye, target, up){
+    const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+    const norm=v=>{const l=Math.hypot(v[0],v[1],v[2])||1;return [v[0]/l,v[1]/l,v[2]/l];};
+    const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+    const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+    const zax = norm(sub(eye,target));
+    const xax = norm(cross(up,zax));
+    const yax = cross(zax,xax);
+    const o = new Float32Array(16);
+    o[0]=xax[0]; o[1]=yax[0]; o[2]=zax[0]; o[3]=0;
+    o[4]=xax[1]; o[5]=yax[1]; o[6]=zax[1]; o[7]=0;
+    o[8]=xax[2]; o[9]=yax[2]; o[10]=zax[2]; o[11]=0;
+    o[12]=-dot(xax,eye); o[13]=-dot(yax,eye); o[14]=-dot(zax,eye); o[15]=1;
+    return o;
+  },
+};
+
+/* ── camera (orbit) ───────────────────────────────────────────────────── */
+const camera = {
+  yaw: 0.55, pitch: -0.30, dist: 2.55,
+  target: [DOMAIN[0]*0.5, MOLD.center[1]*0.65, DOMAIN[2]*0.5],
+  fovY: 32*Math.PI/180,
+  view: M4.identity(), proj: M4.identity(),
+  tanHalfFovY: 0, aspect: 1,
+};
+function cameraEye(){
+  const cy=Math.cos(camera.pitch), sy=Math.sin(camera.pitch);
+  const cx=Math.cos(camera.yaw), sx=Math.sin(camera.yaw);
+  return [
+    camera.target[0] + camera.dist*cy*Math.sin(camera.yaw),
+    camera.target[1] + camera.dist*sy,
+    camera.target[2] + camera.dist*cy*Math.cos(camera.yaw),
+  ];
+}
+function updateCamera(aspect){
+  camera.pitch = Math.max(-1.35, Math.min(0.6, camera.pitch));
+  camera.dist = Math.max(1.1, Math.min(6.0, camera.dist));
+  const eye = cameraEye();
+  camera.view = M4.lookAt(eye, camera.target, [0,1,0]);
+  camera.aspect = aspect;
+  camera.tanHalfFovY = Math.tan(camera.fovY/2);
+  camera.proj = M4.perspective(camera.fovY, aspect, 0.05, 12.0);
+}
+
+/* ── state ─────────────────────────────────────────────────────────────── */
+const state = {
+  phase: 'idle',           // idle | pouring | solidifying | solid
+  activeCount: 0,
+  targetCount: DEFAULT_TARGET,
+  simTime: 0,
+  spawned: 0,
+  paused: false,
+  moldOpacity: 1,
+  moldLift: 0,
+  solidHoldT: 0,
+  peakTemp: 0,
+  solidPct: 0,
+  fps: 0,
+  timeScale: 1,
+  params: Object.assign({}, DEFAULTS),
+};
+
+let device, adapter, ctx, canvasFormat;
+let canvas = $('#stage');
+
+/* ── WGSL: MPM compute ─────────────────────────────────────────────────
+   Particle buffer `P` is a flat array<f32>, indexed by hand-picked offsets
+   (see OFF above, mirrored below as *_O constants) — this is the direct fix
+   for the byte-alignment bug the previous attempt hit: no WGSL struct means
+   no implicit vec3f/scalar padding to get wrong on the JS side.
+   ────────────────────────────────────────────────────────────────────── */
+const WGSL_COMPUTE = `
+const GXu: u32 = ${GX}u; const GYu: u32 = ${GY}u; const GZu: u32 = ${GZ}u;
+const GXi: i32 = ${GX}; const GYi: i32 = ${GY}; const GZi: i32 = ${GZ};
+const GXf: f32 = ${GX}.0; const GYf: f32 = ${GY}.0; const GZf: f32 = ${GZ}.0;
+const GCELLSu: u32 = ${GCELLS}u;
+const NUMPu: u32 = ${MAX_PARTICLES}u;
+const PSTRIDEu: u32 = ${PSTRIDE}u;
+const DOMXf: f32 = ${DOMAIN[0]}; const DOMYf: f32 = ${DOMAIN[1]}; const DOMZf: f32 = ${DOMAIN[2]};
+const SCALE: f32 = 65536.0;
+
+@group(0) @binding(0) var<storage, read_write> P: array<f32>;
+@group(0) @binding(1) var<storage, read_write> gridMass: array<atomic<i32>>;
+@group(0) @binding(2) var<storage, read_write> gridVelX: array<atomic<i32>>;
+@group(0) @binding(3) var<storage, read_write> gridVelY: array<atomic<i32>>;
+@group(0) @binding(4) var<storage, read_write> gridVelZ: array<atomic<i32>>;
+@group(0) @binding(5) var<storage, read_write> moldSDF: array<f32>;
+@group(0) @binding(6) var<uniform> U: array<vec4<f32>, 10>;
+@group(0) @binding(7) var<storage, read_write> stats: array<atomic<i32>, 3>; // 0:solidSum(fixed) 1:peakTemp(fixed) 2:activeCount
+
+fn encFix(v: f32) -> i32 { return i32(clamp(v*SCALE, -2000000000.0, 2000000000.0)); }
+fn decFix(v: i32) -> f32 { return f32(v) / SCALE; }
+
+fn quadW(f: f32) -> array<f32,3> {
+  return array<f32,3>(
+    0.5*(1.5-f)*(1.5-f),
+    0.75-(f-1.0)*(f-1.0),
+    0.5*(f-0.5)*(f-0.5)
+  );
+}
+
+fn sdRoundRect(p: vec2f, b: vec2f, r: f32) -> f32 {
+  let q = abs(p) - b + vec2f(r);
+  return length(max(q, vec2f(0.0))) + min(max(q.x,q.y), 0.0) - r;
+}
+
+@compute @workgroup_size(64)
+fn clearGrid(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let idx = gid.x;
+  if (idx >= GCELLSu) { return; }
+  atomicStore(&gridMass[idx], 0);
+  atomicStore(&gridVelX[idx], 0);
+  atomicStore(&gridVelY[idx], 0);
+  atomicStore(&gridVelZ[idx], 0);
+}
+
+@compute @workgroup_size(64)
+fn bakeMoldSDF(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let idx = gid.x;
+  if (idx >= GCELLSu) { return; }
+  let i = idx % GXu; let j = (idx / GXu) % GYu; let k = idx / (GXu*GYu);
+  let dx = U[1].w;
+  let gp = (vec3f(f32(i),f32(j),f32(k)) + 0.5) * dx;
+
+  let center = U[4].xyz; let wallT = U[4].w;
+  let half = U[5].xyz; let corner = U[5].w;
+  let local = gp - center;
+
+  let distXZ = sdRoundRect(local.xz, half.xz - vec2f(wallT), corner);
+  let topY = center.y + half.y - wallT;
+  let cavityFloorY = (center.y - half.y) + wallT;
+
+  let band = smoothstep(topY, topY - 0.03, gp.y);
+  let wallSDF = mix(1.0, -distXZ, band);
+  let floorSDF = gp.y - cavityFloorY;
+  moldSDF[idx] = min(wallSDF, floorSDF);
+}
+
+@compute @workgroup_size(1)
+fn clearStats(@builtin(global_invocation_id) gid: vec3<u32>) {
+  atomicStore(&stats[0], 0);
+  atomicStore(&stats[1], 0);
+  atomicStore(&stats[2], 0);
+}
+
+@compute @workgroup_size(64)
+fn reduceStats(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let pi = gid.x;
+  if (pi >= NUMPu) { return; }
+  let base = pi*PSTRIDEu;
+  if (P[base+19u] < 0.5) { return; }
+  let solidFrac = P[base+18u];
+  let temp = P[base+17u];
+  atomicAdd(&stats[0], encFix(solidFrac));
+  atomicMax(&stats[1], encFix(temp));
+  atomicAdd(&stats[2], 1);
+}
+
+@compute @workgroup_size(64)
+fn p2g(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let pi = gid.x;
+  if (pi >= NUMPu) { return; }
+  let base = pi * PSTRIDEu;
+
+  var pos = vec3f(P[base+0u],P[base+1u],P[base+2u]);
+  var mass = P[base+3u];
+  var vel = vec3f(P[base+4u],P[base+5u],P[base+6u]);
+  var Jv = P[base+7u];
+  let c00=P[base+8u]; let c01=P[base+9u]; let c02=P[base+10u];
+  let c10=P[base+11u]; let c11=P[base+12u]; let c12=P[base+13u];
+  let c20=P[base+14u]; let c21=P[base+15u]; let c22=P[base+16u];
+  var temp = P[base+17u];
+  var solidFrac = P[base+18u];
+  var isActive = P[base+19u];
+  let seed = P[base+20u];
+
+  if (isActive < 0.5) {
+    if (f32(pi) < U[3].z) {
+      let jx = (fract(seed*17.13)-0.5)*0.05;
+      let jz = (fract(seed*29.71)-0.5)*0.05;
+      pos = vec3f(U[8].x+jx, U[8].y, U[8].z+jz);
+      let jvx = (fract(seed*53.7)-0.5)*0.25;
+      let jvz = (fract(seed*71.3)-0.5)*0.25;
+      vel = vec3f(jvx, -U[8].w, jvz);
+      mass = 1.0;
+      Jv = 1.0;
+      temp = U[7].z;
+      solidFrac = 0.0;
+      isActive = 1.0;
+      P[base+3u]=mass; P[base+7u]=Jv; P[base+8u]=0.0; P[base+9u]=0.0; P[base+10u]=0.0;
+      P[base+11u]=0.0; P[base+12u]=0.0; P[base+13u]=0.0; P[base+14u]=0.0; P[base+15u]=0.0; P[base+16u]=0.0;
+      P[base+17u]=temp; P[base+18u]=solidFrac; P[base+19u]=isActive;
+    } else {
+      return;
+    }
+  }
+
+  let dx = U[1].w;
+  let invdx = 1.0/dx;
+  let basePos = pos*invdx - 0.5;
+  let baseCell = floor(basePos);
+  let fx = basePos - baseCell;
+
+  let wx = quadW(fx.x); let wy = quadW(fx.y); let wz = quadW(fx.z);
+
+  let stiff = mix(U[2].x, U[2].y, solidFrac);
+  let gammaP = U[2].z;
+  let Jc = clamp(Jv, 0.4, 3.0);
+  let pressure = stiff * (pow(1.0/Jc, gammaP) - 1.0);
+  let pVol = U[3].x;
+  let dt = U[0].x;
+  // Cauchy stress for a pressure-only material is -pressure*I; the MLS-MPM
+  // affine force contribution is -dt*4*Vol*invdx^2*stress, so the diagonal
+  // term added to the affine matrix is +dt*4*Vol*invdx^2*pressure (positive
+  // under compression, pushing neighbors apart to relieve it). The prior
+  // negative coefficient flipped this into an anti-restoring force: any
+  // deviation from rest volume was amplified rather than corrected, which
+  // stayed mild at low liquid stiffness but blew solidified clumps apart
+  // once stiffSolid's much larger magnitude took over.
+  let stressCoeff = dt*4.0*pVol*invdx*invdx*pressure;
+
+  let a00 = mass*c00 + stressCoeff; let a01 = mass*c01; let a02 = mass*c02;
+  let a10 = mass*c10; let a11 = mass*c11 + stressCoeff; let a12 = mass*c12;
+  let a20 = mass*c20; let a21 = mass*c21; let a22 = mass*c22 + stressCoeff;
+
+  let baseI = i32(baseCell.x); let baseJ = i32(baseCell.y); let baseK = i32(baseCell.z);
+
+  for (var ii=0u; ii<3u; ii=ii+1u) {
+    let ci = baseI + i32(ii);
+    if (ci < 0 || ci >= GXi) { continue; }
+    for (var jj=0u; jj<3u; jj=jj+1u) {
+      let cj = baseJ + i32(jj);
+      if (cj < 0 || cj >= GYi) { continue; }
+      for (var kk=0u; kk<3u; kk=kk+1u) {
+        let ck = baseK + i32(kk);
+        if (ck < 0 || ck >= GZi) { continue; }
+        let w = wx[ii]*wy[jj]*wz[kk];
+        if (w <= 1e-9) { continue; }
+        let dpos = (vec3f(f32(ii),f32(jj),f32(kk)) - fx) * dx;
+        let cellIdx = u32(ci) + u32(cj)*GXu + u32(ck)*GXu*GYu;
+        let momx = w*(mass*vel.x + (a00*dpos.x + a01*dpos.y + a02*dpos.z));
+        let momy = w*(mass*vel.y + (a10*dpos.x + a11*dpos.y + a12*dpos.z));
+        let momz = w*(mass*vel.z + (a20*dpos.x + a21*dpos.y + a22*dpos.z));
+        atomicAdd(&gridMass[cellIdx], encFix(w*mass));
+        atomicAdd(&gridVelX[cellIdx], encFix(momx));
+        atomicAdd(&gridVelY[cellIdx], encFix(momy));
+        atomicAdd(&gridVelZ[cellIdx], encFix(momz));
+      }
+    }
+  }
+
+  P[base+0u]=pos.x; P[base+1u]=pos.y; P[base+2u]=pos.z;
+  P[base+4u]=vel.x; P[base+5u]=vel.y; P[base+6u]=vel.z;
+}
+
+@compute @workgroup_size(64)
+fn gridUpdate(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let idx = gid.x;
+  if (idx >= GCELLSu) { return; }
+  let mass = decFix(atomicLoad(&gridMass[idx]));
+  let i = idx % GXu; let j = (idx / GXu) % GYu; let k = idx / (GXu*GYu);
+
+  if (mass < 1e-6) {
+    atomicStore(&gridVelX[idx], 0);
+    atomicStore(&gridVelY[idx], 0);
+    atomicStore(&gridVelZ[idx], 0);
+    return;
+  }
+
+  var vx = decFix(atomicLoad(&gridVelX[idx])) / mass;
+  var vy = decFix(atomicLoad(&gridVelY[idx])) / mass;
+  var vz = decFix(atomicLoad(&gridVelZ[idx])) / mass;
+
+  let dt = U[0].x; let gravity = U[0].y;
+  vy = vy - gravity*dt;
+
+  if (i < 2u || i >= GXu-2u || k < 2u || k >= GZu-2u || j < 2u) { vx=0.0; vy=0.0; vz=0.0; }
+  if (j >= GYu-2u) { vy = min(vy, 0.0); }
+
+  let sdf = moldSDF[idx];
+  let band = U[9].y;
+  if (sdf < band) {
+    let im = select(i-1u, 0u, i==0u); let ip = min(i+1u, GXu-1u);
+    let jm = select(j-1u, 0u, j==0u); let jp = min(j+1u, GYu-1u);
+    let km = select(k-1u, 0u, k==0u); let kp = min(k+1u, GZu-1u);
+    let sdfx0 = moldSDF[im+j*GXu+k*GXu*GYu]; let sdfx1 = moldSDF[ip+j*GXu+k*GXu*GYu];
+    let sdfy0 = moldSDF[i+jm*GXu+k*GXu*GYu]; let sdfy1 = moldSDF[i+jp*GXu+k*GXu*GYu];
+    let sdfz0 = moldSDF[i+j*GXu+km*GXu*GYu]; let sdfz1 = moldSDF[i+j*GXu+kp*GXu*GYu];
+    var n = vec3f(sdfx1-sdfx0, sdfy1-sdfy0, sdfz1-sdfz0);
+    let nl = length(n);
+    if (nl > 1e-5) { n = n / nl; } else { n = vec3f(0.0,1.0,0.0); }
+    if (sdf < 0.0) {
+      var v = vec3f(vx,vy,vz);
+      let vn = dot(v,n);
+      if (vn < 0.0) { v = v - vn*n; }
+      let pushOut = clamp(-sdf, 0.0, 0.06) * 24.0;
+      v = v + n*pushOut;
+      v = v * 0.4;
+      vx=v.x; vy=v.y; vz=v.z;
+    }
+  }
+
+  atomicStore(&gridVelX[idx], encFix(vx));
+  atomicStore(&gridVelY[idx], encFix(vy));
+  atomicStore(&gridVelZ[idx], encFix(vz));
+}
+
+@compute @workgroup_size(64)
+fn g2p(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let pi = gid.x;
+  if (pi >= NUMPu) { return; }
+  let base = pi*PSTRIDEu;
+  if (P[base+19u] < 0.5) { return; }
+
+  var pos = vec3f(P[base+0u],P[base+1u],P[base+2u]);
+  var Jv = P[base+7u];
+  var temp = P[base+17u];
+
+  let dx = U[1].w;
+  let invdx = 1.0/dx;
+  let basePos = pos*invdx - 0.5;
+  let baseCell = floor(basePos);
+  let fx = basePos - baseCell;
+  let wx = quadW(fx.x); let wy = quadW(fx.y); let wz = quadW(fx.z);
+  let baseI=i32(baseCell.x); let baseJ=i32(baseCell.y); let baseK=i32(baseCell.z);
+
+  var nvx=0.0; var nvy=0.0; var nvz=0.0;
+  var nc00=0.0; var nc01=0.0; var nc02=0.0;
+  var nc10=0.0; var nc11=0.0; var nc12=0.0;
+  var nc20=0.0; var nc21=0.0; var nc22=0.0;
+  let coeff = 4.0*invdx*invdx;
+
+  for (var ii=0u; ii<3u; ii=ii+1u) {
+    let ci=baseI+i32(ii);
+    if (ci<0 || ci>=GXi) { continue; }
+    for (var jj=0u; jj<3u; jj=jj+1u) {
+      let cj=baseJ+i32(jj);
+      if (cj<0 || cj>=GYi) { continue; }
+      for (var kk=0u; kk<3u; kk=kk+1u) {
+        let ck=baseK+i32(kk);
+        if (ck<0 || ck>=GZi) { continue; }
+        let w = wx[ii]*wy[jj]*wz[kk];
+        if (w<=1e-9) { continue; }
+        let cellIdx = u32(ci)+u32(cj)*GXu+u32(ck)*GXu*GYu;
+        let gvx = decFix(atomicLoad(&gridVelX[cellIdx]));
+        let gvy = decFix(atomicLoad(&gridVelY[cellIdx]));
+        let gvz = decFix(atomicLoad(&gridVelZ[cellIdx]));
+        nvx += w*gvx; nvy += w*gvy; nvz += w*gvz;
+        let dpos = (vec3f(f32(ii),f32(jj),f32(kk)) - fx) * dx;
+        let cw = coeff*w;
+        nc00 += cw*gvx*dpos.x; nc01 += cw*gvx*dpos.y; nc02 += cw*gvx*dpos.z;
+        nc10 += cw*gvy*dpos.x; nc11 += cw*gvy*dpos.y; nc12 += cw*gvy*dpos.z;
+        nc20 += cw*gvz*dpos.x; nc21 += cw*gvz*dpos.y; nc22 += cw*gvz*dpos.z;
+      }
+    }
+  }
+
+  let dt = U[0].x;
+  let trace = nc00+nc11+nc22;
+  Jv = clamp(Jv*(1.0+dt*trace), 0.4, 3.0);
+
+  var vel = vec3f(nvx,nvy,nvz);
+  pos = pos + dt*vel;
+  let margin = 2.2*dx;
+  pos.x = clamp(pos.x, margin, DOMXf-margin);
+  pos.y = clamp(pos.y, margin, DOMYf-margin);
+  pos.z = clamp(pos.z, margin, DOMZf-margin);
+
+  let sdfIdxPos = clamp(pos*invdx, vec3f(0.0), vec3f(GXf-1.0,GYf-1.0,GZf-1.0));
+  let si = u32(sdfIdxPos.x); let sj=u32(sdfIdxPos.y); let sk=u32(sdfIdxPos.z);
+  let sdfHere = moldSDF[si+sj*GXu+sk*GXu*GYu];
+  let contactBand = U[9].y;
+  // contact should only fire on genuine solid overlap (sdf<0), not near any
+  // sdf zero-crossing — the open-top blend band in bakeMoldSDF puts a
+  // transitional near-zero value just above the rim too, which is free air.
+  let contact = 1.0 - smoothstep(-contactBand, 0.0, sdfHere);
+  let ambientT=U[7].x; let moldT=U[7].y;
+  let coolBase=U[6].z; let coolContact=U[6].w;
+  temp = temp + dt*( -coolBase*(temp-ambientT) - coolContact*contact*(temp-moldT) );
+
+  let liquidus=U[6].x; let solidus=U[6].y;
+  let solidFrac = 1.0 - smoothstep(solidus, liquidus, temp);
+
+  let damp = U[7].w;
+  vel = vel / (1.0 + solidFrac*damp*dt);
+
+  let visc = U[2].w;
+  let viscK = 1.0/(1.0+visc*dt);
+  nc01*=viscK; nc02*=viscK; nc10*=viscK; nc12*=viscK; nc20*=viscK; nc21*=viscK;
+
+  P[base+0u]=pos.x; P[base+1u]=pos.y; P[base+2u]=pos.z;
+  P[base+4u]=vel.x; P[base+5u]=vel.y; P[base+6u]=vel.z;
+  P[base+7u]=Jv;
+  P[base+8u]=nc00; P[base+9u]=nc01; P[base+10u]=nc02;
+  P[base+11u]=nc10; P[base+12u]=nc11; P[base+13u]=nc12;
+  P[base+14u]=nc20; P[base+15u]=nc21; P[base+16u]=nc22;
+  P[base+17u]=temp;
+  P[base+18u]=solidFrac;
+}
+`;
+
+/* ── WGSL: screen-space fluid render ──────────────────────────────────
+   Camera-facing particle spheres are splat to a linear-depth + material
+   buffer, bilateral-blurred so the point cloud reads as one continuous
+   surface, then relit from reconstructed view-space normals (screen-space
+   derivatives of the position rebuilt from that depth). The render uniform
+   below uses only mat4x4/vec4 fields deliberately — no vec3f — so there is
+   no struct-padding ambiguity to get wrong here either.
+   ────────────────────────────────────────────────────────────────────── */
+const FAR_SENTINEL = 1.0e6;
+const WGSL_RENDER = `
+const PSTRIDEu: u32 = ${PSTRIDE}u;
+const FAR: f32 = ${FAR_SENTINEL};
+
+struct RenderU {
+  view: mat4x4<f32>,
+  proj: mat4x4<f32>,
+  params0: vec4<f32>, // aspect, tanHalfFovY, particleRadius, exposure
+  params1: vec4<f32>, // resX, resY, moldOpacity, moldLift
+  params2: vec4<f32>, // liquidus, solidus, pourTemp, ambientTemp
+  light1: vec4<f32>,
+  light2: vec4<f32>,
+  moldC: vec4<f32>,   // moldCenter.xyz, wallThickness
+  moldH: vec4<f32>,   // moldHalfExtents.xyz, cornerRadius
+};
+@group(0) @binding(0) var<uniform> RU: RenderU;
+
+/* ── particle splat ── */
+@group(0) @binding(1) var<storage, read> P: array<f32>;
+
+struct SplatOut {
+  @builtin(position) pos: vec4<f32>,
+  @location(0) uv: vec2<f32>,
+  @location(1) viewCenterZ: f32,
+  @location(2) radius: f32,
+  @location(3) temp: f32,
+  @location(4) solidFrac: f32,
+};
+const QUAD = array<vec2<f32>,6>(vec2f(-1,-1),vec2f(1,-1),vec2f(1,1),vec2f(-1,-1),vec2f(1,1),vec2f(-1,1));
+
+@vertex
+fn vsSplat(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> SplatOut {
+  var o: SplatOut;
+  let base = ii * PSTRIDEu;
+  let isActive = P[base+19u];
+  if (isActive < 0.5) {
+    o.pos = vec4f(10.0,10.0,10.0,1.0); o.uv=vec2f(0.0); o.viewCenterZ=0.0; o.radius=0.0; o.temp=0.0; o.solidFrac=0.0;
+    return o;
+  }
+  let worldPos = vec3f(P[base+0u],P[base+1u],P[base+2u]);
+  let temp = P[base+17u];
+  let solidFrac = P[base+18u];
+  let viewPos4 = RU.view * vec4f(worldPos,1.0);
+  let corner = QUAD[vi];
+  let radius = RU.params0.z * mix(1.0, 0.93, solidFrac);
+  let viewPos = viewPos4.xyz + vec3f(corner*radius, 0.0);
+  o.pos = RU.proj * vec4f(viewPos,1.0);
+  o.uv = corner;
+  o.viewCenterZ = -viewPos4.z;
+  o.radius = radius;
+  o.temp = temp;
+  o.solidFrac = solidFrac;
+  return o;
+}
+
+struct SplatFragOut {
+  @location(0) depth: f32,
+  @location(1) mat: vec2<f32>,
+};
+
+@fragment
+fn fsSplat(input: SplatOut) -> SplatFragOut {
+  var o: SplatFragOut;
+  let r2 = dot(input.uv, input.uv);
+  if (r2 > 1.0 || input.radius <= 0.0) { discard; }
+  let zOff = sqrt(max(0.0, 1.0-r2)) * input.radius;
+  o.depth = input.viewCenterZ - zOff;
+  o.mat = vec2f(input.temp, input.solidFrac);
+  return o;
+}
+
+/* ── mold shell (translucent box, open top) ── */
+const CORNERS = array<vec3<f32>,8>(
+  vec3f(-1,-1,-1), vec3f(1,-1,-1), vec3f(1,-1,1), vec3f(-1,-1,1),
+  vec3f(-1,1,-1), vec3f(1,1,-1), vec3f(1,1,1), vec3f(-1,1,1)
+);
+const IDX = array<u32,30>(
+  0u,1u,2u, 0u,2u,3u,          // bottom
+  0u,4u,5u, 0u,5u,1u,          // front (z-)
+  3u,2u,6u, 3u,6u,7u,          // back (z+)
+  0u,3u,7u, 0u,7u,4u,          // left
+  1u,5u,6u, 1u,6u,2u           // right
+);
+const FACE_N = array<vec3<f32>,5>(
+  vec3f(0,-1,0), vec3f(0,0,-1), vec3f(0,0,1), vec3f(-1,0,0), vec3f(1,0,0)
+);
+
+struct MoldOut {
+  @builtin(position) pos: vec4<f32>,
+  @location(0) viewPosZ: f32,
+  @location(1) nDotV: f32,
+};
+
+@vertex
+fn vsMold(@builtin(vertex_index) vi: u32) -> MoldOut {
+  var o: MoldOut;
+  let ci = IDX[vi];
+  let corner = CORNERS[ci];
+  let faceIdx = vi / 6u;
+  let n = FACE_N[faceIdx];
+  let half = RU.moldH.xyz;
+  var world = RU.moldC.xyz + corner*half;
+  world.y = world.y + RU.params1.w;
+  let viewPos4 = RU.view * vec4f(world,1.0);
+  o.pos = RU.proj * viewPos4;
+  o.viewPosZ = -viewPos4.z;
+  let viewN = (RU.view * vec4f(n,0.0)).xyz;
+  let viewDir = normalize(-viewPos4.xyz);
+  o.nDotV = abs(dot(normalize(viewN), viewDir));
+  return o;
+}
+
+struct MoldFragOut {
+  @location(0) color: vec4<f32>,
+  @location(1) depth: f32,
+};
+
+@fragment
+fn fsMold(input: MoldOut) -> MoldFragOut {
+  var o: MoldFragOut;
+  let fres = pow(1.0-clamp(input.nDotV,0.0,1.0), 3.5);
+  let glass = vec3f(0.55,0.62,0.70);
+  let rim = vec3f(0.95,0.85,0.65);
+  let col = mix(glass, rim, fres*0.6);
+  let a = clamp(mix(0.06, 0.30, fres), 0.0, 1.0) * RU.params1.z;
+  o.color = vec4f(col, a);
+  o.depth = input.viewPosZ;
+  return o;
+}
+
+/* ── bilateral blur (separable) ── */
+struct BlurU { texel: vec2<f32>, dir: vec2<f32> };
+@group(0) @binding(0) var<uniform> BU: BlurU;
+@group(0) @binding(1) var depthIn: texture_2d<f32>;
+@group(0) @binding(2) var matIn: texture_2d<f32>;
+
+struct FullOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
+@vertex
+fn vsFull(@builtin(vertex_index) vi: u32) -> FullOut {
+  var p = array<vec2<f32>,3>(vec2f(-1,-1), vec2f(3,-1), vec2f(-1,3));
+  var o: FullOut;
+  o.pos = vec4f(p[vi], 0.0, 1.0);
+  o.uv = p[vi];
+  return o;
+}
+
+struct BlurOut { @location(0) depth: f32, @location(1) mat: vec2<f32> };
+const GAUSS = array<f32,7>(0.0060,0.0605,0.2417,0.3829,0.2417,0.0605,0.0060);
+
+@fragment
+fn fsBlur(input: FullOut) -> BlurOut {
+  var o: BlurOut;
+  let coord = vec2<i32>(input.pos.xy);
+  let center = textureLoad(depthIn, coord, 0).r;
+  if (center > FAR*0.5) { o.depth = FAR; o.mat = vec2f(0.0); return o; }
+  var sumW = 0.0; var sumD = 0.0; var sumM = vec2f(0.0);
+  let dims = vec2<i32>(textureDimensions(depthIn));
+  for (var t=-3; t<=3; t=t+1) {
+    let c = clamp(coord + vec2<i32>(BU.dir)*t, vec2<i32>(0), dims-vec2<i32>(1));
+    let d = textureLoad(depthIn, c, 0).r;
+    if (d > FAR*0.5) { continue; }
+    let rangeW = exp(-abs(d-center)*40.0);
+    let w = GAUSS[t+3] * rangeW;
+    sumW += w; sumD += d*w;
+    sumM += textureLoad(matIn, c, 0).rg * w;
+  }
+  if (sumW < 1e-5) { o.depth = center; o.mat = textureLoad(matIn, coord, 0).rg; }
+  else { o.depth = sumD/sumW; o.mat = sumM/sumW; }
+  return o;
+}
+
+/* ── composite: reconstruct + shade + combine with mold ── */
+@group(0) @binding(0) var<uniform> RU2: RenderU;
+@group(0) @binding(1) var moldColorTex: texture_2d<f32>;
+@group(0) @binding(2) var moldDepthTex: texture_2d<f32>;
+@group(0) @binding(3) var fluidDepthTex: texture_2d<f32>;
+@group(0) @binding(4) var fluidMatTex: texture_2d<f32>;
+
+fn tempColor(t: f32) -> vec3f {
+  let castCol = vec3f(0.58,0.44,0.29);
+  let orange = vec3f(1.0,0.42,0.07);
+  let white = vec3f(1.0,0.97,0.90);
+  var c = mix(castCol, orange, smoothstep(0.0,0.62,t));
+  c = mix(c, white, smoothstep(0.6,1.0,t));
+  return c;
+}
+
+@fragment
+fn fsComposite(input: FullOut) -> @location(0) vec4<f32> {
+  let coord = vec2<i32>(input.pos.xy);
+  let res = RU2.params1.xy;
+  var ndc = (vec2f(coord)+0.5)/res * 2.0 - 1.0;
+  ndc.y = -ndc.y;
+
+  let bgTop = vec3f(0.055,0.045,0.038);
+  let bgBot = vec3f(0.018,0.014,0.011);
+  var bg = mix(bgBot, bgTop, clamp(ndc.y*0.5+0.5,0.0,1.0));
+
+  let fluidDepth = textureLoad(fluidDepthTex, coord, 0).r;
+  let mv = textureLoad(fluidMatTex, coord, 0).rg;
+  let moldDepth = textureLoad(moldDepthTex, coord, 0).r;
+  let moldRGBA = textureLoad(moldColorTex, coord, 0);
+
+  let aspect = RU2.params0.x; let tanFov = RU2.params0.y; let exposure = RU2.params0.w;
+
+  // dpdx/dpdy must run in uniform control flow, so the reconstruction and
+  // its derivatives are computed unconditionally (with a safe fallback
+  // depth for background pixels) and only *used* behind the branch below.
+  let safeDepth = select(fluidDepth, 1.0, fluidDepth > FAR*0.5);
+  let viewPos = vec3f(ndc.x*safeDepth*aspect*tanFov, ndc.y*safeDepth*tanFov, -safeDepth);
+  let n = normalize(cross(dpdy(viewPos), dpdx(viewPos)));
+  let fluidValid = fluidDepth < FAR*0.5;
+  var fluidColor = vec3f(0.0);
+  if (fluidValid) {
+    let v = normalize(-viewPos);
+    let l1 = normalize(RU2.light1.xyz);
+    let l2 = normalize(RU2.light2.xyz);
+    let temp = mv.x; let solidFrac = mv.y;
+    let tNorm = clamp((temp-RU2.params2.y)/(max(RU2.params2.z-RU2.params2.y,1.0)), 0.0, 1.0);
+    let baseCol = tempColor(tNorm);
+    let ndl1 = max(dot(n,l1),0.0);
+    let ndl2 = max(dot(n,l2),0.0);
+    let fres = pow(1.0-clamp(dot(n,v),0.0,1.0), 5.0);
+    let hv = normalize(l1+v);
+    let specPow = mix(380.0, 18.0, solidFrac);
+    let spec = pow(max(dot(n,hv),0.0), specPow) * mix(1.4,0.35,solidFrac);
+    let envGrad = mix(vec3f(0.05,0.05,0.07), vec3f(0.30,0.28,0.24), n.y*0.5+0.5);
+    let emissive = tempColor(tNorm) * pow(clamp((temp-RU2.params2.y)/max(RU2.params2.z-RU2.params2.y,1.0),0.0,1.0), 1.6) * smoothstep(0.15,0.85,tNorm) * 1.6;
+    var col = baseCol*(0.30+0.85*ndl1) + baseCol*ndl2*0.22;
+    col = col + envGrad*fres*mix(0.5,0.18,solidFrac);
+    col = col + vec3f(1.0,0.92,0.80)*spec;
+    col = col + emissive;
+    fluidColor = col * exposure;
+  }
+
+  var outColor = bg;
+  if (moldDepth < FAR*0.5 && (!fluidValid || moldDepth < fluidDepth)) {
+    let behind = select(bg, fluidColor, fluidValid);
+    outColor = mix(behind, moldRGBA.rgb, clamp(moldRGBA.a,0.0,1.0));
+  } else if (fluidValid) {
+    outColor = fluidColor;
+  }
+  return vec4f(outColor, 1.0);
+}
+`;
+
+async function init(){
+  if (!('gpu' in navigator) || !navigator.gpu) {
+    fail('WebGPU unavailable',
+      'This study runs an MPM solver in GPU compute pipelines and has no meaningful fallback. ' +
+      'Open it in Chrome or Edge 113+, or Safari 18+, on a machine with hardware acceleration enabled.');
+    return;
+  }
+
+  stage(6, 'Requesting GPU adapter');
+  await nextFrame();
+  try { adapter = await navigator.gpu.requestAdapter({ powerPreference:'high-performance' }); }
+  catch(e){ adapter = null; }
+  if (!adapter) {
+    fail('No GPU adapter', 'The browser exposes WebGPU but could not supply an adapter. Hardware acceleration may be off.');
+    return;
+  }
+
+  stage(16, 'Acquiring device');
+  await nextFrame();
+  try {
+    device = await adapter.requestDevice({
+      requiredLimits: {
+        maxStorageBufferBindingSize: Math.min(adapter.limits.maxStorageBufferBindingSize, 268435456),
+        maxBufferSize: Math.min(adapter.limits.maxBufferSize, 268435456),
+      }
+    });
+  } catch(e){
+    try { device = await adapter.requestDevice(); }
+    catch(e2){ fail('Device request failed', String(e2.message||e2)); return; }
+  }
+  device.lost.then(info => {
+    if (info.reason !== 'destroyed') {
+      loader.classList.remove('done');
+      loader.style.opacity = '1'; loader.style.pointerEvents = 'auto';
+      fail('GPU device lost', String(info.message || 'The graphics device was reset.'));
+    }
+  });
+
+  ctx = canvas.getContext('webgpu');
+  if (!ctx) { fail('No WebGPU canvas context', 'The canvas could not be configured for WebGPU.'); return; }
+  canvasFormat = navigator.gpu.getPreferredCanvasFormat();
+  // NOTE: this context is a copy DESTINATION only. Rendering straight into its
+  // swapchain texture crashes SwiftShader in headless verification with
+  // "device lost" — everything renders to an offscreen target below and is
+  // copied into the canvas texture once per frame via copyTextureToTexture.
+  ctx.configure({ device, format: canvasFormat, usage: GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_DST, alphaMode:'opaque' });
+
+  stage(26, 'Allocating buffers');
+  await nextFrame();
+
+  const particleBufSize = MAX_PARTICLES*PSTRIDE*4;
+  buf.P = device.createBuffer({ size: particleBufSize, usage: GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC|GPUBufferUsage.COPY_DST, label:'P' });
+  buf.gridMass = device.createBuffer({ size: GCELLS*4, usage: GPUBufferUsage.STORAGE, label:'gridMass' });
+  buf.gridVelX = device.createBuffer({ size: GCELLS*4, usage: GPUBufferUsage.STORAGE, label:'gridVelX' });
+  buf.gridVelY = device.createBuffer({ size: GCELLS*4, usage: GPUBufferUsage.STORAGE, label:'gridVelY' });
+  buf.gridVelZ = device.createBuffer({ size: GCELLS*4, usage: GPUBufferUsage.STORAGE, label:'gridVelZ' });
+  buf.moldSDF  = device.createBuffer({ size: GCELLS*4, usage: GPUBufferUsage.STORAGE, label:'moldSDF' });
+  buf.U = device.createBuffer({ size: 10*16, usage: GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST, label:'U' });
+  buf.stats = device.createBuffer({ size: 12, usage: GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC, label:'stats' });
+  buf.statsStaging = device.createBuffer({ size: 12, usage: GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ, label:'statsStaging' });
+  buf.staging = device.createBuffer({ size: PSTRIDE*4*8, usage: GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ, label:'staging' });
+
+  const initial = new Float32Array(MAX_PARTICLES*PSTRIDE);
+  for (let p=0; p<MAX_PARTICLES; p++) initial[p*PSTRIDE + OFF.SEED] = Math.random();
+  device.queue.writeBuffer(buf.P, 0, initial);
+
+  stage(40, 'Compiling WGSL compute pipelines');
+  await nextFrame();
+
+  const computeModule = device.createShaderModule({ code: WGSL_COMPUTE, label:'compute' });
+  const info = await computeModule.getCompilationInfo();
+  const errs = info.messages.filter(m => m.type === 'error');
+  if (errs.length) {
+    fail('WGSL compile error', errs.map(m => `line ${m.lineNum}: ${m.message}`).join('\n'));
+    console.error('[riser] WGSL compute errors', errs);
+    return;
+  }
+
+  computeBGL = device.createBindGroupLayout({
+    entries: [
+      { binding:0, visibility:GPUShaderStage.COMPUTE, buffer:{ type:'storage' } },
+      { binding:1, visibility:GPUShaderStage.COMPUTE, buffer:{ type:'storage' } },
+      { binding:2, visibility:GPUShaderStage.COMPUTE, buffer:{ type:'storage' } },
+      { binding:3, visibility:GPUShaderStage.COMPUTE, buffer:{ type:'storage' } },
+      { binding:4, visibility:GPUShaderStage.COMPUTE, buffer:{ type:'storage' } },
+      { binding:5, visibility:GPUShaderStage.COMPUTE, buffer:{ type:'storage' } },
+      { binding:6, visibility:GPUShaderStage.COMPUTE, buffer:{ type:'uniform' } },
+      { binding:7, visibility:GPUShaderStage.COMPUTE, buffer:{ type:'storage' } },
+    ]
+  });
+  const computeLayout = device.createPipelineLayout({ bindGroupLayouts:[computeBGL] });
+  computeBG = device.createBindGroup({
+    layout: computeBGL,
+    entries: [
+      { binding:0, resource:{ buffer: buf.P } },
+      { binding:1, resource:{ buffer: buf.gridMass } },
+      { binding:2, resource:{ buffer: buf.gridVelX } },
+      { binding:3, resource:{ buffer: buf.gridVelY } },
+      { binding:4, resource:{ buffer: buf.gridVelZ } },
+      { binding:5, resource:{ buffer: buf.moldSDF } },
+      { binding:6, resource:{ buffer: buf.U } },
+      { binding:7, resource:{ buffer: buf.stats } },
+    ]
+  });
+
+  const mkCompute = (entryPoint) => device.createComputePipeline({ layout: computeLayout, label: entryPoint, compute:{ module: computeModule, entryPoint } });
+  PL.clearGrid = mkCompute('clearGrid');
+  PL.bakeMoldSDF = mkCompute('bakeMoldSDF');
+  PL.p2g = mkCompute('p2g');
+  PL.gridUpdate = mkCompute('gridUpdate');
+  PL.g2p = mkCompute('g2p');
+  PL.clearStats = mkCompute('clearStats');
+  PL.reduceStats = mkCompute('reduceStats');
+
+  stage(58, 'Voxelizing mold SDF');
+  await nextFrame();
+  {
+    const enc = device.createCommandEncoder();
+    writeUniforms();
+    const pass = enc.beginComputePass();
+    pass.setBindGroup(0, computeBG);
+    pass.setPipeline(PL.bakeMoldSDF);
+    pass.dispatchWorkgroups(Math.ceil(GCELLS/64));
+    pass.end();
+    device.queue.submit([enc.finish()]);
+  }
+
+  console.log('[riser] device ready, format', canvasFormat, 'grid cells', GCELLS, 'max particles', MAX_PARTICLES);
+  window.__riser_boot_ok = true;
+
+  stage(66, 'Compiling render pipelines');
+  await nextFrame();
+  const renderErrs = await initRenderPipelines();
+  if (renderErrs) { fail('WGSL compile error', renderErrs); return; }
+
+  stage(80, 'Building render targets');
+  await nextFrame();
+  buildRenderTargets();
+  window.addEventListener('resize', () => buildRenderTargets());
+
+  installUI();
+  installDiagnostics();
+
+  stage(100, 'Ready');
+  await nextFrame();
+  loader.classList.add('done');
+  document.body.classList.add('is-live');
+
+  lastT = performance.now();
+  requestAnimationFrame(rafLoop);
+}
+
+const buf = {};
+const PL = {};
+let computeBGL, computeBG;
+const uArr = new Float32Array(40);
+function writeUniforms(){
+  const P = state.params;
+  const dt = SIM_DT;
+  uArr.set([dt, P.gravity, state.simTime, PHASE_IDX[state.phase]], 0);
+  uArr.set([GX, GY, GZ, DX], 4);
+  uArr.set([P.stiffLiquid, P.stiffSolid, P.gamma, P.viscosity], 8);
+  uArr.set([P_VOL, 1.0, state.spawned, 0], 12);
+  uArr.set([MOLD.center[0], MOLD.center[1], MOLD.center[2], MOLD.wallThickness], 16);
+  uArr.set([MOLD.halfExtents[0], MOLD.halfExtents[1], MOLD.halfExtents[2], MOLD.cornerRadius], 20);
+  uArr.set([P.liquidus, P.solidus, P.coolBase, P.coolContact], 24);
+  uArr.set([P.ambientTemp, P.moldTemp, P.pourTemp, P.damping], 28);
+  uArr.set([NOZZLE[0], NOZZLE[1], NOZZLE[2], P.pourSpeed], 32);
+  uArr.set([MOLD.floorY, CONTACT_BAND, 0, MAX_PARTICLES], 36);
+  device.queue.writeBuffer(buf.U, 0, uArr);
+}
+const SIM_DT = 1/120;
+const P_VOL = 0.42*DX*DX*DX;
+const CONTACT_BAND = DX*1.6;
+const PHASE_IDX = { idle:0, pouring:1, solidifying:2, solid:3 };
+
+function stepSim(){
+  writeUniforms();
+  const enc = device.createCommandEncoder();
+  const pass = enc.beginComputePass();
+  pass.setBindGroup(0, computeBG);
+  pass.setPipeline(PL.clearGrid); pass.dispatchWorkgroups(Math.ceil(GCELLS/64));
+  pass.setPipeline(PL.p2g); pass.dispatchWorkgroups(Math.ceil(MAX_PARTICLES/64));
+  pass.setPipeline(PL.gridUpdate); pass.dispatchWorkgroups(Math.ceil(GCELLS/64));
+  pass.setPipeline(PL.g2p); pass.dispatchWorkgroups(Math.ceil(MAX_PARTICLES/64));
+  pass.end();
+  device.queue.submit([enc.finish()]);
+  state.simTime += SIM_DT;
+
+  if (state.phase === 'pouring') {
+    state.spawned = Math.min(state.targetCount, state.spawned + state.params.pourRate*SIM_DT);
+    if (state.spawned >= state.targetCount) state.phase = 'solidifying';
+  }
+  state.activeCount = Math.round(state.spawned);
+}
+
+let statsPending = false;
+function pollStats(){
+  if (statsPending) return;
+  statsPending = true;
+  const enc = device.createCommandEncoder();
+  const pass = enc.beginComputePass();
+  pass.setBindGroup(0, computeBG);
+  pass.setPipeline(PL.clearStats); pass.dispatchWorkgroups(1);
+  pass.setPipeline(PL.reduceStats); pass.dispatchWorkgroups(Math.ceil(MAX_PARTICLES/64));
+  pass.end();
+  enc.copyBufferToBuffer(buf.stats, 0, buf.statsStaging, 0, 12);
+  device.queue.submit([enc.finish()]);
+  buf.statsStaging.mapAsync(GPUMapMode.READ).then(() => {
+    const arr = new Int32Array(buf.statsStaging.getMappedRange().slice(0));
+    buf.statsStaging.unmap();
+    const activeN = arr[2];
+    state.solidPct = activeN > 0 ? (arr[0]/65536)/activeN : 0;
+    state.peakTemp = arr[1]/65536;
+    statsPending = false;
+    if (state.phase === 'solidifying' && activeN > 0 && state.solidPct > 0.96) {
+      state.solidHoldT += 0.25; // ~ polling cadence in seconds
+      if (state.solidHoldT > 0.6) state.phase = 'solid';
+    } else {
+      state.solidHoldT = 0;
+    }
+  }).catch(()=>{ statsPending = false; });
+}
+
+async function readParticle(i){
+  const base = i*PSTRIDE*4;
+  const enc = device.createCommandEncoder();
+  enc.copyBufferToBuffer(buf.P, base, buf.staging, 0, PSTRIDE*4);
+  device.queue.submit([enc.finish()]);
+  await buf.staging.mapAsync(GPUMapMode.READ);
+  const arr = new Float32Array(buf.staging.getMappedRange().slice(0));
+  buf.staging.unmap();
+  return {
+    pos: [arr[OFF.POS], arr[OFF.POS+1], arr[OFF.POS+2]],
+    vel: [arr[OFF.VEL], arr[OFF.VEL+1], arr[OFF.VEL+2]],
+    temp: arr[OFF.TEMP],
+    solidFrac: arr[OFF.SOLID],
+    active: arr[OFF.ACTIVE],
+    J: arr[OFF.J],
+  };
+}
+
+function resetSim(){
+  const initial = new Float32Array(MAX_PARTICLES*PSTRIDE);
+  for (let p=0; p<MAX_PARTICLES; p++) initial[p*PSTRIDE + OFF.SEED] = Math.random();
+  device.queue.writeBuffer(buf.P, 0, initial);
+  state.phase = 'idle';
+  state.spawned = 0;
+  state.activeCount = 0;
+  state.simTime = 0;
+  state.moldOpacity = 1;
+  state.moldLift = 0;
+  state.solidHoldT = 0;
+  state.peakTemp = 0;
+  state.solidPct = 0;
+}
+
+function triggerPour(){
+  if (state.phase === 'pouring' || state.phase === 'solidifying') return;
+  resetSim();
+  state.phase = 'pouring';
+}
+
+let accumulator = 0, lastT = 0, statsClock = 0, frameCount = 0, fpsClock = 0, fpsCount = 0;
+function rafLoop(t){
+  requestAnimationFrame(rafLoop);
+  let dtMs = t - lastT; lastT = t;
+  if (!(dtMs > 0)) dtMs = 16.7;
+  dtMs = Math.min(dtMs, 80);
+
+  if (!state.paused) {
+    accumulator += (dtMs/1000) * state.timeScale;
+    let steps = 0;
+    while (accumulator >= SIM_DT && steps < 10) {
+      stepSim();
+      accumulator -= SIM_DT;
+      steps++;
+    }
+    statsClock += dtMs/1000;
+    if (statsClock > 0.25 && state.activeCount > 0) { statsClock = 0; pollStats(); }
+
+    // demold animation once solid
+    if (state.phase === 'solid') {
+      state.moldOpacity = Math.max(0, state.moldOpacity - dtMs/1000*0.6);
+      state.moldLift = Math.min(0.35, state.moldLift + dtMs/1000*0.18);
+      if (state.moldOpacity <= 0 && state.params.loop) {
+        triggerPour();
+      }
+    }
+  }
+
+  updateCamera(canvas.clientWidth / Math.max(1,canvas.clientHeight));
+  renderFrame();
+
+  fpsCount++; fpsClock += dtMs;
+  if (fpsClock > 500) { state.fps = Math.round(fpsCount*1000/fpsClock); fpsCount=0; fpsClock=0; }
+  updateReadout();
+}
+
+function updateReadout(){
+  $('#r-phase').textContent = state.phase;
+  $('#r-part').textContent = state.activeCount.toLocaleString() + ' / ' + state.targetCount.toLocaleString();
+  $('#r-grid').textContent = `${GX}×${GY}×${GZ}`;
+  $('#r-temp').textContent = state.peakTemp > 1 ? Math.round(state.peakTemp) + '°' : '—';
+  $('#r-solid').textContent = state.activeCount > 0 ? Math.round(state.solidPct*100) + '%' : '—';
+  $('#r-fps').textContent = state.fps ? state.fps + ' fps' : '—';
+}
+
+function installUI(){
+  window.addEventListener('keydown', (e) => {
+    if (e.target && /input|textarea/i.test(e.target.tagName)) return;
+    if (e.key === 'c' || e.key === 'C') togglePanel();
+    else if (e.key === ' ') { e.preventDefault(); state.paused = !state.paused; document.body.classList.toggle('is-paused', state.paused); }
+    else if (e.key === 'r' || e.key === 'R') resetSim();
+    else if (e.key === 'p' || e.key === 'P') triggerPour();
+    else if (e.key === 'ArrowRight') { state.timeScale = Math.min(4, +(state.timeScale*1.6).toFixed(2)); }
+    else if (e.key === 'ArrowLeft') { state.timeScale = Math.max(0.15, +(state.timeScale/1.6).toFixed(2)); }
+    else if (e.key === 'Escape') setPanel(false);
+  });
+  $('#panel-toggle').addEventListener('click', () => setPanel(true));
+  $('#panel-close').addEventListener('click', () => setPanel(false));
+  $('#reset').addEventListener('click', () => { Object.assign(state.params, DEFAULTS); resetSim(); refreshPanelValues(); });
+  buildPanel();
+  installOrbitControls();
+}
+function togglePanel(){ setPanel(!document.body.classList.contains('panel-open')); }
+function setPanel(open){
+  document.body.classList.toggle('panel-open', open);
+  $('#panel-toggle').setAttribute('aria-expanded', String(open));
+  $('#panel').setAttribute('aria-hidden', String(!open));
+}
+
+function buildPanel(){
+  const body = $('#panel-body');
+  const sliders = [
+    ['pourRate','Pour rate',200,2400,10],
+    ['gravity','Gravity',0.5,6,0.05],
+    ['viscosity','Viscosity',0,12,0.1],
+    ['coolBase','Cooling',0.01,0.25,0.005],
+    ['coolContact','Mold contact',0.2,4,0.05],
+    ['damping','Freeze lock',0.5,14,0.1],
+    ['exposure','Exposure',0.3,2.5,0.02],
+  ];
+  body.innerHTML = '<div class="grp"><div class="t">Pour</div>' +
+    sliders.map(([key,label,min,max,step]) =>
+      `<div class="row"><label>${label}</label><input type="range" data-k="${key}" min="${min}" max="${max}" step="${step}" value="${state.params[key]}"><span class="val" id="v-${key}"></span></div>`
+    ).join('') + '</div>' +
+    '<div class="grp"><div class="t">Transient</div><div class="btns">' +
+    '<button class="act" id="btn-pour">Pour</button>' +
+    '<button class="act" id="btn-loop">Loop</button>' +
+    '</div></div>';
+  body.querySelectorAll('input[type=range]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      state.params[inp.dataset.k] = parseFloat(inp.value);
+      refreshPanelValues();
+    });
+  });
+  $('#btn-pour').addEventListener('click', triggerPour);
+  $('#btn-loop').addEventListener('click', () => {
+    state.params.loop = state.params.loop ? 0 : 1;
+    $('#btn-loop').classList.toggle('on', !!state.params.loop);
+  });
+  refreshPanelValues();
+}
+function refreshPanelValues(){
+  Object.keys(state.params).forEach(k => {
+    const el = document.getElementById('v-'+k);
+    if (el) el.textContent = typeof state.params[k] === 'number' ? state.params[k].toFixed(k==='pourRate'?0:2) : state.params[k];
+    const inp = document.querySelector(`input[data-k="${k}"]`);
+    if (inp) inp.value = state.params[k];
+  });
+}
+
+function installOrbitControls(){
+  let dragging = false, lx=0, ly=0;
+  canvas.addEventListener('pointerdown', e => { dragging=true; lx=e.clientX; ly=e.clientY; canvas.setPointerCapture(e.pointerId); document.body.classList.add('is-orbiting'); });
+  canvas.addEventListener('pointerup', e => { dragging=false; document.body.classList.remove('is-orbiting'); });
+  canvas.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dx = e.clientX-lx, dy = e.clientY-ly; lx=e.clientX; ly=e.clientY;
+    camera.yaw -= dx*0.006;
+    camera.pitch += dy*0.006;
+  });
+  canvas.addEventListener('wheel', e => { e.preventDefault(); camera.dist *= Math.exp(e.deltaY*0.001); }, { passive:false });
+}
+
+function installDiagnostics(){
+  window.__riser = {
+    get phase(){ return state.phase; },
+    get particleCount(){ return state.activeCount; },
+    get targetCount(){ return state.targetCount; },
+    get maxParticles(){ return MAX_PARTICLES; },
+    get simTime(){ return state.simTime; },
+    get peakTemp(){ return state.peakTemp; },
+    get solidPct(){ return state.solidPct; },
+    get grid(){ return [GX,GY,GZ]; },
+    pour(){ triggerPour(); },
+    reset(){ resetSim(); },
+    setParticleTarget(n){ state.targetCount = Math.max(1, Math.min(MAX_PARTICLES, n|0)); },
+    sample(i){ return readParticle(i|0); },
+    pollStatsNow(){ pollStats(); },
+  };
+}
+
+/* ── render setup ─────────────────────────────────────────────────────── */
+const RT = {}; const RPL = {}; const RBG = {};
+let renderModule;
+const ruArr = new Float32Array(60);
+
+async function initRenderPipelines(){
+  renderModule = device.createShaderModule({ code: WGSL_RENDER, label:'render' });
+  const info = await renderModule.getCompilationInfo();
+  const errs = info.messages.filter(m => m.type === 'error');
+  if (errs.length) {
+    console.error('[riser] WGSL render errors', errs);
+    return errs.map(m => `line ${m.lineNum}: ${m.message}`).join('\n');
+  }
+
+  RT.ru = device.createBuffer({ size: 60*4, usage: GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST, label:'RU' });
+  RT.blurH = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST, label:'blurH' });
+  RT.blurV = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST, label:'blurV' });
+
+  const splatBGL = device.createBindGroupLayout({ entries:[
+    { binding:0, visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT, buffer:{ type:'uniform' } },
+    { binding:1, visibility:GPUShaderStage.VERTEX, buffer:{ type:'read-only-storage' } },
+  ]});
+  RPL.splatLayout = device.createPipelineLayout({ bindGroupLayouts:[splatBGL] });
+  RBG.splat = device.createBindGroup({ layout: splatBGL, entries:[
+    { binding:0, resource:{ buffer: RT.ru } },
+    { binding:1, resource:{ buffer: buf.P } },
+  ]});
+  RPL.splat = device.createRenderPipeline({
+    layout: RPL.splatLayout, label:'splat',
+    vertex:{ module: renderModule, entryPoint:'vsSplat' },
+    fragment:{ module: renderModule, entryPoint:'fsSplat', targets:[
+      { format:'r32float' }, { format:'rg32float' },
+    ]},
+    primitive:{ topology:'triangle-list' },
+    depthStencil:{ format:'depth24plus', depthWriteEnabled:true, depthCompare:'less' },
+  });
+
+  const moldBGL = device.createBindGroupLayout({ entries:[
+    { binding:0, visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT, buffer:{ type:'uniform' } },
+  ]});
+  RPL.moldLayout = device.createPipelineLayout({ bindGroupLayouts:[moldBGL] });
+  RBG.mold = device.createBindGroup({ layout: moldBGL, entries:[ { binding:0, resource:{ buffer: RT.ru } } ] });
+  RPL.mold = device.createRenderPipeline({
+    layout: RPL.moldLayout, label:'mold',
+    vertex:{ module: renderModule, entryPoint:'vsMold' },
+    fragment:{ module: renderModule, entryPoint:'fsMold', targets:[
+      { format:'rgba8unorm', blend:undefined }, { format:'r32float' },
+    ]},
+    primitive:{ topology:'triangle-list', cullMode:'none' },
+    depthStencil:{ format:'depth24plus', depthWriteEnabled:true, depthCompare:'less' },
+  });
+
+  const blurBGL = device.createBindGroupLayout({ entries:[
+    { binding:0, visibility:GPUShaderStage.FRAGMENT, buffer:{ type:'uniform' } },
+    { binding:1, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'unfilterable-float' } },
+    { binding:2, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'unfilterable-float' } },
+  ]});
+  RPL.blurLayout = device.createPipelineLayout({ bindGroupLayouts:[blurBGL] });
+  RPL.blur = device.createRenderPipeline({
+    layout: RPL.blurLayout, label:'blur',
+    vertex:{ module: renderModule, entryPoint:'vsFull' },
+    fragment:{ module: renderModule, entryPoint:'fsBlur', targets:[ { format:'r32float' }, { format:'rg32float' } ] },
+    primitive:{ topology:'triangle-list' },
+  });
+  RBG.blurBGL = blurBGL;
+
+  const compBGL = device.createBindGroupLayout({ entries:[
+    { binding:0, visibility:GPUShaderStage.FRAGMENT, buffer:{ type:'uniform' } },
+    { binding:1, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'unfilterable-float' } },
+    { binding:2, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'unfilterable-float' } },
+    { binding:3, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'unfilterable-float' } },
+    { binding:4, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'unfilterable-float' } },
+  ]});
+  RPL.compLayout = device.createPipelineLayout({ bindGroupLayouts:[compBGL] });
+  RPL.comp = device.createRenderPipeline({
+    layout: RPL.compLayout, label:'composite',
+    vertex:{ module: renderModule, entryPoint:'vsFull' },
+    fragment:{ module: renderModule, entryPoint:'fsComposite', targets:[ { format: canvasFormat } ] },
+    primitive:{ topology:'triangle-list' },
+  });
+  RBG.compBGL = compBGL;
+}
+
+let renderW = 0, renderH = 0;
+function buildRenderTargets(){
+  const dpr = Math.min(window.devicePixelRatio||1, 1.5);
+  let w = Math.round((canvas.clientWidth||960) * dpr);
+  let h = Math.round((canvas.clientHeight||600) * dpr);
+  w = Math.max(64, Math.min(w, 1600));
+  h = Math.max(64, Math.min(h, 960));
+  if (w === renderW && h === renderH && RT.final) return;
+  renderW = w; renderH = h;
+  canvas.width = w; canvas.height = h;
+
+  const mk = (format, extra) => device.createTexture({ size:[w,h], format, usage: GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING|(extra||0) });
+  for (const k of ['fluidDepthA','fluidDepthB']) RT[k] = mk('r32float');
+  for (const k of ['fluidMatA','fluidMatB']) RT[k] = mk('rg32float');
+  RT.moldColor = mk('rgba8unorm');
+  RT.moldDepth = mk('r32float');
+  RT.final = device.createTexture({ size:[w,h], format:canvasFormat, usage: GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC });
+  RT.splatDepthAtt = device.createTexture({ size:[w,h], format:'depth24plus', usage: GPUTextureUsage.RENDER_ATTACHMENT });
+  RT.moldDepthAtt = device.createTexture({ size:[w,h], format:'depth24plus', usage: GPUTextureUsage.RENDER_ATTACHMENT });
+
+  device.queue.writeBuffer(RT.blurH, 0, new Float32Array([1/w, 1/h, 1, 0]));
+  device.queue.writeBuffer(RT.blurV, 0, new Float32Array([1/w, 1/h, 0, 1]));
+
+  RBG.blurAtoB = device.createBindGroup({ layout: RBG.blurBGL, entries:[
+    { binding:0, resource:{ buffer: RT.blurH } },
+    { binding:1, resource: RT.fluidDepthA.createView() },
+    { binding:2, resource: RT.fluidMatA.createView() },
+  ]});
+  RBG.blurBtoA = device.createBindGroup({ layout: RBG.blurBGL, entries:[
+    { binding:0, resource:{ buffer: RT.blurV } },
+    { binding:1, resource: RT.fluidDepthB.createView() },
+    { binding:2, resource: RT.fluidMatB.createView() },
+  ]});
+  RBG.comp = device.createBindGroup({ layout: RBG.compBGL, entries:[
+    { binding:0, resource:{ buffer: RT.ru } },
+    { binding:1, resource: RT.moldColor.createView() },
+    { binding:2, resource: RT.moldDepth.createView() },
+    { binding:3, resource: RT.fluidDepthA.createView() },
+    { binding:4, resource: RT.fluidMatA.createView() },
+  ]});
+}
+
+const lightViewCache = new Float32Array(4);
+function transformDirToView(dir){
+  const v = camera.view;
+  return [
+    v[0]*dir[0]+v[4]*dir[1]+v[8]*dir[2],
+    v[1]*dir[0]+v[5]*dir[1]+v[9]*dir[2],
+    v[2]*dir[0]+v[6]*dir[1]+v[10]*dir[2],
+    0,
+  ];
+}
+
+function renderFrame(){
+  if (!RT.final) return;
+  const P = state.params;
+  ruArr.set(camera.view, 0);
+  ruArr.set(camera.proj, 16);
+  ruArr.set([camera.aspect, camera.tanHalfFovY, particleSplatRadius(state.targetCount), P.exposure], 32);
+  ruArr.set([renderW, renderH, state.moldOpacity, state.moldLift], 36);
+  ruArr.set([P.liquidus, P.solidus, P.pourTemp, P.ambientTemp], 40);
+  ruArr.set(transformDirToView([0.42,0.78,0.32]), 44);
+  ruArr.set(transformDirToView([-0.5,0.25,-0.6]), 48);
+  ruArr.set([MOLD.center[0],MOLD.center[1],MOLD.center[2],MOLD.wallThickness], 52);
+  ruArr.set([MOLD.halfExtents[0],MOLD.halfExtents[1],MOLD.halfExtents[2],MOLD.cornerRadius], 56);
+  device.queue.writeBuffer(RT.ru, 0, ruArr);
+
+  const enc = device.createCommandEncoder();
+
+  // mold shell
+  {
+    const pass = enc.beginRenderPass({
+      colorAttachments:[
+        { view: RT.moldColor.createView(), clearValue:{r:0,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
+        { view: RT.moldDepth.createView(), clearValue:{r:FAR_SENTINEL,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
+      ],
+      depthStencilAttachment:{ view: RT.moldDepthAtt.createView(), depthClearValue:1.0, depthLoadOp:'clear', depthStoreOp:'discard' },
+    });
+    if (state.moldOpacity > 0.002) {
+      pass.setPipeline(RPL.mold);
+      pass.setBindGroup(0, RBG.mold);
+      pass.draw(30);
+    }
+    pass.end();
+  }
+
+  // particle depth+material splat
+  {
+    const pass = enc.beginRenderPass({
+      colorAttachments:[
+        { view: RT.fluidDepthA.createView(), clearValue:{r:FAR_SENTINEL,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
+        { view: RT.fluidMatA.createView(), clearValue:{r:0,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
+      ],
+      depthStencilAttachment:{ view: RT.splatDepthAtt.createView(), depthClearValue:1.0, depthLoadOp:'clear', depthStoreOp:'discard' },
+    });
+    if (state.activeCount > 0) {
+      pass.setPipeline(RPL.splat);
+      pass.setBindGroup(0, RBG.splat);
+      pass.draw(6, state.activeCount); // indices < activeCount are always active (strict spawn order)
+    }
+    pass.end();
+  }
+
+  // bilateral blur: A -> B -> A
+  {
+    const pass = enc.beginRenderPass({ colorAttachments:[
+      { view: RT.fluidDepthB.createView(), clearValue:{r:FAR_SENTINEL,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
+      { view: RT.fluidMatB.createView(), clearValue:{r:0,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
+    ]});
+    pass.setPipeline(RPL.blur);
+    pass.setBindGroup(0, RBG.blurAtoB);
+    pass.draw(3);
+    pass.end();
+  }
+  {
+    const pass = enc.beginRenderPass({ colorAttachments:[
+      { view: RT.fluidDepthA.createView(), clearValue:{r:FAR_SENTINEL,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
+      { view: RT.fluidMatA.createView(), clearValue:{r:0,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
+    ]});
+    pass.setPipeline(RPL.blur);
+    pass.setBindGroup(0, RBG.blurBtoA);
+    pass.draw(3);
+    pass.end();
+  }
+
+  // composite
+  {
+    const pass = enc.beginRenderPass({ colorAttachments:[
+      { view: RT.final.createView(), clearValue:{r:0,g:0,b:0,a:1}, loadOp:'clear', storeOp:'store' },
+    ]});
+    pass.setPipeline(RPL.comp);
+    pass.setBindGroup(0, RBG.comp);
+    pass.draw(3);
+    pass.end();
+  }
+
+  const canvasTex = ctx.getCurrentTexture();
+  enc.copyTextureToTexture({ texture: RT.final }, { texture: canvasTex }, [renderW, renderH, 1]);
+
+  device.queue.submit([enc.finish()]);
+}
+
+init();
+
+})();
+</script>
+</body>
+</html>
