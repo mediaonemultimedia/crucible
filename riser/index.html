@@ -290,6 +290,19 @@ const MOLD = {
 MOLD.center = [DOMAIN[0]*0.5, MOLD.floorY + MOLD.halfExtents[1], DOMAIN[2]*0.5];
 const NOZZLE = [MOLD.center[0]-0.10, DOMAIN[1]-6*DX, MOLD.center[2]+0.02];
 
+// Interior (cavity) volume, wall thickness subtracted from each half-extent —
+// used to size particle splats so neighbors overlap on screen regardless of
+// particle count (see particleSplatRadius below).
+const CAVITY_VOLUME =
+  2*(MOLD.halfExtents[0]-MOLD.wallThickness) *
+  2*(MOLD.halfExtents[1]-MOLD.wallThickness) *
+  2*(MOLD.halfExtents[2]-MOLD.wallThickness);
+const SPLAT_RADIUS_K = 2.0; // hand-tuned: 1.5–2.5 gives solid neighbor overlap
+function particleSplatRadius(particleCount){
+  const perParticleVol = CAVITY_VOLUME / Math.max(1, particleCount);
+  return SPLAT_RADIUS_K * Math.cbrt(perParticleVol);
+}
+
 const DEFAULTS = {
   gravity: 2.6,
   stiffLiquid: 5.0,
@@ -541,7 +554,15 @@ fn p2g(@builtin(global_invocation_id) gid: vec3<u32>) {
   let pressure = stiff * (pow(1.0/Jc, gammaP) - 1.0);
   let pVol = U[3].x;
   let dt = U[0].x;
-  let stressCoeff = -dt*4.0*pVol*invdx*invdx*pressure;
+  // Cauchy stress for a pressure-only material is -pressure*I; the MLS-MPM
+  // affine force contribution is -dt*4*Vol*invdx^2*stress, so the diagonal
+  // term added to the affine matrix is +dt*4*Vol*invdx^2*pressure (positive
+  // under compression, pushing neighbors apart to relieve it). The prior
+  // negative coefficient flipped this into an anti-restoring force: any
+  // deviation from rest volume was amplified rather than corrected, which
+  // stayed mild at low liquid stiffness but blew solidified clumps apart
+  // once stiffSolid's much larger magnitude took over.
+  let stressCoeff = dt*4.0*pVol*invdx*invdx*pressure;
 
   let a00 = mass*c00 + stressCoeff; let a01 = mass*c01; let a02 = mass*c02;
   let a10 = mass*c10; let a11 = mass*c11 + stressCoeff; let a12 = mass*c12;
@@ -1523,7 +1544,7 @@ function renderFrame(){
   const P = state.params;
   ruArr.set(camera.view, 0);
   ruArr.set(camera.proj, 16);
-  ruArr.set([camera.aspect, camera.tanHalfFovY, 0.017, P.exposure], 32);
+  ruArr.set([camera.aspect, camera.tanHalfFovY, particleSplatRadius(state.targetCount), P.exposure], 32);
   ruArr.set([renderW, renderH, state.moldOpacity, state.moldLift], 36);
   ruArr.set([P.liquidus, P.solidus, P.pourTemp, P.ambientTemp], 40);
   ruArr.set(transformDirToView([0.42,0.78,0.32]), 44);
