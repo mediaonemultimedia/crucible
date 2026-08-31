@@ -4441,6 +4441,28 @@ float hingeDist(float x) {
   return uHingeSign * x + 0.5;
 }
 
+float hash1(float n) { return fract(sin(n) * 43758.5453123); }
+float valueNoise1D(float x) {
+  float i = floor(x);
+  float f = fract(x);
+  float a = hash1(i);
+  float b = hash1(i + 1.0);
+  return mix(a, b, smoothstep(0.0, 1.0, f));
+}
+
+// Irregular offset for the active fold line, as a function of position
+// across the panel's height \u2014 without this the peel boundary is a perfectly
+// straight ruled edge, which reads as synthetic. creaseScale sets how fine
+// the wobble is; amp is pre-scaled by crinkle and faded in with progress by
+// the caller so the sheet still closes perfectly flat at rest.
+float edgeWaviness(float v, float creaseScale, float amp) {
+  float freq = mix(2.5, 9.0, creaseScale);
+  float n = valueNoise1D(v * freq + uHingeSign * 7.3) * 0.55
+          + valueNoise1D(v * freq * 2.3 + uHingeSign * 2.1) * 0.30
+          + valueNoise1D(v * freq * 4.7 + uHingeSign * 9.7) * 0.15;
+  return (n - 0.5) * 2.0 * amp;
+}
+
 // Sum of seeded crease facets: each is a smooth ridge/valley band along a
 // random direction through the unit square, faceted (steep power curve)
 // rather than a smooth sine so it reads as stiff paper, not cloth.
@@ -4464,7 +4486,13 @@ float facetSum(float u, float v, float freqScale) {
 
 // Returns the bent local position (still in the plane's own XY/Z=0 frame,
 // Z is "lift" \u2014 becomes world "up" after the mesh's flat rotation).
-vec3 bend(vec2 pos, float foldLine, float hingeWidth, float finalAngle, out float bendAmount, out float foldProximity) {
+vec3 bend(vec2 pos, float baseFoldLine, float hingeWidth, float finalAngle, out float bendAmount, out float foldProximity) {
+  // the fold line wobbles along the panel's height instead of running dead
+  // straight \u2014 faded in with progress so the sheet still closes perfectly
+  // flat at rest, same as the fold itself.
+  float waveFade = smoothstep(0.015, 0.12, uProgress);
+  float foldLine = baseFoldLine + edgeWaviness(pos.y + 0.5, uCreaseScale, uCrinkle * 0.1 * waveFade);
+
   float d = hingeDist(pos.x);
   // one-sided: guarantees bendAmount is exactly 0 at d == foldLine, so the
   // resting sheet (foldLine pinned at the free edge, d <= 1 == foldLine) is
@@ -4501,17 +4529,17 @@ vec3 bend(vec2 pos, float foldLine, float hingeWidth, float finalAngle, out floa
 void main() {
   vUv = uv;
 
-  float foldLine = mix(1.0, -0.18, uProgress);
+  float baseFoldLine = mix(1.0, -0.18, uProgress);
   float hingeWidth = mix(0.34, 0.035, uFoldSharpness);
   float finalAngle = mix(radians(55.0), radians(205.0), uLiftHeight);
 
   float bendAmount, foldProximity;
-  vec3 p0 = bend(position.xy, foldLine, hingeWidth, finalAngle, bendAmount, foldProximity);
+  vec3 p0 = bend(position.xy, baseFoldLine, hingeWidth, finalAngle, bendAmount, foldProximity);
 
   float e = 0.006;
   float bA, fP;
-  vec3 pu = bend(position.xy + vec2(e, 0.0), foldLine, hingeWidth, finalAngle, bA, fP);
-  vec3 pv = bend(position.xy + vec2(0.0, e), foldLine, hingeWidth, finalAngle, bA, fP);
+  vec3 pu = bend(position.xy + vec2(e, 0.0), baseFoldLine, hingeWidth, finalAngle, bA, fP);
+  vec3 pv = bend(position.xy + vec2(0.0, e), baseFoldLine, hingeWidth, finalAngle, bA, fP);
 
   vec3 tangentU = (pu - p0) / e;
   vec3 tangentV = (pv - p0) / e;
