@@ -4463,12 +4463,16 @@ float edgeWaviness(float v, float creaseScale, float amp) {
   return (n - 0.5) * 2.0 * amp;
 }
 
-// Sum of seeded crease facets: each is a smooth ridge/valley band along a
-// random direction through the unit square, faceted (steep power curve)
-// rather than a smooth sine so it reads as stiff paper, not cloth.
+// Sum of seeded crease facets: each is a sharp-edged ridge/valley band along
+// a random direction through the unit square \u2014 a linear-falloff fold with a
+// steep power curve, not a smoothstep bump, so it reads as a hard crease in
+// stiff paper rather than a soft cloth undulation. A second, narrower pass
+// over the same lines adds a sharp micro-crease riding inside the broader
+// dent, the way real heavy paper creases at more than one scale at once.
 float facetSum(float u, float v, float freqScale) {
   vec2 p = vec2(u, v);
   float sum = 0.0;
+  float fineSum = 0.0;
   for (int i = 0; i < 9; i++) {
     int base = i * 4;
     vec2 dir = vec2(uFacets[base + 0], uFacets[base + 1]);
@@ -4476,12 +4480,18 @@ float facetSum(float u, float v, float freqScale) {
     float signedWeight = uFacets[base + 3];
     vec2 perp = vec2(-dir.y, dir.x);
     float dist = dot(p - vec2(0.5), perp) - off * 0.5;
-    float width = mix(0.30, 0.05, freqScale);
-    float band = 1.0 - smoothstep(0.0, width, abs(dist));
-    band = pow(band, 1.6);
+    float width = mix(0.26, 0.035, freqScale);
+
+    float band = 1.0 - clamp(abs(dist) / width, 0.0, 1.0);
+    band = pow(band, 2.2);
     sum += band * signedWeight;
+
+    float fineWidth = width * 0.32;
+    float fineBand = 1.0 - clamp(abs(dist) / fineWidth, 0.0, 1.0);
+    fineBand = pow(fineBand, 3.0);
+    fineSum += fineBand * signedWeight;
   }
-  return sum / float(9);
+  return (sum + fineSum * 0.5) / float(9);
 }
 
 // Returns the bent local position (still in the plane's own XY/Z=0 frame,
@@ -4503,7 +4513,13 @@ vec3 bend(vec2 pos, float baseFoldLine, float hingeWidth, float finalAngle, out 
 
   float xHinge = uHingeSign * (foldLine - 0.5);
   float arcLen = (pos.x - xHinge) * uHingeSign;
-  float angle = bendAmount * finalAngle;
+
+  // rigid paper doesn't sweep through a perfect circular arc the way cloth
+  // would \u2014 it kinks unevenly across its width. A coarse per-row wobble on
+  // the rotation angle itself (not just a surface bump) breaks that up,
+  // ramping in with the bend so there's no seam at the hinge line.
+  float kink = (valueNoise1D(pos.y * 3.1 + uHingeSign * 4.4) - 0.5) * 2.0;
+  float angle = bendAmount * finalAngle + kink * uCrinkle * 0.3 * bendAmount;
 
   float rotX = arcLen * cos(angle);
   float rotZ = arcLen * sin(angle);
@@ -4511,9 +4527,13 @@ vec3 bend(vec2 pos, float baseFoldLine, float hingeWidth, float finalAngle, out 
   float x = xHinge + rotX * uHingeSign;
   float z = rotZ;
 
-  // crinkle: local buckle riding on top of the hinge fold, strongest right
-  // at the active crease line, faded in only once the panel starts moving.
-  float crinkleAmp = uCrinkle * 0.11 * foldProximity;
+  // crinkle: buckle across the whole bent/curled region, not just a thin
+  // band at the active crease \u2014 real paper keeps its creases as it's
+  // carried further into the peel, it doesn't smooth back out. The crease
+  // line itself still gets extra emphasis on top of that baseline.
+  float spreadMask = smoothstep(0.0, 0.15, bendAmount) * 0.8;
+  float crinkleMask = max(spreadMask, foldProximity);
+  float crinkleAmp = uCrinkle * 0.17 * crinkleMask;
   float facets = facetSum(pos.x + 0.5, pos.y + 0.5, uCreaseScale);
   z += facets * crinkleAmp;
 
@@ -4589,7 +4609,7 @@ void main() {
 
   float diff = max(dot(N, L), 0.0);
   float wrap = max(dot(N, L) * 0.5 + 0.5, 0.0);
-  float lighting = mix(wrap, diff, 0.55);
+  float lighting = mix(wrap, diff, 0.68);
 
   vec3 H = normalize(L + V);
   float spec = pow(max(dot(N, H), 0.0), 22.0) * 0.18;
