@@ -442,6 +442,10 @@ const DEFAULTS = {
   exposure: 1.3,
   hue: 195,
   autoLoop: 0,
+  steer: 0.5,
+  chroma: 0.0018,
+  vignette: 0.38,
+  grain: 0.035,
 };
 let S = Object.assign({}, DEFAULTS);
 let uColorArr = hslToRgb(S.hue, 0.85, 0.60);
@@ -573,14 +577,28 @@ function relax(iterations){
   }
 }
 
+const _biasPos = [0,0,0];
 function growOne(){
   if (frontierList.length === 0) return false;
   if (clusterSize >= S.maxCells) return false;
   const n = frontierList.length;
   if (weightScratch.length < n) weightScratch.length = n;
   let total = 0;
+  // Continuous cursor steering: the cursor's live 3D target (a plane through
+  // the origin facing the camera, updated once per frame — see frame()) biases
+  // candidate selection toward whichever frontier cells sit closer to it, on
+  // top of the base phi^eta dielectric-breakdown weight. This is deliberately
+  // a soft multiplicative nudge, not a hard override — growth should still
+  // read as fractal lightning reacting to you, not a cursor-chasing snake.
+  const steer = cursorTarget3D;
+  const sharpness = steer ? S.steer * S.steer * 6.0 : 0;
   for (let k=0; k<n; k++){
-    const w = Math.pow(Math.max(phi[frontierList[k]], 1e-4), S.eta);
+    let w = Math.pow(Math.max(phi[frontierList[k]], 1e-4), S.eta);
+    if (steer){
+      cellPos(frontierList[k], _biasPos);
+      const dx=_biasPos[0]-steer[0], dy=_biasPos[1]-steer[1], dz=_biasPos[2]-steer[2];
+      w *= Math.exp(-(dx*dx+dy*dy+dz*dz) * sharpness);
+    }
     weightScratch[k] = w; total += w;
   }
   let sel;
@@ -681,6 +699,19 @@ function pickRay(clientX, clientY){
   const dir = vnorm(vadd(vadd(camFwd, vscale(camRight, ndcX*halfW)), vscale(camUp, ndcY*halfH)));
   return { origin: camEye.slice(), dir };
 }
+// Cursor steering: intersect the pick ray with the plane through the origin
+// (the growth is always centered there) facing the camera. Gives a 3D point
+// that tracks the cursor naturally across the whole canvas, not just when
+// it's directly over the sphere.
+function rayPlaneOrigin(ray){
+  const denom = vdot(ray.dir, camFwd);
+  if (Math.abs(denom) < 1e-6) return null;
+  const t = -vdot(ray.origin, camFwd) / denom;
+  if (t < 0) return null;
+  return vadd(ray.origin, vscale(ray.dir, t));
+}
+let hoverX = null, hoverY = null;
+let cursorTarget3D = null;
 function raySphere(origin, dir, radius){
   const b = vdot(origin, dir);
   const c = vdot(origin,origin) - radius*radius;
@@ -819,14 +850,44 @@ uniform sampler2D uScene;
 uniform sampler2D uBloom;
 uniform float uBloomStrength;
 uniform float uExposure;
+uniform float uChroma;
+uniform float uVignette;
+uniform float uGrain;
+uniform float uTime;
 out vec4 fragColor;
+
+float hash12(vec2 p){
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
 void main(){
-  vec3 scene = texture(uScene, vUV).rgb;
-  vec3 bloom = texture(uBloom, vUV).rgb;
+  vec2 c = vUV - 0.5;
+  float d2 = dot(c, c);
+  vec2 dir = d2 > 1e-8 ? c * inversesqrt(d2) : vec2(0.0);
+  float aberr = uChroma * d2;
+  vec2 off = dir * aberr;
+
+  vec3 scene, bloom;
+  scene.r = texture(uScene, vUV - off).r;
+  scene.g = texture(uScene, vUV).g;
+  scene.b = texture(uScene, vUV + off).b;
+  bloom.r = texture(uBloom, vUV - off).r;
+  bloom.g = texture(uBloom, vUV).g;
+  bloom.b = texture(uBloom, vUV + off).b;
+
   vec3 hdr = scene + bloom * uBloomStrength;
   vec3 mapped = vec3(1.0) - exp(-hdr * uExposure);
   mapped = pow(mapped, vec3(1.0/2.2));
-  fragColor = vec4(mapped, 1.0);
+
+  float vig = 1.0 - uVignette * smoothstep(0.35, 0.95, sqrt(d2));
+  mapped *= vig;
+
+  float g = (hash12(vUV*vec2(1920.0,1080.0) + uTime*47.13) - 0.5) * uGrain;
+  mapped += g;
+
+  fragColor = vec4(clamp(mapped, 0.0, 1.0), 1.0);
 }`;
 
 /* ── GL setup ──────────────────────────────────────────────────────────── */
@@ -875,7 +936,9 @@ function compileShaders(){
             uColor:gl.getUniformLocation(tubeProg,'uColor'), uIntensity:gl.getUniformLocation(tubeProg,'uIntensity') };
   blurU = { uTex:gl.getUniformLocation(blurProg,'uTex'), uTexel:gl.getUniformLocation(blurProg,'uTexel'), uDir:gl.getUniformLocation(blurProg,'uDir') };
   compU = { uScene:gl.getUniformLocation(compositeProg,'uScene'), uBloom:gl.getUniformLocation(compositeProg,'uBloom'),
-            uBloomStrength:gl.getUniformLocation(compositeProg,'uBloomStrength'), uExposure:gl.getUniformLocation(compositeProg,'uExposure') };
+            uBloomStrength:gl.getUniformLocation(compositeProg,'uBloomStrength'), uExposure:gl.getUniformLocation(compositeProg,'uExposure'),
+            uChroma:gl.getUniformLocation(compositeProg,'uChroma'), uVignette:gl.getUniformLocation(compositeProg,'uVignette'),
+            uGrain:gl.getUniformLocation(compositeProg,'uGrain'), uTime:gl.getUniformLocation(compositeProg,'uTime') };
 }
 
 function buildSphere(lat, lon, radius){
@@ -1095,6 +1158,10 @@ function renderFrame(){
   gl.uniform1i(compU.uBloom, 1);
   gl.uniform1f(compU.uBloomStrength, S.bloom);
   gl.uniform1f(compU.uExposure, S.exposure);
+  gl.uniform1f(compU.uChroma, S.chroma);
+  gl.uniform1f(compU.uVignette, S.vignette);
+  gl.uniform1f(compU.uGrain, S.grain);
+  gl.uniform1f(compU.uTime, lastT/1000);
   drawQuad();
 }
 
@@ -1118,11 +1185,19 @@ const SPEC = [
   ['Substrate', [
     { k:'tubeRadius', t:'rng', l:'Tube radius', min:0.010, max:0.060, step:0.001, f:v=>v.toFixed(3) },
   ]],
+  ['Interaction', [
+    { k:'steer', t:'rng', l:'Cursor steer', min:0, max:1, step:0.02, f:v=>v.toFixed(2) },
+  ]],
   ['Render', [
     { k:'hue', t:'rng', l:'Hue', min:0, max:360, step:1, f:v=>v.toFixed(0)+'°' },
     { k:'intensity', t:'rng', l:'Intensity', min:0.3, max:2.2, step:0.02, f:v=>v.toFixed(2) },
     { k:'bloom', t:'rng', l:'Bloom', min:0, max:2.0, step:0.02, f:v=>v.toFixed(2) },
     { k:'exposure', t:'rng', l:'Exposure', min:0.4, max:2.6, step:0.02, f:v=>v.toFixed(2) },
+  ]],
+  ['Post', [
+    { k:'chroma', t:'rng', l:'Chromatic aberration', min:0, max:0.006, step:0.0001, f:v=>v.toFixed(4) },
+    { k:'vignette', t:'rng', l:'Vignette', min:0, max:0.8, step:0.02, f:v=>v.toFixed(2) },
+    { k:'grain', t:'rng', l:'Film grain', min:0, max:0.12, step:0.002, f:v=>v.toFixed(3) },
   ]],
   ['Playback', [
     { k:'autoLoop', t:'seg', l:'Auto-replay', o:[[0,'Off'],[1,'On']] },
@@ -1242,6 +1317,7 @@ function bindInput(){
     document.body.classList.add('is-orbiting');
   });
   canvas.addEventListener('pointermove', e => {
+    hoverX = e.clientX; hoverY = e.clientY;
     if (!ORBIT.dragging) return;
     const dx = e.clientX-ORBIT.px, dy = e.clientY-ORBIT.py;
     if (Math.hypot(e.clientX-downX, e.clientY-downY) > 4) moved = true;
@@ -1249,6 +1325,7 @@ function bindInput(){
     ORBIT.el = clampf(ORBIT.el + dy*0.0034, ORBIT.EL_MIN, ORBIT.EL_MAX);
     ORBIT.px = e.clientX; ORBIT.py = e.clientY;
   }, {passive:true});
+  canvas.addEventListener('pointerleave', () => { hoverX = null; hoverY = null; }, {passive:true});
   const up = e => {
     if (ORBIT.dragging && !moved){
       const ray = pickRay(e.clientX, e.clientY);
@@ -1385,6 +1462,7 @@ function loop(t){
   fpsAcc += dt; fpsCount++;
   if (fpsAcc >= 0.5){ fpsShown = fpsCount/fpsAcc; fpsAcc=0; fpsCount=0; }
   updateCamera(canvas.width/canvas.height);
+  cursorTarget3D = (hoverX !== null && !ORBIT.dragging) ? rayPlaneOrigin(pickRay(hoverX, hoverY)) : null;
   stepGrowth(dt);
   renderFrame();
   updateReadout();
