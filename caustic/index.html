@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07080a">
+<title>Caustic — a real-time GPU caustics study</title>
+<meta name="description" content="Light bent through a deforming glass field and pooled on a floor below, resolved as real caustics by splatting refracted photons to a texture every frame in raw WebGL2 — no baked map, no screen-space cheat.">
+<style>
+:root{
+  --bg:#07080a;
+  --ink:#e8e3d8;
+  --dim:#7b8087;
+  --faint:#4a4e54;
+  --rule:rgba(232,227,216,.11);
+  --rule-2:rgba(232,227,216,.055);
+  --accent:#c8a877;
+  --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);overflow:hidden;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+canvas#stage{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+body.is-orbiting canvas#stage{cursor:grabbing}
+
+#veil{
+  position:fixed;inset:0;pointer-events:none;z-index:2;
+  background:
+    linear-gradient(to bottom,rgba(7,8,10,.72) 0%,rgba(7,8,10,.28) 8%,rgba(7,8,10,0) 17%),
+    linear-gradient(to top,rgba(7,8,10,.80) 0%,rgba(7,8,10,.34) 9%,rgba(7,8,10,0) 20%),
+    radial-gradient(126% 92% at 50% 46%,transparent 46%,rgba(0,0,0,.30) 86%,rgba(0,0,0,.58) 100%);
+}
+
+#ui{position:fixed;inset:0;z-index:5;pointer-events:none;opacity:0;transition:opacity 1s cubic-bezier(.4,0,.2,1) .2s}
+body.is-live #ui{opacity:1}
+#ui > *{pointer-events:auto}
+
+.eyebrow{font-family:var(--mono);font-size:9.5px;letter-spacing:.20em;text-transform:uppercase;color:var(--faint)}
+
+#mark,#readout,#method,#credit,#panel-toggle{text-shadow:0 0 14px var(--bg),0 0 6px var(--bg),0 0 2px var(--bg)}
+
+#mark{position:absolute;top:26px;left:30px;display:flex;align-items:flex-start;gap:12px}
+#mark .col{display:flex;flex-direction:column}
+#mark .w{font-size:15px;font-weight:300;letter-spacing:.52em;text-transform:uppercase;line-height:1;padding-top:1px;white-space:nowrap}
+#mark .sub{margin-top:9px;display:block}
+#mark .sx-wrap{position:relative;display:inline-block}
+#mark a.ix{
+  text-decoration:none;display:inline-block;cursor:pointer;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--accent);
+  border:1px solid rgba(200,168,119,.32);padding:2px 4px 1px;line-height:1;white-space:nowrap;
+}
+#mark a.ix:hover,#mark .sx-wrap:focus-within a.ix{border-color:rgba(200,168,119,.68);color:var(--ink)}
+#mark a.ix:focus-visible{outline:1px solid rgba(200,168,119,.7);outline-offset:2px}
+#mark .sx-menu{
+  position:absolute;top:calc(100% + 8px);left:0;min-width:210px;
+  background:rgba(9,10,12,.94);border:1px solid var(--rule);
+  padding:8px 0;display:flex;flex-direction:column;
+  opacity:0;visibility:hidden;transform:translateY(-4px);
+  transition:opacity .2s ease,transform .2s ease,visibility 0s linear .2s;
+  z-index:9;
+}
+#mark .sx-wrap:hover .sx-menu,#mark .sx-wrap:focus-within .sx-menu{
+  opacity:1;visibility:visible;transform:translateY(0);transition-delay:0s;
+}
+#mark .sx-menu .sx-hd{
+  font-family:var(--mono);font-size:8px;letter-spacing:.20em;text-transform:uppercase;
+  color:var(--faint);padding:4px 14px 8px;border-bottom:1px solid var(--rule-2);margin-bottom:4px;
+  text-decoration:none;
+}
+a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
+#mark .sx-menu a,#mark .sx-menu span.sx-i{
+  display:flex;gap:10px;align-items:baseline;padding:5px 14px;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;color:var(--dim);
+  text-decoration:none;transition:color .18s ease,background .18s ease;
+}
+#mark .sx-menu a:hover,#mark .sx-menu a:focus-visible{background:rgba(232,227,216,.05);color:var(--ink);outline:none}
+#mark .sx-menu .sx-n{color:var(--faint);flex:0 0 auto;transition:color .18s ease}
+#mark .sx-menu a:hover .sx-n,#mark .sx-menu a:focus-visible .sx-n{color:var(--accent)}
+#mark .sx-menu .sx-here{color:var(--accent)}
+#mark .sx-menu .sx-here .sx-n{color:var(--accent)}
+
+#readout{position:absolute;left:30px;bottom:74px;font-family:var(--mono);font-size:10px;line-height:1.85;color:var(--dim);letter-spacing:.03em}
+#readout dl{margin:0;display:grid;grid-template-columns:78px auto;column-gap:14px}
+#readout dt{color:var(--faint);text-transform:uppercase;letter-spacing:.16em;font-size:9px}
+#readout dd{margin:0;color:var(--dim);font-variant-numeric:tabular-nums}
+#readout dd#r-photons{color:var(--accent)}
+
+#method{
+  position:absolute;right:30px;bottom:74px;width:min(330px,29vw);text-align:right;
+  font-family:var(--mono);font-size:9.5px;line-height:1.95;color:var(--faint);letter-spacing:.04em;
+}
+#method b{color:var(--dim);font-weight:400}
+#method .t{display:block;margin-bottom:8px;font-size:9px;letter-spacing:.20em;text-transform:uppercase;color:rgba(232,227,216,.24)}
+body.panel-open #method{opacity:0;transition:opacity .3s ease;pointer-events:none}
+
+#credit{
+  position:absolute;left:50%;transform:translateX(-50%);bottom:26px;text-align:center;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.20em;color:var(--faint);
+  text-transform:uppercase;line-height:2;white-space:nowrap;
+}
+#credit b{color:var(--dim);font-weight:400}
+#credit .keys{color:rgba(232,227,216,.2)}
+body.is-paused #credit .keys::after{content:" · held — press space to resume";color:var(--accent)}
+
+#panel-toggle{
+  position:absolute;top:24px;right:30px;display:flex;align-items:center;gap:9px;
+  background:none;border:1px solid var(--rule);color:var(--dim);
+  font-family:var(--mono);font-size:9px;letter-spacing:.20em;text-transform:uppercase;
+  padding:7px 11px 6px;cursor:pointer;line-height:1;
+  transition:border-color .3s ease,color .3s ease;
+}
+#panel-toggle:hover{border-color:rgba(200,168,119,.42);color:var(--ink)}
+#panel-toggle .bars{display:flex;flex-direction:column;gap:2px;width:11px}
+#panel-toggle .bars i{display:block;height:1px;background:currentColor}
+#panel-toggle .bars i:nth-child(1){width:11px}
+#panel-toggle .bars i:nth-child(2){width:7px}
+#panel-toggle .bars i:nth-child(3){width:9px}
+body.panel-open #panel-toggle{opacity:0;pointer-events:none;transition:opacity .2s ease}
+
+#panel{
+  position:absolute;top:0;right:0;bottom:0;width:316px;
+  background:rgba(9,10,12,.90);
+  -webkit-backdrop-filter:blur(22px) saturate(.8);backdrop-filter:blur(22px) saturate(.8);
+  border-left:1px solid var(--rule);display:flex;flex-direction:column;
+  transform:translateX(100%);opacity:0;pointer-events:none;
+  transition:transform .52s cubic-bezier(.4,0,.2,1),opacity .38s ease;
+  z-index:6;
+}
+body.panel-open #panel{transform:translateX(0);opacity:1;pointer-events:auto}
+#panel .head{display:flex;align-items:baseline;justify-content:space-between;padding:24px 22px 16px;border-bottom:1px solid var(--rule-2);flex:none}
+#panel .head .h{font-family:var(--mono);font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink)}
+#panel-close{background:none;border:0;padding:2px 0 2px 12px;cursor:pointer;font-family:var(--mono);font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);transition:color .25s ease}
+#panel-close:hover{color:var(--accent)}
+#panel .body{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:4px 22px 22px}
+#panel .body::-webkit-scrollbar{width:3px}
+#panel .body::-webkit-scrollbar-thumb{background:var(--rule)}
+#panel .body::-webkit-scrollbar-track{background:transparent}
+
+.grp{padding:18px 0 4px;border-bottom:1px solid var(--rule-2)}
+.grp:last-of-type{border-bottom:0}
+.grp>.gt{font-family:var(--mono);font-size:8.5px;letter-spacing:.24em;text-transform:uppercase;color:rgba(232,227,216,.26);margin-bottom:14px;display:block}
+.ctl{margin-bottom:15px}
+.ctl .row{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:7px;gap:10px}
+.ctl .lb{font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);white-space:nowrap}
+.ctl .vl{font-family:var(--mono);font-size:9.5px;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:.04em;white-space:nowrap}
+
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:11px;background:none;display:block;margin:0;cursor:ew-resize}
+input[type=range]:focus{outline:none}
+input[type=range]::-webkit-slider-runnable-track{height:1px;background:var(--rule);border:0}
+input[type=range]::-moz-range-track{height:1px;background:var(--rule);border:0}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:2px;height:11px;margin-top:-5px;background:var(--accent);border:0;border-radius:0}
+input[type=range]::-moz-range-thumb{width:2px;height:11px;background:var(--accent);border:0;border-radius:0}
+input[type=range]:hover::-webkit-slider-thumb{height:15px;margin-top:-7px}
+input[type=range]:hover::-moz-range-thumb{height:15px}
+input[type=range]:focus-visible::-webkit-slider-runnable-track{background:rgba(200,168,119,.4)}
+
+.seg{display:flex;gap:0;border:1px solid var(--rule);width:100%}
+.seg button{flex:1 1 0;min-width:0;background:none;border:0;border-right:1px solid var(--rule);color:var(--faint);font-family:var(--mono);font-size:8.5px;letter-spacing:.10em;text-transform:uppercase;padding:6px 2px 5px;cursor:pointer;line-height:1;transition:color .25s ease,background .25s ease;white-space:nowrap}
+.seg button:last-child{border-right:0}
+.seg button:hover{color:var(--dim)}
+.seg button[aria-pressed=true]{color:var(--bg);background:var(--accent)}
+
+#panel .foot{flex:none;padding:14px 22px 20px;border-top:1px solid var(--rule-2);display:flex;align-items:center;justify-content:space-between;gap:10px}
+#reset{background:none;border:1px solid var(--rule);color:var(--dim);font-family:var(--mono);font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;padding:7px 12px 6px;cursor:pointer;line-height:1;transition:border-color .3s ease,color .3s ease}
+#reset:hover{border-color:rgba(200,168,119,.42);color:var(--ink)}
+#panel .foot .fx{font-family:var(--mono);font-size:8px;letter-spacing:.16em;color:rgba(232,227,216,.18);text-transform:uppercase;text-align:right}
+
+#loader{
+  position:fixed;inset:0;z-index:20;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  transition:opacity .6s ease;
+}
+body.is-live #loader{opacity:0;pointer-events:none}
+#loader .idx{font-family:var(--mono);font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--faint)}
+#loader .word{margin:0;font-size:clamp(26px,6vw,42px);font-weight:200;letter-spacing:.4em;text-transform:uppercase}
+#loader .status{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+#loader.err .status{color:#d97a6c}
+
+@media (max-width:720px){
+  #mark{top:18px;left:18px}
+  #mark .w{font-size:12px;letter-spacing:.32em}
+  #panel-toggle{top:18px;right:18px}
+  #panel{width:min(300px,86vw)}
+  #readout,#method{display:none}
+  #credit{bottom:14px;font-size:7.5px;letter-spacing:.12em;white-space:normal;width:calc(100vw - 36px);line-height:1.9}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<canvas id="stage"></canvas>
+<div id="veil"></div>
+
+<div id="ui">
+  <div id="mark">
+    <div class="col">
+      <span class="w">Caustic</span>
+      <span class="eyebrow sub">Real-time GPU caustics study</span>
+    </div>
+    <span class="sx-wrap"><a class="ix" href="../" aria-label="Study 14 — open series index">No. 14</a><nav class="sx-menu" aria-label="Series index"><a class="sx-hd" href="../">Crucible — index</a><a href="../mercury/"><span class="sx-n">03</span><span>Mercury</span></a><a href="../torsion/"><span class="sx-n">04</span><span>Torsion</span></a><a href="../torsion-2/"><span class="sx-n">05</span><span>Torsion 2.0</span></a><a href="../weft/"><span class="sx-n">06</span><span>Weft</span></a><a href="../cast/"><span class="sx-n">07</span><span>Cast</span></a><a href="../solve/"><span class="sx-n">08</span><span>Solve</span></a><a href="../torsion-pineapple/"><span class="sx-n">09</span><span>Torsion Pineapple</span></a><a href="../anneal/"><span class="sx-n">10</span><span>Anneal</span></a><a href="../living-bokeh/"><span class="sx-n">11</span><span>Living Bokeh</span></a><a href="../glyph/"><span class="sx-n">12</span><span>Glyph</span></a><a href="../cockle/"><span class="sx-n">13</span><span>Cockle</span></a><a class="sx-here" href="../caustic/" aria-current="page"><span class="sx-n">14</span><span>Caustic</span></a></nav></span>
+  </div>
+
+  <button id="panel-toggle" aria-expanded="false" aria-controls="panel">
+    <span class="bars" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span>Controls</span>
+  </button>
+
+  <div id="readout">
+    <dl>
+      <dt>Photons</dt><dd id="r-photons">—</dd>
+      <dt>IOR</dt><dd id="r-ior">—</dd>
+      <dt>Rate</dt><dd id="r-fps">—</dd>
+    </dl>
+  </div>
+
+  <div id="method">
+    <span class="t">Method</span>
+    Nothing here is a baked lightmap. Every frame, a grid of <b>photons</b> is
+    fired from the light toward the glass and traced in a <b>vertex shader</b> —
+    refracted on entry, marched through the interior, refracted again on exit —
+    then splatted as soft additive points into a floating-point texture, purely
+    by landing where they land. Density does the rest: where photons converge,
+    the texture gets bright. That texture is sampled back in the next pass,
+    while the same glass is raymarched per pixel with its own two-bounce
+    refraction for the object itself.
+  </div>
+
+  <div id="credit">
+    <b>Caustic</b> — real-time GPU caustics study 14 &nbsp;·&nbsp; photon splatting in a vertex shader &nbsp;·&nbsp; raymarched two-bounce refraction &nbsp;·&nbsp; raw WebGL2<br>
+    <span class="keys" id="keys">drag to orbit &nbsp; scroll to dolly &nbsp; ← → nudge &nbsp; c controls &nbsp; space pause &nbsp; r reset</span>
+  </div>
+
+  <aside id="panel" aria-label="Study controls" aria-hidden="true">
+    <div class="head">
+      <span class="h">Controls</span>
+      <button id="panel-close">Close · esc</button>
+    </div>
+    <div class="body" id="panel-body">
+
+      <div class="grp">
+        <span class="gt">Glass</span>
+        <div class="ctl">
+          <div class="row"><span class="lb">Index of refraction</span><span class="vl" id="v-ior">1.50</span></div>
+          <input type="range" id="s-ior" min="1.05" max="1.9" step="0.01" value="1.5">
+        </div>
+        <div class="ctl">
+          <div class="row"><span class="lb">Facet</span><span class="vl" id="v-facet">0.020</span></div>
+          <input type="range" id="s-facet" min="0" max="0.06" step="0.001" value="0.02">
+        </div>
+        <div class="ctl">
+          <div class="row"><span class="lb">Writhe speed</span><span class="vl" id="v-turb">0.60</span></div>
+          <input type="range" id="s-turb" min="0" max="1.6" step="0.01" value="0.6">
+        </div>
+        <div class="ctl">
+          <div class="row"><span class="lb">Tint</span></div>
+          <div class="seg" id="seg-tint">
+            <button data-v="clear" aria-pressed="false">Clear</button>
+            <button data-v="aqua" aria-pressed="true">Aqua</button>
+            <button data-v="amber" aria-pressed="false">Amber</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grp">
+        <span class="gt">Light</span>
+        <div class="ctl">
+          <div class="row"><span class="lb">Height</span><span class="vl" id="v-lh">2.10</span></div>
+          <input type="range" id="s-lh" min="1.2" max="3.2" step="0.01" value="2.1">
+        </div>
+        <div class="ctl">
+          <div class="row"><span class="lb">Intensity</span><span class="vl" id="v-li">1.30</span></div>
+          <input type="range" id="s-li" min="0.2" max="3" step="0.01" value="1.3">
+        </div>
+        <div class="ctl">
+          <div class="row"><span class="lb">Warmth</span></div>
+          <div class="seg" id="seg-warm">
+            <button data-v="cool" aria-pressed="false">Cool</button>
+            <button data-v="neutral" aria-pressed="false">Neutral</button>
+            <button data-v="warm" aria-pressed="true">Warm</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grp">
+        <span class="gt">Caustics</span>
+        <div class="ctl">
+          <div class="row"><span class="lb">Intensity</span><span class="vl" id="v-ci">3.40</span></div>
+          <input type="range" id="s-ci" min="0" max="6" step="0.05" value="3.4">
+        </div>
+        <div class="ctl">
+          <div class="row"><span class="lb">Photon density</span></div>
+          <div class="seg" id="seg-density">
+            <button data-v="64" aria-pressed="false">Low</button>
+            <button data-v="112" aria-pressed="true">Med</button>
+            <button data-v="176" aria-pressed="false">High</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="foot">
+      <button id="reset">Reset defaults</button>
+      <span class="fx">Study 14<br>Caustic</span>
+    </div>
+  </aside>
+</div>
+
+<div id="loader">
+  <div class="idx">Study 14</div>
+  <h1 class="word">Caustic</h1>
+  <div class="status" id="load-status">Compiling shaders</div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+const canvas = document.getElementById('stage');
+const gl = canvas.getContext('webgl2', { antialias:false, alpha:false, powerPreference:'high-performance' });
+const loader = document.getElementById('loader');
+const loadStatus = document.getElementById('load-status');
+
+if (!gl){
+  loader.classList.add('err');
+  loadStatus.textContent = 'WebGL2 is not available in this browser';
+  return;
+}
+const floatExt = gl.getExtension('EXT_color_buffer_float');
+gl.getExtension('OES_texture_float_linear');
+if (!floatExt){
+  loader.classList.add('err');
+  loadStatus.textContent = 'This GPU cannot render to a floating-point texture';
+  return;
+}
+
+// ---------------------------------------------------------------- shaders --
+// Shared GLSL: the analytic glass field, traced identically by the photon
+// pass (a vertex shader) and the camera pass (a fragment shader). Keeping
+// one copy means a photon and the pixel it lands under always agree about
+// where the glass actually is.
+const GLSL_SCENE = `
+uniform float uIOR;
+uniform float uTurb;
+uniform float uFacet;
+uniform vec3 uLightPos;
+const float FLOOR_Y = -1.15;
+
+float sminP(float a, float b, float k){
+  float h = clamp(0.5 + 0.5*(b-a)/k, 0.0, 1.0);
+  return mix(b, a, h) - k*h*(1.0-h);
+}
+
+vec3 blobCenter(int i, float t){
+  if (i == 0) return vec3(0.34*sin(t*0.60), 0.22*sin(t*0.90+1.7), 0.30*cos(t*0.50));
+  if (i == 1) return vec3(0.30*cos(t*0.45+2.1), 0.20*cos(t*0.70), 0.34*sin(t*0.55+0.6));
+  return vec3(0.28*sin(t*0.70+4.0), 0.24*sin(t*0.50+2.4), 0.26*cos(t*0.65+1.1));
+}
+
+// A metaball blend, then a few low-frequency directional ripples pushed into
+// the field — enough to break the smooth blend into gem-like planes without
+// a mesh, a bevel, or anything but three sines.
+float glassSDF(vec3 p, float t){
+  float d = 1e5;
+  d = sminP(d, length(p - blobCenter(0, t)) - 0.62, 0.34);
+  d = sminP(d, length(p - blobCenter(1, t)) - 0.50, 0.34);
+  d = sminP(d, length(p - blobCenter(2, t)) - 0.46, 0.34);
+  float facet = sin(dot(p, vec3(0.81, 0.45, 0.37))*7.0)
+              + sin(dot(p, vec3(-0.36, 0.82, 0.44))*7.0)
+              + sin(dot(p, vec3(0.42, -0.39, 0.82))*7.0);
+  return d + facet*uFacet;
+}
+
+vec3 glassNormal(vec3 p, float t){
+  vec2 e = vec2(0.0015, 0.0);
+  return normalize(vec3(
+    glassSDF(p+e.xyy, t) - glassSDF(p-e.xyy, t),
+    glassSDF(p+e.yxy, t) - glassSDF(p-e.yxy, t),
+    glassSDF(p+e.yyx, t) - glassSDF(p-e.yyx, t)
+  ));
+}
+`;
+
+const PHOTON_VS = `#version 300 es
+precision highp float;
+uniform float uTime;
+uniform int uDensity;
+uniform float uExtent;
+uniform float uPointSize;
+${GLSL_SCENE}
+out float vIntensity;
+
+void main(){
+  int nx = uDensity;
+  int ix = gl_VertexID % nx;
+  int iy = gl_VertexID / nx;
+  float fx = (float(ix)+0.5)/float(nx)*2.0-1.0;
+  float fy = (float(iy)+0.5)/float(nx)*2.0-1.0;
+  vec3 target = vec3(fx*uExtent*0.55, 1.6, fy*uExtent*0.55);
+
+  vec3 ro = uLightPos;
+  vec3 rd = normalize(target-ro);
+  float tt = uTime*uTurb;
+
+  float t = 0.0;
+  vec3 p = ro;
+  int mat = 0;
+  bool hit = false;
+  for (int i=0; i<64; i++){
+    p = ro + rd*t;
+    float df = p.y - FLOOR_Y;
+    float dg = glassSDF(p, tt);
+    float d = min(df, dg);
+    mat = (dg < df) ? 1 : 0;
+    if (d < 0.002){ hit = true; break; }
+    t += max(d, 0.003);
+    if (t > 20.0) break;
+  }
+
+  vec2 landXZ = vec2(1000.0);
+  float energy = 0.0;
+
+  if (hit && mat == 1){
+    vec3 N = glassNormal(p, tt);
+    if (dot(N, rd) > 0.0) N = -N;
+    vec3 refr = refract(rd, N, 1.0/uIOR);
+    if (dot(refr, refr) < 0.25) refr = reflect(rd, N);
+
+    vec3 q = p - N*0.003;
+    float t2 = 0.0;
+    for (int i=0; i<28; i++){
+      q = p - N*0.003 + refr*t2;
+      float dgi = glassSDF(q, tt);
+      if (dgi > 0.002 && t2 > 0.001) break;
+      t2 += max(abs(dgi), 0.01)*0.6;
+      if (t2 > 4.0) break;
+    }
+    vec3 Nexit = glassNormal(q, tt);
+    if (dot(Nexit, refr) < 0.0) Nexit = -Nexit;
+    vec3 outDir = refract(refr, Nexit, uIOR);
+    if (dot(outDir, outDir) < 0.25) outDir = reflect(refr, Nexit);
+
+    if (abs(outDir.y) > 0.0001){
+      float tf = (FLOOR_Y - q.y)/outDir.y;
+      if (tf > 0.0){
+        vec3 fp = q + outDir*tf;
+        landXZ = fp.xz;
+        energy = 15.0;
+      }
+    }
+  } else if (hit && mat == 0){
+    landXZ = p.xz;
+    energy = 0.15;
+  }
+
+  vIntensity = energy;
+  gl_Position = vec4(landXZ/uExtent, 0.0, 1.0);
+  gl_PointSize = uPointSize;
+}
+`;
+
+const PHOTON_FS = `#version 300 es
+precision highp float;
+in float vIntensity;
+out vec4 outColor;
+void main(){
+  vec2 d = gl_PointCoord*2.0-1.0;
+  float a = smoothstep(1.0, 0.0, dot(d,d));
+  float v = a*vIntensity;
+  outColor = vec4(v, v, v, 1.0);
+}
+`;
+
+const MAIN_VS = `#version 300 es
+void main(){
+  vec2 pos[3] = vec2[3](vec2(-1.0,-1.0), vec2(3.0,-1.0), vec2(-1.0,3.0));
+  gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0);
+}
+`;
+
+const MAIN_FS = `#version 300 es
+precision highp float;
+uniform vec2 uRes;
+uniform float uTime;
+uniform vec3 uCamPos, uCamRight, uCamUp, uCamFwd;
+uniform float uFocal;
+uniform vec3 uLightColor;
+uniform float uLightIntensity;
+uniform vec3 uGlassTint;
+uniform float uCausticIntensity;
+uniform float uExtent;
+uniform sampler2D uCausticMap;
+${GLSL_SCENE}
+out vec4 outColor;
+
+float floorGrid(vec2 xz){
+  vec2 g = fract(xz*2.0-0.5)-0.5;
+  vec2 aw = fwidth(xz*2.0);
+  vec2 line = 1.0 - smoothstep(vec2(0.0), aw*1.5, abs(g));
+  return max(line.x, line.y)*0.5;
+}
+
+float fresnelSchlick(float cosI, float ior){
+  float r0 = (1.0-ior)/(1.0+ior);
+  r0 = r0*r0;
+  return r0 + (1.0-r0)*pow(clamp(1.0-cosI, 0.0, 1.0), 5.0);
+}
+
+vec3 skyColor(vec3 d){
+  float h = clamp(d.y*0.5+0.5, 0.0, 1.0);
+  vec3 top = vec3(0.030, 0.032, 0.045);
+  vec3 bot = vec3(0.007, 0.007, 0.010);
+  vec3 c = mix(bot, top, h);
+  float sunness = pow(max(dot(d, normalize(uLightPos)), 0.0), 5.0);
+  c += uLightColor*sunness*0.22;
+  return c;
+}
+
+float sceneSDF(vec3 p, float tt, out int mat){
+  float df = p.y - FLOOR_Y;
+  float dg = glassSDF(p, tt);
+  if (dg < df){ mat = 1; return dg; }
+  mat = 0;
+  return df;
+}
+
+bool marchScene(vec3 ro, vec3 rd, float tt, out vec3 hitPos, out int hitMat){
+  float t = 0.0;
+  for (int i=0; i<96; i++){
+    vec3 p = ro + rd*t;
+    int m;
+    float d = sceneSDF(p, tt, m);
+    if (d < 0.0015){ hitPos = p; hitMat = m; return true; }
+    t += d*0.9;
+    if (t > 14.0) break;
+  }
+  return false;
+}
+
+vec3 shadeFloor(vec3 p, float tt){
+  vec3 toLight = uLightPos - p;
+  float distL = length(toLight);
+  vec3 L = toLight/distL;
+  float diff = max(L.y, 0.0);
+
+  float shadow = 1.0;
+  {
+    float t = 0.06, minD = 1e5;
+    for (int i=0; i<26; i++){
+      vec3 q = p + L*t;
+      float dg = glassSDF(q, tt);
+      minD = min(minD, dg);
+      t += clamp(dg, 0.03, 0.3);
+      if (t > distL || minD < -0.3) break;
+    }
+    shadow = smoothstep(-0.04, 0.14, minD);
+  }
+
+  float grid = floorGrid(p.xz);
+  vec3 base = mix(vec3(0.050,0.054,0.066), vec3(0.086,0.090,0.100), grid);
+  float atten = 1.0/(1.0+0.16*distL*distL);
+  vec3 lit = base*(0.09 + diff*shadow*uLightIntensity*atten)*uLightColor*1.3;
+
+  vec2 cuv = p.xz/uExtent*0.5 + 0.5;
+  vec3 caustic = vec3(0.0);
+  if (cuv.x > 0.0 && cuv.x < 1.0 && cuv.y > 0.0 && cuv.y < 1.0){
+    caustic = texture(uCausticMap, cuv).rgb;
+  }
+  lit += uLightColor*caustic*uCausticIntensity*atten*(0.25+0.75*shadow);
+
+  float fog = exp(-0.05*max(distL-2.0, 0.0));
+  return mix(skyColor(vec3(0.0,-1.0,0.0)), lit, fog);
+}
+
+vec3 shadeGlass(vec3 ro, vec3 rd, vec3 hitPos, float tt){
+  vec3 N = glassNormal(hitPos, tt);
+  if (dot(N, rd) > 0.0) N = -N;
+  float cosI = max(dot(-rd, N), 0.0);
+  float fres = fresnelSchlick(cosI, uIOR);
+
+  vec3 refrDir = refract(rd, N, 1.0/uIOR);
+  vec3 transmitted;
+
+  if (dot(refrDir, refrDir) < 0.25){
+    transmitted = skyColor(reflect(rd, N));
+  } else {
+    vec3 q = hitPos - N*0.003;
+    float t2 = 0.0;
+    for (int i=0; i<28; i++){
+      q = hitPos - N*0.003 + refrDir*t2;
+      float dgi = glassSDF(q, tt);
+      if (dgi > 0.002 && t2 > 0.001) break;
+      t2 += max(abs(dgi), 0.01)*0.6;
+      if (t2 > 4.0) break;
+    }
+    vec3 Nexit = glassNormal(q, tt);
+    if (dot(Nexit, refrDir) < 0.0) Nexit = -Nexit;
+    vec3 outDir = refract(refrDir, Nexit, uIOR);
+    if (dot(outDir, outDir) < 0.25) outDir = reflect(refrDir, Nexit);
+
+    vec3 hp2; int m2;
+    vec3 through;
+    if (marchScene(q + outDir*0.004, outDir, tt, hp2, m2)){
+      through = (m2 == 0) ? shadeFloor(hp2, tt) : uGlassTint*0.35;
+    } else {
+      through = skyColor(outDir);
+    }
+    float travel = min(t2, 1.3); // a stray long interior march (near a facet ridge) shouldn't crush the pixel to black
+    vec3 absorb = exp(-(vec3(1.0)-uGlassTint)*travel*1.5);
+    transmitted = through*absorb;
+  }
+
+  vec3 reflDir = reflect(rd, N);
+  vec3 reflected = skyColor(reflDir);
+
+  vec3 Lh = normalize(uLightPos - hitPos);
+  vec3 Hh = normalize(Lh - rd);
+  float spec = pow(max(dot(N, Hh), 0.0), 240.0);
+
+  vec3 col = mix(transmitted, reflected, fres) + spec*uLightColor*1.5;
+  float rim = pow(1.0 - cosI, 4.0)*0.45;
+  col += rim*uLightColor*0.5;
+  return col;
+}
+
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5*uRes)/uRes.y;
+  vec3 ro = uCamPos;
+  vec3 rd = normalize(uv.x*uCamRight + uv.y*uCamUp + uFocal*uCamFwd);
+  float tt = uTime*uTurb;
+
+  vec3 col = skyColor(rd);
+  vec3 hitPos; int hitMat;
+  if (marchScene(ro, rd, tt, hitPos, hitMat)){
+    col = (hitMat == 0) ? shadeFloor(hitPos, tt) : shadeGlass(ro, rd, hitPos, tt);
+  }
+
+  col = col/(1.0+col);              // simple Reinhard tonemap
+  col = pow(col, vec3(1.0/2.2));    // gamma
+  outColor = vec4(col, 1.0);
+}
+`;
+
+// --------------------------------------------------------------- helpers --
+function compile(type, src){
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
+    const log = gl.getShaderInfoLog(sh);
+    gl.deleteShader(sh);
+    throw new Error(log);
+  }
+  return sh;
+}
+function link(vsSrc, fsSrc){
+  const vs = compile(gl.VERTEX_SHADER, vsSrc);
+  const fs = compile(gl.FRAGMENT_SHADER, fsSrc);
+  const prog = gl.createProgram();
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)){
+    const log = gl.getProgramInfoLog(prog);
+    gl.deleteProgram(prog);
+    throw new Error(log);
+  }
+  return prog;
+}
+function uniforms(prog, names){
+  const u = {};
+  for (const n of names) u[n] = gl.getUniformLocation(prog, n);
+  return u;
+}
+
+let photonProg, mainProg, uP, uM;
+try{
+  photonProg = link(PHOTON_VS, PHOTON_FS);
+  mainProg = link(MAIN_VS, MAIN_FS);
+  uP = uniforms(photonProg, ['uTime','uDensity','uExtent','uPointSize','uIOR','uTurb','uFacet','uLightPos']);
+  uM = uniforms(mainProg, ['uRes','uTime','uCamPos','uCamRight','uCamUp','uCamFwd','uFocal',
+    'uLightPos','uLightColor','uLightIntensity','uIOR','uTurb','uFacet','uGlassTint',
+    'uCausticIntensity','uExtent','uCausticMap']);
+} catch (err){
+  loader.classList.add('err');
+  loadStatus.textContent = 'Shader compile failed — see console';
+  console.error(err);
+  return;
+}
+
+// Empty VAOs — both draws are fully procedural (gl_VertexID-driven), no
+// vertex buffers anywhere in this study.
+const emptyVAO = gl.createVertexArray();
+
+// ---------------------------------------------------------- caustic FBO --
+const EXTENT = 2.4;
+let density = 112;
+const fbo = gl.createFramebuffer();
+const causticTex = gl.createTexture();
+function sizeCausticTex(){
+  gl.bindTexture(gl.TEXTURE_2D, causticTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 1024, 1024, 0, gl.RGBA, gl.FLOAT, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, causticTex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+sizeCausticTex();
+
+// -------------------------------------------------------------- params --
+const DEFAULTS = {
+  ior: 1.5, facet: 0.02, turb: 0.6, tint: 'aqua',
+  lightHeight: 2.1, lightIntensity: 1.3, warmth: 'warm',
+  causticIntensity: 3.4, density: 112,
+};
+const P = Object.assign({}, DEFAULTS);
+
+const TINTS = { clear: [0.94,0.96,0.98], aqua: [0.55,0.85,0.90], amber: [0.95,0.82,0.55] };
+const WARMTH = { cool: [0.70,0.82,1.00], neutral: [1.0,1.0,1.0], warm: [1.00,0.86,0.66] };
+
+// ------------------------------------------------------------- camera --
+const cam = { theta: 0.6, phi: 0.62, dist: 7.6 };
+const DEF_CAM = Object.assign({}, cam);
+const camPos = new Float32Array(3), camRight = new Float32Array(3), camUp = new Float32Array(3), camFwd = new Float32Array(3);
+function updateCamera(){
+  const ct = Math.cos(cam.theta), st = Math.sin(cam.theta);
+  const cp = Math.cos(cam.phi), sp = Math.sin(cam.phi);
+  const ex = cam.dist*st*cp, ey = cam.dist*sp + 0.15, ez = cam.dist*ct*cp;
+  camPos[0]=ex; camPos[1]=ey; camPos[2]=ez;
+  let fx=-ex, fy=-ey+0.15, fz=-ez;
+  const fl = Math.hypot(fx,fy,fz); fx/=fl; fy/=fl; fz/=fl;
+  camFwd[0]=fx; camFwd[1]=fy; camFwd[2]=fz;
+  let rx = -fz, ry = 0, rz = fx; // cross(fwd, worldUp) simplified since worldUp=(0,1,0)
+  const rl = Math.hypot(rx,ry,rz)||1; rx/=rl; ry/=rl; rz/=rl;
+  camRight[0]=rx; camRight[1]=ry; camRight[2]=rz;
+  camUp[0] = ry*fz-rz*fy; camUp[1] = rz*fx-rx*fz; camUp[2] = rx*fy-ry*fx;
+}
+updateCamera();
+
+// ------------------------------------------------------------- pointer --
+let dragging = false, lastX = 0, lastY = 0;
+canvas.addEventListener('pointerdown', e=>{
+  dragging = true; lastX = e.clientX; lastY = e.clientY;
+  document.body.classList.add('is-orbiting');
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', e=>{
+  if (!dragging) return;
+  const dx = e.clientX - lastX, dy = e.clientY - lastY;
+  lastX = e.clientX; lastY = e.clientY;
+  cam.theta -= dx*0.0055;
+  cam.phi = Math.max(-0.15, Math.min(1.15, cam.phi + dy*0.0055));
+  updateCamera();
+});
+function endDrag(){ dragging = false; document.body.classList.remove('is-orbiting'); }
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', endDrag);
+canvas.addEventListener('wheel', e=>{
+  e.preventDefault();
+  cam.dist = Math.max(2.2, Math.min(9, cam.dist*(1+e.deltaY*0.0016)));
+  updateCamera();
+}, { passive:false });
+
+// -------------------------------------------------------------- panel --
+function setPanel(open){
+  document.body.classList.toggle('panel-open', open);
+  document.getElementById('panel').setAttribute('aria-hidden', String(!open));
+  document.getElementById('panel-toggle').setAttribute('aria-expanded', String(open));
+}
+document.getElementById('panel-toggle').addEventListener('click', ()=> setPanel(true));
+document.getElementById('panel-close').addEventListener('click', ()=> setPanel(false));
+
+function bindSlider(id, vid, key, fmt){
+  const el = document.getElementById(id), vl = document.getElementById(vid);
+  el.addEventListener('input', ()=>{
+    P[key] = parseFloat(el.value);
+    vl.textContent = fmt(P[key]);
+  });
+  return { set(v){ el.value = v; P[key] = v; vl.textContent = fmt(v); } };
+}
+const sIor = bindSlider('s-ior','v-ior','ior', v=>v.toFixed(2));
+const sFacet = bindSlider('s-facet','v-facet','facet', v=>v.toFixed(3));
+const sTurb = bindSlider('s-turb','v-turb','turb', v=>v.toFixed(2));
+const sLh = bindSlider('s-lh','v-lh','lightHeight', v=>v.toFixed(2));
+const sLi = bindSlider('s-li','v-li','lightIntensity', v=>v.toFixed(2));
+const sCi = bindSlider('s-ci','v-ci','causticIntensity', v=>v.toFixed(2));
+
+function bindSeg(id, key, onSet){
+  const wrap = document.getElementById(id);
+  const btns = [...wrap.querySelectorAll('button')];
+  btns.forEach(b=> b.addEventListener('click', ()=>{
+    btns.forEach(x=> x.setAttribute('aria-pressed', String(x===b)));
+    P[key] = b.dataset.v;
+    onSet(b.dataset.v);
+  }));
+  return { set(v){
+    btns.forEach(x=> x.setAttribute('aria-pressed', String(x.dataset.v===String(v))));
+    P[key] = v; onSet(v);
+  }};
+}
+const segTint = bindSeg('seg-tint','tint', ()=>{});
+const segWarm = bindSeg('seg-warm','warmth', ()=>{});
+const segDensity = bindSeg('seg-density','density', v=>{ density = parseInt(v,10); });
+
+document.getElementById('reset').addEventListener('click', resetAll);
+function resetAll(){
+  Object.assign(P, DEFAULTS);
+  sIor.set(DEFAULTS.ior); sFacet.set(DEFAULTS.facet); sTurb.set(DEFAULTS.turb);
+  sLh.set(DEFAULTS.lightHeight); sLi.set(DEFAULTS.lightIntensity); sCi.set(DEFAULTS.causticIntensity);
+  segTint.set(DEFAULTS.tint); segWarm.set(DEFAULTS.warmth); segDensity.set(DEFAULTS.density);
+  Object.assign(cam, DEF_CAM); updateCamera();
+  clock.t = 0;
+}
+
+// -------------------------------------------------------------- keys --
+addEventListener('keydown', e=>{
+  const tag = (e.target && e.target.tagName) || '';
+  if (tag === 'INPUT') return;
+  const k = e.key;
+  if (k === 'c' || k === 'C'){ e.preventDefault(); setPanel(!document.body.classList.contains('panel-open')); }
+  else if (k === ' '){ e.preventDefault(); clock.paused = !clock.paused; document.body.classList.toggle('is-paused', clock.paused); }
+  else if (k === 'r' || k === 'R'){ e.preventDefault(); resetAll(); }
+  else if (k === 'Escape'){ setPanel(false); }
+  else if (k === 'ArrowLeft'){ e.preventDefault(); cam.theta -= 0.09; updateCamera(); }
+  else if (k === 'ArrowRight'){ e.preventDefault(); cam.theta += 0.09; updateCamera(); }
+});
+
+// ------------------------------------------------------------ resize --
+function resize(){
+  const dpr = Math.min(devicePixelRatio||1, 2);
+  const w = innerWidth, h = innerHeight;
+  canvas.width = Math.round(w*dpr);
+  canvas.height = Math.round(h*dpr);
+  canvas.style.width = w+'px';
+  canvas.style.height = h+'px';
+}
+addEventListener('resize', resize);
+resize();
+
+// -------------------------------------------------------------- loop --
+const clock = { t: 0, paused: false, last: performance.now() };
+let fpsAcc = 0, fpsN = 0, fps = 60;
+
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - clock.last)/1000, 0.05);
+  clock.last = now;
+  if (!clock.paused) clock.t += dt;
+
+  if (dt > 0){
+    fpsAcc += 1/dt; fpsN++;
+    if (fpsN >= 12){ fps = fpsAcc/fpsN; fpsAcc=0; fpsN=0; }
+  }
+
+  const tint = TINTS[P.tint];
+  const warm = WARMTH[P.warmth];
+  const lightPos = [0, P.lightHeight, 0.15];
+
+  // ---- pass 1: splat photons into the caustic texture ----
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.viewport(0, 0, 1024, 1024);
+  gl.clearColor(0,0,0,1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.ONE, gl.ONE);
+  gl.useProgram(photonProg);
+  gl.uniform1f(uP.uTime, clock.t);
+  gl.uniform1i(uP.uDensity, density);
+  gl.uniform1f(uP.uExtent, EXTENT);
+  gl.uniform1f(uP.uPointSize, Math.max(2.4, 1024/density*1.6));
+  gl.uniform1f(uP.uIOR, P.ior);
+  gl.uniform1f(uP.uTurb, P.turb);
+  gl.uniform1f(uP.uFacet, P.facet);
+  gl.uniform3fv(uP.uLightPos, lightPos);
+  gl.bindVertexArray(emptyVAO);
+  gl.drawArrays(gl.POINTS, 0, density*density);
+  gl.disable(gl.BLEND);
+
+  // ---- pass 2: raymarch the camera view ----
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.useProgram(mainProg);
+  gl.uniform2f(uM.uRes, canvas.width, canvas.height);
+  gl.uniform1f(uM.uTime, clock.t);
+  gl.uniform3fv(uM.uCamPos, camPos);
+  gl.uniform3fv(uM.uCamRight, camRight);
+  gl.uniform3fv(uM.uCamUp, camUp);
+  gl.uniform3fv(uM.uCamFwd, camFwd);
+  gl.uniform1f(uM.uFocal, 1.5);
+  gl.uniform3fv(uM.uLightPos, lightPos);
+  gl.uniform3f(uM.uLightColor, warm[0], warm[1], warm[2]);
+  gl.uniform1f(uM.uLightIntensity, P.lightIntensity);
+  gl.uniform1f(uM.uIOR, P.ior);
+  gl.uniform1f(uM.uTurb, P.turb);
+  gl.uniform1f(uM.uFacet, P.facet);
+  gl.uniform3f(uM.uGlassTint, tint[0], tint[1], tint[2]);
+  gl.uniform1f(uM.uCausticIntensity, P.causticIntensity*(64*64)/(density*density));
+  gl.uniform1f(uM.uExtent, EXTENT);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, causticTex);
+  gl.uniform1i(uM.uCausticMap, 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  document.getElementById('r-photons').textContent = (density*density).toLocaleString();
+  document.getElementById('r-ior').textContent = P.ior.toFixed(2);
+  document.getElementById('r-fps').textContent = Math.round(fps);
+
+  if (!document.body.classList.contains('is-live')) document.body.classList.add('is-live');
+}
+requestAnimationFrame(frame);
+
+})();
+</script>
+</body>
+</html>

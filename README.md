@@ -24,6 +24,10 @@ the same either way.
 | 08 | **Solve** | GPU compute fluid — pressure solve in WebGPU | [`/solve/`](./solve/) |
 | 09 | **Torsion Pineapple** | Imported mesh driven through a torsion field | [`/torsion-pineapple/`](./torsion-pineapple/) |
 | 10 | **Anneal** | Gaussian splats resolving out of disorder | [`/anneal/`](./anneal/) |
+| 11 | **Living Bokeh** | Flocking motes blurred by a real thin-lens rack focus | [`/living-bokeh/`](./living-bokeh/) |
+| 12 | **Glyph** | A flat SVG mark given per-shape dimensional form | [`/glyph/`](./glyph/) |
+| 13 | **Cockle** | Two mirrored craft-paper panels peel open on a fixed top-down camera | [`/cockle/`](./cockle/) |
+| 14 | **Caustic** | Photons splatted in a vertex shader, refracted through raymarched glass | [`/caustic/`](./caustic/) |
 
 Studies 03–06 were lost to a storage failure and are being rebuilt. They'll be
 added here as they land. Numbering follows build order, not merit — it starts at
