@@ -822,8 +822,8 @@ uniform float uTime;
 /* cover-fit: screen uv (0..1, y up) -> content uv (0..1 within the image) */
 vec2 coverUV(vec2 s){
   vec2 c = s - 0.5;
-  if (uAspect > uImgAspect) c.y *= uAspect / uImgAspect;
-  else c.x *= uImgAspect / uAspect;
+  if (uAspect > uImgAspect) c.y *= uImgAspect / uAspect;
+  else c.x *= uAspect / uImgAspect;
   return c + 0.5;
 }
 
@@ -1042,8 +1042,8 @@ function screenToContentUV(sx, sy){
   const p = pairs[activePair];
   const imgAspect = p ? p.aspect : 1;
   let cx = sx - 0.5, cy = (1 - sy) - 0.5;
-  if (canvasAspect > imgAspect) cy *= canvasAspect / imgAspect;
-  else cx *= imgAspect / canvasAspect;
+  if (canvasAspect > imgAspect) cy *= imgAspect / canvasAspect;
+  else cx *= canvasAspect / imgAspect;
   return [cx + 0.5, cy + 0.5];
 }
 
