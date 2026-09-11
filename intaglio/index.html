@@ -1,0 +1,1406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07080a">
+<title>Intaglio — a depth-displacement image reveal study</title>
+<meta name="description" content="Two images share one surface. A procedurally carved height map decides where the second bleeds through first — an irregular, incised boundary, not a wipe — and the longer the cursor dwells on a patch, the more relief it visibly gains.">
+<style>
+:root{
+  --bg:#07080a;
+  --ink:#e8e3d8;
+  --dim:#7b8087;
+  --faint:#4a4e54;
+  --rule:rgba(232,227,216,.11);
+  --rule-2:rgba(232,227,216,.055);
+  --accent:#c9713f;
+  --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);overflow:hidden;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+canvas#stage{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+
+#veil{
+  position:fixed;inset:0;pointer-events:none;z-index:2;
+  background:radial-gradient(126% 92% at 50% 46%,transparent 38%,rgba(0,0,0,.30) 82%,rgba(0,0,0,.62) 100%);
+}
+
+#ui{
+  position:fixed;inset:0;z-index:5;pointer-events:none;
+  opacity:0;transition:opacity 1.1s cubic-bezier(.4,0,.2,1) .25s;
+}
+body.is-live #ui{opacity:1}
+#ui > *{pointer-events:auto}
+
+.eyebrow{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.20em;
+  text-transform:uppercase;color:var(--faint);
+}
+
+/* wordmark --------------------------------------------------------------- */
+#mark{position:absolute;top:26px;left:30px;display:flex;align-items:flex-start;gap:12px}
+#mark .w{
+  font-size:15px;font-weight:300;letter-spacing:.52em;text-transform:uppercase;
+  line-height:1;padding-top:1px;white-space:nowrap;
+}
+#mark .ix{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--accent);
+  border:1px solid rgba(201,113,63,.32);padding:2px 4px 1px;line-height:1;white-space:nowrap;
+}
+#mark .sub{margin-top:9px;display:block}
+#mark .col{display:flex;flex-direction:column}
+
+/* panel toggle ------------------------------------------------------------ */
+#panel-toggle{
+  position:absolute;top:24px;right:30px;z-index:7;
+  display:flex;align-items:center;gap:10px;
+  background:rgba(12,13,16,.55);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  border:1px solid var(--rule);color:var(--dim);
+  font-family:var(--mono);font-size:9px;letter-spacing:.20em;text-transform:uppercase;
+  padding:8px 11px;cursor:pointer;line-height:1;
+  transition:border-color .3s ease,color .3s ease,background .3s ease,opacity .35s ease;
+}
+#panel-toggle:hover{border-color:rgba(201,113,63,.45);color:var(--ink)}
+#panel-toggle .bars{display:flex;flex-direction:column;gap:2.5px;width:11px}
+#panel-toggle .bars i{display:block;height:1px;background:currentColor}
+#panel-toggle .bars i:nth-child(1){width:11px}
+#panel-toggle .bars i:nth-child(2){width:7px}
+#panel-toggle .bars i:nth-child(3){width:9px}
+#panel-toggle .key{
+  color:var(--accent);border:1px solid rgba(201,113,63,.28);
+  padding:2px 4px 1px;font-size:8px;letter-spacing:.06em;
+}
+body.panel-open #panel-toggle{opacity:0;pointer-events:none}
+
+/* control panel ----------------------------------------------------------- */
+#panel{
+  position:absolute;top:0;right:0;bottom:0;width:min(336px,90vw);z-index:8;
+  display:flex;flex-direction:column;
+  background:rgba(9,10,12,.90);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-left:1px solid var(--rule);
+  transform:translateX(101%);transition:transform .52s cubic-bezier(.4,0,.2,1);
+  will-change:transform;
+}
+body.panel-open #panel{transform:translateX(0)}
+#panel header{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+  padding:24px 22px 16px;border-bottom:1px solid var(--rule);flex:0 0 auto;
+}
+#panel header h2{
+  margin:8px 0 0;font-size:13px;font-weight:300;letter-spacing:.34em;text-transform:uppercase;
+}
+#panel-close{
+  background:none;border:1px solid var(--rule);color:var(--dim);
+  width:24px;height:24px;line-height:1;cursor:pointer;font-size:14px;
+  transition:border-color .25s ease,color .25s ease;
+}
+#panel-close:hover{border-color:rgba(201,113,63,.45);color:var(--ink)}
+
+#panel .body{overflow-y:auto;overscroll-behavior:contain;padding:0 22px 26px;flex:1 1 auto}
+#panel .body::-webkit-scrollbar{width:6px}
+#panel .body::-webkit-scrollbar-thumb{background:rgba(232,227,216,.12)}
+
+#panel section{padding:20px 0 6px;border-bottom:1px solid var(--rule-2)}
+#panel section:last-of-type{border-bottom:0}
+#panel h3{
+  margin:0 0 13px;font-family:var(--mono);font-size:9px;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--faint);font-weight:400;
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+}
+#panel h3 .ix{color:rgba(201,113,63,.5)}
+#panel .note{
+  margin:10px 0 2px;font-family:var(--mono);font-size:8.5px;line-height:1.85;
+  letter-spacing:.05em;color:var(--faint);
+}
+#panel .note b{color:var(--dim);font-weight:400}
+
+/* sliders */
+.sld{display:block;margin:13px 0 0}
+.sld .row{
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);
+}
+.sld .row output{color:var(--dim);letter-spacing:.06em;font-variant-numeric:tabular-nums}
+.sld input[type=range]{
+  appearance:none;-webkit-appearance:none;width:100%;height:12px;background:none;cursor:pointer;display:block;
+}
+.sld input[type=range]::-webkit-slider-runnable-track{height:1px;background:var(--rule)}
+.sld input[type=range]::-moz-range-track{height:1px;background:var(--rule)}
+.sld input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:9px;height:9px;margin-top:-4px;background:var(--accent);
+  border:0;border-radius:0;transform:rotate(45deg);
+}
+.sld input[type=range]::-moz-range-thumb{
+  width:8px;height:8px;background:var(--accent);border:0;border-radius:0;
+}
+.sld input[type=range]:focus{outline:none}
+.sld input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(201,113,63,.25)}
+
+/* wide action button */
+.act{
+  display:block;width:100%;margin-top:14px;background:none;border:1px solid var(--rule);
+  color:var(--dim);cursor:pointer;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;
+  padding:9px 8px 8px;transition:border-color .25s ease,color .25s ease,background .25s ease;
+}
+.act:hover{border-color:rgba(201,113,63,.45);color:var(--ink);background:rgba(201,113,63,.05)}
+
+/* pair picker -------------------------------------------------------------- */
+.pairs{display:flex;gap:7px;margin-top:13px}
+.pair-btn{
+  flex:1 1 0;background:none;border:1px solid var(--rule);color:var(--faint);cursor:pointer;
+  font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;
+  padding:9px 4px 8px;transition:border-color .25s ease,color .25s ease,background .25s ease;
+}
+.pair-btn:hover{color:var(--ink);border-color:rgba(201,113,63,.4)}
+.pair-btn.is-active{color:var(--accent);border-color:rgba(201,113,63,.55);background:rgba(201,113,63,.07)}
+
+/* readout ---------------------------------------------------------------- */
+#readout{
+  position:absolute;left:30px;bottom:74px;font-family:var(--mono);font-size:10px;
+  line-height:1.85;color:var(--dim);letter-spacing:.03em;
+}
+#readout dl{margin:0;display:grid;grid-template-columns:78px auto}
+#readout dt{color:var(--faint);text-transform:uppercase;letter-spacing:.16em;font-size:9px}
+#readout dd{margin:0;color:var(--dim);font-variant-numeric:tabular-nums}
+
+/* method note ------------------------------------------------------------ */
+#method{
+  position:absolute;right:30px;bottom:74px;width:min(330px,31vw);text-align:right;
+  font-family:var(--mono);font-size:9.5px;line-height:1.95;color:var(--faint);
+  letter-spacing:.04em;transition:opacity .4s ease;
+}
+#method b{color:var(--dim);font-weight:400}
+#method .t{
+  display:block;margin-bottom:8px;font-size:9px;letter-spacing:.20em;
+  text-transform:uppercase;color:rgba(232,227,216,.24);
+}
+body.panel-open #method{opacity:0;pointer-events:none}
+
+/* credit ----------------------------------------------------------------- */
+#credit{
+  position:absolute;left:50%;transform:translateX(-50%);bottom:26px;text-align:center;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.20em;color:var(--faint);
+  text-transform:uppercase;line-height:2;white-space:nowrap;
+}
+#credit b{color:var(--dim);font-weight:400}
+#credit .keys{color:rgba(232,227,216,.2)}
+body.is-paused #credit .keys::after{content:" · held — press space to play";color:var(--accent)}
+
+/* loader ----------------------------------------------------------------- */
+#loader{
+  position:fixed;inset:0;z-index:20;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity .9s cubic-bezier(.4,0,.2,1);
+}
+#loader.done{opacity:0;pointer-events:none}
+#loader .idx{
+  font-family:var(--mono);font-size:10px;letter-spacing:.34em;color:var(--accent);margin-bottom:30px;
+}
+#pulse{position:relative;width:64px;height:64px;margin-bottom:30px}
+#pulse .ring{
+  position:absolute;inset:0;border:1px solid var(--accent);border-radius:50%;opacity:0;
+  animation:pulse 2.2s cubic-bezier(.3,0,.4,1) infinite;
+}
+#pulse .ring:nth-child(2){animation-delay:.55s}
+#pulse .ring:nth-child(3){animation-delay:1.1s}
+#pulse .dot{
+  position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;
+  background:var(--accent);border-radius:50%;
+}
+@keyframes pulse{
+  0%{transform:scale(.2);opacity:.85}
+  100%{transform:scale(1.6);opacity:0}
+}
+#loader .word{
+  font-size:clamp(30px,6.6vw,68px);font-weight:200;letter-spacing:.38em;
+  text-transform:uppercase;text-indent:.38em;line-height:1;margin:0;text-align:center;
+}
+#loader .study{
+  margin-top:22px;font-family:var(--mono);font-size:9.5px;letter-spacing:.30em;
+  text-transform:uppercase;color:var(--dim);text-align:center;
+}
+#load-bar{margin-top:44px;width:min(290px,52vw);height:1px;background:rgba(232,227,216,.1);position:relative}
+#load-bar-fill{position:absolute;inset:0 auto 0 0;width:5%;background:var(--accent);transition:width .5s cubic-bezier(.4,0,.2,1)}
+#load-status{
+  margin-top:14px;font-family:var(--mono);font-size:8.5px;letter-spacing:.26em;
+  text-transform:uppercase;color:var(--faint);
+}
+#loader.is-error #load-status{color:#d97a6c}
+#loader.is-error #load-bar-fill{background:#d97a6c}
+#loader .rule{width:min(290px,52vw);height:1px;background:var(--rule-2);margin-top:30px}
+#loader .foot{
+  margin-top:14px;font-family:var(--mono);font-size:8px;letter-spacing:.2em;
+  text-transform:uppercase;color:rgba(232,227,216,.16);text-align:center;line-height:2;
+}
+
+@media (prefers-reduced-motion: reduce){
+  #pulse .ring{animation-duration:.01ms}
+  #loader{transition-duration:.01ms}
+  #panel{transition-duration:.01ms}
+}
+@media (max-width:1180px){
+  #method{display:none}
+}
+@media (max-width:1360px){
+  #credit{font-size:8px;letter-spacing:.14em}
+}
+@media (max-width:880px){
+  #mark{top:18px;left:18px}
+  #panel-toggle{top:16px;right:18px}
+  #panel{width:min(336px,100vw)}
+  #readout{left:18px;right:18px;bottom:96px;font-size:9px}
+  #readout dl{grid-template-columns:62px auto}
+  #credit{bottom:14px;font-size:7.5px;letter-spacing:.12em;white-space:normal;width:calc(100vw - 36px);line-height:1.9}
+}
+@media (max-height:560px){
+  #readout{display:none}
+}
+
+/* ── series navigation ─────────────────────────────────────────────── */
+#mark .sx-wrap{position:relative;display:inline-block}
+#mark a.ix{text-decoration:none;display:inline-block;cursor:pointer;
+  transition:border-color .28s ease,color .28s ease,background .28s ease}
+#mark a.ix:hover,#mark .sx-wrap:focus-within a.ix{
+  border-color:rgba(201,113,63,.62);background:rgba(201,113,63,.08)}
+#mark a.ix:focus-visible{outline:1px solid rgba(201,113,63,.7);outline-offset:2px}
+#mark .sx-menu{
+  position:absolute;top:calc(100% + 9px);left:0;z-index:20;min-width:228px;
+  background:rgba(9,10,12,.93);
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+  border:1px solid var(--rule);padding:7px 0;
+  opacity:0;visibility:hidden;transform:translateY(-5px);
+  transition:opacity .26s ease,transform .26s cubic-bezier(.4,0,.2,1),visibility 0s linear .26s;
+}
+#mark .sx-wrap:hover .sx-menu,
+#mark .sx-wrap:focus-within .sx-menu{
+  opacity:1;visibility:visible;transform:translateY(0);transition-delay:0s}
+#mark .sx-menu .sx-hd{
+  display:block;font-family:var(--mono);font-size:8px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--faint);padding:5px 13px 8px;
+  border-bottom:1px solid var(--rule-2,rgba(232,227,216,.055));margin-bottom:5px;
+  text-decoration:none;transition:color .24s ease}
+a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
+#mark .sx-menu a,#mark .sx-menu span.sx-i{
+  display:flex;align-items:baseline;gap:9px;padding:4px 13px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;
+  text-transform:uppercase;text-decoration:none;color:var(--dim);
+  transition:color .22s ease,background .22s ease}
+#mark .sx-menu a:hover,#mark .sx-menu a:focus-visible{
+  color:var(--ink);background:rgba(232,227,216,.05);outline:none}
+#mark .sx-menu .sx-n{color:var(--faint);flex:0 0 auto;transition:color .22s ease}
+#mark .sx-menu a:hover .sx-n,#mark .sx-menu a:focus-visible .sx-n{color:var(--accent)}
+#mark .sx-menu .sx-here{color:var(--accent)}
+#mark .sx-menu .sx-here .sx-n{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<canvas id="stage"></canvas>
+<div id="veil"></div>
+
+<div id="ui">
+  <div id="mark">
+    <div class="col">
+      <span class="w">Intaglio</span>
+      <span class="eyebrow sub">A depth-displacement image reveal</span>
+    </div>
+    <span class="sx-wrap"><a class="ix" href="../" aria-label="Study 15 — open series index">No. 15</a><nav class="sx-menu" aria-label="Series index"><a class="sx-hd" href="../">Crucible — index</a><a href="../mercury/"><span class="sx-n">03</span><span>Mercury</span></a><a href="../torsion/"><span class="sx-n">04</span><span>Torsion</span></a><a href="../torsion-2/"><span class="sx-n">05</span><span>Torsion 2.0</span></a><a href="../weft/"><span class="sx-n">06</span><span>Weft</span></a><a href="../cast/"><span class="sx-n">07</span><span>Cast</span></a><a href="../solve/"><span class="sx-n">08</span><span>Solve</span></a><a href="../torsion-pineapple/"><span class="sx-n">09</span><span>Torsion Pineapple</span></a><a href="../anneal/"><span class="sx-n">10</span><span>Anneal</span></a><a href="../living-bokeh/"><span class="sx-n">11</span><span>Living Bokeh</span></a><a href="../glyph/"><span class="sx-n">12</span><span>Glyph</span></a><a href="../cockle/"><span class="sx-n">13</span><span>Cockle</span></a><a class="sx-here" href="../intaglio/" aria-current="page"><span class="sx-n">15</span><span>Intaglio</span></a></nav></span>
+  </div>
+
+  <button id="panel-toggle" type="button" aria-expanded="false" aria-controls="panel">
+    <span class="bars"><i></i><i></i><i></i></span>
+    <span class="lbl">Controls</span>
+    <span class="key">C</span>
+  </button>
+
+  <aside id="panel" aria-label="Controls">
+    <header>
+      <div>
+        <span class="eyebrow">Study 15</span>
+        <h2>Intaglio</h2>
+      </div>
+      <button id="panel-close" type="button" aria-label="Close controls">×</button>
+    </header>
+
+    <div class="body">
+
+      <section>
+        <h3>Reveal <span class="ix">01</span></h3>
+
+        <label class="sld">
+          <span class="row"><span>Edge feather</span><output id="o-feather">0.060</output></span>
+          <input id="p-feather" type="range" min="0.01" max="0.18" step="0.001" value="0.06">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Reach</span><output id="o-reach">0.26</output></span>
+          <input id="p-reach" type="range" min="0.08" max="0.55" step="0.005" value="0.26">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Instant reveal</span><output id="o-instant">0.40</output></span>
+          <input id="p-instant" type="range" min="0" max="1.2" step="0.01" value="0.40">
+        </label>
+
+        <p class="note">
+          A carved height map sets a per-pixel threshold. The surface reveals
+          once the local <b>dwell field</b> climbing under the cursor passes
+          that pixel's threshold — <b>low</b> ground goes first, <b>high</b>
+          ground resists — so the boundary follows the map's contours, not a
+          circle.
+        </p>
+      </section>
+
+      <section>
+        <h3>Relief <span class="ix">02</span></h3>
+
+        <label class="sld">
+          <span class="row"><span>Dwell gain</span><output id="o-gain">0.34</output></span>
+          <input id="p-gain" type="range" min="0.15" max="2.2" step="0.01" value="0.34">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Dwell decay</span><output id="o-decay">0.20</output></span>
+          <input id="p-decay" type="range" min="0.05" max="1.2" step="0.01" value="0.20">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Parallax depth</span><output id="o-parallax">1.00×</output></span>
+          <input id="p-parallax" type="range" min="0" max="2.2" step="0.01" value="1">
+        </label>
+
+        <p class="note">
+          Dwell is <b>accumulated</b>, not instantaneous — it climbs while the
+          cursor lingers near a patch and bleeds off once it leaves. The same
+          field that drives the reveal also pushes a height-map-aligned
+          parallax offset, so lingered ground visibly gains relief the longer
+          you stay.
+        </p>
+      </section>
+
+      <section>
+        <h3>Pair <span class="ix">03</span></h3>
+        <div class="pairs" role="group" aria-label="Image pair">
+          <button class="pair-btn" data-pair="0" type="button">Clay<br>／Slate</button>
+          <button class="pair-btn" data-pair="1" type="button">Frond<br>／Rust</button>
+          <button class="pair-btn" data-pair="2" type="button">Plate<br>／Grid</button>
+        </div>
+        <p class="note">
+          Each pair carries its own procedurally carved height map — <b>1</b>
+          and <b>2</b>&nbsp;/&nbsp;<b>3</b> also cycle it, <b>[</b> and
+          <b>]</b> step through.
+        </p>
+      </section>
+
+      <section>
+        <h3>Session <span class="ix">04</span></h3>
+        <button class="act" id="p-wander" type="button">Auto-wander: on</button>
+        <button class="act" id="p-reset" type="button">Reset all to defaults</button>
+      </section>
+
+    </div>
+  </aside>
+
+  <div id="readout">
+    <dl>
+      <dt>Pair</dt><dd id="r-pair">—</dd>
+      <dt>Dwell</dt><dd id="r-dwell">—</dd>
+      <dt>Cursor</dt><dd id="r-cursor">—</dd>
+      <dt>Rate</dt><dd id="r-fps">—</dd>
+    </dl>
+  </div>
+
+  <div id="method">
+    <span class="t">Method</span>
+    Every pair carries a procedurally carved grayscale height field — layered,
+    domain-warped value noise, not a radial gradient. A low-resolution
+    <b>accumulator texture</b> tracks how long the cursor has lingered over
+    each patch of the surface, charging where it stays and bleeding off
+    where it doesn't. The reveal thresholds each pixel's dwell against that
+    pixel's height; the same dwell field also drives a gradient-aligned
+    <b>parallax offset</b>, so the longer a patch is attended to, the more
+    it reads as carved rather than merely faded.
+  </div>
+
+  <div id="credit">
+    <b>Intaglio</b> — depth-displacement reveal study 15 &nbsp;·&nbsp; carved height maps &nbsp;·&nbsp; dwell-accumulated parallax &nbsp;·&nbsp; webgl2<br>
+    <span class="keys">move the cursor to carve the surface &nbsp; linger to raise relief &nbsp; 1–3 or [ ] to switch pairs &nbsp; c controls &nbsp; space pause &nbsp; r reset</span>
+  </div>
+</div>
+
+<div id="loader">
+  <div class="idx">Study 15</div>
+  <div id="pulse"><i class="ring"></i><i class="ring"></i><i class="ring"></i><span class="dot"></span></div>
+  <h1 class="word">Intaglio</h1>
+  <div class="study">A depth-displacement image reveal</div>
+  <div id="load-bar"><div id="load-bar-fill"></div></div>
+  <div id="load-status">Opening a context</div>
+  <div class="rule"></div>
+  <div class="foot">
+    no crossfade · no alpha wipe · one carved height field<br>
+    the boundary follows the plate, not the cursor
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INTAGLIO — a depth-displacement image reveal study
+   No. 15 of Crucible. Single file, raw WebGL2, no runtime network access.
+
+   Two images share every pixel of the surface. A procedurally carved
+   grayscale height map assigns each pixel a threshold; a low-resolution
+   "dwell" accumulator texture — charged by cursor proximity every frame,
+   decaying when the cursor moves on — supplies a per-pixel progress value.
+   Where dwell has climbed past a pixel's threshold, the second image shows
+   through. Because the threshold field is organic rather than radial, the
+   reveal boundary carves along the plate's contours instead of sweeping as
+   a circle. The same dwell field drives a gradient-aligned parallax offset,
+   so patches that have been lingered on longest read as visibly raised —
+   an accumulating effect, not an instantaneous one.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const lerp  = (a, b, t) => a + (b - a) * t;
+const smoothstep = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+
+/* ── defaults ──────────────────────────────────────────────────────────── */
+const DEFAULTS = Object.freeze({
+  feather:  0.060,  // reveal edge softness, in threshold units
+  reach:    0.26,   // gaussian radius (content-uv units) of cursor influence
+  instant:  0.40,   // instantaneous proximity contribution to reveal progress
+  gain:     0.34,   // dwell charge rate, 1/s at cursor center
+  decay:    0.20,   // dwell bleed-off rate, 1/s
+  parallax: 1.00    // relief displacement scale
+});
+
+const S = Object.seal(Object.assign({}, DEFAULTS));
+
+/* ── dom ───────────────────────────────────────────────────────────────── */
+const $  = (id) => document.getElementById(id);
+const canvas   = $("stage");
+const loader   = $("loader");
+const barFill  = $("load-bar-fill");
+const statusEl = $("load-status");
+
+const setLoad = (pct, msg) => {
+  barFill.style.width = pct + "%";
+  if (msg) statusEl.textContent = msg;
+};
+const failLoad = (msg) => {
+  loader.classList.add("is-error");
+  setLoad(100, msg);
+};
+
+setLoad(6, "Opening a context");
+
+/* ── gl context ────────────────────────────────────────────────────────── */
+const gl = canvas.getContext("webgl2", {
+  alpha: false, antialias: false, depth: false, stencil: false,
+  premultipliedAlpha: false, preserveDrawingBuffer: false,
+  powerPreference: "high-performance"
+});
+
+if (!gl) {
+  failLoad("WebGL2 unavailable in this browser");
+  return;
+}
+
+const extLinearFloat = gl.getExtension("OES_texture_float_linear");
+
+/* canvas/image row 0 is visually the top; without this, textures sample
+   upside-down against our gl_FragCoord-based (bottom-up) content uv */
+gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOISE — seeded value noise, domain-warped, for the carved height fields
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function hash2(ix, iy, seed){
+  let h = (ix | 0) * 374761393 + (iy | 0) * 668265263 + (seed | 0) * 2147483647;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h = h ^ (h >>> 16);
+  return ((h >>> 0) % 1000000) / 1000000;
+}
+
+function valueNoise(x, y, seed){
+  const x0 = Math.floor(x), y0 = Math.floor(y);
+  const sx = x - x0, sy = y - y0;
+  const fx = sx * sx * (3 - 2 * sx), fy = sy * sy * (3 - 2 * sy);
+  const n00 = hash2(x0, y0, seed),     n10 = hash2(x0 + 1, y0, seed);
+  const n01 = hash2(x0, y0 + 1, seed), n11 = hash2(x0 + 1, y0 + 1, seed);
+  return lerp(lerp(n00, n10, fx), lerp(n01, n11, fx), fy);
+}
+
+function fbm(x, y, seed, octaves, lac, gain){
+  let amp = 0.5, freq = 1.0, sum = 0, norm = 0;
+  for (let i = 0; i < octaves; i++){
+    sum += valueNoise(x * freq, y * freq, seed + i * 101) * amp;
+    norm += amp;
+    amp *= gain; freq *= lac;
+  }
+  return sum / norm;
+}
+
+/* domain-warped fbm: the coordinate fed to the final fractal sum is itself
+   pushed around by two independent noise fields, which is what keeps the
+   result from reading as a smooth blob or a disguised radial gradient */
+function carve(x, y, seed){
+  const qx = fbm(x + 5.2, y + 1.3, seed + 11, 3, 2.0, 0.55);
+  const qy = fbm(x + 3.7, y + 9.2, seed + 37, 3, 2.0, 0.55);
+  const warp = 1.35;
+  return fbm(x + warp * (qx - 0.5), y + warp * (qy - 0.5), seed, 5, 2.05, 0.52);
+}
+
+/* build one NxN grayscale height field, returned as a Uint8Array (R8) plus
+   real summary stats — genuine measurements, not an assumption that the
+   generator "must" look organic */
+function buildHeightField(size, seed){
+  const data = new Uint8Array(size * size);
+  const freq = 3.1;
+  let min = Infinity, max = -Infinity, sum = 0, sumSq = 0;
+  for (let j = 0; j < size; j++){
+    const v = j / size;
+    for (let i = 0; i < size; i++){
+      const u = i / size;
+      let h = carve(u * freq, v * freq, seed);
+      h = clamp((h - 0.5) * 1.18 + 0.5, 0, 1);
+      const b = (h * 255) | 0;
+      data[j * size + i] = b;
+      if (h < min) min = h;
+      if (h > max) max = h;
+      sum += h; sumSq += h * h;
+    }
+  }
+  const n = size * size;
+  const mean = sum / n;
+  const variance = sumSq / n - mean * mean;
+  /* edge density: fraction of texels whose 4-neighbor gradient exceeds a
+     small threshold — near zero for a plain gradient, well above it for a
+     genuinely irregular field */
+  let edgeCount = 0;
+  for (let j = 1; j < size - 1; j++){
+    for (let i = 1; i < size - 1; i++){
+      const c = data[j * size + i];
+      const gx = data[j * size + i + 1] - data[j * size + i - 1];
+      const gy = data[(j + 1) * size + i] - data[(j - 1) * size + i];
+      if (Math.hypot(gx, gy) > 10) edgeCount++;
+    }
+  }
+  const edgeDensity = edgeCount / n;
+  return { data, stats: { min, max, mean, variance, edgeDensity } };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROCEDURAL IMAGE PAIRS — canvas-drawn, deterministic (seeded), inlined
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const IMG_W = 896, IMG_H = 672;
+
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function grain(ctx, w, h, rnd, amount){
+  const id = ctx.getImageData(0, 0, w, h);
+  const d = id.data;
+  for (let p = 0; p < d.length; p += 4){
+    const n = (rnd() - 0.5) * amount;
+    d[p] = clamp(d[p] + n, 0, 255);
+    d[p + 1] = clamp(d[p + 1] + n, 0, 255);
+    d[p + 2] = clamp(d[p + 2] + n, 0, 255);
+  }
+  ctx.putImageData(id, 0, 0);
+}
+
+function makeCanvas(){
+  const c = document.createElement("canvas");
+  c.width = IMG_W; c.height = IMG_H;
+  return { c, ctx: c.getContext("2d") };
+}
+
+/* pair 0 — "Clay / Slate": a single soft disc against banded ground, warm
+   vs. cool, with a different secondary mark so the two read as distinct
+   compositions rather than a palette swap of one image */
+function drawClay(alt){
+  const { c, ctx } = makeCanvas();
+  const rnd = mulberry32(alt ? 9001 : 4001);
+  const sky = alt ? ["#232b33", "#161b21"] : ["#3a2418", "#1c130d"];
+  const disc = alt ? "#8fa4b0" : "#d98c4f";
+  const g = ctx.createLinearGradient(0, 0, 0, IMG_H);
+  g.addColorStop(0, sky[0]); g.addColorStop(1, sky[1]);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, IMG_W, IMG_H);
+
+  for (let i = 0; i < 5; i++){
+    ctx.strokeStyle = `rgba(255,255,255,${alt ? 0.03 : 0.045})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, IMG_H * (0.55 + i * 0.09));
+    ctx.lineTo(IMG_W, IMG_H * (0.55 + i * 0.09) - (alt ? 40 : -20));
+    ctx.stroke();
+  }
+
+  const cx = alt ? IMG_W * 0.36 : IMG_W * 0.62;
+  const cy = alt ? IMG_H * 0.40 : IMG_H * 0.46;
+  const r  = alt ? 150 : 200;
+  const rg = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.05, cx, cy, r);
+  rg.addColorStop(0, disc); rg.addColorStop(1, alt ? "#4c5c66" : "#7a3f22");
+  ctx.fillStyle = rg;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+
+  ctx.fillStyle = alt ? "rgba(143,164,176,0.5)" : "rgba(217,140,79,0.35)";
+  for (let i = 0; i < (alt ? 26 : 10); i++){
+    const rr = 3 + rnd() * (alt ? 6 : 14);
+    ctx.beginPath();
+    ctx.arc(rnd() * IMG_W, IMG_H * (0.72 + rnd() * 0.22), rr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  grain(ctx, IMG_W, IMG_H, mulberry32(alt ? 9002 : 4002), 7);
+  return c;
+}
+
+/* pair 1 — "Frond / Rust": layered leaf silhouettes, spring greens vs a
+   scorched autumn palette, rearranged rather than recolored */
+function drawFrond(alt){
+  const { c, ctx } = makeCanvas();
+  const rnd = mulberry32(alt ? 9101 : 4101);
+  ctx.fillStyle = alt ? "#1a1410" : "#0e1712";
+  ctx.fillRect(0, 0, IMG_W, IMG_H);
+
+  const palette = alt
+    ? ["#8a4a2a", "#b6672f", "#5c2c1c", "#d99a4e"]
+    : ["#3d6b3f", "#5c8a4f", "#274a34", "#8fae5a"];
+
+  const fronds = alt ? 9 : 12;
+  for (let i = 0; i < fronds; i++){
+    const bx = (i / fronds) * IMG_W + (rnd() - 0.5) * 90;
+    const by = IMG_H * (alt ? 0.98 : 1.02);
+    const len = IMG_H * (0.42 + rnd() * 0.4);
+    const lean = (rnd() - 0.5) * (alt ? 1.1 : 0.6);
+    const col = palette[i % palette.length];
+    ctx.strokeStyle = col;
+    ctx.fillStyle = col;
+    const segs = 9;
+    for (let s = 0; s < segs; s++){
+      const t = s / segs;
+      const px = bx + Math.sin(t * 2.4 + lean) * len * 0.22 * lean + lean * t * 90;
+      const py = by - t * len;
+      const leafW = (1 - t) * (alt ? 30 : 22) + 4;
+      ctx.beginPath();
+      ctx.ellipse(px, py, leafW, leafW * 2.6, lean * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.globalAlpha = alt ? 0.5 : 0.35;
+  ctx.fillStyle = alt ? "#e0a860" : "#c8dba0";
+  for (let i = 0; i < 60; i++){
+    ctx.beginPath();
+    ctx.arc(rnd() * IMG_W, rnd() * IMG_H, rnd() * 2 + 0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  grain(ctx, IMG_W, IMG_H, mulberry32(alt ? 9102 : 4102), 6);
+  return c;
+}
+
+/* pair 2 — "Plate / Grid": an engraved-looking type/rule composition —
+   ink-on-paper cream for the "plate" state, an inverted, denser grid for
+   the "grid" state */
+function drawPlate(alt){
+  const { c, ctx } = makeCanvas();
+  const rnd = mulberry32(alt ? 9201 : 4201);
+  ctx.fillStyle = alt ? "#100e0c" : "#d8cdb8";
+  ctx.fillRect(0, 0, IMG_W, IMG_H);
+
+  const ink = alt ? "#d8cdb8" : "#211a12";
+  ctx.strokeStyle = ink;
+  const cols = alt ? 14 : 7, rows = alt ? 10 : 5;
+  ctx.lineWidth = alt ? 1 : 2;
+  ctx.globalAlpha = alt ? 0.5 : 0.7;
+  for (let i = 1; i < cols; i++){
+    const x = (i / cols) * IMG_W;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, IMG_H); ctx.stroke();
+  }
+  for (let j = 1; j < rows; j++){
+    const y = (j / rows) * IMG_H;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(IMG_W, y); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = ink;
+  const blocks = alt ? 20 : 8;
+  for (let i = 0; i < blocks; i++){
+    const w = 18 + rnd() * (alt ? 60 : 120);
+    const h = 10 + rnd() * (alt ? 40 : 70);
+    ctx.fillRect(rnd() * IMG_W, rnd() * IMG_H, w, h);
+  }
+  ctx.font = alt ? "700 88px Helvetica Neue, Helvetica, Arial, sans-serif" : "300 140px Helvetica Neue, Helvetica, Arial, sans-serif";
+  ctx.fillStyle = ink;
+  ctx.globalAlpha = 0.9;
+  ctx.fillText(alt ? "INK" : "I", IMG_W * (alt ? 0.06 : 0.5) , IMG_H * (alt ? 0.5 : 0.62));
+  ctx.globalAlpha = 1;
+  grain(ctx, IMG_W, IMG_H, mulberry32(alt ? 9202 : 4202), alt ? 10 : 5);
+  return c;
+}
+
+const PAIR_BUILDERS = [
+  { name: "Clay ／ Slate",  a: () => drawClay(false),  b: () => drawClay(true),  seed: 501 },
+  { name: "Frond ／ Rust",  a: () => drawFrond(false), b: () => drawFrond(true), seed: 601 },
+  { name: "Plate ／ Grid",  a: () => drawPlate(false), b: () => drawPlate(true), seed: 701 }
+];
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SHADERS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const VERT = `#version 300 es
+precision highp float;
+void main(){
+  vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+}`;
+
+/* dwell accumulator — ping-ponged at low resolution, in normalized content
+   (image) uv space so it stays independent of viewport size or aspect */
+const ACCUM_FRAG = `#version 300 es
+precision highp float;
+out vec4 fragColor;
+uniform sampler2D uPrev;
+uniform vec2  uRes;
+uniform vec2  uCursor;      // content uv, or (-10,-10) when inactive
+uniform float uHasCursor;
+uniform float uDt;
+uniform float uGain;
+uniform float uDecay;
+uniform float uReach;
+
+void main(){
+  vec2 uv = gl_FragCoord.xy / uRes;
+  float prev = texture(uPrev, uv).r;
+  float d = distance(uv, uCursor);
+  float proximity = uHasCursor * exp(-(d * d) / (2.0 * uReach * uReach));
+  float next = prev + proximity * uGain * uDt - uDecay * uDt;
+  fragColor = vec4(clamp(next, 0.0, 1.0), 0.0, 0.0, 1.0);
+}`;
+
+const MAIN_FRAG = `#version 300 es
+precision highp float;
+out vec4 fragColor;
+
+uniform sampler2D uTexA;
+uniform sampler2D uTexB;
+uniform sampler2D uHeight;
+uniform sampler2D uAccum;
+
+uniform vec2  uRes;
+uniform float uAspect;      // canvas aspect
+uniform float uImgAspect;   // image aspect
+uniform vec2  uCursor;      // content uv, or (-10,-10) when inactive
+uniform float uHasCursor;
+uniform float uReach;
+uniform float uInstant;
+uniform float uFeather;
+uniform float uParallax;
+uniform float uTime;
+
+/* cover-fit: screen uv (0..1, y up) -> content uv (0..1 within the image) */
+vec2 coverUV(vec2 s){
+  vec2 c = s - 0.5;
+  if (uAspect > uImgAspect) c.y *= uImgAspect / uAspect;
+  else c.x *= uAspect / uImgAspect;
+  return c + 0.5;
+}
+
+void main(){
+  vec2 screenUV = gl_FragCoord.xy / uRes;
+  vec2 uv = coverUV(screenUV);
+
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0){
+    fragColor = vec4(0.03, 0.032, 0.036, 1.0);
+    return;
+  }
+
+  float texel = 1.0 / uRes.y;
+  float h  = texture(uHeight, uv).r;
+  float dwell = texture(uAccum, uv).r;
+
+  float dInst = distance(uv, uCursor);
+  float instant = uHasCursor * uInstant * exp(-(dInst * dInst) / (2.0 * uReach * uReach * 0.4));
+  float progress = clamp(dwell + instant, 0.0, 1.0);
+
+  float edge = smoothstep(h - uFeather, h + uFeather, progress);
+
+  /* height-map gradient, for the carved-edge bevel shading and the
+     dwell-driven relief displacement */
+  float hx1 = texture(uHeight, uv + vec2(texel * 2.0, 0.0)).r;
+  float hx0 = texture(uHeight, uv - vec2(texel * 2.0, 0.0)).r;
+  float hy1 = texture(uHeight, uv + vec2(0.0, texel * 2.0)).r;
+  float hy0 = texture(uHeight, uv - vec2(0.0, texel * 2.0)).r;
+  vec2 grad = vec2(hx1 - hx0, hy1 - hy0);
+
+  /* relief grows with accumulated dwell only (not the instantaneous term) —
+     the effect this piece exists to demonstrate is that it accumulates */
+  float relief = dwell * uParallax;
+  vec2 offset = grad * relief * 0.55;
+
+  vec3 colA = texture(uTexA, uv - offset * 0.5).rgb;
+  vec3 colB = texture(uTexB, uv + offset * 0.5).rgb;
+  vec3 col = mix(colA, colB, edge);
+
+  /* carved-plate bevel: a fixed raking light against the height gradient,
+     strongest right at the reveal boundary and scaled by how much relief
+     has built up there */
+  vec2 lightDir = normalize(vec2(-0.55, 0.68));
+  float bevel = dot(grad, lightDir) * 46.0;
+  float atEdge = 1.0 - abs(edge - 0.5) * 2.0;
+  float reliefVis = clamp(relief * 1.6, 0.0, 1.0);
+  col *= 1.0 + clamp(bevel, -1.0, 1.0) * (0.16 + 0.30 * atEdge) * (0.35 + 0.65 * reliefVis);
+
+  /* a soft ambient occlusion-ish darkening low in the height field, so the
+     surface reads as physically incised rather than merely alpha-blended */
+  col *= mix(0.90, 1.0, smoothstep(0.0, 0.5, h));
+
+  col = pow(clamp(col, 0.0, 1.0), vec3(0.96));
+  fragColor = vec4(col, 1.0);
+}`;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROGRAM SETUP
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function compile(type, src){
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
+    const log = gl.getShaderInfoLog(sh);
+    gl.deleteShader(sh);
+    throw new Error("shader compile: " + log);
+  }
+  return sh;
+}
+function link(vsSrc, fsSrc){
+  const p = gl.createProgram();
+  const vs = compile(gl.VERTEX_SHADER, vsSrc);
+  const fs = compile(gl.FRAGMENT_SHADER, fsSrc);
+  gl.attachShader(p, vs); gl.attachShader(p, fs);
+  gl.linkProgram(p);
+  gl.deleteShader(vs); gl.deleteShader(fs);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)){
+    const log = gl.getProgramInfoLog(p);
+    gl.deleteProgram(p);
+    throw new Error("program link: " + log);
+  }
+  return p;
+}
+
+setLoad(16, "Compiling the reveal shader");
+
+let accumProg, mainProg, vao;
+try {
+  accumProg = link(VERT, ACCUM_FRAG);
+  mainProg  = link(VERT, MAIN_FRAG);
+} catch (err){
+  console.error(err);
+  failLoad("Shader compilation failed");
+  return;
+}
+
+vao = gl.createVertexArray();
+gl.bindVertexArray(vao);
+
+const AU = {};
+["uPrev", "uRes", "uCursor", "uHasCursor", "uDt", "uGain", "uDecay", "uReach"].forEach(n => {
+  AU[n] = gl.getUniformLocation(accumProg, n);
+});
+const MU = {};
+["uTexA", "uTexB", "uHeight", "uAccum", "uRes", "uAspect", "uImgAspect",
+ "uCursor", "uHasCursor", "uReach", "uInstant", "uFeather", "uParallax", "uTime"].forEach(n => {
+  MU[n] = gl.getUniformLocation(mainProg, n);
+});
+
+/* ── accumulator ping-pong FBOs ────────────────────────────────────────── */
+const ACC_RES = 256;
+function makeAccumTarget(){
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, ACC_RES, ACC_RES, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return { tex, fbo };
+}
+const accumTargets = [makeAccumTarget(), makeAccumTarget()];
+let accumRead = 0;
+
+function clearAccum(){
+  for (const t of accumTargets){
+    gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
+    gl.viewport(0, 0, ACC_RES, ACC_RES);
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+/* ── per-pair GPU textures, built once at boot ────────────────────────── */
+const HEIGHT_RES = 320;
+
+function uploadRGBA(canvasEl){
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvasEl);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return tex;
+}
+function uploadR8(data, size){
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, size, size, 0, gl.RED, gl.UNSIGNED_BYTE, data);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return tex;
+}
+
+const pairs = [];  // { name, texA, texB, texH, aspect, heightStats }
+
+function buildPairs(){
+  PAIR_BUILDERS.forEach((def, i) => {
+    setLoad(24 + i * 20, "Carving pair " + (i + 1) + " of " + PAIR_BUILDERS.length);
+    const canvasA = def.a();
+    const canvasB = def.b();
+    const field = buildHeightField(HEIGHT_RES, def.seed);
+    pairs.push({
+      name: def.name,
+      texA: uploadRGBA(canvasA),
+      texB: uploadRGBA(canvasB),
+      texH: uploadR8(field.data, HEIGHT_RES),
+      aspect: IMG_W / IMG_H,
+      heightStats: field.stats
+    });
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+let activePair = 0;
+let paused = false;
+let clock = 0;
+let cw = 1, ch = 1, dpr = 1;
+
+const pointer = { u: -10, v: -10, active: false, lastRealMoveAt: -999 };
+let wanderEnabled = true;
+
+function resize(){
+  const wCss = canvas.clientWidth  || window.innerWidth;
+  const hCss = canvas.clientHeight || window.innerHeight;
+  const cap  = wCss > 1600 ? 1.15 : 1.4;
+  dpr = Math.min(window.devicePixelRatio || 1, cap);
+  const w = Math.max(2, Math.round(wCss * dpr));
+  const h = Math.max(2, Math.round(hCss * dpr));
+  if (w !== cw || h !== ch){
+    cw = w; ch = h;
+    canvas.width = w; canvas.height = h;
+  }
+}
+resize();
+window.addEventListener("resize", resize, { passive: true });
+
+/* screen uv (0..1, origin top-left, y-down as in CSS) -> content uv, using
+   the same cover-fit transform the shader applies */
+function screenToContentUV(sx, sy){
+  const canvasAspect = cw / ch;
+  const p = pairs[activePair];
+  const imgAspect = p ? p.aspect : 1;
+  let cx = sx - 0.5, cy = (1 - sy) - 0.5;
+  if (canvasAspect > imgAspect) cy *= imgAspect / canvasAspect;
+  else cx *= canvasAspect / imgAspect;
+  return [cx + 0.5, cy + 0.5];
+}
+
+/* ── wander: a smooth seeded path used only while there is no real cursor
+   activity, so the surface stays legible on load and after the pointer
+   idles away — real pointer input always takes priority */
+const WANDER_IDLE_S = 2.2;
+function wanderUV(t){
+  const x = 0.5 + 0.30 * Math.sin(t * 0.31) * Math.cos(t * 0.07 + 1.1);
+  const y = 0.5 + 0.26 * Math.sin(t * 0.23 + 2.1);
+  return [clamp(x, 0.05, 0.95), clamp(y, 0.05, 0.95)];
+}
+
+function currentCursorUV(){
+  const idle = clock - pointer.lastRealMoveAt > WANDER_IDLE_S;
+  if (pointer.active && !idle) return { uv: [pointer.u, pointer.v], has: 1 };
+  if (wanderEnabled) return { uv: wanderUV(clock), has: 1 };
+  return { uv: [-10, -10], has: 0 };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DRAW
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function stepAccum(dt){
+  const p = pairs[activePair];
+  const { uv, has } = currentCursorUV();
+  const writeIdx = 1 - accumRead;
+  const target = accumTargets[writeIdx];
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+  gl.viewport(0, 0, ACC_RES, ACC_RES);
+  gl.useProgram(accumProg);
+  gl.bindVertexArray(vao);
+
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, accumTargets[accumRead].tex);
+  gl.uniform1i(AU.uPrev, 0);
+  gl.uniform2f(AU.uRes, ACC_RES, ACC_RES);
+  gl.uniform2f(AU.uCursor, uv[0], uv[1]);
+  gl.uniform1f(AU.uHasCursor, has);
+  gl.uniform1f(AU.uDt, dt);
+  gl.uniform1f(AU.uGain, S.gain);
+  gl.uniform1f(AU.uDecay, S.decay);
+  gl.uniform1f(AU.uReach, S.reach);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  accumRead = writeIdx;
+  return { uv, has };
+}
+
+function drawMain(cursor){
+  const p = pairs[activePair];
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, cw, ch);
+  gl.useProgram(mainProg);
+  gl.bindVertexArray(vao);
+
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, p.texA);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, p.texB);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, p.texH);
+  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, accumTargets[accumRead].tex);
+  gl.uniform1i(MU.uTexA, 0);
+  gl.uniform1i(MU.uTexB, 1);
+  gl.uniform1i(MU.uHeight, 2);
+  gl.uniform1i(MU.uAccum, 3);
+
+  gl.uniform2f(MU.uRes, cw, ch);
+  gl.uniform1f(MU.uAspect, cw / ch);
+  gl.uniform1f(MU.uImgAspect, p.aspect);
+  gl.uniform2f(MU.uCursor, cursor.uv[0], cursor.uv[1]);
+  gl.uniform1f(MU.uHasCursor, cursor.has);
+  gl.uniform1f(MU.uReach, S.reach);
+  gl.uniform1f(MU.uInstant, S.instant);
+  gl.uniform1f(MU.uFeather, S.feather);
+  gl.uniform1f(MU.uParallax, S.parallax);
+  gl.uniform1f(MU.uTime, clock);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+function renderOnce(dt){
+  resize();
+  const cursor = stepAccum(typeof dt === "number" ? dt : 1 / 60);
+  drawMain(cursor);
+  return cursor;
+}
+
+/* real, on-demand measurement of the accumulator — used by the diagnostic
+   surface and by the readout, never assumed */
+function readAccumStats(){
+  gl.bindFramebuffer(gl.FRAMEBUFFER, accumTargets[accumRead].fbo);
+  const buf = new Uint8Array(ACC_RES * ACC_RES * 4);
+  gl.readPixels(0, 0, ACC_RES, ACC_RES, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  let sum = 0, max = 0, n = ACC_RES * ACC_RES;
+  for (let i = 0; i < n; i++){
+    const v = buf[i * 4];
+    sum += v;
+    if (v > max) max = v;
+  }
+  return { mean: sum / n / 255, max: max / 255 };
+}
+
+function sampleAccumAt(u, v){
+  const x = clamp(Math.round(u * (ACC_RES - 1)), 0, ACC_RES - 1);
+  const y = clamp(Math.round(v * (ACC_RES - 1)), 0, ACC_RES - 1);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, accumTargets[accumRead].fbo);
+  const px = new Uint8Array(4);
+  gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return px[0] / 255;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MAIN LOOP
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+let last = 0, running = false;
+let fpsAcc = 0, fpsN = 0, fpsShown = 0;
+let lastCursor = { uv: [-10, -10], has: 0 };
+
+function frame_(now){
+  if (!running) return;
+  const dt = last ? Math.min((now - last) / 1000, 0.05) : 1 / 60;
+  last = now;
+
+  resize();
+  if (!paused){
+    clock += dt;
+    lastCursor = stepAccum(dt);
+  }
+  drawMain(lastCursor);
+
+  fpsAcc += dt; fpsN++;
+  if (fpsAcc > 0.5){
+    fpsShown = Math.round(fpsN / fpsAcc);
+    fpsAcc = 0; fpsN = 0;
+    updateReadout();
+  }
+
+  requestAnimationFrame(frame_);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UI
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const body = document.body;
+
+function updateReadout(){
+  $("r-pair").textContent = pairs[activePair] ? pairs[activePair].name : "—";
+  const stats = readAccumStats();
+  $("r-dwell").textContent = (stats.mean * 100).toFixed(1) + "% avg / " + (stats.max * 100).toFixed(0) + "% pk";
+  $("r-cursor").textContent = lastCursor.has ? lastCursor.uv[0].toFixed(2) + ", " + lastCursor.uv[1].toFixed(2) : "idle";
+  $("r-fps").textContent = fpsShown ? fpsShown + " fps" : "—";
+}
+
+const panelToggle = $("panel-toggle"), panelClose = $("panel-close");
+function setPanel(open){
+  body.classList.toggle("panel-open", open);
+  panelToggle.setAttribute("aria-expanded", open ? "true" : "false");
+}
+panelToggle.addEventListener("click", () => setPanel(true));
+panelClose.addEventListener("click", () => setPanel(false));
+
+const fmt = {
+  feather:  v => v.toFixed(3),
+  reach:    v => v.toFixed(2),
+  instant:  v => v.toFixed(2),
+  gain:     v => v.toFixed(2),
+  decay:    v => v.toFixed(2),
+  parallax: v => v.toFixed(2) + "×"
+};
+
+function applyKey(key, value){
+  S[key] = value;
+  const out = $("o-" + key);
+  if (out) out.textContent = fmt[key](value);
+  return S[key];
+}
+["feather", "reach", "instant", "gain", "decay", "parallax"].forEach(key => {
+  const el = $("p-" + key);
+  if (!el) return;
+  el.addEventListener("input", () => applyKey(key, +el.value));
+});
+
+function resetAll(){
+  Object.assign(S, DEFAULTS);
+  ["feather", "reach", "instant", "gain", "decay", "parallax"].forEach(key => {
+    const el = $("p-" + key);
+    if (el){ el.value = S[key]; $("o-" + key).textContent = fmt[key](S[key]); }
+  });
+  clearAccum();
+}
+$("p-reset").addEventListener("click", resetAll);
+
+const pairButtons = Array.from(document.querySelectorAll(".pair-btn"));
+function setActivePair(i){
+  activePair = clamp(i | 0, 0, pairs.length - 1);
+  pairButtons.forEach(b => b.classList.toggle("is-active", +b.dataset.pair === activePair));
+  clearAccum();
+  updateReadout();
+}
+pairButtons.forEach(b => b.addEventListener("click", () => setActivePair(+b.dataset.pair)));
+
+const wanderBtn = $("p-wander");
+function setWander(on){
+  wanderEnabled = on;
+  wanderBtn.textContent = "Auto-wander: " + (on ? "on" : "off");
+}
+wanderBtn.addEventListener("click", () => setWander(!wanderEnabled));
+
+/* ── pointer: continuous tracking, mapped into content space every move ─── */
+function setPointerFromEvent(e){
+  const r = canvas.getBoundingClientRect();
+  const sx = (e.clientX - r.left) / r.width;
+  const sy = (e.clientY - r.top) / r.height;
+  const [u, v] = screenToContentUV(sx, sy);
+  pointer.u = u; pointer.v = v; pointer.active = true;
+  pointer.lastRealMoveAt = clock;
+}
+canvas.addEventListener("pointermove", setPointerFromEvent, { passive: true });
+canvas.addEventListener("pointerenter", setPointerFromEvent, { passive: true });
+canvas.addEventListener("pointerleave", () => { pointer.active = false; }, { passive: true });
+
+/* ── keys ──────────────────────────────────────────────────────────────── */
+window.addEventListener("keydown", (e) => {
+  const tag = (e.target && e.target.tagName) || "";
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  const k = e.key.toLowerCase();
+  if (k === "c"){ setPanel(!body.classList.contains("panel-open")); }
+  else if (k === "escape"){ setPanel(false); }
+  else if (k === "r"){ resetAll(); }
+  else if (k === " "){ e.preventDefault(); paused = !paused; body.classList.toggle("is-paused", paused); }
+  else if (k === "1" || k === "2" || k === "3"){ setActivePair(+k - 1); }
+  else if (k === "["){ setActivePair((activePair - 1 + pairs.length) % pairs.length); }
+  else if (k === "]"){ setActivePair((activePair + 1) % pairs.length); }
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden){ running = false; }
+  else if (!running){ running = true; last = 0; requestAnimationFrame(frame_); }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DIAGNOSTIC SURFACE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+window.__intaglio = {
+  version: "1.0.0",
+  title: "Intaglio — a depth-displacement image reveal study",
+
+  settings: S,
+  defaults: Object.assign({}, DEFAULTS),
+  set(key, value){
+    if (!(key in S)) throw new Error("unknown setting: " + key);
+    S[key] = value;
+    return S[key];
+  },
+  reset(){ resetAll(); return Object.assign({}, S); },
+
+  get pairs(){ return pairs.map(p => ({ name: p.name, aspect: p.aspect, heightStats: p.heightStats })); },
+  get activePair(){ return activePair; },
+  setPair(i){ setActivePair(i); return activePair; },
+
+  get clock(){ return clock; },
+  get paused(){ return paused; },
+  pause(v){ paused = (v === undefined) ? !paused : !!v; body.classList.toggle("is-paused", paused); return paused; },
+
+  get wander(){ return wanderEnabled; },
+  setWander(v){ setWander(!!v); return wanderEnabled; },
+
+  /* cursor injection in content-uv [0,1]^2, independent of real pointer
+     events — deterministic and testable without dispatching DOM events */
+  setCursorUV(u, v){
+    pointer.u = clamp(u, 0, 1); pointer.v = clamp(v, 0, 1);
+    pointer.active = true; pointer.lastRealMoveAt = clock;
+    return [pointer.u, pointer.v];
+  },
+  clearCursor(){ pointer.active = false; },
+  get cursorUV(){ return lastCursor.uv.slice(); },
+
+  /* real GPU readback, not a JS-side estimate */
+  accumStats(){ return readAccumStats(); },
+  sampleAccumAt(u, v){ return sampleAccumAt(u, v); },
+  clearAccum(){ clearAccum(); },
+
+  /* advance the simulation by a fixed dt off the rAF loop, for deterministic
+     multi-step tests (e.g. "advance 2s of dwell, then measure") */
+  step(dt){
+    const d = typeof dt === "number" ? dt : 1 / 60;
+    clock += d;
+    lastCursor = stepAccum(d);
+    drawMain(lastCursor);
+    return { clock, cursor: lastCursor };
+  },
+  render(){ return renderOnce(1 / 60), true; },
+
+  info(){
+    return {
+      fps: fpsShown,
+      resolution: [cw, ch],
+      dpr,
+      pair: pairs[activePair] ? pairs[activePair].name : null,
+      accum: readAccumStats(),
+      cursor: lastCursor,
+      renderer: (() => {
+        const d = gl.getExtension("WEBGL_debug_renderer_info");
+        return d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : "unavailable";
+      })()
+    };
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOOT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+
+(async function boot(){
+  try {
+    clearAccum();
+
+    setLoad(20, "Preparing image pairs");
+    await wait(60);
+    buildPairs();
+    setActivePair(0);
+
+    setLoad(86, "Warming the reveal pass");
+    resize();
+    renderOnce(0);
+    gl.finish();
+    await wait(160);
+
+    setLoad(94, "Waking up");
+    updateReadout();
+    await wait(200);
+
+    setLoad(100, "Live");
+    await wait(240);
+
+    loader.classList.add("done");
+    body.classList.add("is-live");
+    setTimeout(() => { loader.style.display = "none"; }, 1000);
+
+    running = true;
+    last = 0;
+    requestAnimationFrame(frame_);
+  } catch (err){
+    console.error(err);
+    failLoad("Could not start the study");
+  }
+})();
+
+})();
+</script>
+</body>
+</html>
