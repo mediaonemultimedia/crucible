@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07080a">
+<title>Armature — a procedurally animated SDF creature study</title>
+<meta name="description" content="A raymarched signed-distance creature with no mesh and no rig — the distance field itself is the skeleton, animated by moving the primitives that compose it. It watches the cursor and startles when you click.">
+<style>
+:root{
+  --bg:#07080a;
+  --ink:#e8e3d8;
+  --dim:#7b8087;
+  --faint:#4a4e54;
+  --rule:rgba(232,227,216,.11);
+  --rule-2:rgba(232,227,216,.055);
+  --accent:#c8a877;
+  --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);overflow:hidden;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+canvas#stage{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+body.is-dragging canvas#stage{cursor:grabbing}
+
+#veil{
+  position:fixed;inset:0;pointer-events:none;z-index:2;
+  background:radial-gradient(126% 92% at 50% 46%,transparent 38%,rgba(0,0,0,.34) 80%,rgba(0,0,0,.68) 100%);
+}
+
+#ui{
+  position:fixed;inset:0;z-index:5;pointer-events:none;
+  opacity:0;transition:opacity 1.1s cubic-bezier(.4,0,.2,1) .25s;
+}
+body.is-live #ui{opacity:1}
+#ui > *{pointer-events:auto}
+
+.eyebrow{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.20em;
+  text-transform:uppercase;color:var(--faint);
+}
+
+/* wordmark --------------------------------------------------------------- */
+#mark{position:absolute;top:26px;left:30px;display:flex;align-items:flex-start;gap:12px}
+#mark .w{
+  font-size:15px;font-weight:300;letter-spacing:.52em;text-transform:uppercase;
+  line-height:1;padding-top:1px;white-space:nowrap;
+}
+#mark .ix{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--accent);
+  border:1px solid rgba(200,168,119,.32);padding:2px 4px 1px;line-height:1;white-space:nowrap;
+}
+#mark .sub{margin-top:9px;display:block}
+#mark .col{display:flex;flex-direction:column}
+
+/* panel toggle ------------------------------------------------------------ */
+#panel-toggle{
+  position:absolute;top:24px;right:30px;z-index:7;
+  display:flex;align-items:center;gap:10px;
+  background:rgba(12,13,16,.55);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  border:1px solid var(--rule);color:var(--dim);
+  font-family:var(--mono);font-size:9px;letter-spacing:.20em;text-transform:uppercase;
+  padding:8px 11px;cursor:pointer;line-height:1;
+  transition:border-color .3s ease,color .3s ease,background .3s ease,opacity .35s ease;
+}
+#panel-toggle:hover{border-color:rgba(200,168,119,.45);color:var(--ink)}
+#panel-toggle .bars{display:flex;flex-direction:column;gap:2.5px;width:11px}
+#panel-toggle .bars i{display:block;height:1px;background:currentColor}
+#panel-toggle .bars i:nth-child(1){width:11px}
+#panel-toggle .bars i:nth-child(2){width:7px}
+#panel-toggle .bars i:nth-child(3){width:9px}
+#panel-toggle .key{
+  color:var(--accent);border:1px solid rgba(200,168,119,.28);
+  padding:2px 4px 1px;font-size:8px;letter-spacing:.06em;
+}
+body.panel-open #panel-toggle{opacity:0;pointer-events:none}
+
+/* control panel ----------------------------------------------------------- */
+#panel{
+  position:absolute;top:0;right:0;bottom:0;width:min(336px,90vw);z-index:8;
+  display:flex;flex-direction:column;
+  background:rgba(9,10,12,.90);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-left:1px solid var(--rule);
+  transform:translateX(101%);transition:transform .52s cubic-bezier(.4,0,.2,1);
+  will-change:transform;
+}
+body.panel-open #panel{transform:translateX(0)}
+#panel header{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+  padding:24px 22px 16px;border-bottom:1px solid var(--rule);flex:0 0 auto;
+}
+#panel header h2{
+  margin:8px 0 0;font-size:13px;font-weight:300;letter-spacing:.34em;text-transform:uppercase;
+}
+#panel-close{
+  background:none;border:1px solid var(--rule);color:var(--dim);
+  width:24px;height:24px;line-height:1;cursor:pointer;font-size:14px;
+  transition:border-color .25s ease,color .25s ease;
+}
+#panel-close:hover{border-color:rgba(200,168,119,.45);color:var(--ink)}
+
+#panel .body{overflow-y:auto;overscroll-behavior:contain;padding:0 22px 26px;flex:1 1 auto}
+#panel .body::-webkit-scrollbar{width:6px}
+#panel .body::-webkit-scrollbar-thumb{background:rgba(232,227,216,.12)}
+
+#panel section{padding:20px 0 6px;border-bottom:1px solid var(--rule-2)}
+#panel section:last-of-type{border-bottom:0}
+#panel h3{
+  margin:0 0 13px;font-family:var(--mono);font-size:9px;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--faint);font-weight:400;
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+}
+#panel h3 .ix{color:rgba(200,168,119,.5)}
+#panel .note{
+  margin:10px 0 2px;font-family:var(--mono);font-size:8.5px;line-height:1.85;
+  letter-spacing:.05em;color:var(--faint);
+}
+#panel .note b{color:var(--dim);font-weight:400}
+
+/* sliders */
+.sld{display:block;margin:13px 0 0}
+.sld .row{
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);
+}
+.sld .row output{color:var(--dim);letter-spacing:.06em;font-variant-numeric:tabular-nums}
+.sld input[type=range]{
+  appearance:none;-webkit-appearance:none;width:100%;height:12px;background:none;cursor:pointer;display:block;
+}
+.sld input[type=range]::-webkit-slider-runnable-track{height:1px;background:var(--rule)}
+.sld input[type=range]::-moz-range-track{height:1px;background:var(--rule)}
+.sld input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:9px;height:9px;margin-top:-4px;background:var(--accent);
+  border:0;border-radius:0;transform:rotate(45deg);
+}
+.sld input[type=range]::-moz-range-thumb{
+  width:8px;height:8px;background:var(--accent);border:0;border-radius:0;
+}
+.sld input[type=range]:focus{outline:none}
+.sld input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(200,168,119,.25)}
+
+/* wide action button */
+.act{
+  display:block;width:100%;margin-top:14px;background:none;border:1px solid var(--rule);
+  color:var(--dim);cursor:pointer;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;
+  padding:9px 8px 8px;transition:border-color .25s ease,color .25s ease,background .25s ease;
+}
+.act:hover{border-color:rgba(200,168,119,.45);color:var(--ink);background:rgba(200,168,119,.05)}
+
+/* readout ---------------------------------------------------------------- */
+#readout{
+  position:absolute;left:30px;bottom:74px;font-family:var(--mono);font-size:10px;
+  line-height:1.85;color:var(--dim);letter-spacing:.03em;
+}
+#readout dl{margin:0;display:grid;grid-template-columns:78px auto}
+#readout dt{color:var(--faint);text-transform:uppercase;letter-spacing:.16em;font-size:9px}
+#readout dd{margin:0;color:var(--dim);font-variant-numeric:tabular-nums}
+
+/* method note ------------------------------------------------------------ */
+#method{
+  position:absolute;right:30px;bottom:74px;width:min(330px,31vw);text-align:right;
+  font-family:var(--mono);font-size:9.5px;line-height:1.95;color:var(--faint);
+  letter-spacing:.04em;transition:opacity .4s ease;
+}
+#method b{color:var(--dim);font-weight:400}
+#method .t{
+  display:block;margin-bottom:8px;font-size:9px;letter-spacing:.20em;
+  text-transform:uppercase;color:rgba(232,227,216,.24);
+}
+body.panel-open #method{opacity:0;pointer-events:none}
+
+/* credit ----------------------------------------------------------------- */
+#credit{
+  position:absolute;left:50%;transform:translateX(-50%);bottom:26px;text-align:center;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.20em;color:var(--faint);
+  text-transform:uppercase;line-height:2;white-space:nowrap;
+}
+#credit b{color:var(--dim);font-weight:400}
+#credit .keys{color:rgba(232,227,216,.2)}
+body.is-paused #credit .keys::after{content:" · held — press space to play";color:var(--accent)}
+
+/* loader ----------------------------------------------------------------- */
+#loader{
+  position:fixed;inset:0;z-index:20;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity .9s cubic-bezier(.4,0,.2,1);
+}
+#loader.done{opacity:0;pointer-events:none}
+#loader .idx{
+  font-family:var(--mono);font-size:10px;letter-spacing:.34em;color:var(--accent);margin-bottom:30px;
+}
+#pulse{position:relative;width:64px;height:64px;margin-bottom:30px}
+#pulse .ring{
+  position:absolute;inset:0;border:1px solid var(--accent);border-radius:50%;opacity:0;
+  animation:pulse 2.2s cubic-bezier(.3,0,.4,1) infinite;
+}
+#pulse .ring:nth-child(2){animation-delay:.55s}
+#pulse .ring:nth-child(3){animation-delay:1.1s}
+#pulse .dot{
+  position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;
+  background:var(--accent);border-radius:50%;
+}
+@keyframes pulse{
+  0%{transform:scale(.2);opacity:.85}
+  100%{transform:scale(1.6);opacity:0}
+}
+#loader .word{
+  font-size:clamp(30px,6.6vw,68px);font-weight:200;letter-spacing:.38em;
+  text-transform:uppercase;text-indent:.38em;line-height:1;margin:0;text-align:center;
+}
+#loader .study{
+  margin-top:22px;font-family:var(--mono);font-size:9.5px;letter-spacing:.30em;
+  text-transform:uppercase;color:var(--dim);text-align:center;
+}
+#load-bar{margin-top:44px;width:min(290px,52vw);height:1px;background:rgba(232,227,216,.1);position:relative}
+#load-bar-fill{position:absolute;inset:0 auto 0 0;width:5%;background:var(--accent);transition:width .5s cubic-bezier(.4,0,.2,1)}
+#load-status{
+  margin-top:14px;font-family:var(--mono);font-size:8.5px;letter-spacing:.26em;
+  text-transform:uppercase;color:var(--faint);
+}
+#loader.is-error #load-status{color:#d97a6c}
+#loader.is-error #load-bar-fill{background:#d97a6c}
+#loader .rule{width:min(290px,52vw);height:1px;background:var(--rule-2);margin-top:30px}
+#loader .foot{
+  margin-top:14px;font-family:var(--mono);font-size:8px;letter-spacing:.2em;
+  text-transform:uppercase;color:rgba(232,227,216,.16);text-align:center;line-height:2;
+}
+
+@media (prefers-reduced-motion: reduce){
+  #pulse .ring{animation-duration:.01ms}
+  #loader{transition-duration:.01ms}
+  #panel{transition-duration:.01ms}
+}
+@media (max-width:1180px){
+  #method{display:none}
+}
+@media (max-width:1360px){
+  #credit{font-size:8px;letter-spacing:.14em}
+}
+@media (max-width:880px){
+  #mark{top:18px;left:18px}
+  #panel-toggle{top:16px;right:18px}
+  #panel{width:min(336px,100vw)}
+  #readout{left:18px;right:18px;bottom:96px;font-size:9px}
+  #readout dl{grid-template-columns:62px auto}
+  #credit{bottom:14px;font-size:7.5px;letter-spacing:.12em;white-space:normal;width:calc(100vw - 36px);line-height:1.9}
+}
+@media (max-height:560px){
+  #readout{display:none}
+}
+
+/* ── series navigation ─────────────────────────────────────────────── */
+#mark .sx-wrap{position:relative;display:inline-block}
+#mark a.ix{text-decoration:none;display:inline-block;cursor:pointer;
+  transition:border-color .28s ease,color .28s ease,background .28s ease}
+#mark a.ix:hover,#mark .sx-wrap:focus-within a.ix{
+  border-color:rgba(200,168,119,.62);background:rgba(200,168,119,.08)}
+#mark a.ix:focus-visible{outline:1px solid rgba(200,168,119,.7);outline-offset:2px}
+#mark .sx-menu{
+  position:absolute;top:calc(100% + 9px);left:0;z-index:20;min-width:228px;
+  background:rgba(9,10,12,.93);
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+  border:1px solid var(--rule);padding:7px 0;
+  opacity:0;visibility:hidden;transform:translateY(-5px);
+  transition:opacity .26s ease,transform .26s cubic-bezier(.4,0,.2,1),visibility 0s linear .26s;
+}
+#mark .sx-wrap:hover .sx-menu,
+#mark .sx-wrap:focus-within .sx-menu{
+  opacity:1;visibility:visible;transform:translateY(0);transition-delay:0s}
+#mark .sx-menu .sx-hd{
+  display:block;font-family:var(--mono);font-size:8px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--faint);padding:5px 13px 8px;
+  border-bottom:1px solid var(--rule-2,rgba(232,227,216,.055));margin-bottom:5px;
+  text-decoration:none;transition:color .24s ease}
+a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
+#mark .sx-menu a,#mark .sx-menu span.sx-i{
+  display:flex;align-items:baseline;gap:9px;padding:4px 13px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;
+  text-transform:uppercase;text-decoration:none;color:var(--dim);
+  transition:color .22s ease,background .22s ease}
+#mark .sx-menu a:hover,#mark .sx-menu a:focus-visible{
+  color:var(--ink);background:rgba(232,227,216,.05);outline:none}
+#mark .sx-menu .sx-n{color:var(--faint);flex:0 0 auto;transition:color .22s ease}
+#mark .sx-menu a:hover .sx-n,#mark .sx-menu a:focus-visible .sx-n{color:var(--accent)}
+#mark .sx-menu .sx-here{color:var(--accent)}
+#mark .sx-menu .sx-here .sx-n{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<canvas id="stage"></canvas>
+<div id="veil"></div>
+
+<div id="ui">
+  <div id="mark">
+    <div class="col">
+      <span class="w">Armature</span>
+      <span class="eyebrow sub">A procedurally animated SDF creature</span>
+    </div>
+    <span class="sx-wrap"><a class="ix" href="../" aria-label="Study 14 — open series index">No. 14</a><nav class="sx-menu" aria-label="Series index"><a class="sx-hd" href="../">Crucible — index</a><a href="../mercury/"><span class="sx-n">03</span><span>Mercury</span></a><a href="../torsion/"><span class="sx-n">04</span><span>Torsion</span></a><a href="../torsion-2/"><span class="sx-n">05</span><span>Torsion 2.0</span></a><a href="../weft/"><span class="sx-n">06</span><span>Weft</span></a><a href="../cast/"><span class="sx-n">07</span><span>Cast</span></a><a href="../solve/"><span class="sx-n">08</span><span>Solve</span></a><a href="../torsion-pineapple/"><span class="sx-n">09</span><span>Torsion Pineapple</span></a><a href="../anneal/"><span class="sx-n">10</span><span>Anneal</span></a><a href="../living-bokeh/"><span class="sx-n">11</span><span>Living Bokeh</span></a><a href="../glyph/"><span class="sx-n">12</span><span>Glyph</span></a><a href="../cockle/"><span class="sx-n">13</span><span>Cockle</span></a><a class="sx-here" href="../armature/" aria-current="page"><span class="sx-n">14</span><span>Armature</span></a></nav></span>
+  </div>
+
+  <button id="panel-toggle" type="button" aria-expanded="false" aria-controls="panel">
+    <span class="bars"><i></i><i></i><i></i></span>
+    <span class="lbl">Controls</span>
+    <span class="key">C</span>
+  </button>
+
+  <aside id="panel" aria-label="Controls">
+    <header>
+      <div>
+        <span class="eyebrow">Study 14</span>
+        <h2>Armature</h2>
+      </div>
+      <button id="panel-close" type="button" aria-label="Close controls">×</button>
+    </header>
+
+    <div class="body">
+
+      <section>
+        <h3>Attention <span class="ix">01</span></h3>
+
+        <label class="sld">
+          <span class="row"><span>Head reflex</span><output id="o-headrate">7.5</output></span>
+          <input id="p-headrate" type="range" min="2" max="14" step="0.1" value="7.5">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Body follow</span><output id="o-bodyrate">2.2</output></span>
+          <input id="p-bodyrate" type="range" min="0.5" max="6" step="0.1" value="2.2">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Gaze range</span><output id="o-gazerange">1.00×</output></span>
+          <input id="p-gazerange" type="range" min="0.3" max="1.3" step="0.01" value="1">
+        </label>
+
+        <p class="note">
+          There is no rig. The head's aim is two exponential filters chasing
+          the same target at different rates — <b>fast</b> for the head,
+          <b>slow</b> for the body — so it snaps to notice you, then settles
+          into facing you.
+        </p>
+      </section>
+
+      <section>
+        <h3>Motion <span class="ix">02</span></h3>
+
+        <label class="sld">
+          <span class="row"><span>Breathing rate</span><output id="o-breathrate">0.42</output></span>
+          <input id="p-breathrate" type="range" min="0.1" max="1.2" step="0.01" value="0.42">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Breathing depth</span><output id="o-breathdepth">1.00×</output></span>
+          <input id="p-breathdepth" type="range" min="0" max="2" step="0.01" value="1">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Tail liveliness</span><output id="o-tail">1.00×</output></span>
+          <input id="p-tail" type="range" min="0" max="2" step="0.01" value="1">
+        </label>
+
+        <p class="note">
+          Nothing here is baked. Every joint position is recomputed on the
+          CPU each frame — the <b>distance field is the skeleton</b> — and
+          handed to the shader as a fresh set of primitive transforms.
+        </p>
+      </section>
+
+      <section>
+        <h3>Render <span class="ix">03</span></h3>
+
+        <label class="sld">
+          <span class="row"><span>March step</span><output id="o-step">0.85</output></span>
+          <input id="p-step" type="range" min="0.4" max="1" step="0.01" value="0.85">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Max steps</span><output id="o-steps">110</output></span>
+          <input id="p-steps" type="range" min="50" max="180" step="2" value="110">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Shadow softness</span><output id="o-shk">10.0</output></span>
+          <input id="p-shk" type="range" min="3" max="24" step="0.5" value="10">
+        </label>
+
+        <p class="note">
+          Shadows are a second march toward the key light, tracking the
+          tightest pinch of <b>distance ÷ travel</b> along the way. Ambient
+          occlusion samples the field a few short steps off the surface
+          normal and compares it to what an empty room would give back.
+        </p>
+      </section>
+
+      <section>
+        <h3>Session <span class="ix">04</span></h3>
+        <button class="act" id="p-react" type="button">Startle it</button>
+        <button class="act" id="p-reset" type="button">Reset all to defaults</button>
+      </section>
+
+    </div>
+  </aside>
+
+  <div id="readout">
+    <dl>
+      <dt>Gaze</dt><dd id="r-gaze">—</dd>
+      <dt>Blink</dt><dd id="r-blink">—</dd>
+      <dt>Steps</dt><dd id="r-steps">—</dd>
+      <dt>Rate</dt><dd id="r-fps">—</dd>
+    </dl>
+  </div>
+
+  <div id="method">
+    <span class="t">Method</span>
+    There is no mesh and no bones. Every part of the body — spine, skull,
+    ears, tail — is a sphere or a capsule, and the only thing that makes
+    them read as one animal is a <b>polynomial smooth-minimum</b> welding
+    their distances together where they meet. Animation is nothing but
+    those primitives' <b>positions changing over time</b>: a breathing scale
+    on the torso, two damped rotations chasing the cursor for the head, a
+    swung pair of segments for the tail. The shader never sees a rig — it
+    just sphere-traces whatever shape the primitives make this frame.
+  </div>
+
+  <div id="credit">
+    <b>Armature</b> — procedurally animated SDF creature study 14 &nbsp;·&nbsp; smooth-min primitives &nbsp;·&nbsp; soft shadows + AO &nbsp;·&nbsp; cursor-held gaze &nbsp;·&nbsp; webgl2<br>
+    <span class="keys">move the cursor to hold its attention &nbsp; click to startle it &nbsp; drag to orbit &nbsp; c controls &nbsp; space pause &nbsp; r reset</span>
+  </div>
+</div>
+
+<div id="loader">
+  <div class="idx">Study 14</div>
+  <div id="pulse"><i class="ring"></i><i class="ring"></i><i class="ring"></i><span class="dot"></span></div>
+  <h1 class="word">Armature</h1>
+  <div class="study">A procedurally animated SDF creature</div>
+  <div id="load-bar"><div id="load-bar-fill"></div></div>
+  <div id="load-status">Opening a context</div>
+  <div class="rule"></div>
+  <div class="foot">
+    no mesh · no bones · one distance field<br>
+    smooth-min primitives animated frame by frame
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ARMATURE — a procedurally animated SDF creature study
+   No. 14 of Crucible. Single file, raw WebGL2, no runtime network access.
+
+   There is no mesh and no skeleton in the traditional sense. The "rig" is a
+   handful of primitive transforms (positions, radii, two rotation angles for
+   the head) recomputed on the CPU every frame from a small state machine —
+   breathing, gaze, blink, a click reaction — and handed to the fragment
+   shader as uniforms. The shader itself only ever sphere-traces a static
+   union of spheres and capsules, smooth-min welded together. The animation
+   lives entirely in where those primitives sit this frame.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const lerp  = (a, b, t) => a + (b - a) * t;
+/* exponential smoothing toward a target at a fixed rate, independent of dt */
+const damp  = (cur, target, rate, dt) => lerp(cur, target, 1 - Math.exp(-rate * dt));
+
+/* ── defaults ──────────────────────────────────────────────────────────── */
+const DEFAULTS = Object.freeze({
+  headRate:    7.5,   // 1/s — head chase speed
+  bodyRate:    2.2,   // 1/s — body chase speed
+  gazeRange:   1.00,  // scales max head/body swivel
+
+  breathRate:  0.42,  // Hz
+  breathDepth: 1.00,
+  tailLife:    1.00,
+
+  step:        0.85,
+  maxSteps:    110,
+  shadowK:     10.0
+});
+
+const S = Object.seal(Object.assign({}, DEFAULTS));
+
+/* ── dom ───────────────────────────────────────────────────────────────── */
+const $  = (id) => document.getElementById(id);
+const canvas   = $("stage");
+const loader   = $("loader");
+const barFill  = $("load-bar-fill");
+const statusEl = $("load-status");
+
+const setLoad = (pct, msg) => {
+  barFill.style.width = pct + "%";
+  if (msg) statusEl.textContent = msg;
+};
+const failLoad = (msg) => {
+  loader.classList.add("is-error");
+  setLoad(100, msg);
+};
+
+setLoad(6, "Opening a context");
+
+/* ── gl context ────────────────────────────────────────────────────────── */
+const gl = canvas.getContext("webgl2", {
+  alpha: false, antialias: false, depth: false, stencil: false,
+  premultipliedAlpha: false, preserveDrawingBuffer: false,
+  powerPreference: "high-performance"
+});
+
+if (!gl) {
+  failLoad("WebGL2 unavailable in this browser");
+  return;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SHADERS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const VERT = `#version 300 es
+precision highp float;
+void main(){
+  vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+}`;
+
+const FRAG = `#version 300 es
+precision highp float;
+
+out vec4 fragColor;
+
+uniform vec2  uRes;
+uniform vec3  uCamPos;
+uniform mat3  uCamBasis;      // columns: right, up, forward
+uniform float uFocal;
+
+/* ── rig: every primitive's world-space transform this frame ─────────── */
+uniform vec3  uBodyPos;
+uniform vec3  uBodyR;
+uniform vec3  uHeadPos;
+uniform float uHeadR;
+uniform vec3  uNeckA;
+uniform float uNeckR;
+uniform vec3  uEarTipL;
+uniform vec3  uEarTipR;
+uniform float uEarR;
+uniform vec3  uEyeL;
+uniform vec3  uEyeR;
+uniform float uEyeRad;
+uniform vec3  uLegTop[4];
+uniform vec3  uLegBot[4];
+uniform float uLegR;
+uniform vec3  uTailA;
+uniform vec3  uTailB;
+uniform vec3  uTailC;
+uniform float uTailR1;
+uniform float uTailR2;
+
+uniform float uStepScale;
+uniform int   uMaxSteps;
+uniform float uShadowK;
+
+uniform vec3  uSkinColor;
+uniform vec3  uGroundColor;
+
+const float PI = 3.14159265359;
+const float GROUND_Y = -0.95;
+
+/* ── primitives ────────────────────────────────────────────────────────── */
+float sdSphere(vec3 p, vec3 c, float r){ return length(p - c) - r; }
+
+float sdEllipsoid(vec3 p, vec3 c, vec3 r){
+  vec3 q = (p - c) / r;
+  float k0 = length(q);
+  float k1 = length(q / r);
+  return k0 * (k0 - 1.0) / max(k1, 1e-5);
+}
+
+float sdCapsule(vec3 p, vec3 a, vec3 b, float r){
+  vec3 pa = p - a, ba = b - a;
+  float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
+  return length(pa - ba * h) - r;
+}
+
+float smin(float a, float b, float k){
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+/* ── the creature ──────────────────────────────────────────────────────── */
+const float K_NECK = 0.20, K_HEAD = 0.22, K_LEG = 0.15, K_TAIL = 0.17, K_EAR = 0.075;
+
+float dCreature(vec3 p){
+  float d = sdEllipsoid(p, uBodyPos, uBodyR);
+  d = smin(d, sdCapsule(p, uNeckA, uHeadPos, uNeckR), K_NECK);
+  d = smin(d, sdSphere(p, uHeadPos, uHeadR), K_HEAD);
+  for (int i = 0; i < 4; i++){
+    d = smin(d, sdCapsule(p, uLegTop[i], uLegBot[i], uLegR), K_LEG);
+  }
+  d = smin(d, sdCapsule(p, uTailA, uTailB, uTailR1), K_TAIL);
+  d = smin(d, sdCapsule(p, uTailB, uTailC, uTailR2), K_TAIL * 0.75);
+  d = smin(d, sdCapsule(p, uHeadPos, uEarTipL, uEarR), K_EAR);
+  d = smin(d, sdCapsule(p, uHeadPos, uEarTipR, uEarR), K_EAR);
+  return d;
+}
+
+float dEyes(vec3 p){
+  return min(sdSphere(p, uEyeL, uEyeRad), sdSphere(p, uEyeR, uEyeRad));
+}
+
+/* x = distance, y = material id (0 skin, 1 eye, 2 ground) */
+vec2 map(vec3 p){
+  float body = dCreature(p);
+  float eye  = dEyes(p);
+  vec2 res = body < eye ? vec2(body, 0.0) : vec2(eye, 1.0);
+  float g = p.y - GROUND_Y;
+  if (g < res.x) res = vec2(g, 2.0);
+  return res;
+}
+
+vec3 calcNormal(vec3 p){
+  vec2 e = vec2(1.0, -1.0) * 0.0005;
+  return normalize(
+    e.xyy * map(p + e.xyy).x + e.yyx * map(p + e.yyx).x +
+    e.yxy * map(p + e.yxy).x + e.xxx * map(p + e.xxx).x);
+}
+
+float calcAO(vec3 p, vec3 n){
+  float occ = 0.0, sca = 1.0;
+  for (int i = 0; i < 5; i++){
+    float h = 0.02 + 0.13 * float(i) / 4.0;
+    float d = map(p + n * h).x;
+    occ += (h - d) * sca;
+    sca *= 0.72;
+  }
+  return clamp(1.0 - 2.6 * occ, 0.0, 1.0);
+}
+
+float calcShadow(vec3 ro, vec3 rd, float mint, float maxt){
+  float res = 1.0, t = mint;
+  for (int i = 0; i < 42; i++){
+    float h = map(ro + rd * t).x;
+    res = min(res, uShadowK * h / t);
+    t += clamp(h, 0.02, 0.28);
+    if (res < 0.02 || t > maxt) break;
+  }
+  return clamp(res, 0.0, 1.0);
+}
+
+vec2 raymarch(vec3 ro, vec3 rd, float maxDist){
+  float t = 0.0;
+  float m = -1.0;
+  for (int i = 0; i < 200; i++){
+    if (i >= uMaxSteps) break;
+    vec3 p = ro + rd * t;
+    vec2 h = map(p);
+    if (h.x < max(0.0006, 0.0009 * t)){ m = h.y; break; }
+    t += h.x * uStepScale;
+    if (t > maxDist) break;
+  }
+  return vec2(t, m);
+}
+
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+  vec3 ro = uCamPos;
+  vec3 rd = normalize(uCamBasis * vec3(uv, uFocal));
+
+  vec3 skyTop = vec3(0.050, 0.054, 0.063);
+  vec3 skyBot = vec3(0.026, 0.028, 0.034);
+  vec3 bg = mix(skyBot, skyTop, clamp(rd.y * 0.5 + 0.42, 0.0, 1.0));
+  /* a very soft warm glow low on the horizon behind the creature */
+  bg += vec3(0.05, 0.038, 0.024) * pow(clamp(1.0 - abs(rd.y) * 3.2, 0.0, 1.0), 2.0) * clamp(rd.z * 0.5 + 0.5, 0.0, 1.0);
+
+  vec2 hit = raymarch(ro, rd, 16.0);
+  vec3 col = bg;
+
+  if (hit.y >= 0.0){
+    vec3 p = ro + rd * hit.x;
+    vec3 n = calcNormal(p);
+
+    vec3 albedo; float roughK; float specAmt;
+    if (hit.y < 0.5){        albedo = uSkinColor;            roughK = 46.0; specAmt = 0.22; }
+    else if (hit.y < 1.5){   albedo = vec3(0.016,0.015,0.019); roughK = 220.0; specAmt = 0.95; }
+    else {                   albedo = uGroundColor;          roughK = 14.0; specAmt = 0.08; }
+
+    vec3 keyDir  = normalize(vec3(-0.40, 0.86, 0.32));
+    vec3 keyCol  = vec3(1.0, 0.95, 0.86) * 2.35;
+    vec3 fillDir = normalize(vec3(0.62, 0.28, -0.58));
+    vec3 fillCol = vec3(0.56, 0.63, 0.80) * 0.50;
+
+    float ao = calcAO(p, n);
+    float sh = calcShadow(p + n * 0.02, keyDir, 0.03, 6.0);
+
+    float ndl = clamp(dot(n, keyDir), 0.0, 1.0);
+    vec3 h = normalize(keyDir - rd);
+    float ndh = clamp(dot(n, h), 0.0, 1.0);
+    float specTerm = pow(ndh, roughK) * specAmt;
+
+    float skyAmt = clamp(n.y * 0.5 + 0.5, 0.0, 1.0);
+    vec3 ambient = mix(vec3(0.048,0.050,0.058), vec3(0.095,0.102,0.120), skyAmt) * ao;
+
+    vec3 lit = albedo * (ambient + keyCol * ndl * sh);
+    lit += keyCol * specTerm * sh;
+    lit += albedo * fillCol * clamp(dot(n, fillDir), 0.0, 1.0) * ao;
+
+    if (hit.y > 0.5 && hit.y < 1.5){
+      float rim = pow(1.0 - clamp(dot(n, -rd), 0.0, 1.0), 3.0);
+      lit += vec3(0.55, 0.55, 0.60) * rim * 0.5 * sh;
+    }
+
+    /* faint contact shadow where creature meets ground, independent of the AO pass */
+    if (hit.y > 1.5){
+      float near = smoothstep(1.4, 0.0, length(p.xz));
+      lit *= mix(1.0, 0.78, near * (1.0 - ao) * 0.6 + near * 0.12);
+    }
+
+    float fog = 1.0 - exp(-hit.x * 0.045);
+    col = mix(lit, bg, clamp(fog, 0.0, 1.0));
+  }
+
+  col = col / (1.0 + col);
+  col = pow(col, vec3(0.4545));
+  fragColor = vec4(col, 1.0);
+}`;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROGRAM
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function compile(type, src){
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
+    const log = gl.getShaderInfoLog(sh);
+    gl.deleteShader(sh);
+    throw new Error("shader compile: " + log);
+  }
+  return sh;
+}
+
+function link(vsSrc, fsSrc){
+  const p  = gl.createProgram();
+  const vs = compile(gl.VERTEX_SHADER, vsSrc);
+  const fs = compile(gl.FRAGMENT_SHADER, fsSrc);
+  gl.attachShader(p, vs); gl.attachShader(p, fs);
+  gl.linkProgram(p);
+  gl.deleteShader(vs); gl.deleteShader(fs);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)){
+    const log = gl.getProgramInfoLog(p);
+    gl.deleteProgram(p);
+    throw new Error("program link: " + log);
+  }
+  return p;
+}
+
+setLoad(20, "Compiling the distance field");
+
+let prog, vao;
+try {
+  prog = link(VERT, FRAG);
+} catch (err){
+  console.error(err);
+  failLoad("Shader compilation failed");
+  return;
+}
+
+vao = gl.createVertexArray();   // attribute-less: gl_VertexID drives the triangle
+gl.bindVertexArray(vao);
+
+const U = {};
+[
+  "uRes","uCamPos","uCamBasis","uFocal",
+  "uBodyPos","uBodyR","uHeadPos","uHeadR","uNeckA","uNeckR",
+  "uEarTipL","uEarTipR","uEarR","uEyeL","uEyeR","uEyeRad",
+  "uLegTop[0]","uLegBot[0]","uLegR",
+  "uTailA","uTailB","uTailC","uTailR1","uTailR2",
+  "uStepScale","uMaxSteps","uShadowK","uSkinColor","uGroundColor"
+].forEach(n => { U[n] = gl.getUniformLocation(prog, n); });
+
+const SKIN_COLOR   = new Float32Array([0.760, 0.640, 0.530]);
+const GROUND_COLOR = new Float32Array([0.052, 0.050, 0.052]);
+
+setLoad(38, "Assembling the primitives");
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RIG — rest pose and per-frame state
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const GROUND_Y = -0.95;
+
+/* everything in creature-local space: +Y up, +Z the creature's default
+   forward (the direction it faces at rest, toward the default camera) */
+const REST = {
+  bodyPos: [0, 0.06, 0.00],   bodyR: [0.55, 0.40, 0.50],
+  headPos: [0, 0.62, 0.34],   headR: 0.285,
+  neckA:   [0, 0.24, 0.18],   neckR: 0.185,
+  earHingeDroop: [0.155, -0.10, -0.06],   // local offset from headPos, mirrored on x
+  earHingePerk:  [0.130,  0.235,-0.015],
+  earR: 0.070,
+  eyeOffset: [0.150, 0.055, 0.235],       // local offset from headPos, mirrored on x
+  eyeR: 0.048,
+  legTop: [[0.29, 0.00, 0.22], [-0.29, 0.00, 0.22], [0.26, 0.00, -0.20], [-0.26, 0.00, -0.20]],
+  legBot: [[0.31, GROUND_Y + 0.02, 0.23], [-0.31, GROUND_Y + 0.02, 0.23], [0.28, GROUND_Y + 0.02, -0.21], [-0.28, GROUND_Y + 0.02, -0.21]],
+  legR: 0.098,
+  tailA: [0, 0.16, -0.46], tailB: [0, 0.04, -0.80], tailC: [0, 0.08, -1.08],
+  tailR1: 0.110, tailR2: 0.055
+};
+
+const HEAD_MAX_YAW   = 55 * Math.PI / 180;
+const HEAD_MAX_PITCH = 28 * Math.PI / 180;
+const BODY_MAX_YAW   = 26 * Math.PI / 180;
+
+const rig = {
+  bodyYaw: 0, headYaw: 0, headPitch: 0,
+  bob: 0, breathePhase: 0,
+  squash: 0,          // 0..1 reaction squash/stretch envelope
+  earPerk: 0,          // 0 droop .. 1 perked
+  blink: 0,             // 0 open .. 1 closed
+  hop: 0
+};
+
+let clock = 0, paused = false;
+let cw = 1, ch = 1, dpr = 1;
+
+/* ── pointer: continuous gaze target + drag-to-orbit ─────────────────── */
+const pointer = { nx: 0, ny: 0 };
+let dragging = false, dragMoved = 0, dragStartX = 0, dragStartY = 0;
+let dragAz = 0, dragEl = 0, dragStartAz = 0, dragStartEl = 0;
+
+/* ── camera ────────────────────────────────────────────────────────────── */
+const CAM_R = 4.55, FOCAL = 1.85, CAM_TARGET_Y = -0.08;
+let baseAz = 0.58, elevation = 0.245;
+const AUTO_DRIFT = 0.028;
+
+function cameraAt(time){
+  const az = time * AUTO_DRIFT + baseAz + dragAz;
+  const el = clamp(elevation + dragEl, -0.08, 0.62);
+  const ce = Math.cos(el), se = Math.sin(el);
+  const pos = [CAM_R * ce * Math.sin(az), CAM_TARGET_Y + CAM_R * se, CAM_R * ce * Math.cos(az)];
+
+  let fx = -pos[0], fy = CAM_TARGET_Y - pos[1], fz = -pos[2];
+  const fl = Math.hypot(fx, fy, fz); fx /= fl; fy /= fl; fz /= fl;
+  let rx = -fz, ry = 0, rz = fx;
+  const rl = Math.hypot(rx, ry, rz); rx /= rl; ry /= rl; rz /= rl;
+  const ux = ry * fz - rz * fy, uy = rz * fx - rx * fz, uz = rx * fy - ry * fx;
+
+  return {
+    pos,
+    basis: new Float32Array([rx, ry, rz, ux, uy, uz, fx, fy, fz]),
+    fwd: [fx, fy, fz]
+  };
+}
+
+/* project the pointer onto the plane through the origin facing the camera —
+   this is the cursor's world-space position, used as the gaze target */
+function cursorWorld(cam){
+  const aspect = cw / ch;
+  const ux = pointer.nx * aspect * 0.5, uy = pointer.ny * 0.5;
+  const b = cam.basis;
+  let rx = b[0] * ux + b[3] * uy + b[6] * FOCAL;
+  let ry = b[1] * ux + b[4] * uy + b[7] * FOCAL;
+  let rz = b[2] * ux + b[5] * uy + b[8] * FOCAL;
+  const rl = Math.hypot(rx, ry, rz); rx /= rl; ry /= rl; rz /= rl;
+
+  const f = cam.fwd;
+  const denom = rx * f[0] + ry * f[1] + rz * f[2];
+  if (Math.abs(denom) < 1e-4) return [0, 0.3, 1];
+  const t = (-(cam.pos[0] * f[0] + (cam.pos[1] - 0.3) * f[1] + cam.pos[2] * f[2])) / denom;
+
+  return [cam.pos[0] + rx * t, 0.3 + ry * t, cam.pos[2] + rz * t];
+}
+
+/* ── click reaction + blink state machine ─────────────────────────────── */
+let reactionT = -1;     // seconds since last startle trigger, -1 = idle
+let nextAutoBlink = 2.2 + Math.random() * 3.0;
+let blinkT = -1;
+
+function triggerReaction(){ reactionT = 0; blinkT = 0; }
+function triggerBlink(){ if (blinkT < 0) blinkT = 0; }
+
+const BLINK_DUR = 0.16;
+function blinkEnvelope(t){
+  if (t < 0 || t > BLINK_DUR) return 0;
+  const x = t / BLINK_DUR;
+  return x < 0.4 ? x / 0.4 : 1 - (x - 0.4) / 0.6;
+}
+
+const REACT_DUR = 0.85;
+function reactionEnvelope(t){
+  if (t < 0 || t > REACT_DUR) return 0;
+  const attack = 0.05;
+  if (t < attack) return t / attack;
+  const x = (t - attack) / (REACT_DUR - attack);
+  return Math.exp(-x * 4.2) * Math.cos(x * 5.0) * 0.5 + Math.exp(-x * 3.2) * 0.5;
+}
+function reactionHop(t){
+  if (t < 0 || t > 0.42) return 0;
+  return Math.sin((t / 0.42) * Math.PI) * Math.exp(-t * 2.0);
+}
+
+/* ── per-frame rig update ─────────────────────────────────────────────── */
+function rotateHeadLocal(v, yaw, pitch){
+  const cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const x1 = cy * v[0] + sy * v[2], z1 = -sy * v[0] + cy * v[2], y1 = v[1];
+  const cp = Math.cos(pitch), sp = Math.sin(pitch);
+  const y2 = cp * y1 - sp * z1, z2 = sp * y1 + cp * z1;
+  return [x1, y2, z2];
+}
+function yawXZ(x, z, yaw){
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  return [c * x + s * z, -s * x + c * z];
+}
+function toWorld(local, includeBob){
+  const [rx, rz] = yawXZ(local[0], local[2], rig.bodyYaw);
+  const ry = local[1] + (includeBob ? rig.bob : 0);
+  return [rx, ry, rz];
+}
+function add(a, b){ return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
+function mulX(v, s){ return [v[0] * s, v[1], v[2]]; }
+
+let cursorEyeLine = [0, 0.4, 1];
+
+function updateRig(dt, cam){
+  if (!paused){
+    clock += dt;
+    rig.breathePhase += dt * S.breathRate * Math.PI * 2;
+  }
+
+  /* gaze target, in world space, held with a small lag so it reads as
+     attention rather than an instant snap-to */
+  const targetPoint = cursorWorld(cam);
+  cursorEyeLine[0] = damp(cursorEyeLine[0], targetPoint[0], 9, dt);
+  cursorEyeLine[1] = damp(cursorEyeLine[1], targetPoint[1], 9, dt);
+  cursorEyeLine[2] = damp(cursorEyeLine[2], targetPoint[2], 9, dt);
+
+  const eyeOrigin = [0, REST.headPos[1] * 0.9, REST.headPos[2] * 0.4];
+  const dx = cursorEyeLine[0] - eyeOrigin[0];
+  const dy = cursorEyeLine[1] - eyeOrigin[1];
+  const dz = cursorEyeLine[2] - eyeOrigin[2];
+  const dlen = Math.max(1e-4, Math.hypot(dx, dy, dz));
+  const yawTarget   = Math.atan2(dx / dlen, Math.max(0.15, dz / dlen));
+  const pitchTarget = Math.asin(clamp(dy / dlen, -0.85, 0.85));
+
+  const gr = S.gazeRange;
+  const bodyYawTarget = clamp(yawTarget, -BODY_MAX_YAW * gr, BODY_MAX_YAW * gr);
+  rig.bodyYaw = damp(rig.bodyYaw, paused ? rig.bodyYaw : bodyYawTarget, S.bodyRate, dt);
+
+  const headYawTarget = clamp(yawTarget - rig.bodyYaw, -HEAD_MAX_YAW * gr, HEAD_MAX_YAW * gr);
+  const headPitchTarget = clamp(pitchTarget, -HEAD_MAX_PITCH * gr, HEAD_MAX_PITCH * gr);
+  rig.headYaw   = damp(rig.headYaw,   paused ? rig.headYaw   : headYawTarget,   S.headRate, dt);
+  rig.headPitch = damp(rig.headPitch, paused ? rig.headPitch : headPitchTarget, S.headRate, dt);
+
+  /* breathing: a torso scale pulse plus a very small whole-body bob */
+  const breathe = 0.5 + 0.5 * Math.sin(rig.breathePhase);
+  const breatheAmt = breathe * S.breathDepth;
+  rig.bob = 0.018 * breatheAmt + reactionHop(reactionT) * 0.12;
+
+  /* reaction envelope: squash/stretch + ear perk + a quick hop */
+  if (reactionT >= 0){
+    reactionT += paused ? 0 : dt;
+    if (reactionT > REACT_DUR) reactionT = -1;
+  }
+  const reactAmt = reactionT >= 0 ? reactionEnvelope(reactionT) : 0;
+  rig.squash = damp(rig.squash, reactAmt, 18, dt);
+
+  const curiosity = clamp(Math.abs(yawTarget) / (HEAD_MAX_YAW * gr + 0.001), 0, 1) * 0.35;
+  const earTarget = clamp(Math.max(curiosity, reactAmt > 0.15 ? 1 : 0), 0, 1);
+  rig.earPerk = damp(rig.earPerk, earTarget, 6.5, dt);
+
+  /* blink: autonomous + reaction-triggered, whichever is active wins */
+  if (!paused){
+    nextAutoBlink -= dt;
+    if (nextAutoBlink <= 0){ triggerBlink(); nextAutoBlink = 2.6 + Math.random() * 3.4; }
+    if (blinkT >= 0){
+      blinkT += dt;
+      if (blinkT > BLINK_DUR) blinkT = -1;
+    }
+  }
+  rig.blink = blinkT >= 0 ? blinkEnvelope(blinkT) : 0;
+
+  return { breatheAmt, reactAmt };
+}
+
+/* build every primitive transform for this frame, returns flat uniform data */
+const legTopFlat = new Float32Array(12);
+const legBotFlat = new Float32Array(12);
+
+function buildFrame(anim){
+  const squashY = 1 - 0.16 * rig.squash;
+  const squashXZ = 1 + 0.08 * rig.squash;
+
+  const bodyRLocal = [
+    REST.bodyR[0] * squashXZ,
+    REST.bodyR[1] * (1 + 0.05 * anim.breatheAmt) * squashY,
+    REST.bodyR[2] * squashXZ
+  ];
+  const bodyPosLocal = [REST.bodyPos[0], REST.bodyPos[1] + 0.012 * anim.breatheAmt, REST.bodyPos[2]];
+
+  const bodyPos = toWorld(bodyPosLocal, true);
+  const bodyR = bodyRLocal;
+  const neckA = toWorld(REST.neckA, true);
+
+  const headLocalRot = rotateHeadLocal([0, 0, 0], rig.headYaw, rig.headPitch);
+  const headPosLocal = add(REST.headPos, headLocalRot);
+  const headPos = toWorld(headPosLocal, true);
+
+  const earOffL = rotateHeadLocal(
+    [
+      lerp(REST.earHingeDroop[0], REST.earHingePerk[0], rig.earPerk),
+      lerp(REST.earHingeDroop[1], REST.earHingePerk[1], rig.earPerk),
+      lerp(REST.earHingeDroop[2], REST.earHingePerk[2], rig.earPerk)
+    ],
+    rig.headYaw, rig.headPitch
+  );
+  const earOffR = mulX(earOffL, -1);
+  const earTipL = toWorld(add(headPosLocal, earOffL), true);
+  const earTipR = toWorld(add(headPosLocal, earOffR), true);
+
+  const eyeOffL = rotateHeadLocal(REST.eyeOffset, rig.headYaw, rig.headPitch);
+  const eyeOffR = mulX(eyeOffL, -1);
+  const eyeR = 1 - rig.blink * 0.94;
+  const eyeL = toWorld(add(headPosLocal, eyeOffL), true);
+  const eyeRp = toWorld(add(headPosLocal, eyeOffR), true);
+
+  for (let i = 0; i < 4; i++){
+    const t = toWorld(REST.legTop[i], true);
+    const b = toWorld(REST.legBot[i], false);
+    legTopFlat[i*3] = t[0]; legTopFlat[i*3+1] = t[1]; legTopFlat[i*3+2] = t[2];
+    legBotFlat[i*3] = b[0]; legBotFlat[i*3+1] = b[1]; legBotFlat[i*3+2] = b[2];
+  }
+
+  const tailSway = Math.sin(clock * 1.6) * 0.16 + Math.sin(rig.bodyYaw * 3.0) * 0.10 * S.tailLife;
+  const tailFlick = rig.squash * 0.5 * Math.sin(clock * 14.0);
+  const swayAmt = S.tailLife * (0.4 + 0.6 * clamp(Math.abs(rig.bodyYaw) * 2.0, 0, 1));
+  const tailA = toWorld(REST.tailA, true);
+  const tailB = toWorld([REST.tailB[0] + (tailSway + tailFlick) * 0.55 * swayAmt, REST.tailB[1], REST.tailB[2]], true);
+  const tailC = toWorld([REST.tailC[0] + (tailSway + tailFlick) * 1.15 * swayAmt, REST.tailC[1], REST.tailC[2]], true);
+
+  return {
+    bodyPos, bodyR, headPos, neckA, earTipL, earTipR, eyeL, eyeR: eyeRp, eyeRad: REST.eyeR * eyeR,
+    tailA, tailB, tailC
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DRAW
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function drawScene(cam, frame){
+  gl.viewport(0, 0, cw, ch);
+  gl.useProgram(prog);
+  gl.bindVertexArray(vao);
+
+  gl.uniform2f(U.uRes, cw, ch);
+  gl.uniform3fv(U.uCamPos, cam.pos);
+  gl.uniformMatrix3fv(U.uCamBasis, false, cam.basis);
+  gl.uniform1f(U.uFocal, FOCAL);
+
+  gl.uniform3fv(U.uBodyPos, frame.bodyPos);
+  gl.uniform3fv(U.uBodyR, frame.bodyR);
+  gl.uniform3fv(U.uHeadPos, frame.headPos);
+  gl.uniform1f(U.uHeadR, REST.headR);
+  gl.uniform3fv(U.uNeckA, frame.neckA);
+  gl.uniform1f(U.uNeckR, REST.neckR);
+  gl.uniform3fv(U.uEarTipL, frame.earTipL);
+  gl.uniform3fv(U.uEarTipR, frame.earTipR);
+  gl.uniform1f(U.uEarR, REST.earR);
+  gl.uniform3fv(U.uEyeL, frame.eyeL);
+  gl.uniform3fv(U.uEyeR, frame.eyeR);
+  gl.uniform1f(U.uEyeRad, frame.eyeRad);
+  gl.uniform3fv(U["uLegTop[0]"], legTopFlat);
+  gl.uniform3fv(U["uLegBot[0]"], legBotFlat);
+  gl.uniform1f(U.uLegR, REST.legR);
+  gl.uniform3fv(U.uTailA, frame.tailA);
+  gl.uniform3fv(U.uTailB, frame.tailB);
+  gl.uniform3fv(U.uTailC, frame.tailC);
+  gl.uniform1f(U.uTailR1, REST.tailR1);
+  gl.uniform1f(U.uTailR2, REST.tailR2);
+
+  gl.uniform1f(U.uStepScale, S.step);
+  gl.uniform1i(U.uMaxSteps, S.maxSteps | 0);
+  gl.uniform1f(U.uShadowK, S.shadowK);
+  gl.uniform3fv(U.uSkinColor, SKIN_COLOR);
+  gl.uniform3fv(U.uGroundColor, GROUND_COLOR);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+function resize(){
+  const wCss = canvas.clientWidth  || window.innerWidth;
+  const hCss = canvas.clientHeight || window.innerHeight;
+  const cap  = wCss > 1600 ? 1.15 : 1.4;
+  dpr = Math.min(window.devicePixelRatio || 1, cap);
+  const w = Math.max(2, Math.round(wCss * dpr));
+  const h = Math.max(2, Math.round(hCss * dpr));
+  if (w !== cw || h !== ch){
+    cw = w; ch = h;
+    canvas.width = w; canvas.height = h;
+  }
+}
+resize();
+window.addEventListener("resize", resize, { passive: true });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MAIN LOOP
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+let last = 0, running = false;
+let fpsAcc = 0, fpsN = 0, fpsShown = 0;
+let lastFrame = null, lastCam = null;
+
+function step(dt){
+  dt = Math.min(dt, 0.05);
+  const camNow = cameraAt(clock);
+  const anim = updateRig(dt, camNow);
+  const frame = buildFrame(anim);
+  lastFrame = frame; lastCam = camNow;
+  return { cam: camNow, frame };
+}
+
+function renderOnce(dt){
+  resize();
+  const { cam, frame } = step(typeof dt === "number" ? dt : 1 / 60);
+  drawScene(cam, frame);
+  return { cam, frame };
+}
+
+function frame_(now){
+  if (!running) return;
+  const dt = last ? (now - last) / 1000 : 1 / 60;
+  last = now;
+
+  resize();
+  const { cam, frame } = step(dt);
+  drawScene(cam, frame);
+
+  fpsAcc += dt; fpsN++;
+  if (fpsAcc > 0.5){
+    fpsShown = Math.round(fpsN / fpsAcc);
+    fpsAcc = 0; fpsN = 0;
+    updateReadout();
+  }
+
+  requestAnimationFrame(frame_);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UI
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const body = document.body;
+
+function updateReadout(){
+  $("r-gaze").textContent = (rig.headYaw * 180/Math.PI).toFixed(0) + "° / " + (rig.headPitch * 180/Math.PI).toFixed(0) + "°";
+  $("r-blink").textContent = rig.blink > 0.05 ? "closing" : "open";
+  $("r-steps").textContent = S.maxSteps;
+  $("r-fps").textContent = fpsShown ? fpsShown + " fps" : "—";
+}
+
+const panelToggle = $("panel-toggle"), panelClose = $("panel-close");
+function setPanel(open){
+  body.classList.toggle("panel-open", open);
+  panelToggle.setAttribute("aria-expanded", open ? "true" : "false");
+}
+panelToggle.addEventListener("click", () => setPanel(true));
+panelClose.addEventListener("click", () => setPanel(false));
+
+const fmt = {
+  headrate:    v => v.toFixed(1),
+  bodyrate:    v => v.toFixed(1),
+  gazerange:   v => v.toFixed(2) + "×",
+  breathrate:  v => v.toFixed(2),
+  breathdepth: v => v.toFixed(2) + "×",
+  tail:        v => v.toFixed(2) + "×",
+  step:        v => v.toFixed(2),
+  steps:       v => String(v | 0),
+  shk:         v => v.toFixed(1)
+};
+const KEYMAP = {
+  headrate: "headRate", bodyrate: "bodyRate", gazerange: "gazeRange",
+  breathrate: "breathRate", breathdepth: "breathDepth", tail: "tailLife",
+  step: "step", steps: "maxSteps", shk: "shadowK"
+};
+
+function applyKey(uiKey, value){
+  const k = KEYMAP[uiKey];
+  S[k] = value;
+  const out = $("o-" + uiKey);
+  if (out) out.textContent = fmt[uiKey](value);
+  return S[k];
+}
+
+["headrate","bodyrate","gazerange","breathrate","breathdepth","tail","step","steps","shk"].forEach(uiKey => {
+  const el = $("p-" + uiKey);
+  if (!el) return;
+  el.addEventListener("input", () => { applyKey(uiKey, +el.value); });
+});
+
+function resetAll(){
+  Object.assign(S, DEFAULTS);
+  ["headrate","bodyrate","gazerange","breathrate","breathdepth","tail","step","steps","shk"].forEach(uiKey => {
+    const el = $("p-" + uiKey);
+    const k = KEYMAP[uiKey];
+    if (el){ el.value = S[k]; $("o-" + uiKey).textContent = fmt[uiKey](S[k]); }
+  });
+}
+$("p-reset").addEventListener("click", resetAll);
+$("p-react").addEventListener("click", () => triggerReaction());
+
+/* ── pointer: continuous gaze + explicit drag-to-orbit ────────────────── */
+function setPointerFromEvent(e){
+  const r = canvas.getBoundingClientRect();
+  pointer.nx =  ((e.clientX - r.left) / r.width)  * 2 - 1;
+  pointer.ny = -(((e.clientY - r.top) / r.height) * 2 - 1);
+}
+
+canvas.addEventListener("pointermove", (e) => {
+  setPointerFromEvent(e);
+  if (dragging){
+    const ddx = e.clientX - dragStartX, ddy = e.clientY - dragStartY;
+    dragMoved += Math.abs(e.movementX || 0) + Math.abs(e.movementY || 0);
+    dragAz = dragStartAz + ddx * 0.0048;
+    dragEl = clamp(dragStartEl - ddy * 0.0042, -0.55, 0.55);
+  }
+}, { passive: true });
+
+canvas.addEventListener("pointerdown", (e) => {
+  setPointerFromEvent(e);
+  dragging = true; dragMoved = 0;
+  dragStartX = e.clientX; dragStartY = e.clientY;
+  dragStartAz = dragAz; dragStartEl = dragEl;
+  body.classList.add("is-dragging");
+  canvas.setPointerCapture(e.pointerId);
+});
+
+canvas.addEventListener("pointerup", (e) => {
+  dragging = false;
+  body.classList.remove("is-dragging");
+  if (dragMoved < 6){ triggerReaction(); }
+});
+
+canvas.addEventListener("pointercancel", () => {
+  dragging = false;
+  body.classList.remove("is-dragging");
+});
+
+/* ── keys ──────────────────────────────────────────────────────────────── */
+window.addEventListener("keydown", (e) => {
+  const tag = (e.target && e.target.tagName) || "";
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  const k = e.key.toLowerCase();
+  if (k === "c"){ setPanel(!body.classList.contains("panel-open")); }
+  else if (k === "escape"){ setPanel(false); }
+  else if (k === "r"){ resetAll(); }
+  else if (k === " "){ e.preventDefault(); paused = !paused; body.classList.toggle("is-paused", paused); }
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden){ running = false; }
+  else if (!running){ running = true; last = 0; requestAnimationFrame(frame_); }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DIAGNOSTIC SURFACE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+window.__armature = {
+  version: "1.0.0",
+  title: "Armature — a procedurally animated SDF creature study",
+
+  settings: S,
+  defaults: Object.assign({}, DEFAULTS),
+  set(key, value){
+    if (!(key in S)) throw new Error("unknown setting: " + key);
+    S[key] = value;
+    return S[key];
+  },
+  reset(){ resetAll(); return Object.assign({}, S); },
+
+  get rig(){ return Object.assign({}, rig); },
+  get clock(){ return clock; },
+  get paused(){ return paused; },
+  get resolution(){ return [cw, ch]; },
+  get camera(){ return lastCam ? { pos: Array.from(lastCam.pos), az: baseAz + dragAz, el: elevation + dragEl } : null; },
+
+  pause(v){ paused = (v === undefined) ? !paused : !!v; body.classList.toggle("is-paused", paused); return paused; },
+
+  /* cursor injection in NDC [-1,1], so gaze is testable without real mouse events */
+  setPointer(nx, ny){ pointer.nx = clamp(nx, -1, 1); pointer.ny = clamp(ny, -1, 1); return [pointer.nx, pointer.ny]; },
+  get pointerNDC(){ return [pointer.nx, pointer.ny]; },
+  get gazeTarget(){ return cursorEyeLine.slice(); },
+
+  /* orbit the camera programmatically */
+  orbit(az, el){ dragAz = az; if (el !== undefined) dragEl = el; return { az: baseAz + dragAz, el: elevation + dragEl }; },
+
+  triggerReaction(){ triggerReaction(); return true; },
+  triggerBlink(){ triggerBlink(); return true; },
+
+  /* force a simulation step + render, off the rAF loop — for deterministic testing */
+  step(dt){ return renderOnce(dt), true; },
+  render(){ return renderOnce(1/60), true; },
+
+  info(){
+    return {
+      fps: fpsShown,
+      resolution: [cw, ch],
+      dpr,
+      headYawDeg: rig.headYaw * 180 / Math.PI,
+      headPitchDeg: rig.headPitch * 180 / Math.PI,
+      bodyYawDeg: rig.bodyYaw * 180 / Math.PI,
+      blink: rig.blink,
+      squash: rig.squash,
+      earPerk: rig.earPerk,
+      renderer: (() => {
+        const d = gl.getExtension("WEBGL_debug_renderer_info");
+        return d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : "unavailable";
+      })()
+    };
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOOT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+
+(async function boot(){
+  try {
+    setLoad(55, "Welding the primitives");
+    await wait(180);
+
+    // warm the pipeline: one throwaway frame so first paint is not a hitch
+    setLoad(75, "Warming the march");
+    resize();
+    renderOnce(0);
+    gl.finish();
+    await wait(180);
+
+    setLoad(92, "Waking up");
+    updateReadout();
+    await wait(220);
+
+    setLoad(100, "Live");
+    await wait(260);
+
+    loader.classList.add("done");
+    body.classList.add("is-live");
+    setTimeout(() => { loader.style.display = "none"; }, 1000);
+
+    running = true;
+    last = 0;
+    requestAnimationFrame(frame_);
+  } catch (err){
+    console.error(err);
+    failLoad("Could not start the study");
+  }
+})();
+
+})();
+</script>
+</body>
+</html>
