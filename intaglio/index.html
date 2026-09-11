@@ -346,8 +346,8 @@ a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
         </label>
 
         <label class="sld">
-          <span class="row"><span>Instant reveal</span><output id="o-instant">0.55</output></span>
-          <input id="p-instant" type="range" min="0" max="1.2" step="0.01" value="0.55">
+          <span class="row"><span>Instant reveal</span><output id="o-instant">0.40</output></span>
+          <input id="p-instant" type="range" min="0" max="1.2" step="0.01" value="0.40">
         </label>
 
         <p class="note">
@@ -363,13 +363,13 @@ a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
         <h3>Relief <span class="ix">02</span></h3>
 
         <label class="sld">
-          <span class="row"><span>Dwell gain</span><output id="o-gain">0.85</output></span>
-          <input id="p-gain" type="range" min="0.15" max="2.2" step="0.01" value="0.85">
+          <span class="row"><span>Dwell gain</span><output id="o-gain">0.34</output></span>
+          <input id="p-gain" type="range" min="0.15" max="2.2" step="0.01" value="0.34">
         </label>
 
         <label class="sld">
-          <span class="row"><span>Dwell decay</span><output id="o-decay">0.34</output></span>
-          <input id="p-decay" type="range" min="0.05" max="1.2" step="0.01" value="0.34">
+          <span class="row"><span>Dwell decay</span><output id="o-decay">0.20</output></span>
+          <input id="p-decay" type="range" min="0.05" max="1.2" step="0.01" value="0.20">
         </label>
 
         <label class="sld">
@@ -478,9 +478,9 @@ const smoothstep = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1);
 const DEFAULTS = Object.freeze({
   feather:  0.060,  // reveal edge softness, in threshold units
   reach:    0.26,   // gaussian radius (content-uv units) of cursor influence
-  instant:  0.55,   // instantaneous proximity contribution to reveal progress
-  gain:     0.85,   // dwell charge rate, 1/s at cursor center
-  decay:    0.34,   // dwell bleed-off rate, 1/s
+  instant:  0.40,   // instantaneous proximity contribution to reveal progress
+  gain:     0.34,   // dwell charge rate, 1/s at cursor center
+  decay:    0.20,   // dwell bleed-off rate, 1/s
   parallax: 1.00    // relief displacement scale
 });
 
@@ -517,6 +517,10 @@ if (!gl) {
 }
 
 const extLinearFloat = gl.getExtension("OES_texture_float_linear");
+
+/* canvas/image row 0 is visually the top; without this, textures sample
+   upside-down against our gl_FragCoord-based (bottom-up) content uv */
+gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
 /* ═══════════════════════════════════════════════════════════════════════════
    NOISE — seeded value noise, domain-warped, for the carved height fields
@@ -827,7 +831,6 @@ void main(){
   vec2 screenUV = gl_FragCoord.xy / uRes;
   vec2 uv = coverUV(screenUV);
 
-  vec3 vign = vec3(1.0);
   if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0){
     fragColor = vec4(0.03, 0.032, 0.036, 1.0);
     return;
