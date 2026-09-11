@@ -541,8 +541,9 @@ uniform mat3  uCamBasis;      // columns: right, up, forward
 uniform float uFocal;
 
 /* ── rig: every primitive's world-space transform this frame ─────────── */
-uniform vec3  uBodyPos;
-uniform vec3  uBodyR;
+uniform vec3  uBodyA;
+uniform vec3  uBodyB;
+uniform float uBodyR;
 uniform vec3  uHeadPos;
 uniform float uHeadR;
 uniform vec3  uNeckA;
@@ -573,14 +574,11 @@ const float PI = 3.14159265359;
 const float GROUND_Y = -0.95;
 
 /* ── primitives ────────────────────────────────────────────────────────── */
+/* every primitive here is an exact distance field on purpose — an
+   approximate one (like the common ellipsoid SDF) distorts the metric the
+   smooth-min blend relies on and shows up as visible seams and faceting
+   where two parts meet */
 float sdSphere(vec3 p, vec3 c, float r){ return length(p - c) - r; }
-
-float sdEllipsoid(vec3 p, vec3 c, vec3 r){
-  vec3 q = (p - c) / r;
-  float k0 = length(q);
-  float k1 = length(q / r);
-  return k0 * (k0 - 1.0) / max(k1, 1e-5);
-}
 
 float sdCapsule(vec3 p, vec3 a, vec3 b, float r){
   vec3 pa = p - a, ba = b - a;
@@ -594,10 +592,10 @@ float smin(float a, float b, float k){
 }
 
 /* ── the creature ──────────────────────────────────────────────────────── */
-const float K_NECK = 0.20, K_HEAD = 0.22, K_LEG = 0.15, K_TAIL = 0.17, K_EAR = 0.075;
+const float K_NECK = 0.11, K_HEAD = 0.13, K_LEG = 0.10, K_TAIL = 0.15, K_EAR = 0.045;
 
 float dCreature(vec3 p){
-  float d = sdEllipsoid(p, uBodyPos, uBodyR);
+  float d = sdCapsule(p, uBodyA, uBodyB, uBodyR);
   d = smin(d, sdCapsule(p, uNeckA, uHeadPos, uNeckR), K_NECK);
   d = smin(d, sdSphere(p, uHeadPos, uHeadR), K_HEAD);
   for (int i = 0; i < 4; i++){
@@ -778,7 +776,7 @@ gl.bindVertexArray(vao);
 const U = {};
 [
   "uRes","uCamPos","uCamBasis","uFocal",
-  "uBodyPos","uBodyR","uHeadPos","uHeadR","uNeckA","uNeckR",
+  "uBodyA","uBodyB","uBodyR","uHeadPos","uHeadR","uNeckA","uNeckR",
   "uEarTipL","uEarTipR","uEarR","uEyeL","uEyeR","uEyeRad",
   "uLegTop[0]","uLegBot[0]","uLegR",
   "uTailA","uTailB","uTailC","uTailR1","uTailR2",
@@ -799,18 +797,20 @@ const GROUND_Y = -0.95;
 /* everything in creature-local space: +Y up, +Z the creature's default
    forward (the direction it faces at rest, toward the default camera) */
 const REST = {
-  bodyPos: [0, 0.06, 0.00],   bodyR: [0.55, 0.40, 0.50],
-  headPos: [0, 0.62, 0.34],   headR: 0.285,
-  neckA:   [0, 0.24, 0.18],   neckR: 0.185,
-  earHingeDroop: [0.155, -0.10, -0.06],   // local offset from headPos, mirrored on x
-  earHingePerk:  [0.130,  0.235,-0.015],
-  earR: 0.070,
-  eyeOffset: [0.150, 0.055, 0.235],       // local offset from headPos, mirrored on x
-  eyeR: 0.048,
-  legTop: [[0.29, 0.00, 0.22], [-0.29, 0.00, 0.22], [0.26, 0.00, -0.20], [-0.26, 0.00, -0.20]],
-  legBot: [[0.31, GROUND_Y + 0.02, 0.23], [-0.31, GROUND_Y + 0.02, 0.23], [0.28, GROUND_Y + 0.02, -0.21], [-0.28, GROUND_Y + 0.02, -0.21]],
-  legR: 0.098,
-  tailA: [0, 0.16, -0.46], tailB: [0, 0.04, -0.80], tailC: [0, 0.08, -1.08],
+  /* body is a horizontal capsule — a short, stout torso, tilted slightly so
+     the chest sits a little higher than the haunch */
+  bodyA: [0, -0.18, -0.24], bodyB: [0, -0.02, 0.20], bodyR: 0.40,
+  headPos: [0, 0.44, 0.42],   headR: 0.27,
+  neckA:   [0, 0.06, 0.27],   neckR: 0.125,
+  earHingeDroop: [0.150, -0.09, -0.05],   // local offset from headPos, mirrored on x
+  earHingePerk:  [0.120,  0.27, -0.02],
+  earR: 0.082,
+  eyeOffset: [0.135, 0.03, 0.225],        // local offset from headPos, mirrored on x
+  eyeR: 0.052,
+  legTop: [[0.23, -0.28, 0.18], [-0.23, -0.28, 0.18], [0.21, -0.28, -0.19], [-0.21, -0.28, -0.19]],
+  legBot: [[0.24, GROUND_Y + 0.02, 0.19], [-0.24, GROUND_Y + 0.02, 0.19], [0.22, GROUND_Y + 0.02, -0.20], [-0.22, GROUND_Y + 0.02, -0.20]],
+  legR: 0.150,
+  tailA: [0, -0.06, -0.50], tailB: [0, 0.05, -0.84], tailC: [0, 0.10, -1.08],
   tailR1: 0.110, tailR2: 0.055
 };
 
@@ -859,23 +859,22 @@ function cameraAt(time){
   };
 }
 
-/* project the pointer onto the plane through the origin facing the camera —
-   this is the cursor's world-space position, used as the gaze target */
-function cursorWorld(cam){
+/* the pointer's position in the same uv units the shader casts rays with */
+function pointerUV(){
   const aspect = cw / ch;
-  const ux = pointer.nx * aspect * 0.5, uy = pointer.ny * 0.5;
-  const b = cam.basis;
-  let rx = b[0] * ux + b[3] * uy + b[6] * FOCAL;
-  let ry = b[1] * ux + b[4] * uy + b[7] * FOCAL;
-  let rz = b[2] * ux + b[5] * uy + b[8] * FOCAL;
-  const rl = Math.hypot(rx, ry, rz); rx /= rl; ry /= rl; rz /= rl;
+  return [pointer.nx * aspect * 0.5, pointer.ny * 0.5];
+}
 
-  const f = cam.fwd;
-  const denom = rx * f[0] + ry * f[1] + rz * f[2];
-  if (Math.abs(denom) < 1e-4) return [0, 0.3, 1];
-  const t = (-(cam.pos[0] * f[0] + (cam.pos[1] - 0.3) * f[1] + cam.pos[2] * f[2])) / denom;
-
-  return [cam.pos[0] + rx * t, 0.3 + ry * t, cam.pos[2] + rz * t];
+/* where a world point would land in that same uv space for this camera —
+   the inverse of the shader's rd = normalize(camBasis * vec3(uv, FOCAL)) */
+function projectToUV(cam, worldPos){
+  const dx = worldPos[0] - cam.pos[0], dy = worldPos[1] - cam.pos[1], dz = worldPos[2] - cam.pos[2];
+  const b = cam.basis; // columns: right, up, forward
+  const cx = dx * b[0] + dy * b[1] + dz * b[2];
+  const cy = dx * b[3] + dy * b[4] + dz * b[5];
+  const cz = dx * b[6] + dy * b[7] + dz * b[8];
+  const safeZ = Math.max(0.25, cz);
+  return [cx / safeZ * FOCAL, cy / safeZ * FOCAL];
 }
 
 /* ── click reaction + blink state machine ─────────────────────────────── */
@@ -926,7 +925,10 @@ function toWorld(local, includeBob){
 function add(a, b){ return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
 function mulX(v, s){ return [v[0] * s, v[1], v[2]]; }
 
-let cursorEyeLine = [0, 0.4, 1];
+const HEAD_SCREEN_REF = [0, 0.44, 0.42];   // where the face roughly sits, for projection
+const GAZE_SCREEN_GAIN = 2.35;              // uv-offset → radians
+
+let gazeUV = [0, 0];
 
 function updateRig(dt, cam){
   if (!paused){
@@ -934,20 +936,16 @@ function updateRig(dt, cam){
     rig.breathePhase += dt * S.breathRate * Math.PI * 2;
   }
 
-  /* gaze target, in world space, held with a small lag so it reads as
-     attention rather than an instant snap-to */
-  const targetPoint = cursorWorld(cam);
-  cursorEyeLine[0] = damp(cursorEyeLine[0], targetPoint[0], 9, dt);
-  cursorEyeLine[1] = damp(cursorEyeLine[1], targetPoint[1], 9, dt);
-  cursorEyeLine[2] = damp(cursorEyeLine[2], targetPoint[2], 9, dt);
+  /* how far off the creature's on-screen position the cursor sits, in the
+     same uv units the raymarcher casts rays with — held with a small lag so
+     it reads as attention settling rather than an instant snap-to */
+  const [pux, puy] = pointerUV();
+  const [fux, fuy] = projectToUV(cam, HEAD_SCREEN_REF);
+  gazeUV[0] = damp(gazeUV[0], pux - fux, 9, dt);
+  gazeUV[1] = damp(gazeUV[1], puy - fuy, 9, dt);
 
-  const eyeOrigin = [0, REST.headPos[1] * 0.9, REST.headPos[2] * 0.4];
-  const dx = cursorEyeLine[0] - eyeOrigin[0];
-  const dy = cursorEyeLine[1] - eyeOrigin[1];
-  const dz = cursorEyeLine[2] - eyeOrigin[2];
-  const dlen = Math.max(1e-4, Math.hypot(dx, dy, dz));
-  const yawTarget   = Math.atan2(dx / dlen, Math.max(0.15, dz / dlen));
-  const pitchTarget = Math.asin(clamp(dy / dlen, -0.85, 0.85));
+  const yawTarget   = clamp(gazeUV[0] * GAZE_SCREEN_GAIN, -1.5, 1.5);
+  const pitchTarget = clamp(gazeUV[1] * GAZE_SCREEN_GAIN, -1.5, 1.5);
 
   const gr = S.gazeRange;
   const bodyYawTarget = clamp(yawTarget, -BODY_MAX_YAW * gr, BODY_MAX_YAW * gr);
@@ -994,18 +992,28 @@ const legTopFlat = new Float32Array(12);
 const legBotFlat = new Float32Array(12);
 
 function buildFrame(anim){
-  const squashY = 1 - 0.16 * rig.squash;
-  const squashXZ = 1 + 0.08 * rig.squash;
-
-  const bodyRLocal = [
-    REST.bodyR[0] * squashXZ,
-    REST.bodyR[1] * (1 + 0.05 * anim.breatheAmt) * squashY,
-    REST.bodyR[2] * squashXZ
+  /* breathing pulses the torso radius; the startle reaction bunches the
+     body up — endpoints pull together while the radius puffs out */
+  const lenScale = 1 - 0.14 * rig.squash;
+  const bodyR = REST.bodyR * (1 + 0.055 * anim.breatheAmt) * (1 + 0.09 * rig.squash);
+  const bodyMid = [
+    (REST.bodyA[0] + REST.bodyB[0]) * 0.5,
+    (REST.bodyA[1] + REST.bodyB[1]) * 0.5,
+    (REST.bodyA[2] + REST.bodyB[2]) * 0.5
   ];
-  const bodyPosLocal = [REST.bodyPos[0], REST.bodyPos[1] + 0.012 * anim.breatheAmt, REST.bodyPos[2]];
+  const bodyALocal = [
+    lerp(bodyMid[0], REST.bodyA[0], lenScale),
+    lerp(bodyMid[1], REST.bodyA[1], lenScale) + 0.010 * anim.breatheAmt,
+    lerp(bodyMid[2], REST.bodyA[2], lenScale)
+  ];
+  const bodyBLocal = [
+    lerp(bodyMid[0], REST.bodyB[0], lenScale),
+    lerp(bodyMid[1], REST.bodyB[1], lenScale) + 0.010 * anim.breatheAmt,
+    lerp(bodyMid[2], REST.bodyB[2], lenScale)
+  ];
 
-  const bodyPos = toWorld(bodyPosLocal, true);
-  const bodyR = bodyRLocal;
+  const bodyA = toWorld(bodyALocal, true);
+  const bodyB = toWorld(bodyBLocal, true);
   const neckA = toWorld(REST.neckA, true);
 
   const headLocalRot = rotateHeadLocal([0, 0, 0], rig.headYaw, rig.headPitch);
@@ -1045,7 +1053,7 @@ function buildFrame(anim){
   const tailC = toWorld([REST.tailC[0] + (tailSway + tailFlick) * 1.15 * swayAmt, REST.tailC[1], REST.tailC[2]], true);
 
   return {
-    bodyPos, bodyR, headPos, neckA, earTipL, earTipR, eyeL, eyeR: eyeRp, eyeRad: REST.eyeR * eyeR,
+    bodyA, bodyB, bodyR, headPos, neckA, earTipL, earTipR, eyeL, eyeR: eyeRp, eyeRad: REST.eyeR * eyeR,
     tailA, tailB, tailC
   };
 }
@@ -1064,8 +1072,9 @@ function drawScene(cam, frame){
   gl.uniformMatrix3fv(U.uCamBasis, false, cam.basis);
   gl.uniform1f(U.uFocal, FOCAL);
 
-  gl.uniform3fv(U.uBodyPos, frame.bodyPos);
-  gl.uniform3fv(U.uBodyR, frame.bodyR);
+  gl.uniform3fv(U.uBodyA, frame.bodyA);
+  gl.uniform3fv(U.uBodyB, frame.bodyB);
+  gl.uniform1f(U.uBodyR, frame.bodyR);
   gl.uniform3fv(U.uHeadPos, frame.headPos);
   gl.uniform1f(U.uHeadR, REST.headR);
   gl.uniform3fv(U.uNeckA, frame.neckA);
@@ -1296,7 +1305,7 @@ window.__armature = {
   /* cursor injection in NDC [-1,1], so gaze is testable without real mouse events */
   setPointer(nx, ny){ pointer.nx = clamp(nx, -1, 1); pointer.ny = clamp(ny, -1, 1); return [pointer.nx, pointer.ny]; },
   get pointerNDC(){ return [pointer.nx, pointer.ny]; },
-  get gazeTarget(){ return cursorEyeLine.slice(); },
+  get gazeTarget(){ return gazeUV.slice(); },
 
   /* orbit the camera programmatically */
   orbit(az, el){ dragAz = az; if (el !== undefined) dragEl = el; return { az: baseAz + dragAz, el: elevation + dragEl }; },
