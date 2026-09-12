@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0d0f">
+<title>Telecine — live playback of exported keyframe animation data</title>
+<meta name="description" content="A canvas playback engine that reads a small hand-authored JSON keyframe schema — the kind a real After Effects export would carry — and renders any point on the timeline directly, by interpolation. Fully scrubbable, never a baked video.">
+<style>
+:root{
+  --bg:#0a0d0f;
+  --ink:#e9f2f0;
+  --dim:#7c8f8c;
+  --faint:#44514f;
+  --rule:rgba(233,242,240,.11);
+  --rule-2:rgba(233,242,240,.055);
+  --accent:#57d6c4;
+  --accent-2:#ff6b57;
+  --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);overflow:hidden;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+canvas#stage{position:fixed;inset:0;width:100%;height:100%;display:block}
+
+#veil{
+  position:fixed;inset:0;pointer-events:none;z-index:2;
+  background:radial-gradient(120% 90% at 50% 46%,transparent 42%,rgba(0,0,0,.30) 82%,rgba(0,0,0,.62) 100%);
+}
+
+#ui{
+  position:fixed;inset:0;z-index:5;pointer-events:none;
+  opacity:0;transition:opacity 1.1s cubic-bezier(.4,0,.2,1) .2s;
+}
+body.is-live #ui{opacity:1}
+#ui > *{pointer-events:auto}
+
+.eyebrow{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.20em;
+  text-transform:uppercase;color:var(--faint);
+}
+
+/* wordmark ---------------------------------------------------------------- */
+#mark{position:absolute;top:26px;left:30px;display:flex;align-items:flex-start;gap:12px;z-index:9}
+#mark .w{
+  font-size:15px;font-weight:300;letter-spacing:.52em;text-transform:uppercase;
+  line-height:1;padding-top:1px;white-space:nowrap;
+}
+#mark .ix{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--accent);
+  border:1px solid rgba(87,214,196,.32);padding:2px 4px 1px;line-height:1;white-space:nowrap;
+}
+#mark .sub{margin-top:9px;display:block}
+#mark .col{display:flex;flex-direction:column}
+
+#mark .sx-wrap{position:relative;display:inline-block}
+#mark .ix{cursor:pointer}
+#mark .sx-menu{
+  position:absolute;top:100%;right:0;margin-top:10px;min-width:236px;
+  background:rgba(9,11,13,.94);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid var(--rule);padding:6px 0;
+  display:flex;flex-direction:column;
+  opacity:0;visibility:hidden;transform:translateY(-4px);
+  transition:opacity .22s ease,transform .22s ease,visibility 0s linear .22s;
+  z-index:10;
+}
+#mark .sx-wrap:hover .sx-menu,#mark .sx-wrap:focus-within .sx-menu{
+  opacity:1;visibility:visible;transform:translateY(0);transition-delay:0s;
+}
+#mark .sx-menu a{
+  display:flex;align-items:baseline;gap:10px;padding:6px 14px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--dim);text-decoration:none;
+  white-space:nowrap;
+}
+#mark .sx-menu a:hover,#mark .sx-menu a:focus-visible{color:var(--ink);background:rgba(233,242,240,.05)}
+#mark .sx-menu .sx-hd{color:var(--faint);text-transform:uppercase;letter-spacing:.2em;font-size:9px;border-bottom:1px solid var(--rule-2);margin-bottom:4px;padding-bottom:8px}
+#mark .sx-menu .sx-n{color:var(--faint);min-width:16px;display:inline-block}
+#mark .sx-menu a:hover .sx-n,#mark .sx-menu a:focus-visible .sx-n{color:var(--accent)}
+#mark .sx-menu .sx-here{color:var(--accent)}
+#mark .sx-menu .sx-here .sx-n{color:var(--accent)}
+
+/* panel toggle -------------------------------------------------------------*/
+#panel-toggle{
+  position:absolute;top:24px;right:30px;z-index:7;
+  display:flex;align-items:center;gap:10px;
+  background:rgba(12,13,16,.55);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  border:1px solid var(--rule);color:var(--dim);
+  font-family:var(--mono);font-size:9px;letter-spacing:.20em;text-transform:uppercase;
+  padding:8px 11px;cursor:pointer;line-height:1;
+  transition:border-color .3s ease,color .3s ease,background .3s ease,opacity .35s ease;
+}
+#panel-toggle:hover{border-color:rgba(87,214,196,.45);color:var(--ink)}
+#panel-toggle .bars{display:flex;flex-direction:column;gap:2.5px;width:11px}
+#panel-toggle .bars i{display:block;height:1px;background:currentColor}
+#panel-toggle .bars i:nth-child(1){width:11px}
+#panel-toggle .bars i:nth-child(2){width:7px}
+#panel-toggle .bars i:nth-child(3){width:9px}
+#panel-toggle .key{color:var(--accent);border:1px solid rgba(87,214,196,.28);padding:2px 4px 1px;font-size:8px;letter-spacing:.06em}
+body.panel-open #panel-toggle{opacity:0;pointer-events:none}
+
+/* control panel --------------------------------------------------------------*/
+#panel{
+  position:absolute;top:0;right:0;bottom:0;width:min(336px,90vw);z-index:8;
+  display:flex;flex-direction:column;
+  background:rgba(9,10,12,.90);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-left:1px solid var(--rule);
+  transform:translateX(101%);transition:transform .52s cubic-bezier(.4,0,.2,1);
+  will-change:transform;
+}
+body.panel-open #panel{transform:translateX(0)}
+#panel header{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+  padding:24px 22px 16px;border-bottom:1px solid var(--rule);flex:0 0 auto;
+}
+#panel header h2{margin:8px 0 0;font-size:13px;font-weight:300;letter-spacing:.34em;text-transform:uppercase}
+#panel-close{
+  background:none;border:1px solid var(--rule);color:var(--dim);
+  width:24px;height:24px;line-height:1;cursor:pointer;font-size:14px;
+  transition:border-color .25s ease,color .25s ease;
+}
+#panel-close:hover{border-color:rgba(87,214,196,.45);color:var(--ink)}
+
+#panel .body{overflow-y:auto;overscroll-behavior:contain;padding:0 22px 26px;flex:1 1 auto}
+#panel .body::-webkit-scrollbar{width:6px}
+#panel .body::-webkit-scrollbar-thumb{background:rgba(233,242,240,.12)}
+
+#panel section{padding:20px 0 6px;border-bottom:1px solid var(--rule-2)}
+#panel section:last-of-type{border-bottom:0}
+#panel h3{
+  margin:0 0 13px;font-family:var(--mono);font-size:9px;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--faint);font-weight:400;
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+}
+#panel h3 .ix{color:rgba(87,214,196,.5)}
+#panel .note{margin:10px 0 2px;font-family:var(--mono);font-size:8.5px;line-height:1.85;letter-spacing:.05em;color:var(--faint)}
+#panel .note b{color:var(--dim);font-weight:400}
+
+/* scene picker */
+.scenes{display:flex;flex-direction:column;gap:6px}
+.scene-btn{
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  background:none;border:1px solid var(--rule);color:var(--dim);
+  font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-align:left;
+  padding:9px 11px;cursor:pointer;transition:border-color .2s ease,color .2s ease,background .2s ease;
+}
+.scene-btn:hover{border-color:rgba(87,214,196,.4);color:var(--ink)}
+.scene-btn.active{border-color:var(--accent);color:var(--ink);background:rgba(87,214,196,.06)}
+.scene-btn .k{color:var(--faint);font-size:9px}
+.scene-btn.active .k{color:var(--accent)}
+
+/* sliders (reused for speed) */
+.sld{display:block;margin:13px 0 0}
+.sld .row{
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);
+}
+.sld .row output{color:var(--dim);letter-spacing:.06em;font-variant-numeric:tabular-nums}
+.sld input[type=range]{appearance:none;-webkit-appearance:none;width:100%;height:12px;background:none;cursor:pointer;display:block}
+.sld input[type=range]::-webkit-slider-runnable-track{height:1px;background:var(--rule)}
+.sld input[type=range]::-moz-range-track{height:1px;background:var(--rule)}
+.sld input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:9px;height:9px;margin-top:-4px;background:var(--accent);border:0;transform:rotate(45deg);
+}
+.sld input[type=range]::-moz-range-thumb{width:9px;height:9px;background:var(--accent);border:0;transform:rotate(45deg)}
+
+.act{
+  display:block;width:100%;margin-top:8px;background:none;border:1px solid var(--rule);color:var(--dim);
+  font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;
+  padding:10px 12px;cursor:pointer;transition:border-color .2s ease,color .2s ease;
+}
+.act:hover{border-color:rgba(87,214,196,.45);color:var(--ink)}
+
+/* readout ------------------------------------------------------------------*/
+#readout{
+  position:absolute;top:26px;right:82px;z-index:6;
+  font-family:var(--mono);font-size:9px;letter-spacing:.08em;color:var(--faint);
+  text-align:right;
+}
+#readout dl{margin:0;display:flex;gap:14px}
+#readout dt{display:none}
+#readout .stat{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+#readout .stat b{color:var(--dim);font-size:8px;letter-spacing:.18em;text-transform:uppercase;font-weight:400}
+#readout .stat span{color:var(--ink);font-variant-numeric:tabular-nums;font-size:11px}
+body.panel-open #readout{opacity:0;pointer-events:none}
+
+/* transport / scrubber ------------------------------------------------------*/
+#transport{
+  position:absolute;left:0;right:0;bottom:0;z-index:6;
+  padding:0 30px 26px;
+  display:flex;flex-direction:column;gap:10px;
+}
+#scrub{position:relative;height:34px;cursor:pointer;touch-action:none}
+#scrub .track{position:absolute;left:0;right:0;top:16px;height:2px;background:var(--rule)}
+#scrub .fill{position:absolute;left:0;top:16px;height:2px;background:var(--accent);width:0%}
+#scrub .kf{position:absolute;top:12px;width:1px;height:10px;background:var(--rule);pointer-events:none}
+#scrub .head{
+  position:absolute;top:8px;width:2px;height:18px;background:var(--ink);
+  transform:translateX(-1px);box-shadow:0 0 0 3px rgba(87,214,196,.16);
+}
+#scrub .hit{position:absolute;inset:0}
+
+#tbar{display:flex;align-items:center;gap:14px}
+#tbar .grp{display:flex;align-items:center;gap:8px}
+.tbtn{
+  background:none;border:1px solid var(--rule);color:var(--dim);
+  width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:12px;transition:border-color .2s ease,color .2s ease;
+  font-family:var(--mono);
+}
+.tbtn:hover{border-color:rgba(87,214,196,.45);color:var(--ink)}
+.tbtn.on{border-color:var(--accent);color:var(--accent)}
+#time{
+  font-family:var(--mono);font-size:11px;letter-spacing:.05em;color:var(--dim);
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+#time b{color:var(--ink);font-weight:400}
+#tbar .spacer{flex:1}
+#tbar .scenelbl{
+  font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);
+  white-space:nowrap;
+}
+#tbar .scenelbl b{color:var(--accent);font-weight:400}
+body.panel-open #transport{right:336px}
+@media (max-width:640px){
+  body.panel-open #transport{right:0}
+  #readout{display:none}
+}
+
+/* method / credit ------------------------------------------------------------*/
+#method{
+  position:absolute;left:30px;bottom:96px;z-index:6;max-width:300px;
+  font-family:var(--mono);font-size:9px;line-height:1.85;letter-spacing:.03em;color:var(--faint);
+  opacity:.9;
+}
+#method .t{display:block;color:var(--dim);letter-spacing:.2em;text-transform:uppercase;font-size:8.5px;margin-bottom:8px}
+#method b{color:var(--dim);font-weight:400}
+@media (max-width:900px){#method{display:none}}
+
+/* boot loader ---------------------------------------------------------------*/
+#loader{
+  position:fixed;inset:0;z-index:20;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  transition:opacity .7s cubic-bezier(.4,0,.2,1),visibility 0s linear .7s;
+}
+body.is-live #loader{opacity:0;visibility:hidden;pointer-events:none}
+#loader .idx{font-family:var(--mono);font-size:9px;letter-spacing:.3em;text-transform:uppercase;color:var(--faint)}
+#loader #pulse{position:relative;width:64px;height:64px;display:flex;align-items:center;justify-content:center}
+#loader #pulse .ring{position:absolute;inset:0;border:1px solid rgba(87,214,196,.35);border-radius:50%;animation:pulse-ring 2.2s ease-out infinite}
+#loader #pulse .ring:nth-child(2){animation-delay:.5s}
+#loader #pulse .ring:nth-child(3){animation-delay:1s}
+#loader #pulse .dot{width:6px;height:6px;background:var(--accent);border-radius:50%}
+@keyframes pulse-ring{0%{transform:scale(.3);opacity:.8}100%{transform:scale(1.6);opacity:0}}
+#loader h1.word{margin:0;font-size:20px;font-weight:300;letter-spacing:.5em;text-transform:uppercase}
+#loader .study{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;color:var(--dim);text-align:center;max-width:280px}
+#loader #load-bar{width:200px;height:1px;background:var(--rule);margin-top:6px}
+#loader #load-bar-fill{height:100%;background:var(--accent);width:0%;transition:width .25s ease}
+#loader #load-status{font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;color:var(--faint)}
+#loader .rule{width:40px;height:1px;background:var(--rule-2);margin-top:4px}
+#loader .foot{font-family:var(--mono);font-size:8px;letter-spacing:.06em;color:var(--faint);text-align:center;line-height:1.7}
+</style>
+</head>
+<body>
+
+<canvas id="stage"></canvas>
+<div id="veil"></div>
+
+<div id="ui">
+  <div id="mark">
+    <div class="col">
+      <span class="w">Telecine</span>
+      <span class="eyebrow sub">Live playback of exported keyframe data</span>
+    </div>
+    <span class="sx-wrap">
+      <a class="ix" href="../" aria-label="Study 15 — open series index">No. 15</a>
+      <nav class="sx-menu" aria-label="Series index">
+        <a class="sx-hd" href="../">Crucible — index</a>
+        <a href="../mercury/"><span class="sx-n">03</span><span>Mercury</span></a>
+        <a href="../torsion/"><span class="sx-n">04</span><span>Torsion</span></a>
+        <a href="../torsion-2/"><span class="sx-n">05</span><span>Torsion 2.0</span></a>
+        <a href="../weft/"><span class="sx-n">06</span><span>Weft</span></a>
+        <a href="../cast/"><span class="sx-n">07</span><span>Cast</span></a>
+        <a href="../solve/"><span class="sx-n">08</span><span>Solve</span></a>
+        <a href="../torsion-pineapple/"><span class="sx-n">09</span><span>Torsion Pineapple</span></a>
+        <a href="../anneal/"><span class="sx-n">10</span><span>Anneal</span></a>
+        <a href="../living-bokeh/"><span class="sx-n">11</span><span>Living Bokeh</span></a>
+        <a href="../glyph/"><span class="sx-n">12</span><span>Glyph</span></a>
+        <a href="../cockle/"><span class="sx-n">13</span><span>Cockle</span></a>
+        <a href="../armature/"><span class="sx-n">14</span><span>Armature</span></a>
+        <a class="sx-here" href="../telecine/" aria-current="page"><span class="sx-n">15</span><span>Telecine</span></a>
+      </nav>
+    </span>
+  </div>
+
+  <button id="panel-toggle" type="button" aria-expanded="false" aria-controls="panel">
+    <span class="bars"><i></i><i></i><i></i></span>
+    <span class="lbl">Controls</span>
+    <span class="key">C</span>
+  </button>
+
+  <div id="readout">
+    <dl>
+      <div class="stat"><b>Scene</b><span id="r-scene">—</span></div>
+      <div class="stat"><b>Layers</b><span id="r-layers">—</span></div>
+      <div class="stat"><b>FPS</b><span id="r-fps">—</span></div>
+    </dl>
+  </div>
+
+  <aside id="panel" aria-label="Controls">
+    <header>
+      <div>
+        <span class="eyebrow">Study 15</span>
+        <h2>Telecine</h2>
+      </div>
+      <button id="panel-close" type="button" aria-label="Close controls">×</button>
+    </header>
+
+    <div class="body">
+
+      <section>
+        <h3>Scene <span class="ix">01</span></h3>
+        <div class="scenes" id="scene-picker"></div>
+        <p class="note">
+          Three hand-authored keyframe files, each a small JSON document —
+          the same shape a real <b>After Effects</b> export would carry:
+          position, scale, rotation and opacity per layer, sampled over time.
+        </p>
+      </section>
+
+      <section>
+        <h3>Timeline <span class="ix">02</span></h3>
+        <label class="sld">
+          <span class="row"><span>Playback speed</span><output id="o-speed">1.00×</output></span>
+          <input id="p-speed" type="range" min="0.1" max="2" step="0.05" value="1">
+        </label>
+        <button class="act" id="p-play" type="button">Pause</button>
+        <button class="act" id="p-restart" type="button">Restart from 0:00</button>
+        <p class="note">
+          Drag the scrubber, use <b>← →</b>, or scroll over the stage — every
+          position calls the same <b>sample(t)</b> function the render loop
+          uses. Nothing here is a video frame; every value on screen is
+          interpolated fresh from the JSON for the exact time requested.
+        </p>
+      </section>
+
+      <section>
+        <h3>Schema <span class="ix">03</span></h3>
+        <p class="note">
+          Each layer keyframe is <b>{ time, value, easing }</b>. Easing is
+          either <b>"linear"</b> or a cubic bézier <b>{ x1,y1,x2,y2 }</b> —
+          the same handle-pair shape AE stores per keyframe. This is a
+          deliberate <b>Phase 1</b> stand-in for a real AE export, not a
+          parser for actual .aep project data. See the PR description for
+          exact scope.
+        </p>
+      </section>
+
+    </div>
+  </aside>
+
+  <div id="transport">
+    <div id="scrub">
+      <div class="track"></div>
+      <div class="fill" id="scrub-fill"></div>
+      <div id="scrub-kfs"></div>
+      <div class="head" id="scrub-head"></div>
+      <div class="hit" id="scrub-hit"></div>
+    </div>
+    <div id="tbar">
+      <div class="grp">
+        <button class="tbtn on" id="t-play" type="button" aria-label="Play / pause" title="Play / pause (space)">❚❚</button>
+      </div>
+      <div id="time"><b id="time-cur">0.00</b> / <span id="time-dur">0.00</span>s</div>
+      <div class="spacer"></div>
+      <div class="scenelbl">Scene <b id="scene-name">—</b></div>
+    </div>
+  </div>
+
+  <div id="method">
+    <span class="t">Method</span>
+    No frame of this animation is baked. A JSON file lists each layer's
+    <b>position, scale, rotation, opacity</b> as keyframes — plain numbers
+    at plain times — and the engine asks, for whatever instant you land on,
+    "what does every property equal <b>right now</b>?" by interpolating
+    between the two surrounding keyframes with that keyframe's easing curve.
+    Scrub anywhere; it renders that instant directly, not the nearest frame.
+  </div>
+</div>
+
+<div id="loader">
+  <div class="idx">Study 15</div>
+  <div id="pulse"><i class="ring"></i><i class="ring"></i><i class="ring"></i><span class="dot"></span></div>
+  <h1 class="word">Telecine</h1>
+  <div class="study">Live playback of exported keyframe animation data</div>
+  <div id="load-bar"><div id="load-bar-fill"></div></div>
+  <div id="load-status">Parsing keyframe JSON</div>
+  <div class="rule"></div>
+  <div class="foot">
+    no baked frames · no video element<br>
+    every instant sampled fresh from JSON keyframes
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TELECINE — live playback of exported keyframe animation data
+   No. 15 of Crucible. Single file, canvas 2D, no runtime network access.
+
+   Named for the broadcast-engineering process of transferring a recorded
+   film into a live-playable video signal. The piece proves the same move
+   for motion graphics: instead of baking an After Effects composition down
+   to a locked video file, export its keyframes as data and replay them in
+   a small engine that can render ANY point on the timeline directly, by
+   interpolation — so the result stays scrubbable and interactive at any
+   resolution, forever.
+
+   SCOPE (read this before extending it): this is a deliberate Phase 1.
+   The three JSON scenes below are hand-authored stand-ins for a real AE
+   export, not a parser for actual .aep project files. There is no support
+   for masks, track mattes, expressions, or layer styles — see the PR
+   description for exactly what a Phase 2 would add.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const lerp = (a, b, t) => a + (b - a) * t;
+const $ = (id) => document.getElementById(id);
+const body = document.body;
+
+/* ── easing ──────────────────────────────────────────────────────────────
+   "linear" or a cubic bézier { x1,y1,x2,y2 } — the same pair-of-handles
+   shape After Effects itself stores per keyframe. We solve the bézier's
+   parametric X for the requested progress t (Newton-Raphson, bisection
+   fallback), then read off Y — the standard approach browsers use for
+   CSS's own cubic-bezier() timing functions. */
+function cubicBezierY(t, x1, y1, x2, y2){
+  const cx = 3*x1, bx = 3*(x2-x1)-cx, ax = 1-cx-bx;
+  const cy = 3*y1, by = 3*(y2-y1)-cy, ay = 1-cy-by;
+  const sampleX = (s) => ((ax*s+bx)*s+cx)*s;
+  const sampleY = (s) => ((ay*s+by)*s+cy)*s;
+  const sampleXd = (s) => (3*ax*s+2*bx)*s+cx;
+  let s = t;
+  for (let i=0;i<8;i++){
+    const dx = sampleX(s)-t;
+    if (Math.abs(dx) < 1e-6) return sampleY(s);
+    const d = sampleXd(s);
+    if (Math.abs(d) < 1e-6) break;
+    s -= dx/d;
+  }
+  let lo=0, hi=1; s=t;
+  for (let i=0;i<20;i++){
+    const x = sampleX(s);
+    if (Math.abs(x-t) < 1e-6) break;
+    if (x < t) lo = s; else hi = s;
+    s = (lo+hi)/2;
+  }
+  return sampleY(s);
+}
+const EASE_INOUT = Object.freeze({ type:"bezier", x1:0.65, y1:0, x2:0.35, y2:1 });
+function easeValue(t, easing){
+  if (!easing || easing === "linear") return t;
+  if (easing.type === "bezier") return cubicBezierY(t, easing.x1, easing.y1, easing.x2, easing.y2);
+  return t;
+}
+
+/* ── keyframe sampling ───────────────────────────────────────────────────
+   A property is a list of { time, value, easing } sorted by time. Before
+   the first keyframe or after the last, the edge value holds. Between two
+   keyframes, the EARLIER keyframe's easing shapes that segment — a
+   simplification of AE's separate per-keyframe in/out eases, folded into
+   one curve per segment. `value` is a number or a [x,y] pair; both
+   interpolate the same way. */
+function sampleProp(kfs, t){
+  if (!kfs || !kfs.length) return undefined;
+  if (t <= kfs[0].time) return kfs[0].value;
+  const last = kfs[kfs.length-1];
+  if (t >= last.time) return last.value;
+  for (let i=0;i<kfs.length-1;i++){
+    const a = kfs[i], b = kfs[i+1];
+    if (t >= a.time && t <= b.time){
+      const span = b.time - a.time;
+      const localT = span > 0 ? (t-a.time)/span : 1;
+      const eased = easeValue(clamp(localT,0,1), a.easing);
+      return Array.isArray(a.value)
+        ? a.value.map((v,i2) => lerp(v, b.value[i2], eased))
+        : lerp(a.value, b.value, eased);
+    }
+  }
+  return last.value;
+}
+function sampleLayer(layer, t){
+  const p = layer.properties;
+  return {
+    position: sampleProp(p.position, t) ?? [0,0],
+    scale:    sampleProp(p.scale, t)    ?? 1,
+    rotation: sampleProp(p.rotation, t) ?? 0,
+    opacity:  sampleProp(p.opacity, t)  ?? 1,
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SAMPLE SCENES — hand-authored JSON, exactly what a real AE export of a
+   simple staggered-entrance composition would contain. Stored as literal
+   JSON text and parsed below, not as JS object literals, so this really is
+   "load a keyframe file and play it" rather than "construct a scene in
+   code."
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Scene 1 — SIGNAL: an 8-letter wordmark lockup. Each letter is its own
+   layer, staggered 0.15s apart, sliding up from below while it fades in
+   and un-rotates — position/scale/rotation ease with the smooth bézier,
+   opacity fades linearly, so the two curves visibly disagree in the same
+   layer. An underline bar grows in afterward, and a tally dot blinks on
+   with sharp linear keyframes — the "crisp" easing counterpart. */
+const SIGNAL_JSON = `{
+  "meta": { "id":"signal", "name":"Signal", "duration":4.2, "width":1280, "height":720, "background":"#0a0d0f" },
+  "layers": [
+    ${["T","E","L","E","C","I","N","E"].map((ch,i) => {
+      const x = 308 + i*95;
+      const t0 = +(0.15*i).toFixed(2), t1 = +(t0+0.75).toFixed(2);
+      const rot = i%2===0 ? -11 : 11;
+      return `{
+      "id":"letter-${i}-${ch}", "type":"text", "text":"${ch}",
+      "font":"600 132px 'Helvetica Neue',Arial,sans-serif", "fill":"#e9f2f0", "align":"center", "baseline":"middle",
+      "properties": {
+        "position": [ {"time":${t0}, "value":[${x},480], "easing":{"type":"bezier","x1":0.65,"y1":0,"x2":0.35,"y2":1}}, {"time":${t1}, "value":[${x},340], "easing":"linear"} ],
+        "scale":    [ {"time":${t0}, "value":0.55, "easing":{"type":"bezier","x1":0.65,"y1":0,"x2":0.35,"y2":1}}, {"time":${t1}, "value":1, "easing":"linear"} ],
+        "rotation": [ {"time":${t0}, "value":${rot}, "easing":{"type":"bezier","x1":0.65,"y1":0,"x2":0.35,"y2":1}}, {"time":${t1}, "value":0, "easing":"linear"} ],
+        "opacity":  [ {"time":${t0}, "value":0, "easing":"linear"}, {"time":${t1}, "value":1, "easing":"linear"} ]
+      }
+    }`;
+    }).join(",\n    ")},
+    {
+      "id":"underline", "type":"rect", "w":760, "h":4, "ax":0, "ay":0.5, "fill":"#57d6c4",
+      "properties": {
+        "position": [ {"time":0, "value":[270,404], "easing":"linear"} ],
+        "scale":    [ {"time":1.95, "value":0.015, "easing":{"type":"bezier","x1":0.65,"y1":0,"x2":0.35,"y2":1}}, {"time":2.55, "value":1, "easing":"linear"} ],
+        "rotation": [ {"time":0, "value":0, "easing":"linear"} ],
+        "opacity":  [ {"time":1.9, "value":0, "easing":"linear"}, {"time":2.05, "value":1, "easing":"linear"} ]
+      }
+    },
+    {
+      "id":"tally", "type":"circle", "r":7, "fill":"#ff6b57",
+      "properties": {
+        "position": [ {"time":0, "value":[1120,120], "easing":"linear"} ],
+        "scale":    [ {"time":0, "value":1, "easing":"linear"} ],
+        "rotation": [ {"time":0, "value":0, "easing":"linear"} ],
+        "opacity":  [
+          {"time":2.75, "value":0, "easing":"linear"},
+          {"time":2.85, "value":1, "easing":"linear"},
+          {"time":3.0,  "value":0.12, "easing":"linear"},
+          {"time":3.1,  "value":1, "easing":"linear"},
+          {"time":3.25, "value":0.12, "easing":"linear"},
+          {"time":3.35, "value":1, "easing":"linear"},
+          {"time":4.2,  "value":1, "easing":"linear"}
+        ]
+      }
+    }
+  ]
+}`;
+
+/* Scene 2 — BARS: six colour-bar-style panels rising from the baseline
+   like a level meter, staggered 0.09s apart (scale grows from the bottom
+   anchor, opacity fades in slightly faster than the scale settles — two
+   different-length windows on the same layer). A thin scan line then
+   sweeps left to right across the full frame on a pure linear position
+   keyframe — the plainest possible proof that scrubbing to any x is real
+   interpolation, not a snap to the nearest authored value. */
+const BARS_JSON = `{
+  "meta": { "id":"bars", "name":"Bars", "duration":3.6, "width":1280, "height":720, "background":"#0a0d0f" },
+  "layers": [
+    ${["#57d6c4","#8fd9ff","#ffd166","#ff6b57","#b98cff","#9fb8b5"].map((color,i) => {
+      const w = 1280/6, cx = +(i*w + w/2).toFixed(1);
+      const t0 = +(0.09*i).toFixed(2), t1 = +(t0+0.55).toFixed(2), ot1 = +(t0+0.2).toFixed(2);
+      return `{
+      "id":"bar-${i}", "type":"rect", "w":${(w-14).toFixed(1)}, "h":480, "ax":0.5, "ay":1, "fill":"${color}",
+      "properties": {
+        "position": [ {"time":0, "value":[${cx},560], "easing":"linear"} ],
+        "scale":    [ {"time":${t0}, "value":0.02, "easing":{"type":"bezier","x1":0.65,"y1":0,"x2":0.35,"y2":1}}, {"time":${t1}, "value":1, "easing":"linear"} ],
+        "rotation": [ {"time":0, "value":0, "easing":"linear"} ],
+        "opacity":  [ {"time":${t0}, "value":0, "easing":"linear"}, {"time":${ot1}, "value":1, "easing":"linear"} ]
+      }
+    }`;
+    }).join(",\n    ")},
+    {
+      "id":"scanline", "type":"rect", "w":6, "h":560, "ax":0.5, "ay":0.5, "fill":"#e9f2f0",
+      "properties": {
+        "position": [ {"time":1.2, "value":[-40,320], "easing":"linear"}, {"time":2.6, "value":[1320,320], "easing":"linear"} ],
+        "scale":    [ {"time":0, "value":1, "easing":"linear"} ],
+        "rotation": [ {"time":0, "value":0, "easing":"linear"} ],
+        "opacity":  [ {"time":1.15, "value":0, "easing":"linear"}, {"time":1.3, "value":0.55, "easing":"linear"}, {"time":2.5, "value":0.55, "easing":"linear"}, {"time":2.65, "value":0, "easing":"linear"} ]
+      }
+    }
+  ]
+}`;
+
+/* Scene 3 — SCOPE: a vectorscope-style graticule. A faint ring and centre
+   dot fade in, then four trace arcs rotate in from wide scattered offsets
+   to their resting angle on the smooth ease, staggered 0.25s apart. One
+   arc keeps a third keyframe past its settle point and drifts slowly for
+   the rest of the scene — proving a property can carry more than one
+   eased segment, each with its own curve. */
+const SCOPE_JSON = `{
+  "meta": { "id":"scope", "name":"Scope", "duration":4.0, "width":1280, "height":720, "background":"#0a0d0f" },
+  "layers": [
+    {
+      "id":"graticule", "type":"ring", "r":220, "stroke":"#44514f", "lineWidth":1,
+      "properties": {
+        "position": [ {"time":0, "value":[640,360], "easing":"linear"} ],
+        "scale":    [ {"time":0, "value":1, "easing":"linear"} ],
+        "rotation": [ {"time":0, "value":0, "easing":"linear"} ],
+        "opacity":  [ {"time":0, "value":0, "easing":"linear"}, {"time":0.7, "value":0.5, "easing":"linear"} ]
+      }
+    },
+    {
+      "id":"center-dot", "type":"circle", "r":4, "fill":"#57d6c4",
+      "properties": {
+        "position": [ {"time":0, "value":[640,360], "easing":"linear"} ],
+        "scale":    [ {"time":0, "value":1, "easing":"linear"} ],
+        "rotation": [ {"time":0, "value":0, "easing":"linear"} ],
+        "opacity":  [ {"time":0.1, "value":0, "easing":"linear"}, {"time":0.45, "value":1, "easing":"linear"} ]
+      }
+    },
+    ${[
+      {r:150, start:-20, end:20, color:"#57d6c4", off:-230, t0:0.30, drift:null},
+      {r:172, start:70,  end:110, color:"#8fd9ff", off:260, t0:0.55, drift:32},
+      {r:194, start:160, end:200, color:"#ffd166", off:-250, t0:0.80, drift:null},
+      {r:216, start:250, end:290, color:"#ff6b57", off:240, t0:1.05, drift:null},
+    ].map((a,i) => {
+      const t1 = +(a.t0+0.9).toFixed(2);
+      const rotKfs = a.drift
+        ? `[ {"time":${a.t0}, "value":${a.off}, "easing":{"type":"bezier","x1":0.65,"y1":0,"x2":0.35,"y2":1}}, {"time":${t1}, "value":0, "easing":"linear"}, {"time":4.0, "value":${a.drift}, "easing":"linear"} ]`
+        : `[ {"time":${a.t0}, "value":${a.off}, "easing":{"type":"bezier","x1":0.65,"y1":0,"x2":0.35,"y2":1}}, {"time":${t1}, "value":0, "easing":"linear"} ]`;
+      return `{
+      "id":"trace-${i}", "type":"arc", "r":${a.r}, "startAngle":${a.start}, "endAngle":${a.end}, "stroke":"${a.color}", "lineWidth":9,
+      "properties": {
+        "position": [ {"time":0, "value":[640,360], "easing":"linear"} ],
+        "scale":    [ {"time":0, "value":1, "easing":"linear"} ],
+        "rotation": ${rotKfs},
+        "opacity":  [ {"time":${a.t0}, "value":0, "easing":"linear"}, {"time":${(a.t0+0.2).toFixed(2)}, "value":0.9, "easing":"linear"} ]
+      }
+    }`;
+    }).join(",\n    ")}
+  ]
+}`;
+
+const SCENES = {};
+[SIGNAL_JSON, BARS_JSON, SCOPE_JSON].forEach((txt) => {
+  const scene = JSON.parse(txt);
+  SCENES[scene.meta.id] = scene;
+});
+const SCENE_ORDER = ["signal","bars","scope"];
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RENDER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const canvas = $("stage");
+const ctx = canvas.getContext("2d");
+let dpr = Math.min(window.devicePixelRatio || 1, 2);
+let cw = 0, ch = 0;
+const STAGE_W = 1280, STAGE_H = 720;
+let stageScale = 1, stageOX = 0, stageOY = 0;
+
+function resize(){
+  cw = window.innerWidth; ch = window.innerHeight;
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.round(cw*dpr); canvas.height = Math.round(ch*dpr);
+  stageScale = Math.min(cw/STAGE_W, ch/STAGE_H) * 0.94;
+  stageOX = (cw - STAGE_W*stageScale) / 2;
+  stageOY = (ch - STAGE_H*stageScale) / 2;
+}
+window.addEventListener("resize", resize);
+resize();
+
+function drawShape(c, layer){
+  switch (layer.type){
+    case "text":
+      c.font = layer.font;
+      c.fillStyle = layer.fill;
+      c.textAlign = layer.align || "center";
+      c.textBaseline = layer.baseline || "middle";
+      c.fillText(layer.text, 0, 0);
+      break;
+    case "rect": {
+      const w = layer.w, h = layer.h;
+      const ax = layer.ax ?? 0.5, ay = layer.ay ?? 0.5;
+      c.fillStyle = layer.fill;
+      c.fillRect(-w*ax, -h*ay, w, h);
+      break;
+    }
+    case "circle":
+      c.fillStyle = layer.fill;
+      c.beginPath(); c.arc(0, 0, layer.r, 0, Math.PI*2); c.fill();
+      break;
+    case "ring":
+      c.strokeStyle = layer.stroke; c.lineWidth = layer.lineWidth || 1;
+      c.beginPath(); c.arc(0, 0, layer.r, 0, Math.PI*2); c.stroke();
+      break;
+    case "arc":
+      c.strokeStyle = layer.stroke; c.lineWidth = layer.lineWidth || 4; c.lineCap = "round";
+      c.beginPath(); c.arc(0, 0, layer.r, layer.startAngle*Math.PI/180, layer.endAngle*Math.PI/180); c.stroke();
+      break;
+  }
+}
+
+function renderScene(scene, t){
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = scene.meta.background;
+  ctx.fillRect(0, 0, cw, ch);
+
+  ctx.save();
+  ctx.translate(stageOX, stageOY);
+  ctx.scale(stageScale, stageScale);
+  ctx.beginPath(); ctx.rect(0,0,STAGE_W,STAGE_H); ctx.clip();
+  ctx.fillStyle = scene.meta.background;
+  ctx.fillRect(0,0,STAGE_W,STAGE_H);
+
+  for (const layer of scene.layers){
+    const s = sampleLayer(layer, t);
+    if (s.opacity <= 0.002) continue;
+    ctx.save();
+    ctx.translate(s.position[0], s.position[1]);
+    ctx.rotate(s.rotation * Math.PI/180);
+    ctx.scale(s.scale, s.scale);
+    ctx.globalAlpha = clamp(s.opacity, 0, 1);
+    drawShape(ctx, layer);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PLAYBACK STATE + TRANSPORT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+let sceneId = "signal";
+let scene = SCENES[sceneId];
+let clock = 0;
+let playing = true;
+let speed = 1;
+let lastTs = 0;
+let scrubbing = false;
+let fpsShown = 0, fpsAccum = 0, fpsFrames = 0, fpsLast = 0;
+
+const scrubFill = $("scrub-fill"), scrubHead = $("scrub-head"), scrubHit = $("scrub-hit"), scrubKfs = $("scrub-kfs");
+const timeCur = $("time-cur"), timeDur = $("time-dur"), sceneName = $("scene-name");
+const rScene = $("r-scene"), rLayers = $("r-layers"), rFps = $("r-fps");
+const tPlay = $("t-play"), pPlay = $("p-play");
+
+function collectKeyframeTimes(sc){
+  const set = new Set();
+  for (const layer of sc.layers){
+    for (const key of ["position","scale","rotation","opacity"]){
+      for (const kf of (layer.properties[key] || [])) set.add(+kf.time.toFixed(3));
+    }
+  }
+  return Array.from(set).sort((a,b)=>a-b);
+}
+
+function buildKfMarkers(){
+  scrubKfs.innerHTML = "";
+  const times = collectKeyframeTimes(scene);
+  const dur = scene.meta.duration;
+  for (const t of times){
+    const el = document.createElement("div");
+    el.className = "kf";
+    el.style.left = (t/dur*100) + "%";
+    scrubKfs.appendChild(el);
+  }
+}
+
+function buildScenePicker(){
+  const wrap = $("scene-picker");
+  wrap.innerHTML = "";
+  SCENE_ORDER.forEach((id, i) => {
+    const btn = document.createElement("button");
+    btn.className = "scene-btn" + (id === sceneId ? " active" : "");
+    btn.type = "button";
+    btn.dataset.scene = id;
+    btn.innerHTML = `<span>${SCENES[id].meta.name}</span><span class="k">${i+1}</span>`;
+    btn.addEventListener("click", () => setScene(id));
+    wrap.appendChild(btn);
+  });
+}
+
+function setScene(id){
+  if (!SCENES[id] || id === sceneId && scene === SCENES[id]) { /* allow re-select to restart */ }
+  sceneId = id;
+  scene = SCENES[id];
+  clock = 0;
+  timeDur.textContent = scene.meta.duration.toFixed(2);
+  sceneName.textContent = scene.meta.name;
+  rScene.textContent = scene.meta.name;
+  rLayers.textContent = String(scene.layers.length);
+  buildKfMarkers();
+  document.querySelectorAll(".scene-btn").forEach(b => b.classList.toggle("active", b.dataset.scene === id));
+  renderScene(scene, clock);
+  updateTransport();
+}
+
+function setPlaying(v){
+  playing = v;
+  body.classList.toggle("is-paused", !playing);
+  tPlay.textContent = playing ? "❚❚" : "►";
+  tPlay.classList.toggle("on", playing);
+  pPlay.textContent = playing ? "Pause" : "Resume";
+  if (playing) lastTs = 0;
+}
+
+function updateTransport(){
+  const dur = scene.meta.duration;
+  const pct = clamp(clock/dur, 0, 1) * 100;
+  scrubFill.style.width = pct + "%";
+  scrubHead.style.left = pct + "%";
+  timeCur.textContent = clock.toFixed(2);
+}
+
+function seek(t, opts){
+  const dur = scene.meta.duration;
+  clock = clamp(t, 0, dur);
+  renderScene(scene, clock);
+  updateTransport();
+  if (!(opts && opts.keepPlaying)) setPlaying(false);
+}
+
+/* scrubber drag */
+function scrubFromEvent(e){
+  const rect = scrubHit.getBoundingClientRect();
+  const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+  const t = clamp(x/rect.width, 0, 1) * scene.meta.duration;
+  seek(t);
+}
+scrubHit.addEventListener("pointerdown", (e) => {
+  scrubbing = true;
+  scrubHit.setPointerCapture(e.pointerId);
+  scrubFromEvent(e);
+});
+scrubHit.addEventListener("pointermove", (e) => { if (scrubbing) scrubFromEvent(e); });
+scrubHit.addEventListener("pointerup", (e) => { scrubbing = false; scrubHit.releasePointerCapture(e.pointerId); });
+scrubHit.addEventListener("pointercancel", () => { scrubbing = false; });
+
+/* wheel-over-stage scrub (secondary to the drag scrubber) */
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const dt = (e.deltaY + e.deltaX) * 0.0016;
+  seek(clock + dt);
+}, { passive:false });
+
+/* keyboard: space play/pause, arrows scrub one frame (1/30s), C panel */
+window.addEventListener("keydown", (e) => {
+  const k = e.key.toLowerCase();
+  if (k === " "){ e.preventDefault(); setPlaying(!playing); }
+  else if (k === "arrowright"){ e.preventDefault(); seek(clock + 1/30); }
+  else if (k === "arrowleft"){ e.preventDefault(); seek(clock - 1/30); }
+  else if (k === "c"){ setPanel(!body.classList.contains("panel-open")); }
+  else if (k === "escape"){ setPanel(false); }
+  else if (k >= "1" && k <= "3"){
+    const idx = +k - 1;
+    if (SCENE_ORDER[idx]) setScene(SCENE_ORDER[idx]);
+  }
+});
+
+tPlay.addEventListener("click", () => setPlaying(!playing));
+pPlay.addEventListener("click", () => setPlaying(!playing));
+$("p-restart").addEventListener("click", () => { seek(0, { keepPlaying: playing }); });
+
+const speedSlider = $("p-speed"), speedOut = $("o-speed");
+speedSlider.addEventListener("input", () => {
+  speed = +speedSlider.value;
+  speedOut.textContent = speed.toFixed(2) + "×";
+});
+
+/* panel toggle */
+function setPanel(open){
+  body.classList.toggle("panel-open", open);
+  $("panel-toggle").setAttribute("aria-expanded", String(open));
+}
+$("panel-toggle").addEventListener("click", () => setPanel(true));
+$("panel-close").addEventListener("click", () => setPanel(false));
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MAIN LOOP
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function frame(ts){
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min((ts - lastTs) / 1000, 0.1);
+  lastTs = ts;
+
+  if (playing && !scrubbing){
+    clock += dt * speed;
+    const dur = scene.meta.duration;
+    if (clock >= dur) clock -= dur * Math.floor(clock/dur);
+  }
+
+  renderScene(scene, clock);
+  updateTransport();
+
+  fpsAccum += dt; fpsFrames++;
+  if (fpsAccum >= 0.5){
+    fpsShown = Math.round(fpsFrames/fpsAccum);
+    rFps.textContent = String(fpsShown);
+    fpsAccum = 0; fpsFrames = 0;
+  }
+
+  requestAnimationFrame(frame);
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) lastTs = 0;
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOOT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function boot(){
+  const fill = $("load-bar-fill"), status = $("load-status");
+  const steps = [
+    [18, "Parsing keyframe JSON"],
+    [46, "Indexing layer properties"],
+    [72, "Priming canvas context"],
+    [100, "Ready"],
+  ];
+  let i = 0;
+  const tick = () => {
+    if (i >= steps.length){
+      setScene("signal");
+      buildScenePicker();
+      speedOut.textContent = "1.00×";
+      requestAnimationFrame(frame);
+      requestAnimationFrame(() => body.classList.add("is-live"));
+      return;
+    }
+    const [pct, label] = steps[i++];
+    fill.style.width = pct + "%";
+    status.textContent = label;
+    setTimeout(tick, 90);
+  };
+  tick();
+}
+boot();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DIAGNOSTIC SURFACE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+window.__telecine = {
+  version: "1.0.0",
+  title: "Telecine — live playback of exported keyframe animation data",
+
+  scenes: SCENE_ORDER.slice(),
+  get scene(){ return sceneId; },
+  setScene(id){ if (!SCENES[id]) return false; setScene(id); return true; },
+
+  get time(){ return clock; },
+  get duration(){ return scene.meta.duration; },
+  get playing(){ return playing; },
+  get speed(){ return speed; },
+  get fps(){ return fpsShown; },
+  get layers(){ return scene.layers.map(l => l.id); },
+
+  seek(t){ seek(t, { keepPlaying: playing }); return clock; },
+  play(v){ setPlaying(v === undefined ? true : !!v); return playing; },
+  pause(){ setPlaying(false); return true; },
+  setSpeed(v){ speed = Math.max(0.01, +v || 1); speedSlider.value = String(speed); speedOut.textContent = speed.toFixed(2) + "×"; return speed; },
+
+  /* sample any layer's interpolated properties at a given time (or "now"),
+     independent of the render loop — for testing the interpolation math
+     directly rather than reading pixels back off the canvas. */
+  sample(layerId, t){
+    const layer = scene.layers.find(l => l.id === layerId);
+    if (!layer) return null;
+    return sampleLayer(layer, t === undefined ? clock : t);
+  },
+
+  /* every keyframe time authored anywhere in the current scene, sorted —
+     useful for choosing "between keyframes" scrub targets in tests. */
+  keyframeTimes(){ return collectKeyframeTimes(scene); },
+
+  render(t){ renderScene(scene, t === undefined ? clock : t); return true; },
+  get resolution(){ return [cw, ch]; },
+
+  /* the raw JSON text for each sample scene, exactly as authored/parsed */
+  rawJSON: { signal: SIGNAL_JSON, bars: BARS_JSON, scope: SCOPE_JSON },
+};
+
+})();
+</script>
+</body>
+</html>
