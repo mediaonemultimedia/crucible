@@ -177,7 +177,7 @@ body.panel-open #panel{transform:translateX(0)}
 
 /* readout ------------------------------------------------------------------*/
 #readout{
-  position:absolute;top:26px;right:82px;z-index:6;
+  position:absolute;top:70px;right:30px;z-index:6;
   font-family:var(--mono);font-size:9px;letter-spacing:.08em;color:var(--faint);
   text-align:right;
 }
@@ -240,6 +240,17 @@ body.panel-open #transport{right:336px}
 #method .t{display:block;color:var(--dim);letter-spacing:.2em;text-transform:uppercase;font-size:8.5px;margin-bottom:8px}
 #method b{color:var(--dim);font-weight:400}
 @media (max-width:900px){#method{display:none}}
+
+@media (max-width:640px){
+  #mark{top:18px;left:18px;max-width:58vw;flex-wrap:wrap;row-gap:8px}
+  #mark .w{font-size:13px;letter-spacing:.38em}
+  #mark .eyebrow.sub{font-size:8px;letter-spacing:.1em;line-height:1.5}
+  #panel-toggle{top:16px;right:18px;padding:7px 9px;gap:7px}
+  #panel-toggle .lbl{display:none}
+  #panel{width:min(336px,100vw)}
+  #readout{display:none}
+  #transport{padding:0 18px 18px}
+}
 
 /* boot loader ---------------------------------------------------------------*/
 #loader{
@@ -579,9 +590,9 @@ const BARS_JSON = `{
       const w = 1280/6, cx = +(i*w + w/2).toFixed(1);
       const t0 = +(0.09*i).toFixed(2), t1 = +(t0+0.55).toFixed(2), ot1 = +(t0+0.2).toFixed(2);
       return `{
-      "id":"bar-${i}", "type":"rect", "w":${(w-14).toFixed(1)}, "h":480, "ax":0.5, "ay":1, "fill":"${color}",
+      "id":"bar-${i}", "type":"rect", "w":${(w-14).toFixed(1)}, "h":400, "ax":0.5, "ay":1, "fill":"${color}",
       "properties": {
-        "position": [ {"time":0, "value":[${cx},560], "easing":"linear"} ],
+        "position": [ {"time":0, "value":[${cx},500], "easing":"linear"} ],
         "scale":    [ {"time":${t0}, "value":0.02, "easing":{"type":"bezier","x1":0.65,"y1":0,"x2":0.35,"y2":1}}, {"time":${t1}, "value":1, "easing":"linear"} ],
         "rotation": [ {"time":0, "value":0, "easing":"linear"} ],
         "opacity":  [ {"time":${t0}, "value":0, "easing":"linear"}, {"time":${ot1}, "value":1, "easing":"linear"} ]
@@ -589,9 +600,9 @@ const BARS_JSON = `{
     }`;
     }).join(",\n    ")},
     {
-      "id":"scanline", "type":"rect", "w":6, "h":560, "ax":0.5, "ay":0.5, "fill":"#e9f2f0",
+      "id":"scanline", "type":"rect", "w":6, "h":420, "ax":0.5, "ay":0.5, "fill":"#e9f2f0",
       "properties": {
-        "position": [ {"time":1.2, "value":[-40,320], "easing":"linear"}, {"time":2.6, "value":[1320,320], "easing":"linear"} ],
+        "position": [ {"time":1.2, "value":[-40,300], "easing":"linear"}, {"time":2.6, "value":[1320,300], "easing":"linear"} ],
         "scale":    [ {"time":0, "value":1, "easing":"linear"} ],
         "rotation": [ {"time":0, "value":0, "easing":"linear"} ],
         "opacity":  [ {"time":1.15, "value":0, "easing":"linear"}, {"time":1.3, "value":0.55, "easing":"linear"}, {"time":2.5, "value":0.55, "easing":"linear"}, {"time":2.65, "value":0, "easing":"linear"} ]
