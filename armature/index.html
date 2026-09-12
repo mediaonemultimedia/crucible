@@ -342,10 +342,12 @@ a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
         </label>
 
         <p class="note">
-          There is no rig. The head's aim is two exponential filters chasing
-          the same target at different rates — <b>fast</b> for the head,
-          <b>slow</b> for the body — so it snaps to notice you, then settles
-          into facing you.
+          There is no rig. Attention is three exponential filters chasing the
+          same target at different rates and ranges — <b>slow and wide</b>
+          for the body, <b>slower and narrow</b> for the head, and a
+          <b>quick, small</b> look-offset for the eyes on top of that, so a
+          glance leads and the head follows instead of one part sweeping
+          through the whole arc.
         </p>
       </section>
 
@@ -814,12 +816,33 @@ const REST = {
   tailR1: 0.110, tailR2: 0.055
 };
 
-const HEAD_MAX_YAW   = 55 * Math.PI / 180;
-const HEAD_MAX_PITCH = 28 * Math.PI / 180;
-const BODY_MAX_YAW   = 26 * Math.PI / 180;
+/* attention is split into two independent layers rather than one rigid
+   rotation: the head aims broadly and slowly (a small range — it is a
+   skull, not a turret), while the eyes carry a small, fast, independent
+   look-offset within the socket on top of that. The eyes pick up whatever
+   the head hasn't caught up to yet, so a glance leads and the head follows
+   — the same division real character rigs use to avoid a huge swivel
+   reading as skittish. */
+const HEAD_MAX_YAW   = 18 * Math.PI / 180;
+const HEAD_MAX_PITCH = 11 * Math.PI / 180;
+const EYE_MAX_YAW     = 12 * Math.PI / 180;
+const EYE_MAX_PITCH   = 8 * Math.PI / 180;
+const EYE_RATE_MULT  = 2.0;   // eyes chase their (small) target this much faster than the head
+/* measurement (see PR) showed the body's own swing — carrying the whole
+   head+eye assembly around the body's pivot, well forward of it — was
+   actually the larger contributor to the eyes' on-screen sweep, bigger
+   than the head's local rotation the original diagnosis focused on. Its
+   range is trimmed alongside the head's for the fix to be real, not just
+   local */
+const BODY_MAX_YAW   = 12 * Math.PI / 180;
+/* calibrates the ear "curiosity" ramp against the full tracking arc
+   (body + head + eyes), so it paces similarly to before the head range
+   was narrowed */
+const TRACK_MAX_YAW  = BODY_MAX_YAW + HEAD_MAX_YAW + EYE_MAX_YAW;
 
 const rig = {
   bodyYaw: 0, headYaw: 0, headPitch: 0,
+  eyeYaw: 0, eyePitch: 0,
   bob: 0, breathePhase: 0,
   squash: 0,          // 0..1 reaction squash/stretch envelope
   earPerk: 0,          // 0 droop .. 1 perked
@@ -956,6 +979,15 @@ function updateRig(dt, cam){
   rig.headYaw   = damp(rig.headYaw,   paused ? rig.headYaw   : headYawTarget,   S.headRate, dt);
   rig.headPitch = damp(rig.headPitch, paused ? rig.headPitch : headPitchTarget, S.headRate, dt);
 
+  /* the eye layer: whatever slice of the gaze the (slower, narrower) head
+     hasn't reached yet, clamped to its own small range and chased at a
+     much faster rate — the quick fine-aim on top of the head's coarse aim */
+  const eyeYawTarget   = clamp(yawTarget - rig.bodyYaw - rig.headYaw, -EYE_MAX_YAW * gr, EYE_MAX_YAW * gr);
+  const eyePitchTarget = clamp(pitchTarget - rig.headPitch,            -EYE_MAX_PITCH * gr, EYE_MAX_PITCH * gr);
+  const eyeRate = S.headRate * EYE_RATE_MULT;
+  rig.eyeYaw   = damp(rig.eyeYaw,   paused ? rig.eyeYaw   : eyeYawTarget,   eyeRate, dt);
+  rig.eyePitch = damp(rig.eyePitch, paused ? rig.eyePitch : eyePitchTarget, eyeRate, dt);
+
   /* breathing: a torso scale pulse plus a very small whole-body bob */
   const breathe = 0.5 + 0.5 * Math.sin(rig.breathePhase);
   const breatheAmt = breathe * S.breathDepth;
@@ -969,7 +1001,7 @@ function updateRig(dt, cam){
   const reactAmt = reactionT >= 0 ? reactionEnvelope(reactionT) : 0;
   rig.squash = damp(rig.squash, reactAmt, 18, dt);
 
-  const curiosity = clamp(Math.abs(yawTarget) / (HEAD_MAX_YAW * gr + 0.001), 0, 1) * 0.35;
+  const curiosity = clamp(Math.abs(yawTarget) / (TRACK_MAX_YAW * gr + 0.001), 0, 1) * 0.35;
   const earTarget = clamp(Math.max(curiosity, reactAmt > 0.15 ? 1 : 0), 0, 1);
   rig.earPerk = damp(rig.earPerk, earTarget, 6.5, dt);
 
@@ -1032,7 +1064,9 @@ function buildFrame(anim){
   const earTipL = toWorld(add(headPosLocal, earOffL), true);
   const earTipR = toWorld(add(headPosLocal, earOffR), true);
 
-  const eyeOffL = rotateHeadLocal(REST.eyeOffset, rig.headYaw, rig.headPitch);
+  /* the eyeballs get the head's rotation plus their own small independent
+     look-offset — the head aims the socket, the eyes fine-aim within it */
+  const eyeOffL = rotateHeadLocal(REST.eyeOffset, rig.headYaw + rig.eyeYaw, rig.headPitch + rig.eyePitch);
   const eyeOffR = mulX(eyeOffL, -1);
   const eyeR = 1 - rig.blink * 0.94;
   const eyeL = toWorld(add(headPosLocal, eyeOffL), true);
@@ -1310,6 +1344,12 @@ window.__armature = {
   /* orbit the camera programmatically */
   orbit(az, el){ dragAz = az; if (el !== undefined) dragEl = el; return { az: baseAz + dragAz, el: elevation + dragEl }; },
 
+  /* world-space eye centers this frame, and the uv-space projection the
+     shader itself uses to cast rays — enough to measure actual on-screen
+     eye displacement without guessing at screen-space math independently */
+  get eyeWorld(){ return lastFrame ? { L: Array.from(lastFrame.eyeL), R: Array.from(lastFrame.eyeR) } : null; },
+  projectUV(worldPos){ return lastCam ? projectToUV(lastCam, worldPos) : null; },
+
   triggerReaction(){ triggerReaction(); return true; },
   triggerBlink(){ triggerBlink(); return true; },
 
@@ -1324,6 +1364,8 @@ window.__armature = {
       dpr,
       headYawDeg: rig.headYaw * 180 / Math.PI,
       headPitchDeg: rig.headPitch * 180 / Math.PI,
+      eyeYawDeg: rig.eyeYaw * 180 / Math.PI,
+      eyePitchDeg: rig.eyePitch * 180 / Math.PI,
       bodyYawDeg: rig.bodyYaw * 180 / Math.PI,
       blink: rig.blink,
       squash: rig.squash,
