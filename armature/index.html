@@ -153,6 +153,23 @@ body.panel-open #panel{transform:translateX(0)}
 }
 .act:hover{border-color:rgba(200,168,119,.45);color:var(--ink);background:rgba(200,168,119,.05)}
 
+/* mood preset grid ---------------------------------------------------- */
+.preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.preset-btn{
+  display:flex;align-items:center;gap:8px;background:none;border:1px solid var(--rule);
+  color:var(--dim);cursor:pointer;text-align:left;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.10em;text-transform:uppercase;
+  padding:9px 9px 8px;transition:border-color .25s ease,color .25s ease,background .25s ease;
+}
+.preset-btn:hover{border-color:rgba(200,168,119,.45);color:var(--ink);background:rgba(200,168,119,.05)}
+.preset-btn.active{border-color:rgba(200,168,119,.62);color:var(--ink);background:rgba(200,168,119,.10)}
+.preset-num{
+  flex:0 0 auto;color:var(--accent);border:1px solid rgba(200,168,119,.32);
+  width:14px;height:14px;display:flex;align-items:center;justify-content:center;
+  font-size:8px;line-height:1;
+}
+.preset-btn.active .preset-num{background:rgba(200,168,119,.18)}
+
 /* readout ---------------------------------------------------------------- */
 #readout{
   position:absolute;left:30px;bottom:74px;font-family:var(--mono);font-size:10px;
@@ -403,7 +420,23 @@ a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
       </section>
 
       <section>
-        <h3>Session <span class="ix">04</span></h3>
+        <h3>Mood <span class="ix">04</span></h3>
+        <div class="preset-grid" id="preset-grid" role="group" aria-label="Mood presets">
+          <button class="preset-btn" type="button" data-preset="idle"><span class="preset-num">1</span>Idle / Curious</button>
+          <button class="preset-btn" type="button" data-preset="sleepy"><span class="preset-num">2</span>Sleepy</button>
+          <button class="preset-btn" type="button" data-preset="alert"><span class="preset-num">3</span>Alert</button>
+          <button class="preset-btn" type="button" data-preset="playful"><span class="preset-num">4</span>Playful</button>
+        </div>
+        <p class="note">
+          Each mood is a curated combination — breathing, gaze range and
+          speed, ear position, tail motion, idle micro-movement — eased in
+          as one unit over about <b>¾ second</b>, not a single slider each.
+          The sliders above still tune whatever mood is active.
+        </p>
+      </section>
+
+      <section>
+        <h3>Session <span class="ix">05</span></h3>
         <button class="act" id="p-react" type="button">Startle it</button>
         <button class="act" id="p-reset" type="button">Reset all to defaults</button>
       </section>
@@ -434,7 +467,7 @@ a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
 
   <div id="credit">
     <b>Armature</b> — procedurally animated SDF creature study 14 &nbsp;·&nbsp; smooth-min primitives &nbsp;·&nbsp; soft shadows + AO &nbsp;·&nbsp; cursor-held gaze &nbsp;·&nbsp; webgl2<br>
-    <span class="keys">move the cursor to hold its attention &nbsp; click to startle it &nbsp; drag to orbit &nbsp; c controls &nbsp; space pause &nbsp; r reset</span>
+    <span class="keys">move the cursor to hold its attention &nbsp; click to startle it &nbsp; drag to orbit &nbsp; c controls &nbsp; space pause &nbsp; r reset &nbsp; 1–4 mood</span>
   </div>
 </div>
 
@@ -490,6 +523,57 @@ const DEFAULTS = Object.freeze({
 });
 
 const S = Object.seal(Object.assign({}, DEFAULTS));
+
+/* ── mood presets ──────────────────────────────────────────────────────── */
+/* a curated combination of the animation parameters above, plus a few
+   mood-only knobs with no slider of their own (ear baseline, idle
+   micro-movement, blink pacing, reaction snap) — selected as a single
+   named unit rather than tuned one slider at a time. switching eases every
+   value toward the new preset's over PRESET_EASE_DUR rather than cutting. */
+const PRESETS = {
+  idle: {
+    label: "Idle / Curious",
+    headRate: 7.5, bodyRate: 2.2, gazeRange: 1.00,
+    breathRate: 0.42, breathDepth: 1.00, tailLife: 1.00,
+    earBias: 0.00, idleBob: 1.00, blinkMult: 1.00, reactionMult: 1.00
+  },
+  sleepy: {
+    label: "Sleepy",
+    headRate: 3.0, bodyRate: 1.05, gazeRange: 0.42,
+    breathRate: 0.20, breathDepth: 0.55, tailLife: 0.30,
+    earBias: -0.70, idleBob: 0.30, blinkMult: 2.8, reactionMult: 0.7
+  },
+  alert: {
+    label: "Alert",
+    headRate: 12.5, bodyRate: 3.8, gazeRange: 1.18,
+    breathRate: 0.64, breathDepth: 1.15, tailLife: 0.80,
+    earBias: 0.55, idleBob: 0.65, blinkMult: 0.5, reactionMult: 1.3
+  },
+  playful: {
+    label: "Playful",
+    headRate: 9.5, bodyRate: 3.1, gazeRange: 1.08,
+    breathRate: 0.56, breathDepth: 1.30, tailLife: 1.95,
+    earBias: 0.28, idleBob: 2.0, blinkMult: 0.85, reactionMult: 1.45
+  }
+};
+const PRESET_ORDER = ["idle", "sleepy", "alert", "playful"];
+const PRESET_EASE_DUR = 0.75; // seconds to ease into a newly selected preset
+
+/* mood-only state (no direct slider) — always kept alongside S */
+const MOOD = Object.seal({ earBias: 0, idleBob: 1, blinkMult: 1, reactionMult: 1 });
+
+let activePreset = "idle";
+let presetFrom = Object.assign({}, PRESETS.idle);
+let presetTo   = Object.assign({}, PRESETS.idle);
+let presetEaseStart = -Infinity;
+
+function currentPresetSnapshot(){
+  return {
+    headRate: S.headRate, bodyRate: S.bodyRate, gazeRange: S.gazeRange,
+    breathRate: S.breathRate, breathDepth: S.breathDepth, tailLife: S.tailLife,
+    earBias: MOOD.earBias, idleBob: MOOD.idleBob, blinkMult: MOOD.blinkMult, reactionMult: MOOD.reactionMult
+  };
+}
 
 /* ── dom ───────────────────────────────────────────────────────────────── */
 const $  = (id) => document.getElementById(id);
@@ -1001,16 +1085,20 @@ function projectToUV(cam, worldPos){
 
 /* ── click reaction + blink state machine ─────────────────────────────── */
 let reactionT = -1;     // seconds since last startle trigger, -1 = idle
-let nextAutoBlink = 2.2 + Math.random() * 3.0;
+let nextAutoBlink = (2.2 + Math.random() * 3.0) * MOOD.blinkMult;
 let blinkT = -1;
 
-function triggerReaction(){ reactionT = 0; blinkT = 0; }
-function triggerBlink(){ if (blinkT < 0) blinkT = 0; }
+const BLINK_DUR_BASE = 0.16;
+let blinkDurActive = BLINK_DUR_BASE;
 
-const BLINK_DUR = 0.16;
-function blinkEnvelope(t){
-  if (t < 0 || t > BLINK_DUR) return 0;
-  const x = t / BLINK_DUR;
+/* a startle blink always stays snappy; an autonomous idle blink takes the
+   mood's pace — sleepy's is slow and occasional, alert's is quick and rare */
+function triggerReaction(){ reactionT = 0; blinkDurActive = BLINK_DUR_BASE; blinkT = 0; }
+function triggerBlink(){ if (blinkT < 0){ blinkDurActive = BLINK_DUR_BASE * clamp(MOOD.blinkMult, 0.6, 2.6); blinkT = 0; } }
+
+function blinkEnvelope(t, dur){
+  if (t < 0 || t > dur) return 0;
+  const x = t / dur;
   return x < 0.4 ? x / 0.4 : 1 - (x - 0.4) / 0.6;
 }
 
@@ -1052,7 +1140,38 @@ const GAZE_SCREEN_GAIN = 2.35;              // uv-offset → radians
 
 let gazeUV = [0, 0];
 
+/* ── mood preset easing ───────────────────────────────────────────────── */
+function easeT(x){ x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }
+
+function applyPresetEasing(){
+  if (clock - presetEaseStart >= PRESET_EASE_DUR) return;   // settled — leave S/MOOD alone so sliders stay free
+  const t = easeT((clock - presetEaseStart) / PRESET_EASE_DUR);
+  S.headRate    = lerp(presetFrom.headRate,    presetTo.headRate,    t);
+  S.bodyRate    = lerp(presetFrom.bodyRate,    presetTo.bodyRate,    t);
+  S.gazeRange   = lerp(presetFrom.gazeRange,   presetTo.gazeRange,   t);
+  S.breathRate  = lerp(presetFrom.breathRate,  presetTo.breathRate,  t);
+  S.breathDepth = lerp(presetFrom.breathDepth, presetTo.breathDepth, t);
+  S.tailLife    = lerp(presetFrom.tailLife,    presetTo.tailLife,    t);
+  MOOD.earBias      = lerp(presetFrom.earBias,      presetTo.earBias,      t);
+  MOOD.idleBob      = lerp(presetFrom.idleBob,      presetTo.idleBob,      t);
+  MOOD.blinkMult    = lerp(presetFrom.blinkMult,    presetTo.blinkMult,    t);
+  MOOD.reactionMult = lerp(presetFrom.reactionMult, presetTo.reactionMult, t);
+  syncSlidersFromS();
+}
+
+function selectPreset(key){
+  if (!PRESETS[key]) return activePreset;
+  presetFrom = currentPresetSnapshot();
+  presetTo = Object.assign({}, PRESETS[key]);
+  presetEaseStart = clock;
+  activePreset = key;
+  updatePresetButtons();
+  return activePreset;
+}
+
 function updateRig(dt, cam){
+  applyPresetEasing();
+
   if (!paused){
     clock += dt;
     rig.breathePhase += dt * S.breathRate * Math.PI * 2;
@@ -1087,10 +1206,12 @@ function updateRig(dt, cam){
   rig.eyeYaw   = damp(rig.eyeYaw,   paused ? rig.eyeYaw   : eyeYawTarget,   eyeRate, dt);
   rig.eyePitch = damp(rig.eyePitch, paused ? rig.eyePitch : eyePitchTarget, eyeRate, dt);
 
-  /* breathing: a torso scale pulse plus a very small whole-body bob */
+  /* breathing: a torso scale pulse plus a very small whole-body bob, plus a
+     mood-scaled idle micro-bounce (near-zero when sleepy, lively when playful) */
   const breathe = 0.5 + 0.5 * Math.sin(rig.breathePhase);
   const breatheAmt = breathe * S.breathDepth;
-  rig.bob = 0.018 * breatheAmt + reactionHop(reactionT) * 0.12;
+  const idleBounce = Math.sin(clock * 3.1) * 0.007 * MOOD.idleBob;
+  rig.bob = 0.018 * breatheAmt + reactionHop(reactionT) * 0.12 + idleBounce;
 
   /* reaction envelope: squash/stretch + ear perk + a quick hop */
   if (reactionT >= 0){
@@ -1098,22 +1219,22 @@ function updateRig(dt, cam){
     if (reactionT > REACT_DUR) reactionT = -1;
   }
   const reactAmt = reactionT >= 0 ? reactionEnvelope(reactionT) : 0;
-  rig.squash = damp(rig.squash, reactAmt, 18, dt);
+  rig.squash = damp(rig.squash, reactAmt, 18 * MOOD.reactionMult, dt);
 
   const curiosity = clamp(Math.abs(yawTarget) / (TRACK_MAX_YAW * gr + 0.001), 0, 1) * 0.35;
-  const earTarget = clamp(Math.max(curiosity, reactAmt > 0.15 ? 1 : 0), 0, 1);
+  const earTarget = clamp(Math.max(curiosity, reactAmt > 0.15 ? 1 : 0) + MOOD.earBias, 0, 1);
   rig.earPerk = damp(rig.earPerk, earTarget, 6.5, dt);
 
   /* blink: autonomous + reaction-triggered, whichever is active wins */
   if (!paused){
     nextAutoBlink -= dt;
-    if (nextAutoBlink <= 0){ triggerBlink(); nextAutoBlink = 2.6 + Math.random() * 3.4; }
+    if (nextAutoBlink <= 0){ triggerBlink(); nextAutoBlink = (2.6 + Math.random() * 3.4) * MOOD.blinkMult; }
     if (blinkT >= 0){
       blinkT += dt;
-      if (blinkT > BLINK_DUR) blinkT = -1;
+      if (blinkT > blinkDurActive) blinkT = -1;
     }
   }
-  rig.blink = blinkT >= 0 ? blinkEnvelope(blinkT) : 0;
+  rig.blink = blinkT >= 0 ? blinkEnvelope(blinkT, blinkDurActive) : 0;
 
   return { breatheAmt, reactAmt };
 }
@@ -1371,14 +1492,43 @@ function applyKey(uiKey, value){
 
 function resetAll(){
   Object.assign(S, DEFAULTS);
+  Object.assign(MOOD, { earBias: 0, idleBob: 1, blinkMult: 1, reactionMult: 1 });
+  activePreset = "idle";
+  presetFrom = Object.assign({}, PRESETS.idle);
+  presetTo = Object.assign({}, PRESETS.idle);
+  presetEaseStart = -Infinity;   // already settled — resetAll snaps, it doesn't ease
   ["headrate","bodyrate","gazerange","breathrate","breathdepth","tail","step","steps","shk"].forEach(uiKey => {
     const el = $("p-" + uiKey);
     const k = KEYMAP[uiKey];
     if (el){ el.value = S[k]; $("o-" + uiKey).textContent = fmt[uiKey](S[k]); }
   });
+  updatePresetButtons();
 }
 $("p-reset").addEventListener("click", resetAll);
 $("p-react").addEventListener("click", () => triggerReaction());
+
+/* ── mood presets: UI ─────────────────────────────────────────────────── */
+function syncSlidersFromS(){
+  ["headrate","bodyrate","gazerange","breathrate","breathdepth","tail"].forEach(uiKey => {
+    const el = $("p-" + uiKey);
+    if (!el) return;
+    const k = KEYMAP[uiKey];
+    el.value = S[k];
+    const out = $("o-" + uiKey);
+    if (out) out.textContent = fmt[uiKey](S[k]);
+  });
+}
+
+const presetButtons = Array.from(document.querySelectorAll(".preset-btn"));
+function updatePresetButtons(){
+  presetButtons.forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.preset === activePreset);
+  });
+}
+presetButtons.forEach(btn => {
+  btn.addEventListener("click", () => selectPreset(btn.dataset.preset));
+});
+updatePresetButtons();
 
 /* ── pointer: continuous gaze + explicit drag-to-orbit ────────────────── */
 function setPointerFromEvent(e){
@@ -1426,6 +1576,7 @@ window.addEventListener("keydown", (e) => {
   else if (k === "escape"){ setPanel(false); }
   else if (k === "r"){ resetAll(); }
   else if (k === " "){ e.preventDefault(); paused = !paused; body.classList.toggle("is-paused", paused); }
+  else if (k >= "1" && k <= "4"){ selectPreset(PRESET_ORDER[+k - 1]); }
 });
 
 document.addEventListener("visibilitychange", () => {
@@ -1438,7 +1589,7 @@ document.addEventListener("visibilitychange", () => {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 window.__armature = {
-  version: "1.0.0",
+  version: "1.1.0",
   title: "Armature — a procedurally animated SDF creature study",
 
   settings: S,
@@ -1449,6 +1600,13 @@ window.__armature = {
     return S[key];
   },
   reset(){ resetAll(); return Object.assign({}, S); },
+
+  /* mood presets — a curated combination of the params above, eased in as
+     one unit rather than a slider dump */
+  presets: Object.keys(PRESETS),
+  get activePreset(){ return activePreset; },
+  setPreset(key){ return selectPreset(key); },
+  get mood(){ return Object.assign({}, MOOD); },
 
   get rig(){ return Object.assign({}, rig); },
   get clock(){ return clock; },
@@ -1492,6 +1650,7 @@ window.__armature = {
       blink: rig.blink,
       squash: rig.squash,
       earPerk: rig.earPerk,
+      activePreset,
       renderer: (() => {
         const d = gl.getExtension("WEBGL_debug_renderer_info");
         return d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : "unavailable";
