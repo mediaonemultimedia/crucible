@@ -153,6 +153,23 @@ body.panel-open #panel{transform:translateX(0)}
 }
 .act:hover{border-color:rgba(200,168,119,.45);color:var(--ink);background:rgba(200,168,119,.05)}
 
+/* mood preset grid ---------------------------------------------------- */
+.preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.preset-btn{
+  display:flex;align-items:center;gap:8px;background:none;border:1px solid var(--rule);
+  color:var(--dim);cursor:pointer;text-align:left;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.10em;text-transform:uppercase;
+  padding:9px 9px 8px;transition:border-color .25s ease,color .25s ease,background .25s ease;
+}
+.preset-btn:hover{border-color:rgba(200,168,119,.45);color:var(--ink);background:rgba(200,168,119,.05)}
+.preset-btn.active{border-color:rgba(200,168,119,.62);color:var(--ink);background:rgba(200,168,119,.10)}
+.preset-num{
+  flex:0 0 auto;color:var(--accent);border:1px solid rgba(200,168,119,.32);
+  width:14px;height:14px;display:flex;align-items:center;justify-content:center;
+  font-size:8px;line-height:1;
+}
+.preset-btn.active .preset-num{background:rgba(200,168,119,.18)}
+
 /* readout ---------------------------------------------------------------- */
 #readout{
   position:absolute;left:30px;bottom:74px;font-family:var(--mono);font-size:10px;
@@ -342,10 +359,12 @@ a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
         </label>
 
         <p class="note">
-          There is no rig. The head's aim is two exponential filters chasing
-          the same target at different rates — <b>fast</b> for the head,
-          <b>slow</b> for the body — so it snaps to notice you, then settles
-          into facing you.
+          There is no rig. Attention is three exponential filters chasing the
+          same target at different rates and ranges — <b>slow and wide</b>
+          for the body, <b>slower and narrow</b> for the head, and a
+          <b>quick, small</b> look-offset for the eyes on top of that, so a
+          glance leads and the head follows instead of one part sweeping
+          through the whole arc.
         </p>
       </section>
 
@@ -401,7 +420,23 @@ a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
       </section>
 
       <section>
-        <h3>Session <span class="ix">04</span></h3>
+        <h3>Mood <span class="ix">04</span></h3>
+        <div class="preset-grid" id="preset-grid" role="group" aria-label="Mood presets">
+          <button class="preset-btn" type="button" data-preset="idle"><span class="preset-num">1</span>Idle / Curious</button>
+          <button class="preset-btn" type="button" data-preset="sleepy"><span class="preset-num">2</span>Sleepy</button>
+          <button class="preset-btn" type="button" data-preset="alert"><span class="preset-num">3</span>Alert</button>
+          <button class="preset-btn" type="button" data-preset="playful"><span class="preset-num">4</span>Playful</button>
+        </div>
+        <p class="note">
+          Each mood is a curated combination — breathing, gaze range and
+          speed, ear position, tail motion, idle micro-movement — eased in
+          as one unit over about <b>¾ second</b>, not a single slider each.
+          The sliders above still tune whatever mood is active.
+        </p>
+      </section>
+
+      <section>
+        <h3>Session <span class="ix">05</span></h3>
         <button class="act" id="p-react" type="button">Startle it</button>
         <button class="act" id="p-reset" type="button">Reset all to defaults</button>
       </section>
@@ -432,7 +467,7 @@ a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
 
   <div id="credit">
     <b>Armature</b> — procedurally animated SDF creature study 14 &nbsp;·&nbsp; smooth-min primitives &nbsp;·&nbsp; soft shadows + AO &nbsp;·&nbsp; cursor-held gaze &nbsp;·&nbsp; webgl2<br>
-    <span class="keys">move the cursor to hold its attention &nbsp; click to startle it &nbsp; drag to orbit &nbsp; c controls &nbsp; space pause &nbsp; r reset</span>
+    <span class="keys">move the cursor to hold its attention &nbsp; click to startle it &nbsp; drag to orbit &nbsp; c controls &nbsp; space pause &nbsp; r reset &nbsp; 1–4 mood</span>
   </div>
 </div>
 
@@ -488,6 +523,57 @@ const DEFAULTS = Object.freeze({
 });
 
 const S = Object.seal(Object.assign({}, DEFAULTS));
+
+/* ── mood presets ──────────────────────────────────────────────────────── */
+/* a curated combination of the animation parameters above, plus a few
+   mood-only knobs with no slider of their own (ear baseline, idle
+   micro-movement, blink pacing, reaction snap) — selected as a single
+   named unit rather than tuned one slider at a time. switching eases every
+   value toward the new preset's over PRESET_EASE_DUR rather than cutting. */
+const PRESETS = {
+  idle: {
+    label: "Idle / Curious",
+    headRate: 7.5, bodyRate: 2.2, gazeRange: 1.00,
+    breathRate: 0.42, breathDepth: 1.00, tailLife: 1.00,
+    earBias: 0.00, idleBob: 1.00, blinkMult: 1.00, reactionMult: 1.00
+  },
+  sleepy: {
+    label: "Sleepy",
+    headRate: 3.0, bodyRate: 1.05, gazeRange: 0.42,
+    breathRate: 0.20, breathDepth: 0.55, tailLife: 0.30,
+    earBias: -0.70, idleBob: 0.30, blinkMult: 2.8, reactionMult: 0.7
+  },
+  alert: {
+    label: "Alert",
+    headRate: 12.5, bodyRate: 3.8, gazeRange: 1.18,
+    breathRate: 0.64, breathDepth: 1.15, tailLife: 0.80,
+    earBias: 0.55, idleBob: 0.65, blinkMult: 0.5, reactionMult: 1.3
+  },
+  playful: {
+    label: "Playful",
+    headRate: 9.5, bodyRate: 3.1, gazeRange: 1.08,
+    breathRate: 0.56, breathDepth: 1.30, tailLife: 1.95,
+    earBias: 0.28, idleBob: 2.0, blinkMult: 0.85, reactionMult: 1.45
+  }
+};
+const PRESET_ORDER = ["idle", "sleepy", "alert", "playful"];
+const PRESET_EASE_DUR = 0.75; // seconds to ease into a newly selected preset
+
+/* mood-only state (no direct slider) — always kept alongside S */
+const MOOD = Object.seal({ earBias: 0, idleBob: 1, blinkMult: 1, reactionMult: 1 });
+
+let activePreset = "idle";
+let presetFrom = Object.assign({}, PRESETS.idle);
+let presetTo   = Object.assign({}, PRESETS.idle);
+let presetEaseStart = -Infinity;
+
+function currentPresetSnapshot(){
+  return {
+    headRate: S.headRate, bodyRate: S.bodyRate, gazeRange: S.gazeRange,
+    breathRate: S.breathRate, breathDepth: S.breathDepth, tailLife: S.tailLife,
+    earBias: MOOD.earBias, idleBob: MOOD.idleBob, blinkMult: MOOD.blinkMult, reactionMult: MOOD.reactionMult
+  };
+}
 
 /* ── dom ───────────────────────────────────────────────────────────────── */
 const $  = (id) => document.getElementById(id);
@@ -548,9 +634,16 @@ uniform vec3  uHeadPos;
 uniform float uHeadR;
 uniform vec3  uNeckA;
 uniform float uNeckR;
+uniform vec3  uMuzzleBase;
+uniform vec3  uMuzzleTip;
+uniform float uMuzzleR0;
+uniform float uMuzzleR1;
+uniform vec3  uEarBaseL;
+uniform vec3  uEarBaseR;
 uniform vec3  uEarTipL;
 uniform vec3  uEarTipR;
-uniform float uEarR;
+uniform float uEarR0;
+uniform float uEarR1;
 uniform vec3  uEyeL;
 uniform vec3  uEyeR;
 uniform float uEyeRad;
@@ -567,7 +660,8 @@ uniform float uStepScale;
 uniform int   uMaxSteps;
 uniform float uShadowK;
 
-uniform vec3  uSkinColor;
+uniform vec3  uSkinColorBack;
+uniform vec3  uSkinColorBelly;
 uniform vec3  uGroundColor;
 
 const float PI = 3.14159265359;
@@ -591,20 +685,46 @@ float smin(float a, float b, float k){
   return mix(b, a, h) - k * h * (1.0 - h);
 }
 
+/* a capsule with a different radius at each end — exact, so it welds into
+   the smooth-min chain without the faceting an ellipsoid approximation
+   would show. used for the muzzle (round base, blunt tapered tip) and the
+   ears (wide base, thin tip) so both read as distinct forms rather than
+   uniform-radius tubes */
+float sdRoundCone(vec3 p, vec3 a, vec3 b, float r1, float r2){
+  vec3 ba = b - a;
+  float l2 = dot(ba, ba);
+  float rr = r1 - r2;
+  float a2 = l2 - rr * rr;
+  float il2 = 1.0 / l2;
+
+  vec3 pa = p - a;
+  float y = dot(pa, ba);
+  float z = y - l2;
+  float x2 = dot(pa * l2 - ba * y, pa * l2 - ba * y);
+  float y2 = y * y * l2;
+  float z2 = z * z * l2;
+
+  float k = sign(rr) * rr * rr * x2;
+  if (sign(z) * a2 * z2 > k) return sqrt(x2 + z2) * il2 - r2;
+  if (sign(y) * a2 * y2 < k) return sqrt(x2 + y2) * il2 - r1;
+  return (sqrt(x2 * a2 * il2) + y * rr) * il2 - r1;
+}
+
 /* ── the creature ──────────────────────────────────────────────────────── */
-const float K_NECK = 0.11, K_HEAD = 0.13, K_LEG = 0.10, K_TAIL = 0.15, K_EAR = 0.045;
+const float K_NECK = 0.11, K_HEAD = 0.13, K_MUZZLE = 0.075, K_LEG = 0.10, K_TAIL = 0.15, K_EAR = 0.052;
 
 float dCreature(vec3 p){
   float d = sdCapsule(p, uBodyA, uBodyB, uBodyR);
   d = smin(d, sdCapsule(p, uNeckA, uHeadPos, uNeckR), K_NECK);
   d = smin(d, sdSphere(p, uHeadPos, uHeadR), K_HEAD);
+  d = smin(d, sdRoundCone(p, uMuzzleBase, uMuzzleTip, uMuzzleR0, uMuzzleR1), K_MUZZLE);
   for (int i = 0; i < 4; i++){
     d = smin(d, sdCapsule(p, uLegTop[i], uLegBot[i], uLegR), K_LEG);
   }
   d = smin(d, sdCapsule(p, uTailA, uTailB, uTailR1), K_TAIL);
   d = smin(d, sdCapsule(p, uTailB, uTailC, uTailR2), K_TAIL * 0.75);
-  d = smin(d, sdCapsule(p, uHeadPos, uEarTipL, uEarR), K_EAR);
-  d = smin(d, sdCapsule(p, uHeadPos, uEarTipR, uEarR), K_EAR);
+  d = smin(d, sdRoundCone(p, uEarBaseL, uEarTipL, uEarR0, uEarR1), K_EAR);
+  d = smin(d, sdRoundCone(p, uEarBaseR, uEarTipR, uEarR0, uEarR1), K_EAR);
   return d;
 }
 
@@ -627,6 +747,39 @@ vec3 calcNormal(vec3 p){
   return normalize(
     e.xyy * map(p + e.xyy).x + e.yyx * map(p + e.yyx).x +
     e.yxy * map(p + e.yxy).x + e.xxx * map(p + e.xxx).x);
+}
+
+/* ── shading-only surface bump ─────────────────────────────────────────── */
+/* a coat-like read without touching the SDF (and so without touching march
+   cost): a couple of value-noise octaves perturb the *shading* normal only,
+   evaluated purely from the already-known surface point */
+float hash13(vec3 p3){
+  p3 = fract(p3 * 0.1031);
+  p3 += dot(p3, p3.zyx + 31.32);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+float noise3(vec3 x){
+  vec3 i = floor(x), f = fract(x);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(mix(hash13(i+vec3(0,0,0)), hash13(i+vec3(1,0,0)), f.x),
+        mix(hash13(i+vec3(0,1,0)), hash13(i+vec3(1,1,0)), f.x), f.y),
+    mix(mix(hash13(i+vec3(0,0,1)), hash13(i+vec3(1,0,1)), f.x),
+        mix(hash13(i+vec3(0,1,1)), hash13(i+vec3(1,1,1)), f.x), f.y),
+    f.z);
+}
+
+vec3 coatNormal(vec3 p, vec3 n){
+  const float freq = 20.0;
+  vec2 e = vec2(0.01, 0.0);
+  float n0 = noise3(p * freq) + 0.5 * noise3(p * freq * 2.3);
+  float nx = noise3((p + e.xyy) * freq) + 0.5 * noise3((p + e.xyy) * freq * 2.3);
+  float ny = noise3((p + e.yxy) * freq) + 0.5 * noise3((p + e.yxy) * freq * 2.3);
+  float nz = noise3((p + e.yyx) * freq) + 0.5 * noise3((p + e.yyx) * freq * 2.3);
+  vec3 grad = vec3(nx - n0, ny - n0, nz - n0) / e.x;
+  grad -= n * dot(grad, n);   // keep only the component tangent to the surface
+  return normalize(n - grad * 0.006);
 }
 
 float calcAO(vec3 p, vec3 n){
@@ -683,10 +836,25 @@ void main(){
     vec3 p = ro + rd * hit.x;
     vec3 n = calcNormal(p);
 
-    vec3 albedo; float roughK; float specAmt;
-    if (hit.y < 0.5){        albedo = uSkinColor;            roughK = 46.0; specAmt = 0.22; }
+    vec3 albedo; float roughK; float specAmt; bool isSkin = false;
+    if (hit.y < 0.5){
+      isSkin = true;
+      /* two-tone coloring: a lighter belly/muzzle against a darker back,
+         like real animal countershading — driven by height, how much the
+         surface faces downward, and proximity to the muzzle tip */
+      float bellyT = smoothstep(0.08, -0.30, p.y);
+      bellyT = max(bellyT, clamp(-n.y * 0.8 + 0.1, 0.0, 1.0) * 0.7);
+      float muzzleT = smoothstep(0.20, 0.03, distance(p, uMuzzleTip));
+      bellyT = clamp(max(bellyT, muzzleT * 0.95), 0.0, 1.0);
+      albedo  = mix(uSkinColorBack, uSkinColorBelly, bellyT);
+      roughK = 46.0; specAmt = 0.22;
+    }
     else if (hit.y < 1.5){   albedo = vec3(0.016,0.015,0.019); roughK = 220.0; specAmt = 0.95; }
     else {                   albedo = uGroundColor;          roughK = 14.0; specAmt = 0.08; }
+
+    /* the coat bump only perturbs shading — AO/shadow below still query the
+       true geometric normal, so it can't introduce self-shadowing artifacts */
+    vec3 shadeN = isSkin ? coatNormal(p, n) : n;
 
     vec3 keyDir  = normalize(vec3(-0.40, 0.86, 0.32));
     vec3 keyCol  = vec3(1.0, 0.95, 0.86) * 2.35;
@@ -696,17 +864,17 @@ void main(){
     float ao = calcAO(p, n);
     float sh = calcShadow(p + n * 0.02, keyDir, 0.03, 6.0);
 
-    float ndl = clamp(dot(n, keyDir), 0.0, 1.0);
+    float ndl = clamp(dot(shadeN, keyDir), 0.0, 1.0);
     vec3 h = normalize(keyDir - rd);
-    float ndh = clamp(dot(n, h), 0.0, 1.0);
+    float ndh = clamp(dot(shadeN, h), 0.0, 1.0);
     float specTerm = pow(ndh, roughK) * specAmt;
 
-    float skyAmt = clamp(n.y * 0.5 + 0.5, 0.0, 1.0);
+    float skyAmt = clamp(shadeN.y * 0.5 + 0.5, 0.0, 1.0);
     vec3 ambient = mix(vec3(0.048,0.050,0.058), vec3(0.095,0.102,0.120), skyAmt) * ao;
 
     vec3 lit = albedo * (ambient + keyCol * ndl * sh);
     lit += keyCol * specTerm * sh;
-    lit += albedo * fillCol * clamp(dot(n, fillDir), 0.0, 1.0) * ao;
+    lit += albedo * fillCol * clamp(dot(shadeN, fillDir), 0.0, 1.0) * ao;
 
     if (hit.y > 0.5 && hit.y < 1.5){
       float rim = pow(1.0 - clamp(dot(n, -rd), 0.0, 1.0), 3.0);
@@ -777,13 +945,17 @@ const U = {};
 [
   "uRes","uCamPos","uCamBasis","uFocal",
   "uBodyA","uBodyB","uBodyR","uHeadPos","uHeadR","uNeckA","uNeckR",
-  "uEarTipL","uEarTipR","uEarR","uEyeL","uEyeR","uEyeRad",
+  "uMuzzleBase","uMuzzleTip","uMuzzleR0","uMuzzleR1",
+  "uEarBaseL","uEarBaseR","uEarTipL","uEarTipR","uEarR0","uEarR1",
+  "uEyeL","uEyeR","uEyeRad",
   "uLegTop[0]","uLegBot[0]","uLegR",
   "uTailA","uTailB","uTailC","uTailR1","uTailR2",
-  "uStepScale","uMaxSteps","uShadowK","uSkinColor","uGroundColor"
+  "uStepScale","uMaxSteps","uShadowK","uSkinColorBack","uSkinColorBelly","uGroundColor"
 ].forEach(n => { U[n] = gl.getUniformLocation(prog, n); });
 
-const SKIN_COLOR   = new Float32Array([0.760, 0.640, 0.530]);
+/* countershading: a darker back/crown against a lighter belly/muzzle */
+const SKIN_COLOR_BACK  = new Float32Array([0.440, 0.320, 0.205]);
+const SKIN_COLOR_BELLY = new Float32Array([0.900, 0.840, 0.715]);
 const GROUND_COLOR = new Float32Array([0.052, 0.050, 0.052]);
 
 setLoad(38, "Assembling the primitives");
@@ -802,9 +974,22 @@ const REST = {
   bodyA: [0, -0.18, -0.24], bodyB: [0, -0.02, 0.20], bodyR: 0.40,
   headPos: [0, 0.44, 0.42],   headR: 0.27,
   neckA:   [0, 0.06, 0.27],   neckR: 0.125,
-  earHingeDroop: [0.150, -0.09, -0.05],   // local offset from headPos, mirrored on x
-  earHingePerk:  [0.120,  0.27, -0.02],
-  earR: 0.082,
+  /* muzzle: local offsets from headPos, rotated with the head. base sits
+     just inside the front of the skull sphere so it welds in cleanly; the
+     tip is forward and slightly down, giving a real snout instead of a
+     plain sphere-head */
+  muzzleBase: [0, -0.055, 0.195],
+  muzzleTip:  [0, -0.095, 0.415],
+  muzzleR0: 0.150, muzzleR1: 0.082,
+  /* ear tips as local offsets from headPos (mirrored on x), pulled further
+     up and to the side than a symmetric sphere-head needs, so they clear
+     the skull silhouette and read as ears — not just bumps — from the
+     default camera angle. the base is a fraction of the same vector,
+     computed per-frame, so the ear tapers from a wide root to a thin tip */
+  earHingeDroop: [0.175, -0.075, -0.055],
+  earHingePerk:  [0.150,  0.335, -0.020],
+  earBaseFrac: 0.32,
+  earR0: 0.098, earR1: 0.020,
   eyeOffset: [0.135, 0.03, 0.225],        // local offset from headPos, mirrored on x
   eyeR: 0.052,
   legTop: [[0.23, -0.28, 0.18], [-0.23, -0.28, 0.18], [0.21, -0.28, -0.19], [-0.21, -0.28, -0.19]],
@@ -814,12 +999,33 @@ const REST = {
   tailR1: 0.110, tailR2: 0.055
 };
 
-const HEAD_MAX_YAW   = 55 * Math.PI / 180;
-const HEAD_MAX_PITCH = 28 * Math.PI / 180;
-const BODY_MAX_YAW   = 26 * Math.PI / 180;
+/* attention is split into two independent layers rather than one rigid
+   rotation: the head aims broadly and slowly (a small range — it is a
+   skull, not a turret), while the eyes carry a small, fast, independent
+   look-offset within the socket on top of that. The eyes pick up whatever
+   the head hasn't caught up to yet, so a glance leads and the head follows
+   — the same division real character rigs use to avoid a huge swivel
+   reading as skittish. */
+const HEAD_MAX_YAW   = 18 * Math.PI / 180;
+const HEAD_MAX_PITCH = 11 * Math.PI / 180;
+const EYE_MAX_YAW     = 12 * Math.PI / 180;
+const EYE_MAX_PITCH   = 8 * Math.PI / 180;
+const EYE_RATE_MULT  = 2.0;   // eyes chase their (small) target this much faster than the head
+/* measurement (see PR) showed the body's own swing — carrying the whole
+   head+eye assembly around the body's pivot, well forward of it — was
+   actually the larger contributor to the eyes' on-screen sweep, bigger
+   than the head's local rotation the original diagnosis focused on. Its
+   range is trimmed alongside the head's for the fix to be real, not just
+   local */
+const BODY_MAX_YAW   = 12 * Math.PI / 180;
+/* calibrates the ear "curiosity" ramp against the full tracking arc
+   (body + head + eyes), so it paces similarly to before the head range
+   was narrowed */
+const TRACK_MAX_YAW  = BODY_MAX_YAW + HEAD_MAX_YAW + EYE_MAX_YAW;
 
 const rig = {
   bodyYaw: 0, headYaw: 0, headPitch: 0,
+  eyeYaw: 0, eyePitch: 0,
   bob: 0, breathePhase: 0,
   squash: 0,          // 0..1 reaction squash/stretch envelope
   earPerk: 0,          // 0 droop .. 1 perked
@@ -879,16 +1085,20 @@ function projectToUV(cam, worldPos){
 
 /* ── click reaction + blink state machine ─────────────────────────────── */
 let reactionT = -1;     // seconds since last startle trigger, -1 = idle
-let nextAutoBlink = 2.2 + Math.random() * 3.0;
+let nextAutoBlink = (2.2 + Math.random() * 3.0) * MOOD.blinkMult;
 let blinkT = -1;
 
-function triggerReaction(){ reactionT = 0; blinkT = 0; }
-function triggerBlink(){ if (blinkT < 0) blinkT = 0; }
+const BLINK_DUR_BASE = 0.16;
+let blinkDurActive = BLINK_DUR_BASE;
 
-const BLINK_DUR = 0.16;
-function blinkEnvelope(t){
-  if (t < 0 || t > BLINK_DUR) return 0;
-  const x = t / BLINK_DUR;
+/* a startle blink always stays snappy; an autonomous idle blink takes the
+   mood's pace — sleepy's is slow and occasional, alert's is quick and rare */
+function triggerReaction(){ reactionT = 0; blinkDurActive = BLINK_DUR_BASE; blinkT = 0; }
+function triggerBlink(){ if (blinkT < 0){ blinkDurActive = BLINK_DUR_BASE * clamp(MOOD.blinkMult, 0.6, 2.6); blinkT = 0; } }
+
+function blinkEnvelope(t, dur){
+  if (t < 0 || t > dur) return 0;
+  const x = t / dur;
   return x < 0.4 ? x / 0.4 : 1 - (x - 0.4) / 0.6;
 }
 
@@ -930,7 +1140,38 @@ const GAZE_SCREEN_GAIN = 2.35;              // uv-offset → radians
 
 let gazeUV = [0, 0];
 
+/* ── mood preset easing ───────────────────────────────────────────────── */
+function easeT(x){ x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }
+
+function applyPresetEasing(){
+  if (clock - presetEaseStart >= PRESET_EASE_DUR) return;   // settled — leave S/MOOD alone so sliders stay free
+  const t = easeT((clock - presetEaseStart) / PRESET_EASE_DUR);
+  S.headRate    = lerp(presetFrom.headRate,    presetTo.headRate,    t);
+  S.bodyRate    = lerp(presetFrom.bodyRate,    presetTo.bodyRate,    t);
+  S.gazeRange   = lerp(presetFrom.gazeRange,   presetTo.gazeRange,   t);
+  S.breathRate  = lerp(presetFrom.breathRate,  presetTo.breathRate,  t);
+  S.breathDepth = lerp(presetFrom.breathDepth, presetTo.breathDepth, t);
+  S.tailLife    = lerp(presetFrom.tailLife,    presetTo.tailLife,    t);
+  MOOD.earBias      = lerp(presetFrom.earBias,      presetTo.earBias,      t);
+  MOOD.idleBob      = lerp(presetFrom.idleBob,      presetTo.idleBob,      t);
+  MOOD.blinkMult    = lerp(presetFrom.blinkMult,    presetTo.blinkMult,    t);
+  MOOD.reactionMult = lerp(presetFrom.reactionMult, presetTo.reactionMult, t);
+  syncSlidersFromS();
+}
+
+function selectPreset(key){
+  if (!PRESETS[key]) return activePreset;
+  presetFrom = currentPresetSnapshot();
+  presetTo = Object.assign({}, PRESETS[key]);
+  presetEaseStart = clock;
+  activePreset = key;
+  updatePresetButtons();
+  return activePreset;
+}
+
 function updateRig(dt, cam){
+  applyPresetEasing();
+
   if (!paused){
     clock += dt;
     rig.breathePhase += dt * S.breathRate * Math.PI * 2;
@@ -956,10 +1197,21 @@ function updateRig(dt, cam){
   rig.headYaw   = damp(rig.headYaw,   paused ? rig.headYaw   : headYawTarget,   S.headRate, dt);
   rig.headPitch = damp(rig.headPitch, paused ? rig.headPitch : headPitchTarget, S.headRate, dt);
 
-  /* breathing: a torso scale pulse plus a very small whole-body bob */
+  /* the eye layer: whatever slice of the gaze the (slower, narrower) head
+     hasn't reached yet, clamped to its own small range and chased at a
+     much faster rate — the quick fine-aim on top of the head's coarse aim */
+  const eyeYawTarget   = clamp(yawTarget - rig.bodyYaw - rig.headYaw, -EYE_MAX_YAW * gr, EYE_MAX_YAW * gr);
+  const eyePitchTarget = clamp(pitchTarget - rig.headPitch,            -EYE_MAX_PITCH * gr, EYE_MAX_PITCH * gr);
+  const eyeRate = S.headRate * EYE_RATE_MULT;
+  rig.eyeYaw   = damp(rig.eyeYaw,   paused ? rig.eyeYaw   : eyeYawTarget,   eyeRate, dt);
+  rig.eyePitch = damp(rig.eyePitch, paused ? rig.eyePitch : eyePitchTarget, eyeRate, dt);
+
+  /* breathing: a torso scale pulse plus a very small whole-body bob, plus a
+     mood-scaled idle micro-bounce (near-zero when sleepy, lively when playful) */
   const breathe = 0.5 + 0.5 * Math.sin(rig.breathePhase);
   const breatheAmt = breathe * S.breathDepth;
-  rig.bob = 0.018 * breatheAmt + reactionHop(reactionT) * 0.12;
+  const idleBounce = Math.sin(clock * 3.1) * 0.007 * MOOD.idleBob;
+  rig.bob = 0.018 * breatheAmt + reactionHop(reactionT) * 0.12 + idleBounce;
 
   /* reaction envelope: squash/stretch + ear perk + a quick hop */
   if (reactionT >= 0){
@@ -967,22 +1219,22 @@ function updateRig(dt, cam){
     if (reactionT > REACT_DUR) reactionT = -1;
   }
   const reactAmt = reactionT >= 0 ? reactionEnvelope(reactionT) : 0;
-  rig.squash = damp(rig.squash, reactAmt, 18, dt);
+  rig.squash = damp(rig.squash, reactAmt, 18 * MOOD.reactionMult, dt);
 
-  const curiosity = clamp(Math.abs(yawTarget) / (HEAD_MAX_YAW * gr + 0.001), 0, 1) * 0.35;
-  const earTarget = clamp(Math.max(curiosity, reactAmt > 0.15 ? 1 : 0), 0, 1);
+  const curiosity = clamp(Math.abs(yawTarget) / (TRACK_MAX_YAW * gr + 0.001), 0, 1) * 0.35;
+  const earTarget = clamp(Math.max(curiosity, reactAmt > 0.15 ? 1 : 0) + MOOD.earBias, 0, 1);
   rig.earPerk = damp(rig.earPerk, earTarget, 6.5, dt);
 
   /* blink: autonomous + reaction-triggered, whichever is active wins */
   if (!paused){
     nextAutoBlink -= dt;
-    if (nextAutoBlink <= 0){ triggerBlink(); nextAutoBlink = 2.6 + Math.random() * 3.4; }
+    if (nextAutoBlink <= 0){ triggerBlink(); nextAutoBlink = (2.6 + Math.random() * 3.4) * MOOD.blinkMult; }
     if (blinkT >= 0){
       blinkT += dt;
-      if (blinkT > BLINK_DUR) blinkT = -1;
+      if (blinkT > blinkDurActive) blinkT = -1;
     }
   }
-  rig.blink = blinkT >= 0 ? blinkEnvelope(blinkT) : 0;
+  rig.blink = blinkT >= 0 ? blinkEnvelope(blinkT, blinkDurActive) : 0;
 
   return { breatheAmt, reactAmt };
 }
@@ -1020,6 +1272,14 @@ function buildFrame(anim){
   const headPosLocal = add(REST.headPos, headLocalRot);
   const headPos = toWorld(headPosLocal, true);
 
+  /* muzzle rides the head's own (reduced-range) rotation — not the eyes'
+     extra layer — so the narrower head aim is still visible as an actual
+     change in orientation now that the head isn't just a symmetric sphere */
+  const muzzleBaseOff = rotateHeadLocal(REST.muzzleBase, rig.headYaw, rig.headPitch);
+  const muzzleTipOff  = rotateHeadLocal(REST.muzzleTip,  rig.headYaw, rig.headPitch);
+  const muzzleBase = toWorld(add(headPosLocal, muzzleBaseOff), true);
+  const muzzleTip  = toWorld(add(headPosLocal, muzzleTipOff),  true);
+
   const earOffL = rotateHeadLocal(
     [
       lerp(REST.earHingeDroop[0], REST.earHingePerk[0], rig.earPerk),
@@ -1029,10 +1289,16 @@ function buildFrame(anim){
     rig.headYaw, rig.headPitch
   );
   const earOffR = mulX(earOffL, -1);
+  const earBaseOffL = [earOffL[0] * REST.earBaseFrac, earOffL[1] * REST.earBaseFrac, earOffL[2] * REST.earBaseFrac];
+  const earBaseOffR = mulX(earBaseOffL, -1);
   const earTipL = toWorld(add(headPosLocal, earOffL), true);
   const earTipR = toWorld(add(headPosLocal, earOffR), true);
+  const earBaseL = toWorld(add(headPosLocal, earBaseOffL), true);
+  const earBaseR = toWorld(add(headPosLocal, earBaseOffR), true);
 
-  const eyeOffL = rotateHeadLocal(REST.eyeOffset, rig.headYaw, rig.headPitch);
+  /* the eyeballs get the head's rotation plus their own small independent
+     look-offset — the head aims the socket, the eyes fine-aim within it */
+  const eyeOffL = rotateHeadLocal(REST.eyeOffset, rig.headYaw + rig.eyeYaw, rig.headPitch + rig.eyePitch);
   const eyeOffR = mulX(eyeOffL, -1);
   const eyeR = 1 - rig.blink * 0.94;
   const eyeL = toWorld(add(headPosLocal, eyeOffL), true);
@@ -1053,7 +1319,10 @@ function buildFrame(anim){
   const tailC = toWorld([REST.tailC[0] + (tailSway + tailFlick) * 1.15 * swayAmt, REST.tailC[1], REST.tailC[2]], true);
 
   return {
-    bodyA, bodyB, bodyR, headPos, neckA, earTipL, earTipR, eyeL, eyeR: eyeRp, eyeRad: REST.eyeR * eyeR,
+    bodyA, bodyB, bodyR, headPos, neckA,
+    muzzleBase, muzzleTip,
+    earBaseL, earBaseR, earTipL, earTipR,
+    eyeL, eyeR: eyeRp, eyeRad: REST.eyeR * eyeR,
     tailA, tailB, tailC
   };
 }
@@ -1079,9 +1348,16 @@ function drawScene(cam, frame){
   gl.uniform1f(U.uHeadR, REST.headR);
   gl.uniform3fv(U.uNeckA, frame.neckA);
   gl.uniform1f(U.uNeckR, REST.neckR);
+  gl.uniform3fv(U.uMuzzleBase, frame.muzzleBase);
+  gl.uniform3fv(U.uMuzzleTip, frame.muzzleTip);
+  gl.uniform1f(U.uMuzzleR0, REST.muzzleR0);
+  gl.uniform1f(U.uMuzzleR1, REST.muzzleR1);
+  gl.uniform3fv(U.uEarBaseL, frame.earBaseL);
+  gl.uniform3fv(U.uEarBaseR, frame.earBaseR);
   gl.uniform3fv(U.uEarTipL, frame.earTipL);
   gl.uniform3fv(U.uEarTipR, frame.earTipR);
-  gl.uniform1f(U.uEarR, REST.earR);
+  gl.uniform1f(U.uEarR0, REST.earR0);
+  gl.uniform1f(U.uEarR1, REST.earR1);
   gl.uniform3fv(U.uEyeL, frame.eyeL);
   gl.uniform3fv(U.uEyeR, frame.eyeR);
   gl.uniform1f(U.uEyeRad, frame.eyeRad);
@@ -1097,7 +1373,8 @@ function drawScene(cam, frame){
   gl.uniform1f(U.uStepScale, S.step);
   gl.uniform1i(U.uMaxSteps, S.maxSteps | 0);
   gl.uniform1f(U.uShadowK, S.shadowK);
-  gl.uniform3fv(U.uSkinColor, SKIN_COLOR);
+  gl.uniform3fv(U.uSkinColorBack, SKIN_COLOR_BACK);
+  gl.uniform3fv(U.uSkinColorBelly, SKIN_COLOR_BELLY);
   gl.uniform3fv(U.uGroundColor, GROUND_COLOR);
 
   gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -1215,14 +1492,43 @@ function applyKey(uiKey, value){
 
 function resetAll(){
   Object.assign(S, DEFAULTS);
+  Object.assign(MOOD, { earBias: 0, idleBob: 1, blinkMult: 1, reactionMult: 1 });
+  activePreset = "idle";
+  presetFrom = Object.assign({}, PRESETS.idle);
+  presetTo = Object.assign({}, PRESETS.idle);
+  presetEaseStart = -Infinity;   // already settled — resetAll snaps, it doesn't ease
   ["headrate","bodyrate","gazerange","breathrate","breathdepth","tail","step","steps","shk"].forEach(uiKey => {
     const el = $("p-" + uiKey);
     const k = KEYMAP[uiKey];
     if (el){ el.value = S[k]; $("o-" + uiKey).textContent = fmt[uiKey](S[k]); }
   });
+  updatePresetButtons();
 }
 $("p-reset").addEventListener("click", resetAll);
 $("p-react").addEventListener("click", () => triggerReaction());
+
+/* ── mood presets: UI ─────────────────────────────────────────────────── */
+function syncSlidersFromS(){
+  ["headrate","bodyrate","gazerange","breathrate","breathdepth","tail"].forEach(uiKey => {
+    const el = $("p-" + uiKey);
+    if (!el) return;
+    const k = KEYMAP[uiKey];
+    el.value = S[k];
+    const out = $("o-" + uiKey);
+    if (out) out.textContent = fmt[uiKey](S[k]);
+  });
+}
+
+const presetButtons = Array.from(document.querySelectorAll(".preset-btn"));
+function updatePresetButtons(){
+  presetButtons.forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.preset === activePreset);
+  });
+}
+presetButtons.forEach(btn => {
+  btn.addEventListener("click", () => selectPreset(btn.dataset.preset));
+});
+updatePresetButtons();
 
 /* ── pointer: continuous gaze + explicit drag-to-orbit ────────────────── */
 function setPointerFromEvent(e){
@@ -1270,6 +1576,7 @@ window.addEventListener("keydown", (e) => {
   else if (k === "escape"){ setPanel(false); }
   else if (k === "r"){ resetAll(); }
   else if (k === " "){ e.preventDefault(); paused = !paused; body.classList.toggle("is-paused", paused); }
+  else if (k >= "1" && k <= "4"){ selectPreset(PRESET_ORDER[+k - 1]); }
 });
 
 document.addEventListener("visibilitychange", () => {
@@ -1282,7 +1589,7 @@ document.addEventListener("visibilitychange", () => {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 window.__armature = {
-  version: "1.0.0",
+  version: "1.1.0",
   title: "Armature — a procedurally animated SDF creature study",
 
   settings: S,
@@ -1293,6 +1600,13 @@ window.__armature = {
     return S[key];
   },
   reset(){ resetAll(); return Object.assign({}, S); },
+
+  /* mood presets — a curated combination of the params above, eased in as
+     one unit rather than a slider dump */
+  presets: Object.keys(PRESETS),
+  get activePreset(){ return activePreset; },
+  setPreset(key){ return selectPreset(key); },
+  get mood(){ return Object.assign({}, MOOD); },
 
   get rig(){ return Object.assign({}, rig); },
   get clock(){ return clock; },
@@ -1310,6 +1624,12 @@ window.__armature = {
   /* orbit the camera programmatically */
   orbit(az, el){ dragAz = az; if (el !== undefined) dragEl = el; return { az: baseAz + dragAz, el: elevation + dragEl }; },
 
+  /* world-space eye centers this frame, and the uv-space projection the
+     shader itself uses to cast rays — enough to measure actual on-screen
+     eye displacement without guessing at screen-space math independently */
+  get eyeWorld(){ return lastFrame ? { L: Array.from(lastFrame.eyeL), R: Array.from(lastFrame.eyeR) } : null; },
+  projectUV(worldPos){ return lastCam ? projectToUV(lastCam, worldPos) : null; },
+
   triggerReaction(){ triggerReaction(); return true; },
   triggerBlink(){ triggerBlink(); return true; },
 
@@ -1324,10 +1644,13 @@ window.__armature = {
       dpr,
       headYawDeg: rig.headYaw * 180 / Math.PI,
       headPitchDeg: rig.headPitch * 180 / Math.PI,
+      eyeYawDeg: rig.eyeYaw * 180 / Math.PI,
+      eyePitchDeg: rig.eyePitch * 180 / Math.PI,
       bodyYawDeg: rig.bodyYaw * 180 / Math.PI,
       blink: rig.blink,
       squash: rig.squash,
       earPerk: rig.earPerk,
+      activePreset,
       renderer: (() => {
         const d = gl.getExtension("WEBGL_debug_renderer_info");
         return d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : "unavailable";
