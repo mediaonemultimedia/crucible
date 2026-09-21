@@ -324,7 +324,7 @@ a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
   <aside id="panel" aria-label="Controls">
     <header>
       <div>
-        <span class="eyebrow">Study 15</span>
+        <span class="eyebrow">Study 16</span>
         <h2>Intaglio</h2>
       </div>
       <button id="panel-close" type="button" aria-label="Close controls">×</button>
@@ -441,13 +441,13 @@ a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
   </div>
 
   <div id="credit">
-    <b>Intaglio</b> — depth-displacement reveal study 15 &nbsp;·&nbsp; carved height maps &nbsp;·&nbsp; dwell-accumulated parallax &nbsp;·&nbsp; webgl2<br>
+    <b>Intaglio</b> — depth-displacement reveal study 16 &nbsp;·&nbsp; carved height maps &nbsp;·&nbsp; dwell-accumulated parallax &nbsp;·&nbsp; webgl2<br>
     <span class="keys">move the cursor to carve the surface &nbsp; linger to raise relief &nbsp; 1–3 or [ ] to switch pairs &nbsp; c controls &nbsp; space pause &nbsp; r reset</span>
   </div>
 </div>
 
 <div id="loader">
-  <div class="idx">Study 15</div>
+  <div class="idx">Study 16</div>
   <div id="pulse"><i class="ring"></i><i class="ring"></i><i class="ring"></i><span class="dot"></span></div>
   <h1 class="word">Intaglio</h1>
   <div class="study">A depth-displacement image reveal</div>
@@ -949,10 +949,17 @@ void main(){
   float hy0 = texture(uHeight, uv - vec2(0.0, texel * 2.0)).r;
   vec2 grad = vec2(hx1 - hx0, hy1 - hy0);
 
+  /* reliefAmount: the same accumulated-dwell scalar sampled above (uAccum),
+     reused rather than resampled — 0 wherever the cursor has never lingered,
+     climbing toward 1 with the accumulator's own charge/decay behavior. It
+     is the single knob that carries the surface from genuinely flat art
+     (0: no parallax offset, no shading, base-plane normal) to fully carved
+     relief (1: full parallax offset, fully-computed ridge-lit normal). */
+  float reliefAmount = clamp(dwell, 0.0, 1.0);
+
   /* relief grows with accumulated dwell only (not the instantaneous term) —
      the effect this piece exists to demonstrate is that it accumulates */
-  float relief = dwell * uParallax;
-  vec2 offset = grad * relief * 0.55;
+  vec2 offset = grad * reliefAmount * uParallax * 0.55;
 
   vec3 colA = texture(uTexA, uv - offset * 0.5).rgb;
   vec3 colB = texture(uTexB, uv + offset * 0.5).rgb;
@@ -995,8 +1002,16 @@ void main(){
   /* ── real ridge-and-valley shading: a surface normal from the relief
      gradient, lit from a raking/grazing angle so ridges pick up a genuine
      specular highlight and valleys pool a genuine occlusion-style shadow —
-     legible in a still frame, not only while the dwell field is animating. */
-  vec3 normal = normalize(vec3(-reliefGrad * 6.0, 1.0));
+     legible in a still frame, not only while the dwell field is animating.
+     The normal is blended from the flat base-plane normal (reliefAmount 0
+     — nothing to shade, because there's no relief yet) to the fully-
+     computed ridge normal (reliefAmount 1), so shadow/highlight contrast
+     is an emergent consequence of the surface actually displacing, rather
+     than a separate fade layered on top of an always-present bevel. */
+  vec3 flatNormal  = vec3(0.0, 0.0, 1.0);
+  vec3 ridgeNormal = normalize(vec3(-reliefGrad * 6.0, 1.0));
+  vec3 normal = normalize(mix(flatNormal, ridgeNormal, reliefAmount));
+
   vec3 lightDir = normalize(vec3(-0.55, 0.68, 0.62));
   float ndotl = dot(normal, lightDir);
 
@@ -1005,12 +1020,13 @@ void main(){
   float spec = pow(clamp(dot(normal, halfDir), 0.0, 1.0), 26.0);
 
   float ao = smoothstep(0.015, -0.035, lap);
-  float reliefVis = clamp(relief * 1.6, 0.0, 1.0);
-  float reliefStrength = 0.32 + 0.68 * reliefVis;
 
-  col *= 1.0 + clamp(ndotl, -1.0, 1.0) * 0.58 * reliefStrength;
-  col *= mix(1.0, 0.42, ao * reliefStrength);
-  col += spec * 0.85 * reliefStrength;
+  /* reliefAmount gates the whole lighting contribution — no floor, so at
+     reliefAmount 0 the surface reads as genuinely flat 2D artwork: zero
+     shadow, zero highlight, zero bevel. */
+  col *= 1.0 + clamp(ndotl, -1.0, 1.0) * 0.58 * reliefAmount;
+  col *= mix(1.0, 0.42, ao * reliefAmount);
+  col += spec * 0.85 * reliefAmount;
 
   col = pow(clamp(col, 0.0, 1.0), vec3(0.96));
   fragColor = vec4(col, 1.0);
@@ -1471,6 +1487,12 @@ window.__intaglio = {
   accumStats(){ return readAccumStats(); },
   sampleAccumAt(u, v){ return sampleAccumAt(u, v); },
   clearAccum(){ clearAccum(); },
+
+  /* reliefAmount mirrors MAIN_FRAG exactly: it IS the accumulator sample,
+     reused rather than resampled — the single scalar that gates parallax
+     offset, magnitude and the flat-normal -> ridge-normal blend driving
+     shadow/highlight. reliefAmount(u,v) === sampleAccumAt(u,v). */
+  reliefAmountAt(u, v){ return sampleAccumAt(u, v); },
 
   /* mirrors MAIN_FRAG's gravity-well + elaboration math exactly, so tests
      can predict/verify the pattern warp and dwell-bloom without reading
