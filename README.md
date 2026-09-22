@@ -29,6 +29,7 @@ the same either way.
 | 13 | **Cockle** | Two mirrored craft-paper panels peel open on a fixed top-down camera | [`/cockle/`](./cockle/) |
 | 14 | **Armature** | A raymarched SDF creature with no mesh and no rig — a smooth-min skeleton animated frame by frame, watching the cursor | [`/armature/`](./armature/) |
 | 15 | **Telecine** | Live playback of exported keyframe animation data — a canvas engine that interpolates a hand-authored JSON schema at any point on the timeline, fully scrubbable | [`/telecine/`](./telecine/) |
+| 16 | **Intaglio** | A carved height field decides where one image dissolves through another, and dwell builds visible relief | [`/intaglio/`](./intaglio/) |
 
 Studies 03–06 were lost to a storage failure and are being rebuilt. They'll be
 added here as they land. Numbering follows build order, not merit — it starts at
