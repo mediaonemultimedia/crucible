@@ -271,15 +271,30 @@ const OFF = {
   SEED: 20,
 };
 
-/* ── sim constants ─────────────────────────────────────────────────────── */
-const GX = 64, GY = 92, GZ = 64;
-const GCELLS = GX*GY*GZ;
-const DX = 0.022;
-const DOMAIN = [GX*DX, GY*DX, GZ*DX]; // ≈ 1.408 × 2.024 × 1.408
+/* ── sim constants ─────────────────────────────────────────────────────
+   RESOLUTION IS NOT A FREE PARAMETER. MPM only behaves as a continuum when
+   several particles share each grid cell — the grid is what couples
+   neighbours together, so with fewer than one particle per cell each
+   particle round-trips through its own private stencil and the material
+   degenerates into independent grains. The standard packing is 8 per cell
+   (2×2×2), i.e. particle spacing = dx/2.
 
-const MAX_PARTICLES = 24576;
-const DEFAULT_TARGET = 20480;
-const QUICK_TARGET = 4096; // used by verification harness via __riser.setParticleTarget
+   The previous build had dx=0.022 with 20,480 particles in a 0.328 unit³
+   cavity: 30,845 cavity cells for 20,480 particles = 0.66 particles/cell,
+   about 12× too coarse. That is the single largest reason it read as
+   disconnected blobs rather than liquid. dx is doubled here and the
+   particle target raised so the ratio lands on ~8. See PPC below — the
+   assertion at the bottom of this block keeps the invariant honest.
+   ────────────────────────────────────────────────────────────────────── */
+const GX = 32, GY = 46, GZ = 32;
+const GCELLS = GX*GY*GZ;
+const DX = 0.044;
+const DOMAIN = [GX*DX, GY*DX, GZ*DX]; // ≈ 1.408 × 2.024 × 1.408 (unchanged)
+
+const PPC = 8;                 // target particles per grid cell
+const MAX_PARTICLES = 32768;
+const DEFAULT_TARGET = 30720;
+const QUICK_TARGET = 8192; // used by verification harness via __riser.setParticleTarget
 
 const MOLD = {
   halfExtents: [0.40, 0.56, 0.28],
@@ -297,28 +312,45 @@ const CAVITY_VOLUME =
   2*(MOLD.halfExtents[0]-MOLD.wallThickness) *
   2*(MOLD.halfExtents[1]-MOLD.wallThickness) *
   2*(MOLD.halfExtents[2]-MOLD.wallThickness);
-const SPLAT_RADIUS_K = 2.0; // hand-tuned: 1.5–2.5 gives solid neighbor overlap
+// Splat radius is expressed as a multiple of the particle SPACING. At 2.0 (the
+// previous value) every sphere covered 8× the volume it stands for, so the
+// isosurface was a union of grossly oversized balls — the "large blobs" read.
+// Just above 1.0 the spheres overlap their immediate neighbours and nothing
+// more, which is what a depth-blur can actually resolve into a skin.
+const SPLAT_RADIUS_K = 1.05;
+function particleSpacing(particleCount){
+  return Math.cbrt(CAVITY_VOLUME / Math.max(1, particleCount));
+}
 function particleSplatRadius(particleCount){
-  const perParticleVol = CAVITY_VOLUME / Math.max(1, particleCount);
-  return SPLAT_RADIUS_K * Math.cbrt(perParticleVol);
+  return SPLAT_RADIUS_K * particleSpacing(particleCount);
 }
 
 const DEFAULTS = {
-  gravity: 2.6,
+  gravity: 5.2,
+  // stiffLiquid/stiffSolid are bulk moduli against a unit reference density.
+  // The pressure wave speed is sqrt(gamma*K/rho); CFL wants c*dt < dx, i.e.
+  // K < rho*(dx/dt)^2/gamma = 27.9/3 ≈ 9.3 here, so 5.0 sits at c≈3.9 with
+  // real margin. These numbers were always roughly right — what made them
+  // inert was the particle mass, not the stiffness (see P_MASS).
   stiffLiquid: 5.0,
-  stiffSolid: 260.0,
+  // Solid stiffness cannot simply be "large": at rho=1, gamma=3 the CFL
+  // ceiling is K<9.3, so the old 260 would now be violently unstable. The
+  // solid state is held by the velocity-damping lock below, not by stiffness
+  // — see the honest note about elastoplasticity in the README/PR.
+  stiffSolid: 7.0,
   gamma: 3.0,
-  viscosity: 3.5,
-  damping: 5.0,
-  pourRate: 900,     // particles/sec
-  pourSpeed: 1.55,
+  viscosity: 1.4,
+  damping: 7.0,
+  wallFriction: 0.06,  // 0 = free slip. Molten metal barely wets a cold mold.
+  pourRate: 2600,      // particles/sec
+  pourSpeed: 1.9,
   ambientTemp: 24,
   moldTemp: 140,
   pourTemp: 1420,
   liquidus: 950,
   solidus: 640,
-  coolBase: 0.06,
-  coolContact: 1.6,
+  coolBase: 0.09,
+  coolContact: 0.8,
   exposure: 1.15,
   loop: 0,
 };
@@ -402,6 +434,7 @@ const state = {
   solidPct: 0,
   fps: 0,
   timeScale: 1,
+  debugView: 0,   // index into DEBUG_VIEWS; 0 = normal shaded output
   params: Object.assign({}, DEFAULTS),
 };
 
@@ -422,7 +455,13 @@ const GCELLSu: u32 = ${GCELLS}u;
 const NUMPu: u32 = ${MAX_PARTICLES}u;
 const PSTRIDEu: u32 = ${PSTRIDE}u;
 const DOMXf: f32 = ${DOMAIN[0]}; const DOMYf: f32 = ${DOMAIN[1]}; const DOMZf: f32 = ${DOMAIN[2]};
-const SCALE: f32 = 65536.0;
+// Grid accumulation is fixed-point over i32 atomics, so the quantities it
+// carries must stay O(1). Particle mass is therefore NORMALISED to 1 here and
+// the constitutive term is expressed per unit mass (see stressCoeff in p2g):
+// v = momentum/mass is scale-invariant, so this changes no physics, while
+// carrying the true mass (~1e-5) through encFix would quantise every deposit
+// straight to zero.
+const SCALE: f32 = 1048576.0;
 
 @group(0) @binding(0) var<storage, read_write> P: array<f32>;
 @group(0) @binding(1) var<storage, read_write> gridMass: array<atomic<i32>>;
@@ -436,12 +475,37 @@ const SCALE: f32 = 65536.0;
 fn encFix(v: f32) -> i32 { return i32(clamp(v*SCALE, -2000000000.0, 2000000000.0)); }
 fn decFix(v: i32) -> f32 { return f32(v) / SCALE; }
 
+// The stats reduction SUMS over every particle, so it needs a much coarser
+// fixed-point scale than the grid: solidFrac summed over 32768 particles at
+// the grid's scale would overflow i32 by an order of magnitude.
+const SCALE_STATS: f32 = 4096.0;
+fn encStat(v: f32) -> i32 { return i32(clamp(v*SCALE_STATS, -2000000000.0, 2000000000.0)); }
+
+// Quadratic B-spline weights for the three nodes at index offsets 0,1,2 from
+// baseCell. VALID ONLY FOR f IN [0.5, 1.5) — that is, when baseCell has been
+// chosen so the particle sits inside the MIDDLE node's cell. Call sites must
+// use gridBase() below; evaluating this with f in [0,1) (as the previous build
+// did) silently returns garbage: at f=0 it yields (1.125, -0.25, 0.125), a
+// negative mass deposit, and the true B-spline over that stencil does not even
+// sum to 1 because the node the particle actually sits nearest is not in it.
 fn quadW(f: f32) -> array<f32,3> {
   return array<f32,3>(
     0.5*(1.5-f)*(1.5-f),
     0.75-(f-1.0)*(f-1.0),
     0.5*(f-0.5)*(f-0.5)
   );
+}
+
+// Node (i,j,k) sits at world (i+0.5)*dx, so a particle's position in node-index
+// space is pos/dx - 0.5. Centering the 3-wide stencil on the particle needs
+// baseCell = floor(that - 0.5), which puts the fractional offset in [0.5, 1.5).
+struct GridBase { cell: vec3f, fx: vec3f };
+fn gridBase(pos: vec3f, invdx: f32) -> GridBase {
+  let nodePos = pos*invdx - 0.5;
+  var o: GridBase;
+  o.cell = floor(nodePos - 0.5);
+  o.fx = nodePos - o.cell;   // in [0.5, 1.5)
+  return o;
 }
 
 fn sdRoundRect(p: vec2f, b: vec2f, r: f32) -> f32 {
@@ -475,7 +539,7 @@ fn bakeMoldSDF(@builtin(global_invocation_id) gid: vec3<u32>) {
   let topY = center.y + half.y - wallT;
   let cavityFloorY = (center.y - half.y) + wallT;
 
-  let band = smoothstep(topY, topY - 0.03, gp.y);
+  let band = smoothstep(topY, topY - 1.5*dx, gp.y);
   let wallSDF = mix(1.0, -distXZ, band);
   let floorSDF = gp.y - cavityFloorY;
   moldSDF[idx] = min(wallSDF, floorSDF);
@@ -496,8 +560,8 @@ fn reduceStats(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (P[base+19u] < 0.5) { return; }
   let solidFrac = P[base+18u];
   let temp = P[base+17u];
-  atomicAdd(&stats[0], encFix(solidFrac));
-  atomicMax(&stats[1], encFix(temp));
+  atomicAdd(&stats[0], encStat(solidFrac));
+  atomicMax(&stats[1], encStat(temp));
   atomicAdd(&stats[2], 1);
 }
 
@@ -521,13 +585,24 @@ fn p2g(@builtin(global_invocation_id) gid: vec3<u32>) {
 
   if (isActive < 0.5) {
     if (f32(pi) < U[3].z) {
-      let jx = (fract(seed*17.13)-0.5)*0.05;
-      let jz = (fract(seed*29.71)-0.5)*0.05;
-      pos = vec3f(U[8].x+jx, U[8].y, U[8].z+jz);
+      // Spawn over a disc wide enough to carry the requested pour rate at the
+      // requested speed without over-packing. Emitting N particles/sec through
+      // a fixed tiny aperture crams many particles' worth of volume into one
+      // cell, and the resulting jam explodes outward the moment it resolves —
+      // which is what the CFL clamp was catching. See NOZZLE_RADIUS on the JS
+      // side for the area balance.
+      let nr = U[9].w * sqrt(fract(seed*17.13));
+      let na = 6.2831853 * fract(seed*29.71);
+      let jx = nr*cos(na);
+      let jz = nr*sin(na);
+      // spread the step's worth of particles along the fall axis too, so each
+      // step does not deposit a flat coincident disc
+      let jy = (fract(seed*41.9)-0.5) * U[8].w * U[0].x;
+      pos = vec3f(U[8].x+jx, U[8].y+jy, U[8].z+jz);
       let jvx = (fract(seed*53.7)-0.5)*0.25;
       let jvz = (fract(seed*71.3)-0.5)*0.25;
       vel = vec3f(jvx, -U[8].w, jvz);
-      mass = 1.0;
+      mass = 1.0;      // normalised; real density enters via stressCoeff
       Jv = 1.0;
       temp = U[7].z;
       solidFrac = 0.0;
@@ -542,17 +617,17 @@ fn p2g(@builtin(global_invocation_id) gid: vec3<u32>) {
 
   let dx = U[1].w;
   let invdx = 1.0/dx;
-  let basePos = pos*invdx - 0.5;
-  let baseCell = floor(basePos);
-  let fx = basePos - baseCell;
+  let gb = gridBase(pos, invdx);
+  let baseCell = gb.cell;
+  let fx = gb.fx;
 
   let wx = quadW(fx.x); let wy = quadW(fx.y); let wz = quadW(fx.z);
 
   let stiff = mix(U[2].x, U[2].y, solidFrac);
   let gammaP = U[2].z;
-  let Jc = clamp(Jv, 0.4, 3.0);
+  let Jc = clamp(Jv, 0.5, 2.0);
   let pressure = stiff * (pow(1.0/Jc, gammaP) - 1.0);
-  let pVol = U[3].x;
+  let density = U[3].y;
   let dt = U[0].x;
   // Cauchy stress for a pressure-only material is -pressure*I; the MLS-MPM
   // affine force contribution is -dt*4*Vol*invdx^2*stress, so the diagonal
@@ -562,7 +637,13 @@ fn p2g(@builtin(global_invocation_id) gid: vec3<u32>) {
   // deviation from rest volume was amplified rather than corrected, which
   // stayed mild at low liquid stiffness but blew solidified clumps apart
   // once stiffSolid's much larger magnitude took over.
-  let stressCoeff = dt*4.0*pVol*invdx*invdx*pressure;
+  // Per unit mass, because particle mass is normalised to 1 above: the MLS-MPM
+  // term is dt*4*Vol*invdx^2*pressure, and Vol/mass = 1/density. This is the
+  // correction that actually gives the fluid a pressure response — with the
+  // previous build's mass=1 against Vol=0.42*dx^3 the implied density was
+  // ~2.2e5 and the term came out ~1e-5 of the inertial term, i.e. no equation
+  // of state at all.
+  let stressCoeff = dt*4.0*invdx*invdx*pressure/max(density, 1e-6);
 
   let a00 = mass*c00 + stressCoeff; let a01 = mass*c01; let a02 = mass*c02;
   let a10 = mass*c10; let a11 = mass*c11 + stressCoeff; let a12 = mass*c12;
@@ -605,7 +686,10 @@ fn gridUpdate(@builtin(global_invocation_id) gid: vec3<u32>) {
   let mass = decFix(atomicLoad(&gridMass[idx]));
   let i = idx % GXu; let j = (idx / GXu) % GYu; let k = idx / (GXu*GYu);
 
-  if (mass < 1e-6) {
+  // Particle mass is normalised to 1, so this is "less than 1e-4 of one
+  // particle" — below the fixed-point resolution, where momentum/mass would
+  // be dividing quantisation noise by quantisation noise.
+  if (mass < 1e-4) {
     atomicStore(&gridVelX[idx], 0);
     atomicStore(&gridVelY[idx], 0);
     atomicStore(&gridVelZ[idx], 0);
@@ -616,7 +700,7 @@ fn gridUpdate(@builtin(global_invocation_id) gid: vec3<u32>) {
   var vy = decFix(atomicLoad(&gridVelY[idx])) / mass;
   var vz = decFix(atomicLoad(&gridVelZ[idx])) / mass;
 
-  let dt = U[0].x; let gravity = U[0].y;
+  let dt = U[0].x; let gravity = U[0].y; let dx = U[1].w;
   vy = vy - gravity*dt;
 
   if (i < 2u || i >= GXu-2u || k < 2u || k >= GZu-2u || j < 2u) { vx=0.0; vy=0.0; vz=0.0; }
@@ -638,9 +722,24 @@ fn gridUpdate(@builtin(global_invocation_id) gid: vec3<u32>) {
       var v = vec3f(vx,vy,vz);
       let vn = dot(v,n);
       if (vn < 0.0) { v = v - vn*n; }
-      let pushOut = clamp(-sdf, 0.0, 0.06) * 24.0;
+      // Separation bias only — deliberately NOT scaled by 1/dt. The SDF is
+      // sampled at cell centres, so every cell straddling the wall reports a
+      // negative distance of order dx even when no fluid is actually
+      // penetrating; a 1/dt push therefore fires continuously at a magnitude
+      // that grows as the timestep shrinks, and launches the whole body off
+      // the mold floor. Penetration is prevented by cancelling inward normal
+      // velocity below; this only nudges, and is capped well under the flow
+      // speed.
+      let pushOut = clamp(-sdf/dx, 0.0, 1.0) * 0.3;
       v = v + n*pushOut;
-      v = v * 0.4;
+      // Tangential friction only. The previous v *= 0.4 scrubbed 60% of ALL
+      // velocity every step a cell touched the mold, so metal froze where it
+      // landed instead of running along the floor and filling the cavity —
+      // a large part of the "just piles up" read. Molten metal against a
+      // cold mold is closer to free-slip.
+      let vnAfter = dot(v,n);
+      let vt = v - vnAfter*n;
+      v = vnAfter*n + vt*(1.0 - clamp(U[9].z,0.0,1.0));
       vx=v.x; vy=v.y; vz=v.z;
     }
   }
@@ -660,15 +759,17 @@ fn g2p(@builtin(global_invocation_id) gid: vec3<u32>) {
   var pos = vec3f(P[base+0u],P[base+1u],P[base+2u]);
   var Jv = P[base+7u];
   var temp = P[base+17u];
+  let solidPrev = P[base+18u];
 
   let dx = U[1].w;
   let invdx = 1.0/dx;
-  let basePos = pos*invdx - 0.5;
-  let baseCell = floor(basePos);
-  let fx = basePos - baseCell;
+  let gb = gridBase(pos, invdx);
+  let baseCell = gb.cell;
+  let fx = gb.fx;
   let wx = quadW(fx.x); let wy = quadW(fx.y); let wz = quadW(fx.z);
   let baseI=i32(baseCell.x); let baseJ=i32(baseCell.y); let baseK=i32(baseCell.z);
 
+  var massAcc = 0.0;
   var nvx=0.0; var nvy=0.0; var nvz=0.0;
   var nc00=0.0; var nc01=0.0; var nc02=0.0;
   var nc10=0.0; var nc11=0.0; var nc12=0.0;
@@ -690,6 +791,7 @@ fn g2p(@builtin(global_invocation_id) gid: vec3<u32>) {
         let gvx = decFix(atomicLoad(&gridVelX[cellIdx]));
         let gvy = decFix(atomicLoad(&gridVelY[cellIdx]));
         let gvz = decFix(atomicLoad(&gridVelZ[cellIdx]));
+        massAcc += w*decFix(atomicLoad(&gridMass[cellIdx]));
         nvx += w*gvx; nvy += w*gvy; nvz += w*gvz;
         let dpos = (vec3f(f32(ii),f32(jj),f32(kk)) - fx) * dx;
         let cw = coeff*w;
@@ -702,9 +804,28 @@ fn g2p(@builtin(global_invocation_id) gid: vec3<u32>) {
 
   let dt = U[0].x;
   let trace = nc00+nc11+nc22;
-  Jv = clamp(Jv*(1.0+dt*trace), 0.4, 3.0);
+  // J by pure integration of the velocity divergence DRIFTS: nothing ties it
+  // back to how densely the particles are actually packed, so the equation of
+  // state ends up defending a volume the material does not have. Measured, it
+  // settled the pour at ~3.8 particles per cell while every particle reported
+  // J~1.0 — a body at half the intended density, i.e. a foam.
+  //
+  // The grid already knows the truth, so read it back: a fully packed node
+  // carries PPC particles' worth of (normalised) mass, making PPC/massAcc a
+  // direct measurement of the local volume ratio. Liquid relaxes onto that
+  // measurement quickly; a solidifying particle keeps more of its history.
+  let ppc = U[3].w;
+  let jDens = clamp(ppc/max(massAcc, 1e-3), 0.55, 1.8);
+  let relax = mix(0.30, 0.02, clamp(solidPrev,0.0,1.0));
+  Jv = clamp(mix(Jv*(1.0+dt*trace), jDens, relax), 0.5, 2.0);
 
   var vel = vec3f(nvx,nvy,nvz);
+  // CFL guard: nothing may cross more than ~a cell per step. This should be
+  // inactive in a healthy run; __riser.statsNow().speedMax reports whether
+  // it is being hit.
+  let vmax = 0.9*dx/dt;
+  let sp = length(vel);
+  if (sp > vmax) { vel = vel * (vmax/sp); }
   pos = pos + dt*vel;
   let margin = 2.2*dx;
   pos.x = clamp(pos.x, margin, DOMXf-margin);
@@ -767,6 +888,7 @@ struct RenderU {
   light2: vec4<f32>,
   moldC: vec4<f32>,   // moldCenter.xyz, wallThickness
   moldH: vec4<f32>,   // moldHalfExtents.xyz, cornerRadius
+  dbg: vec4<f32>,     // debugView, depthVisMin, depthVisMax, blurScale
 };
 @group(0) @binding(0) var<uniform> RU: RenderU;
 
@@ -883,8 +1005,9 @@ fn fsMold(input: MoldOut) -> MoldFragOut {
   return o;
 }
 
-/* ── bilateral blur (separable) ── */
-struct BlurU { texel: vec2<f32>, dir: vec2<f32> };
+/* ── bilateral blur (separable) ──
+   params: particleRadius(world), tanHalfFovY, resY, blurScale(radii) ── */
+struct BlurU { texel: vec2<f32>, dir: vec2<f32>, params: vec4<f32> };
 @group(0) @binding(0) var<uniform> BU: BlurU;
 @group(0) @binding(1) var depthIn: texture_2d<f32>;
 @group(0) @binding(2) var matIn: texture_2d<f32>;
@@ -900,22 +1023,40 @@ fn vsFull(@builtin(vertex_index) vi: u32) -> FullOut {
 }
 
 struct BlurOut { @location(0) depth: f32, @location(1) mat: vec2<f32> };
-const GAUSS = array<f32,7>(0.0060,0.0605,0.2417,0.3829,0.2417,0.0605,0.0060);
+const BTAPS: i32 = 8;   // per side; 17 taps per axis
 
+// The kernel width has to track the particle's PROJECTED size, not be a fixed
+// pixel count. A splat here covers roughly 11px of radius at the default
+// camera, so the previous fixed 7-tap (±3px) kernel could not touch structure
+// at the scale of a sphere — it smoothed within each splat and left every
+// silhouette between splats intact, which is precisely the "blobby and
+// disconnected" surface. Sizing from projected radius makes one kernel span
+// several neighbouring particles, which is what merges them into a skin.
 @fragment
 fn fsBlur(input: FullOut) -> BlurOut {
   var o: BlurOut;
   let coord = vec2<i32>(input.pos.xy);
   let center = textureLoad(depthIn, coord, 0).r;
   if (center > FAR*0.5) { o.depth = FAR; o.mat = vec2f(0.0); return o; }
-  var sumW = 0.0; var sumD = 0.0; var sumM = vec2f(0.0);
   let dims = vec2<i32>(textureDimensions(depthIn));
-  for (var t=-3; t<=3; t=t+1) {
-    let c = clamp(coord + vec2<i32>(BU.dir)*t, vec2<i32>(0), dims-vec2<i32>(1));
+
+  let projR = BU.params.x / (max(center,1e-3)*max(BU.params.y,1e-4)) * (BU.params.z*0.5);
+  let radiusPx = clamp(projR*BU.params.w, 2.0, 56.0);
+  let stepPx = max(1.0, radiusPx/f32(BTAPS));
+  let sigma = max(radiusPx*0.5, 1.0);
+  // Depth falloff scaled to the particle radius: separates the near surface
+  // from anything a body-depth behind it, without flattening the surface.
+  let dSigma = max(BU.params.x*2.0, 1e-4);
+
+  var sumW = 0.0; var sumD = 0.0; var sumM = vec2f(0.0);
+  for (var t=-BTAPS; t<=BTAPS; t=t+1) {
+    let off = BU.dir * (f32(t)*stepPx);
+    let c = clamp(coord + vec2<i32>(round(off)), vec2<i32>(0), dims-vec2<i32>(1));
     let d = textureLoad(depthIn, c, 0).r;
     if (d > FAR*0.5) { continue; }
-    let rangeW = exp(-abs(d-center)*40.0);
-    let w = GAUSS[t+3] * rangeW;
+    let sx = f32(t)*stepPx/sigma;
+    let dz = (d-center)/dSigma;
+    let w = exp(-0.5*sx*sx) * exp(-0.5*dz*dz);
     sumW += w; sumD += d*w;
     sumM += textureLoad(matIn, c, 0).rg * w;
   }
@@ -930,6 +1071,46 @@ fn fsBlur(input: FullOut) -> BlurOut {
 @group(0) @binding(2) var moldDepthTex: texture_2d<f32>;
 @group(0) @binding(3) var fluidDepthTex: texture_2d<f32>;
 @group(0) @binding(4) var fluidMatTex: texture_2d<f32>;
+@group(0) @binding(5) var fluidRawDepthTex: texture_2d<f32>;
+
+// Molten metal at pour temperature is genuinely brighter than white, so the
+// shading has to roll off rather than clip — without this the whole casting
+// saturates to a flat white silhouette and all the surface form is lost.
+fn tonemapACES(x: vec3f) -> vec3f {
+  let a = 2.51; let b = 0.03; let c = 2.43; let d = 0.59; let e = 0.14;
+  return clamp((x*(a*x+b))/(x*(c*x+d)+e), vec3f(0.0), vec3f(1.0));
+}
+
+fn viewPosAt(coord: vec2<i32>, res: vec2f, aspect: f32, tanFov: f32, depth: f32) -> vec3f {
+  var ndc = (vec2f(coord)+0.5)/res * 2.0 - 1.0;
+  ndc.y = -ndc.y;
+  return vec3f(ndc.x*depth*aspect*tanFov, ndc.y*depth*tanFov, -depth);
+}
+
+fn depthAt(coord: vec2<i32>, res: vec2f) -> f32 {
+  let c = clamp(coord, vec2<i32>(0), vec2<i32>(res) - vec2<i32>(1));
+  return textureLoad(fluidDepthTex, c, 0).r;
+}
+
+fn reconstructNormal(coord: vec2<i32>, res: vec2f, aspect: f32, tanFov: f32, d0: f32, p: vec3f) -> vec3f {
+  let S = 2;
+  let dR = depthAt(coord + vec2<i32>(S,0), res);
+  let dL = depthAt(coord - vec2<i32>(S,0), res);
+  let dD = depthAt(coord + vec2<i32>(0,S), res);
+  let dU = depthAt(coord - vec2<i32>(0,S), res);
+  let vR = viewPosAt(coord + vec2<i32>(S,0), res, aspect, tanFov, select(dR, d0, dR > FAR*0.5)) - p;
+  let vL = p - viewPosAt(coord - vec2<i32>(S,0), res, aspect, tanFov, select(dL, d0, dL > FAR*0.5));
+  let vD = viewPosAt(coord + vec2<i32>(0,S), res, aspect, tanFov, select(dD, d0, dD > FAR*0.5)) - p;
+  let vU = p - viewPosAt(coord - vec2<i32>(0,S), res, aspect, tanFov, select(dU, d0, dU > FAR*0.5));
+  // keep the side that steps the least in depth — across a silhouette the
+  // other side is a cliff and would tilt the normal into the background
+  let ddx = select(vR, vL, abs(vL.z) < abs(vR.z));
+  let ddy = select(vD, vU, abs(vU.z) < abs(vD.z));
+  let c = cross(ddy, ddx);
+  let l = length(c);
+  if (l < 1e-12) { return vec3f(0.0,0.0,1.0); }
+  return c/l;
+}
 
 fn tempColor(t: f32) -> vec3f {
   let castCol = vec3f(0.58,0.44,0.29);
@@ -958,12 +1139,14 @@ fn fsComposite(input: FullOut) -> @location(0) vec4<f32> {
 
   let aspect = RU2.params0.x; let tanFov = RU2.params0.y; let exposure = RU2.params0.w;
 
-  // dpdx/dpdy must run in uniform control flow, so the reconstruction and
-  // its derivatives are computed unconditionally (with a safe fallback
-  // depth for background pixels) and only *used* behind the branch below.
   let safeDepth = select(fluidDepth, 1.0, fluidDepth > FAR*0.5);
-  let viewPos = vec3f(ndc.x*safeDepth*aspect*tanFov, ndc.y*safeDepth*tanFov, -safeDepth);
-  let n = normalize(cross(dpdy(viewPos), dpdx(viewPos)));
+  let viewPos = viewPosAt(coord, res, aspect, tanFov, safeDepth);
+  // Normals from an explicit ±2px stencil rather than dpdx/dpdy. A hardware
+  // derivative is a one-pixel difference across a 2x2 quad, which amplifies
+  // every bit of residual depth noise into visible speckle; a wider stencil
+  // that picks whichever side has the smaller depth jump is both quieter and
+  // keeps silhouettes crisp. It also needs no uniform-control-flow dance.
+  let n = reconstructNormal(coord, res, aspect, tanFov, safeDepth, viewPos);
   let fluidValid = fluidDepth < FAR*0.5;
   var fluidColor = vec3f(0.0);
   if (fluidValid) {
@@ -980,12 +1163,12 @@ fn fsComposite(input: FullOut) -> @location(0) vec4<f32> {
     let specPow = mix(380.0, 18.0, solidFrac);
     let spec = pow(max(dot(n,hv),0.0), specPow) * mix(1.4,0.35,solidFrac);
     let envGrad = mix(vec3f(0.05,0.05,0.07), vec3f(0.30,0.28,0.24), n.y*0.5+0.5);
-    let emissive = tempColor(tNorm) * pow(clamp((temp-RU2.params2.y)/max(RU2.params2.z-RU2.params2.y,1.0),0.0,1.0), 1.6) * smoothstep(0.15,0.85,tNorm) * 1.6;
-    var col = baseCol*(0.30+0.85*ndl1) + baseCol*ndl2*0.22;
+    let emissive = tempColor(tNorm) * pow(tNorm, 2.2) * smoothstep(0.10,0.80,tNorm) * 1.05;
+    var col = baseCol*(0.22+0.55*ndl1) + baseCol*ndl2*0.16;
     col = col + envGrad*fres*mix(0.5,0.18,solidFrac);
     col = col + vec3f(1.0,0.92,0.80)*spec;
     col = col + emissive;
-    fluidColor = col * exposure;
+    fluidColor = tonemapACES(col * exposure);
   }
 
   var outColor = bg;
@@ -994,6 +1177,37 @@ fn fsComposite(input: FullOut) -> @location(0) vec4<f32> {
     outColor = mix(behind, moldRGBA.rgb, clamp(moldRGBA.a,0.0,1.0));
   } else if (fluidValid) {
     outColor = fluidColor;
+  }
+
+  // ── isolated diagnostic views of each screen-space stage ──
+  // These exist so a claim like "the blur is running" can be *seen* rather
+  // than inferred from the fact that the pass was encoded.
+  let mode = i32(RU2.dbg.x + 0.5);
+  if (mode != 0) {
+    let dMin = RU2.dbg.y; let dMax = RU2.dbg.z;
+    let rawDepth = textureLoad(fluidRawDepthTex, coord, 0).r;
+    let rawValid = rawDepth < FAR*0.5;
+    var dbgCol = vec3f(0.0,0.0,0.06);
+    if (mode == 1) {              // blurred depth
+      if (fluidValid) { dbgCol = vec3f(clamp(1.0-(fluidDepth-dMin)/max(dMax-dMin,1e-4),0.0,1.0)); }
+    } else if (mode == 2) {       // reconstructed normal
+      if (fluidValid) { dbgCol = n*0.5 + vec3f(0.5); }
+    } else if (mode == 3) {       // raw (pre-blur) splat depth
+      if (rawValid) { dbgCol = vec3f(clamp(1.0-(rawDepth-dMin)/max(dMax-dMin,1e-4),0.0,1.0)); }
+    } else if (mode == 4) {       // material: temp (R) / solidFrac (G)
+      if (fluidValid) {
+        let tN = clamp((mv.x-RU2.params2.y)/max(RU2.params2.z-RU2.params2.y,1.0),0.0,1.0);
+        dbgCol = vec3f(tN, mv.y, 0.0);
+      }
+    } else if (mode == 5) {       // |blurred - raw|, amplified: is the blur doing anything?
+      if (fluidValid && rawValid) {
+        let dd = abs(fluidDepth-rawDepth) * 60.0;
+        dbgCol = vec3f(clamp(dd,0.0,1.0), clamp(dd*0.35,0.0,1.0), 0.0);
+      } else if (fluidValid != rawValid) {
+        dbgCol = vec3f(0.0,0.25,0.65); // coverage gained/lost by the blur
+      }
+    }
+    outColor = dbgCol;
   }
   return vec4f(outColor, 1.0);
 }
@@ -1051,15 +1265,20 @@ async function init(){
 
   const particleBufSize = MAX_PARTICLES*PSTRIDE*4;
   buf.P = device.createBuffer({ size: particleBufSize, usage: GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC|GPUBufferUsage.COPY_DST, label:'P' });
-  buf.gridMass = device.createBuffer({ size: GCELLS*4, usage: GPUBufferUsage.STORAGE, label:'gridMass' });
-  buf.gridVelX = device.createBuffer({ size: GCELLS*4, usage: GPUBufferUsage.STORAGE, label:'gridVelX' });
-  buf.gridVelY = device.createBuffer({ size: GCELLS*4, usage: GPUBufferUsage.STORAGE, label:'gridVelY' });
-  buf.gridVelZ = device.createBuffer({ size: GCELLS*4, usage: GPUBufferUsage.STORAGE, label:'gridVelZ' });
+  // COPY_SRC so __riser.gridStats() can read the grid back for diagnosis.
+  const gridUsage = GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC;
+  buf.gridMass = device.createBuffer({ size: GCELLS*4, usage: gridUsage, label:'gridMass' });
+  buf.gridVelX = device.createBuffer({ size: GCELLS*4, usage: gridUsage, label:'gridVelX' });
+  buf.gridVelY = device.createBuffer({ size: GCELLS*4, usage: gridUsage, label:'gridVelY' });
+  buf.gridVelZ = device.createBuffer({ size: GCELLS*4, usage: gridUsage, label:'gridVelZ' });
+  buf.gridStaging = device.createBuffer({ size: GCELLS*4*2, usage: GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ, label:'gridStaging' });
   buf.moldSDF  = device.createBuffer({ size: GCELLS*4, usage: GPUBufferUsage.STORAGE, label:'moldSDF' });
   buf.U = device.createBuffer({ size: 10*16, usage: GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST, label:'U' });
   buf.stats = device.createBuffer({ size: 12, usage: GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC, label:'stats' });
   buf.statsStaging = device.createBuffer({ size: 12, usage: GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ, label:'statsStaging' });
   buf.staging = device.createBuffer({ size: PSTRIDE*4*8, usage: GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ, label:'staging' });
+  // Full-buffer readback, used only by __riser.statsNow() diagnostics.
+  buf.dumpStaging = device.createBuffer({ size: particleBufSize, usage: GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ, label:'dumpStaging' });
 
   const initial = new Float32Array(MAX_PARTICLES*PSTRIDE);
   for (let p=0; p<MAX_PARTICLES; p++) initial[p*PSTRIDE + OFF.SEED] = Math.random();
@@ -1161,18 +1380,54 @@ function writeUniforms(){
   uArr.set([dt, P.gravity, state.simTime, PHASE_IDX[state.phase]], 0);
   uArr.set([GX, GY, GZ, DX], 4);
   uArr.set([P.stiffLiquid, P.stiffSolid, P.gamma, P.viscosity], 8);
-  uArr.set([P_VOL, 1.0, state.spawned, 0], 12);
+  uArr.set([P_VOL, DENSITY, state.spawned, PPC], 12);
   uArr.set([MOLD.center[0], MOLD.center[1], MOLD.center[2], MOLD.wallThickness], 16);
   uArr.set([MOLD.halfExtents[0], MOLD.halfExtents[1], MOLD.halfExtents[2], MOLD.cornerRadius], 20);
   uArr.set([P.liquidus, P.solidus, P.coolBase, P.coolContact], 24);
   uArr.set([P.ambientTemp, P.moldTemp, P.pourTemp, P.damping], 28);
   uArr.set([NOZZLE[0], NOZZLE[1], NOZZLE[2], P.pourSpeed], 32);
-  uArr.set([MOLD.floorY, CONTACT_BAND, 0, MAX_PARTICLES], 36);
+  uArr.set([MOLD.floorY, CONTACT_BAND, P.wallFriction, nozzleRadius()], 36);
   device.queue.writeBuffer(buf.U, 0, uArr);
 }
-const SIM_DT = 1/120;
-const P_VOL = 0.42*DX*DX*DX;
+/* The solver timestep. MLS-MPM is explicit, so this is bounded both by the
+   acoustic CFL (dt < dx/sqrt(gamma*K/rho)) and, more tightly in practice, by
+   the affine transfer: a cell holding a fraction of one particle takes
+   v = momentum/mass ≈ v_p + (C + S)·dpos, so an over-large dt lets the stress
+   term S inflate thin-cell velocities, which g2p then reads back as a larger
+   C — a feedback loop that detonates the pour. Substepping is what keeps that
+   loop contractive. */
+let SIM_DT = 1/480;
+const SUBSTEPS_PER_TICK = 4;   // 4 * (1/480) = one 120Hz display tick
+/* ── mass / volume consistency ────────────────────────────────────────
+   THE dominant physics bug in the previous build. It carried
+   P_VOL = 0.42*dx^3 while spawning every particle with mass = 1.0, so the
+   implied density was mass/volume ≈ 224,000 against a bulk modulus of 5.
+   The pressure wave speed sqrt(gamma*K/rho) came out at ~0.008 units/s:
+   the equation of state existed in the source but was ~5 orders of
+   magnitude too weak to resist anything. Measured against the inertial
+   term mass*vel at the same call site, the stress contribution was
+   3.8e-6 of it at J=0.95. The material was pressureless dust — which is
+   exactly what "loose sand rather than a viscous liquid" looks like, and
+   why J collapsed onto its clamp and stayed there.
+
+   Fixing it is not a tuning change: volume, mass and density have to be
+   one consistent set. One particle owns 1/PPC of a cell, and mass follows
+   from a reference density of 1.
+   ────────────────────────────────────────────────────────────────────── */
+const DENSITY = 1.0;
+const P_VOL = (DX*DX*DX)/PPC;
+const P_MASS = DENSITY * P_VOL;
 const CONTACT_BAND = DX*1.6;
+
+// Volume balance for the pour stream: rate*particleVolume must equal
+// streamArea*pourSpeed, or the nozzle emits more material than the column can
+// carry and the spawn region is over-packed by that ratio. Deriving the radius
+// keeps the stream self-consistent when the pour-rate slider moves.
+function nozzleRadius(){
+  const P = state.params;
+  const area = (P.pourRate * P_VOL) / Math.max(0.05, P.pourSpeed);
+  return Math.max(1.2*Math.cbrt(P_VOL), Math.sqrt(area/Math.PI));
+}
 const PHASE_IDX = { idle:0, pouring:1, solidifying:2, solid:3 };
 
 function stepSim(){
@@ -1211,8 +1466,9 @@ function pollStats(){
     const arr = new Int32Array(buf.statsStaging.getMappedRange().slice(0));
     buf.statsStaging.unmap();
     const activeN = arr[2];
-    state.solidPct = activeN > 0 ? (arr[0]/65536)/activeN : 0;
-    state.peakTemp = arr[1]/65536;
+    const SS = 4096; // must match SCALE_STATS in WGSL
+    state.solidPct = activeN > 0 ? (arr[0]/SS)/activeN : 0;
+    state.peakTemp = arr[1]/SS;
     statsPending = false;
     if (state.phase === 'solidifying' && activeN > 0 && state.solidPct > 0.96) {
       state.solidHoldT += 0.25; // ~ polling cadence in seconds
@@ -1272,7 +1528,9 @@ function rafLoop(t){
   if (!state.paused) {
     accumulator += (dtMs/1000) * state.timeScale;
     let steps = 0;
-    while (accumulator >= SIM_DT && steps < 10) {
+    // Cap = 4 display ticks' worth of substeps. If a machine cannot keep up,
+    // the sim runs in slow motion rather than taking unstable large steps.
+    while (accumulator >= SIM_DT && steps < SUBSTEPS_PER_TICK*4) {
       stepSim();
       accumulator -= SIM_DT;
       steps++;
@@ -1337,6 +1595,7 @@ function buildPanel(){
     ['pourRate','Pour rate',200,2400,10],
     ['gravity','Gravity',0.5,6,0.05],
     ['viscosity','Viscosity',0,12,0.1],
+    ['wallFriction','Wall grip',0,0.6,0.01],
     ['coolBase','Cooling',0.01,0.25,0.005],
     ['coolContact','Mold contact',0.2,4,0.05],
     ['damping','Freeze lock',0.5,14,0.1],
@@ -1385,6 +1644,213 @@ function installOrbitControls(){
   canvas.addEventListener('wheel', e => { e.preventDefault(); camera.dist *= Math.exp(e.deltaY*0.001); }, { passive:false });
 }
 
+/* ── diagnostics ────────────────────────────────────────────────────────
+   Everything below exists so the piece can be *measured*, not eyeballed:
+   a full particle readback with real aggregate statistics (including the
+   particles-per-cell ratio that governs whether MPM behaves as a continuum
+   at all), deterministic stepping that does not race wall-clock rAF, and
+   isolated views of each screen-space render stage.
+   ────────────────────────────────────────────────────────────────────── */
+async function dumpParticles(){
+  const n = Math.max(1, Math.min(MAX_PARTICLES, Math.ceil(state.activeCount)));
+  const bytes = n*PSTRIDE*4;
+  const enc = device.createCommandEncoder();
+  enc.copyBufferToBuffer(buf.P, 0, buf.dumpStaging, 0, bytes);
+  device.queue.submit([enc.finish()]);
+  await buf.dumpStaging.mapAsync(GPUMapMode.READ, 0, bytes);
+  const arr = new Float32Array(buf.dumpStaging.getMappedRange(0, bytes).slice(0));
+  buf.dumpStaging.unmap();
+  return { n, arr };
+}
+
+// Real aggregate state, computed from an actual GPU->CPU readback of every
+// live particle. `perCell` is the number that decides whether this is a
+// fluid or a bag of independent grains: MPM needs ~8 particles per grid
+// cell before the grid transfer resolves a continuum at all.
+async function computeStats(){
+  const { n, arr } = await dumpParticles();
+  const lo = [Infinity,Infinity,Infinity], hi = [-Infinity,-Infinity,-Infinity];
+  let live=0, speedSum=0, speedMax=0, tSum=0, tMax=-Infinity, tMin=Infinity;
+  let jSum=0, jMin=Infinity, jMax=-Infinity, solidSum=0, nonFinite=0;
+  const occ = new Map();
+  const invdx = 1/DX;
+  for (let i=0;i<n;i++){
+    const b = i*PSTRIDE;
+    if (arr[b+OFF.ACTIVE] < 0.5) continue;
+    const x=arr[b], y=arr[b+1], z=arr[b+2];
+    const vx=arr[b+OFF.VEL], vy=arr[b+OFF.VEL+1], vz=arr[b+OFF.VEL+2];
+    if (!Number.isFinite(x+y+z+vx+vy+vz)) { nonFinite++; continue; }
+    live++;
+    if (x<lo[0]) lo[0]=x; if (x>hi[0]) hi[0]=x;
+    if (y<lo[1]) lo[1]=y; if (y>hi[1]) hi[1]=y;
+    if (z<lo[2]) lo[2]=z; if (z>hi[2]) hi[2]=z;
+    const sp = Math.hypot(vx,vy,vz);
+    speedSum += sp; if (sp>speedMax) speedMax = sp;
+    const t = arr[b+OFF.TEMP];
+    tSum += t; if (t>tMax) tMax=t; if (t<tMin) tMin=t;
+    const J = arr[b+OFF.J];
+    jSum += J; if (J<jMin) jMin=J; if (J>jMax) jMax=J;
+    solidSum += arr[b+OFF.SOLID];
+    const key = (Math.floor(x*invdx)) + '|' + (Math.floor(y*invdx)) + '|' + (Math.floor(z*invdx));
+    occ.set(key, (occ.get(key)||0)+1);
+  }
+  const cells = occ.size;
+  let singles=0, hist=[0,0,0,0,0];
+  for (const c of occ.values()){
+    if (c===1) singles++;
+    if (c<2) hist[0]++; else if (c<4) hist[1]++; else if (c<8) hist[2]++; else if (c<16) hist[3]++; else hist[4]++;
+  }
+  // Bounding boxes are decided by single strays, so containment is measured as
+  // a fraction of the population and the spread as a percentile range.
+  let inCavity=0, belowRim=0;
+  const cx=MOLD.center[0], cy=MOLD.center[1], cz=MOLD.center[2];
+  const hx=MOLD.halfExtents[0]-MOLD.wallThickness;
+  const hy=MOLD.halfExtents[1]-MOLD.wallThickness;
+  const hz=MOLD.halfExtents[2]-MOLD.wallThickness;
+  const xs=[], ys=[], zs=[];
+  for (let i=0;i<n;i++){
+    const b=i*PSTRIDE;
+    if (arr[b+OFF.ACTIVE] < 0.5) continue;
+    const x=arr[b], y=arr[b+1], z=arr[b+2];
+    if (!Number.isFinite(x+y+z)) continue;
+    xs.push(x); ys.push(y); zs.push(z);
+    if (y < cy+hy) belowRim++;
+    if (Math.abs(x-cx)<=hx && Math.abs(y-cy)<=hy && Math.abs(z-cz)<=hz) inCavity++;
+  }
+  const pct = (a,p)=>{ if(!a.length) return 0; const s=a.slice().sort((u,v)=>u-v); return s[Math.min(s.length-1, Math.max(0, Math.round(p*(s.length-1))))]; };
+  const spread = a => +(pct(a,0.95)-pct(a,0.05)).toFixed(3);
+
+  const d = live ? 1 : 0;
+  return {
+    inCavityFrac: live ? +(inCavity/live).toFixed(3) : 0,
+    belowRimFrac: live ? +(belowRim/live).toFixed(3) : 0,
+    spread90: [spread(xs), spread(ys), spread(zs)],
+    phase: state.phase, simTime: +state.simTime.toFixed(3),
+    live, nonFinite, targetCount: state.targetCount,
+    // occupancy: the continuum test
+    occupiedCells: cells,
+    perCell: cells ? +(live/cells).toFixed(2) : 0,
+    singleParticleCells: cells ? +(singles/cells).toFixed(3) : 0,
+    occHist: hist, // [1, 2-3, 4-7, 8-15, 16+] particles per cell
+    bbox: live ? lo.map((v,i)=>[+v.toFixed(3), +hi[i].toFixed(3)]) : null,
+    extent: live ? lo.map((v,i)=>+(hi[i]-v).toFixed(3)) : null,
+    speedMean: d ? +(speedSum/live).toFixed(4) : 0,
+    speedMax: d ? +speedMax.toFixed(4) : 0,
+    tempMean: d ? Math.round(tSum/live) : 0,
+    tempMin: d ? Math.round(tMin) : 0,
+    tempMax: d ? Math.round(tMax) : 0,
+    jMean: d ? +(jSum/live).toFixed(4) : 0,
+    jMin: d ? +jMin.toFixed(3) : 0,
+    jMax: d ? +jMax.toFixed(3) : 0,
+    solidMean: d ? +(solidSum/live).toFixed(3) : 0,
+  };
+}
+
+// Grid readback. The grid is where particles are supposed to become a
+// continuum, so when the particle statistics look wrong this is the buffer
+// that says why. Values are fixed-point i32 as written by encFix().
+async function computeGridStats(){
+  const bytes = GCELLS*4;
+  const enc = device.createCommandEncoder();
+  enc.copyBufferToBuffer(buf.gridMass, 0, buf.gridStaging, 0, bytes);
+  enc.copyBufferToBuffer(buf.gridVelY, 0, buf.gridStaging, bytes, bytes);
+  device.queue.submit([enc.finish()]);
+  await buf.gridStaging.mapAsync(GPUMapMode.READ, 0, bytes*2);
+  const raw = new Int32Array(buf.gridStaging.getMappedRange(0, bytes*2).slice(0));
+  buf.gridStaging.unmap();
+  const SCALE = 1048576;
+  let occupied=0, neg=0, massSum=0, massMax=-Infinity, massMin=Infinity;
+  let vyMin=Infinity, vyMax=-Infinity, vyAbsSum=0, vyN=0;
+  // Split by how much mass the cell actually holds. A full cell carries ~PPC
+  // (mass is normalised to 1 per particle), so "thin" cells are stencil tails
+  // holding a fraction of a single particle. v = momentum/mass in a thin cell
+  // is dominated by the affine term rather than by transported momentum, and
+  // that is exactly where a runaway would first show up.
+  const THIN = 0.25;
+  let thin=0, thinVMax=0, fatVMax=0, fat=0;
+  for (let i=0;i<GCELLS;i++){
+    const m = raw[i]/SCALE;
+    if (m === 0) continue;
+    occupied++;
+    if (m < 0) neg++;
+    massSum += m;
+    if (m>massMax) massMax=m; if (m<massMin) massMin=m;
+    const vy = raw[GCELLS+i]/SCALE;
+    if (m < THIN){ thin++; if (Math.abs(vy)>thinVMax) thinVMax=Math.abs(vy); }
+    else { fat++; if (Math.abs(vy)>fatVMax) fatVMax=Math.abs(vy); }
+    if (vy !== 0){ vyN++; vyAbsSum += Math.abs(vy); if (vy<vyMin) vyMin=vy; if (vy>vyMax) vyMax=vy; }
+  }
+  return {
+    occupiedCells: occupied,
+    negativeMassCells: neg,
+    massSum: +massSum.toFixed(2),
+    massMin: occupied? +massMin.toExponential(3):0,
+    massMax: occupied? +massMax.toFixed(4):0,
+    // after gridUpdate these slots hold VELOCITY, not momentum
+    vyMin: vyN? +vyMin.toFixed(3):0,
+    vyMax: vyN? +vyMax.toFixed(3):0,
+    vyAbsMean: vyN? +(vyAbsSum/vyN).toFixed(4):0,
+    thinCells: thin, fatCells: fat,
+    thinVyMax: +thinVMax.toFixed(2),
+    fatVyMax: +fatVMax.toFixed(2),
+  };
+}
+
+// Seed a correctly-packed block of liquid at rest in the cavity, bypassing the
+// pour entirely. This separates "does the solver hold a continuum together"
+// from "does the injection behave" — if a block seeded at exactly the design
+// density disperses, the problem is the solver, not the pour.
+function seedBlock(fillFrac){
+  const f = Math.max(0.05, Math.min(1, fillFrac || 0.45));
+  const s = Math.cbrt(P_VOL);           // lattice spacing = design spacing
+  const hx = MOLD.halfExtents[0]-MOLD.wallThickness;
+  const hz = MOLD.halfExtents[2]-MOLD.wallThickness;
+  const y0 = MOLD.center[1]-MOLD.halfExtents[1]+MOLD.wallThickness;
+  const y1 = y0 + 2*(MOLD.halfExtents[1]-MOLD.wallThickness)*f;
+  const arr = new Float32Array(MAX_PARTICLES*PSTRIDE);
+  let n = 0;
+  for (let y=y0+s*0.5; y<y1 && n<MAX_PARTICLES; y+=s)
+    for (let x=MOLD.center[0]-hx+s*0.5; x<MOLD.center[0]+hx && n<MAX_PARTICLES; x+=s)
+      for (let z=MOLD.center[2]-hz+s*0.5; z<MOLD.center[2]+hz && n<MAX_PARTICLES; z+=s){
+        const b = n*PSTRIDE;
+        arr[b+OFF.POS]=x; arr[b+OFF.POS+1]=y; arr[b+OFF.POS+2]=z;
+        arr[b+OFF.MASS]=1; arr[b+OFF.J]=1;
+        arr[b+OFF.TEMP]=state.params.pourTemp;
+        arr[b+OFF.SOLID]=0; arr[b+OFF.ACTIVE]=1; arr[b+OFF.SEED]=Math.random();
+        n++;
+      }
+  for (let p=n;p<MAX_PARTICLES;p++) arr[p*PSTRIDE+OFF.SEED]=Math.random();
+  device.queue.writeBuffer(buf.P, 0, arr);
+  state.phase='solidifying'; state.spawned=n; state.activeCount=n;
+  state.targetCount=n; state.simTime=0; state.moldOpacity=1; state.moldLift=0;
+  state.solidHoldT=0; state.peakTemp=0; state.solidPct=0;
+  return { seeded:n, spacing:+s.toFixed(5), expectedPerCell:PPC };
+}
+
+// Deterministic stepping: run exactly n solver steps, render once. Yields to
+// the event loop periodically so a long run cannot trip the GPU watchdog.
+async function advanceSteps(n){
+  n = Math.max(0, Math.min(200000, n|0));
+  // Deterministic: stop rAF from stepping the sim as well, or "advance(1)"
+  // silently runs however many steps the render loop also managed to fit in.
+  state.paused = true;
+  accumulator = 0;
+  for (let i=0;i<n;i++){
+    stepSim();
+    if (state.phase === 'solid'){
+      state.moldOpacity = Math.max(0, state.moldOpacity - SIM_DT*0.6);
+      state.moldLift = Math.min(0.35, state.moldLift + SIM_DT*0.18);
+    }
+    if ((i & 63) === 63) { await new Promise(r => setTimeout(r, 0)); }
+  }
+  pollStats();
+  updateCamera(canvas.clientWidth / Math.max(1, canvas.clientHeight));
+  renderFrame();
+  await new Promise(r => setTimeout(r, 0));
+  return { steps: n, simTime: state.simTime, phase: state.phase };
+}
+
+const DEBUG_VIEWS = ['shaded','depth','normal','rawDepth','material','blurDelta'];
 function installDiagnostics(){
   window.__riser = {
     get phase(){ return state.phase; },
@@ -1400,13 +1866,55 @@ function installDiagnostics(){
     setParticleTarget(n){ state.targetCount = Math.max(1, Math.min(MAX_PARTICLES, n|0)); },
     sample(i){ return readParticle(i|0); },
     pollStatsNow(){ pollStats(); },
+    // — added for diagnosis —
+    info(){
+      return {
+        grid: [GX,GY,GZ], dx: DX, domain: DOMAIN,
+        maxParticles: MAX_PARTICLES, defaultTarget: DEFAULT_TARGET,
+        cavityVolume: +CAVITY_VOLUME.toFixed(5),
+        cavityCells: Math.round(CAVITY_VOLUME/(DX*DX*DX)),
+        // design intent: particles per grid cell once the cavity is full.
+        // MPM needs ~8 here; below ~1 it is not a continuum at all.
+        targetPerCell: +(DEFAULT_TARGET/(CAVITY_VOLUME/(DX*DX*DX))).toFixed(2),
+        ppcTarget: PPC,
+        particleSpacing: +particleSpacing(DEFAULT_TARGET).toFixed(5),
+        splatRadius: +particleSplatRadius(DEFAULT_TARGET).toFixed(5),
+        splatRadiusInSpacings: SPLAT_RADIUS_K,
+        blurScale: BLUR_SCALE,
+        particleVolume: P_VOL, particleMass: P_MASS, density: DENSITY,
+        // sqrt(gamma*K/rho) vs dx/dt: the CFL headroom of the pressure wave
+        soundSpeed: +Math.sqrt(DEFAULTS.gamma*DEFAULTS.stiffLiquid/DENSITY).toFixed(3),
+        cflLimitSpeed: +(DX/SIM_DT).toFixed(2),
+        simDt: SIM_DT,
+      };
+    },
+    advance(n){ return advanceSteps(n); },
+    statsNow(){ return computeStats(); },
+    gridStats(){ return computeGridStats(); },
+    seedBlock(f){ return seedBlock(f); },
+    setParams(o){ Object.assign(state.params, o||{}); refreshPanelValues(); },
+    resetParams(o){ Object.assign(state.params, DEFAULTS, o||{}); refreshPanelValues(); },
+    get dt(){ return SIM_DT; },
+    setDt(v){ SIM_DT = Math.max(1/4000, Math.min(1/60, +v||SIM_DT)); return SIM_DT; },
+    advanceSeconds(t){ return advanceSteps(Math.round(Math.max(0,+t||0)/SIM_DT)); },
+    defaults(){ return Object.assign({}, DEFAULTS); },
+    getParams(){ return Object.assign({}, state.params); },
+    get debugView(){ return DEBUG_VIEWS[state.debugView]||'shaded'; },
+    setDebugView(name){
+      const i = DEBUG_VIEWS.indexOf(String(name));
+      state.debugView = i < 0 ? 0 : i;
+      if (RT.final) renderFrame();
+      return DEBUG_VIEWS[state.debugView];
+    },
+    debugViews(){ return DEBUG_VIEWS.slice(); },
+    setCamera(o){ Object.assign(camera, o||{}); },
   };
 }
 
 /* ── render setup ─────────────────────────────────────────────────────── */
 const RT = {}; const RPL = {}; const RBG = {};
 let renderModule;
-const ruArr = new Float32Array(60);
+const ruArr = new Float32Array(64);
 
 async function initRenderPipelines(){
   renderModule = device.createShaderModule({ code: WGSL_RENDER, label:'render' });
@@ -1417,9 +1925,9 @@ async function initRenderPipelines(){
     return errs.map(m => `line ${m.lineNum}: ${m.message}`).join('\n');
   }
 
-  RT.ru = device.createBuffer({ size: 60*4, usage: GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST, label:'RU' });
-  RT.blurH = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST, label:'blurH' });
-  RT.blurV = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST, label:'blurV' });
+  RT.ru = device.createBuffer({ size: 64*4, usage: GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST, label:'RU' });
+  RT.blurH = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST, label:'blurH' });
+  RT.blurV = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST, label:'blurV' });
 
   const splatBGL = device.createBindGroupLayout({ entries:[
     { binding:0, visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT, buffer:{ type:'uniform' } },
@@ -1475,6 +1983,7 @@ async function initRenderPipelines(){
     { binding:2, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'unfilterable-float' } },
     { binding:3, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'unfilterable-float' } },
     { binding:4, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'unfilterable-float' } },
+    { binding:5, visibility:GPUShaderStage.FRAGMENT, texture:{ sampleType:'unfilterable-float' } },
   ]});
   RPL.compLayout = device.createPipelineLayout({ bindGroupLayouts:[compBGL] });
   RPL.comp = device.createRenderPipeline({
@@ -1498,23 +2007,25 @@ function buildRenderTargets(){
   canvas.width = w; canvas.height = h;
 
   const mk = (format, extra) => device.createTexture({ size:[w,h], format, usage: GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING|(extra||0) });
-  for (const k of ['fluidDepthA','fluidDepthB']) RT[k] = mk('r32float');
-  for (const k of ['fluidMatA','fluidMatB']) RT[k] = mk('rg32float');
+  // A = raw splat output, B = after horizontal blur, C = after vertical blur.
+  // A is deliberately NOT reused as the blur's final destination so the raw,
+  // unblurred depth stays inspectable via __riser.setDebugView('rawDepth').
+  for (const k of ['fluidDepthA','fluidDepthB','fluidDepthC']) RT[k] = mk('r32float');
+  for (const k of ['fluidMatA','fluidMatB','fluidMatC']) RT[k] = mk('rg32float');
   RT.moldColor = mk('rgba8unorm');
   RT.moldDepth = mk('r32float');
   RT.final = device.createTexture({ size:[w,h], format:canvasFormat, usage: GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC });
   RT.splatDepthAtt = device.createTexture({ size:[w,h], format:'depth24plus', usage: GPUTextureUsage.RENDER_ATTACHMENT });
   RT.moldDepthAtt = device.createTexture({ size:[w,h], format:'depth24plus', usage: GPUTextureUsage.RENDER_ATTACHMENT });
 
-  device.queue.writeBuffer(RT.blurH, 0, new Float32Array([1/w, 1/h, 1, 0]));
-  device.queue.writeBuffer(RT.blurV, 0, new Float32Array([1/w, 1/h, 0, 1]));
+  writeBlurUniforms();
 
   RBG.blurAtoB = device.createBindGroup({ layout: RBG.blurBGL, entries:[
     { binding:0, resource:{ buffer: RT.blurH } },
     { binding:1, resource: RT.fluidDepthA.createView() },
     { binding:2, resource: RT.fluidMatA.createView() },
   ]});
-  RBG.blurBtoA = device.createBindGroup({ layout: RBG.blurBGL, entries:[
+  RBG.blurBtoC = device.createBindGroup({ layout: RBG.blurBGL, entries:[
     { binding:0, resource:{ buffer: RT.blurV } },
     { binding:1, resource: RT.fluidDepthB.createView() },
     { binding:2, resource: RT.fluidMatB.createView() },
@@ -1523,9 +2034,23 @@ function buildRenderTargets(){
     { binding:0, resource:{ buffer: RT.ru } },
     { binding:1, resource: RT.moldColor.createView() },
     { binding:2, resource: RT.moldDepth.createView() },
-    { binding:3, resource: RT.fluidDepthA.createView() },
-    { binding:4, resource: RT.fluidMatA.createView() },
+    { binding:3, resource: RT.fluidDepthC.createView() },
+    { binding:4, resource: RT.fluidMatC.createView() },
+    { binding:5, resource: RT.fluidDepthA.createView() },
   ]});
+}
+
+// How many projected particle radii the depth blur spans. Below ~1.5 the
+// kernel stays inside a single splat and the surface keeps its per-sphere
+// bumps; __riser.setDebugView('blurDelta') shows directly whether the blur
+// is reaching between neighbours.
+const BLUR_SCALE = 3.0;
+function writeBlurUniforms(){
+  if (!RT.blurH) return;
+  const r = particleSplatRadius(state.targetCount);
+  const common = [r, camera.tanHalfFovY || Math.tan(camera.fovY/2), renderH, BLUR_SCALE];
+  device.queue.writeBuffer(RT.blurH, 0, new Float32Array([1/renderW, 1/renderH, 1, 0, ...common]));
+  device.queue.writeBuffer(RT.blurV, 0, new Float32Array([1/renderW, 1/renderH, 0, 1, ...common]));
 }
 
 const lightViewCache = new Float32Array(4);
@@ -1551,7 +2076,10 @@ function renderFrame(){
   ruArr.set(transformDirToView([-0.5,0.25,-0.6]), 48);
   ruArr.set([MOLD.center[0],MOLD.center[1],MOLD.center[2],MOLD.wallThickness], 52);
   ruArr.set([MOLD.halfExtents[0],MOLD.halfExtents[1],MOLD.halfExtents[2],MOLD.cornerRadius], 56);
+  // debug view index + the depth window the depth views normalize against
+  ruArr.set([state.debugView, Math.max(0.05, camera.dist-0.85), camera.dist+0.85, 0], 60);
   device.queue.writeBuffer(RT.ru, 0, ruArr);
+  writeBlurUniforms();
 
   const enc = device.createCommandEncoder();
 
@@ -1602,11 +2130,11 @@ function renderFrame(){
   }
   {
     const pass = enc.beginRenderPass({ colorAttachments:[
-      { view: RT.fluidDepthA.createView(), clearValue:{r:FAR_SENTINEL,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
-      { view: RT.fluidMatA.createView(), clearValue:{r:0,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
+      { view: RT.fluidDepthC.createView(), clearValue:{r:FAR_SENTINEL,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
+      { view: RT.fluidMatC.createView(), clearValue:{r:0,g:0,b:0,a:0}, loadOp:'clear', storeOp:'store' },
     ]});
     pass.setPipeline(RPL.blur);
-    pass.setBindGroup(0, RBG.blurBtoA);
+    pass.setBindGroup(0, RBG.blurBtoC);
     pass.draw(3);
     pass.end();
   }
