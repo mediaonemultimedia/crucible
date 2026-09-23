@@ -26,7 +26,11 @@ the same either way.
 | 10 | **Anneal** | Gaussian splats resolving out of disorder | [`/anneal/`](./anneal/) |
 | 11 | **Living Bokeh** | Flocking motes blurred by a real thin-lens rack focus | [`/living-bokeh/`](./living-bokeh/) |
 | 12 | **Glyph** | A flat SVG mark given per-shape dimensional form | [`/glyph/`](./glyph/) |
-| 13 | **Riser** | Molten metal poured and solidified — a real-time MPM phase-change study | [`/riser/`](./riser/) |
+| 13 | **Cockle** | Two mirrored craft-paper panels peel open on a fixed top-down camera | [`/cockle/`](./cockle/) |
+| 14 | **Armature** | A raymarched SDF creature with no mesh and no rig — a smooth-min skeleton animated frame by frame, watching the cursor | [`/armature/`](./armature/) |
+| 15 | **Telecine** | Live playback of exported keyframe animation data — a canvas engine that interpolates a hand-authored JSON schema at any point on the timeline, fully scrubbable | [`/telecine/`](./telecine/) |
+| 16 | **Intaglio** | A carved height field decides where one image dissolves through another, and dwell builds visible relief | [`/intaglio/`](./intaglio/) |
+| 17 | **Riser** | Molten metal poured into a mold and solidified — a real-time WebGPU MPM phase-change study | [`/riser/`](./riser/) |
 
 Studies 03–06 were lost to a storage failure and are being rebuilt. They'll be
 added here as they land. Numbering follows build order, not merit — it starts at

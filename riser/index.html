@@ -160,7 +160,7 @@ body.panel-open #panel{transform:translateX(0);opacity:1;pointer-events:auto}
       <span class="w">Riser</span>
       <span class="eyebrow sub">Molten pour &amp; solidification study</span>
     </div>
-    <span class="sx-wrap"><a class="ix" href="../" aria-label="Study 13 — open series index">No. 13</a><nav class="sx-menu" aria-label="Series index"><a class="sx-hd" href="../">Crucible — index</a><a href="../mercury/"><span class="sx-n">03</span><span>Mercury</span></a><a href="../torsion/"><span class="sx-n">04</span><span>Torsion</span></a><a href="../torsion-2/"><span class="sx-n">05</span><span>Torsion 2.0</span></a><a href="../weft/"><span class="sx-n">06</span><span>Weft</span></a><a href="../cast/"><span class="sx-n">07</span><span>Cast</span></a><a href="../solve/"><span class="sx-n">08</span><span>Solve</span></a><a href="../torsion-pineapple/"><span class="sx-n">09</span><span>Torsion Pineapple</span></a><a href="../anneal/"><span class="sx-n">10</span><span>Anneal</span></a><a href="../living-bokeh/"><span class="sx-n">11</span><span>Living Bokeh</span></a><a href="../glyph/"><span class="sx-n">12</span><span>Glyph</span></a><a class="sx-here" href="../riser/" aria-current="page"><span class="sx-n">13</span><span>Riser</span></a></nav></span>
+    <span class="sx-wrap"><a class="ix" href="../" aria-label="Study 17 — open series index">No. 17</a><nav class="sx-menu" aria-label="Series index"><a class="sx-hd" href="../">Crucible — index</a><a href="../mercury/"><span class="sx-n">03</span><span>Mercury</span></a><a href="../torsion/"><span class="sx-n">04</span><span>Torsion</span></a><a href="../torsion-2/"><span class="sx-n">05</span><span>Torsion 2.0</span></a><a href="../weft/"><span class="sx-n">06</span><span>Weft</span></a><a href="../cast/"><span class="sx-n">07</span><span>Cast</span></a><a href="../solve/"><span class="sx-n">08</span><span>Solve</span></a><a href="../torsion-pineapple/"><span class="sx-n">09</span><span>Torsion Pineapple</span></a><a href="../anneal/"><span class="sx-n">10</span><span>Anneal</span></a><a href="../living-bokeh/"><span class="sx-n">11</span><span>Living Bokeh</span></a><a href="../glyph/"><span class="sx-n">12</span><span>Glyph</span></a><a href="../cockle/"><span class="sx-n">13</span><span>Cockle</span></a><a href="../armature/"><span class="sx-n">14</span><span>Armature</span></a><a href="../telecine/"><span class="sx-n">15</span><span>Telecine</span></a><a href="../intaglio/"><span class="sx-n">16</span><span>Intaglio</span></a><a class="sx-here" href="../riser/" aria-current="page"><span class="sx-n">17</span><span>Riser</span></a></nav></span>
   </div>
 
   <button id="panel-toggle" aria-expanded="false" aria-controls="panel">
@@ -181,19 +181,21 @@ body.panel-open #panel{transform:translateX(0);opacity:1;pointer-events:auto}
 
   <div id="method">
     <span class="t">Method</span>
-    Every particle carries a temperature and a deformation state, not a fixed
-    shape. Each frame they scatter mass and momentum onto a <b>MAC grid</b> in
-    a WGSL compute pass, the grid resolves gravity and mold contact, and the
-    particles gather it back — <b>Material Point Method</b>, liquid and solid
-    living in the same solve. Cooling drifts a particle's stiffness from
-    viscous fluid toward locked solid as it crosses a threshold. Nothing here
-    is a mesh. The surface is reconstructed every frame from a cloud of points
-    — camera-facing spheres, their depth bilateral-blurred and relit as one
-    continuous body of metal.
+    Every particle carries a temperature and a volume ratio, not a fixed shape.
+    Each frame they scatter mass and momentum onto a <b>background grid</b> in a
+    WGSL compute pass, the grid resolves pressure, gravity and mold contact, and
+    the particles gather it back — <b>Material Point Method</b>, liquid and solid
+    living in the same solve. The grid is what makes them a liquid rather than a
+    crowd: eight particles share every cell, so each one's quadratic kernel
+    overlaps its neighbours and the whole body moves as one material. Cooling
+    drifts a particle from viscous fluid toward locked solid as it crosses the
+    liquidus. Nothing here is a mesh. The surface is reconstructed every frame
+    from the point cloud — camera-facing spheres whose depth is blurred at the
+    scale of a particle and relit as one continuous body of metal.
   </div>
 
   <div id="credit">
-    <b>Riser</b> — molten pour &amp; solidification study 13 &nbsp;·&nbsp; MPM liquid→solid phase change &nbsp;·&nbsp; screen-space fluid rendering &nbsp;·&nbsp; raw WebGPU compute<br>
+    <b>Riser</b> — molten pour &amp; solidification study 17 &nbsp;·&nbsp; MPM liquid→solid phase change &nbsp;·&nbsp; screen-space fluid rendering &nbsp;·&nbsp; raw WebGPU compute<br>
     <span class="keys" id="keys">drag orbit &nbsp; scroll dolly &nbsp; c controls &nbsp; space pause &nbsp; r reset &nbsp; ← → scrub time-scale &nbsp; p pour</span>
   </div>
 
@@ -205,13 +207,13 @@ body.panel-open #panel{transform:translateX(0);opacity:1;pointer-events:auto}
     <div class="body" id="panel-body"></div>
     <div class="foot">
       <button id="reset">Reset defaults</button>
-      <span class="fx">Study 13<br>Riser</span>
+      <span class="fx">Study 17<br>Riser</span>
     </div>
   </aside>
 </div>
 
 <div id="loader">
-  <div class="idx">Study 13</div>
+  <div class="idx">Study 17</div>
   <h1 class="word">Riser</h1>
   <div class="study">Molten pour &amp; solidification study</div>
   <div id="load-bar"><div id="load-bar-fill"></div></div>
@@ -225,7 +227,7 @@ body.panel-open #panel{transform:translateX(0);opacity:1;pointer-events:auto}
 (function(){
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Riser — study 13
+   Riser — study 17
    A real-time MPM pour-and-solidify simulation living entirely in WebGPU
    compute pipelines. See RISER_NOTES below for the particle byte layout —
    it is a flat f32 array with hand-picked offsets, deliberately NOT a WGSL
