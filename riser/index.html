@@ -285,8 +285,8 @@ const OFF = {
    cavity: 30,845 cavity cells for 20,480 particles = 0.66 particles/cell,
    about 12× too coarse. That is the single largest reason it read as
    disconnected blobs rather than liquid. dx is doubled here and the
-   particle target raised so the ratio lands on ~8. See PPC below — the
-   assertion at the bottom of this block keeps the invariant honest.
+   particle target raised so the ratio lands on ~8. See PPC below; the check
+   next to CAVITY_VOLUME keeps the invariant honest if these are ever retuned.
    ────────────────────────────────────────────────────────────────────── */
 const GX = 32, GY = 46, GZ = 32;
 const GCELLS = GX*GY*GZ;
@@ -319,6 +319,18 @@ const CAVITY_VOLUME =
 // isosurface was a union of grossly oversized balls — the "large blobs" read.
 // Just above 1.0 the spheres overlap their immediate neighbours and nothing
 // more, which is what a depth-blur can actually resolve into a skin.
+// The invariant this piece's behaviour hinges on, checked rather than assumed:
+// if dx, the cavity or the particle target are retuned independently, the
+// particles-per-cell ratio can silently drift back below 1 and the material
+// quietly stops being a continuum again, which is hard to spot by eye.
+(function checkContinuumInvariant(){
+  const perCell = DEFAULT_TARGET / (CAVITY_VOLUME/(DX*DX*DX));
+  if (perCell < PPC*0.6 || perCell > PPC*1.6) {
+    console.warn(`[riser] particles-per-cell is ${perCell.toFixed(2)}, expected ~${PPC}. ` +
+      `MPM needs several particles per cell to behave as a continuum; below ~1 it reads as loose grains.`);
+  }
+})();
+
 const SPLAT_RADIUS_K = 1.05;
 function particleSpacing(particleCount){
   return Math.cbrt(CAVITY_VOLUME / Math.max(1, particleCount));
@@ -330,28 +342,31 @@ function particleSplatRadius(particleCount){
 const DEFAULTS = {
   gravity: 5.2,
   // stiffLiquid/stiffSolid are bulk moduli against a unit reference density.
-  // The pressure wave speed is sqrt(gamma*K/rho); CFL wants c*dt < dx, i.e.
-  // K < rho*(dx/dt)^2/gamma = 27.9/3 ≈ 9.3 here, so 5.0 sits at c≈3.9 with
-  // real margin. These numbers were always roughly right — what made them
-  // inert was the particle mass, not the stiffness (see P_MASS).
+  // The pressure wave speed is sqrt(gamma*K/rho); the acoustic CFL wants
+  // c*dt < dx, i.e. K < rho*(dx/dt)^2/gamma, which at dx=0.044 and
+  // dt=1/480 is K < 148. 5.0 puts the liquid at c≈3.9, far inside that.
+  // These numbers were always roughly right — what made them inert was the
+  // particle mass, not the stiffness (see P_MASS).
   stiffLiquid: 5.0,
-  // Solid stiffness cannot simply be "large": at rho=1, gamma=3 the CFL
-  // ceiling is K<9.3, so the old 260 would now be violently unstable. The
-  // solid state is held by the velocity-damping lock below, not by stiffness
-  // — see the honest note about elastoplasticity in the README/PR.
+  // The old 260 gives c≈27.9 against a limit of 21.1, so it was over the
+  // ceiling outright. 7.0 is deliberately conservative: it is the value the
+  // full pour-to-solid cycle was actually verified at. The solid state here
+  // is held by the velocity-damping lock below rather than by stiffness —
+  // see the elastoplasticity note in the README/PR. There is real CFL
+  // headroom to raise this, but not on an unverified number.
   stiffSolid: 7.0,
   gamma: 3.0,
   viscosity: 1.4,
   damping: 7.0,
   wallFriction: 0.06,  // 0 = free slip. Molten metal barely wets a cold mold.
-  pourRate: 2600,      // particles/sec
+  pourRate: 4200,      // particles/sec — fills the cavity in ~7s
   pourSpeed: 1.9,
   ambientTemp: 24,
   moldTemp: 140,
   pourTemp: 1420,
   liquidus: 950,
   solidus: 640,
-  coolBase: 0.09,
+  coolBase: 0.14,
   coolContact: 0.8,
   exposure: 1.15,
   loop: 0,
@@ -1594,7 +1609,7 @@ function setPanel(open){
 function buildPanel(){
   const body = $('#panel-body');
   const sliders = [
-    ['pourRate','Pour rate',200,2400,10],
+    ['pourRate','Pour rate',600,8000,50],
     ['gravity','Gravity',0.5,6,0.05],
     ['viscosity','Viscosity',0,12,0.1],
     ['wallFriction','Wall grip',0,0.6,0.01],
@@ -1843,6 +1858,10 @@ async function advanceSteps(n){
       state.moldOpacity = Math.max(0, state.moldOpacity - SIM_DT*0.6);
       state.moldLift = Math.min(0.35, state.moldLift + SIM_DT*0.18);
     }
+    // Poll on the same 0.25s cadence the render loop uses. Without this the
+    // solidPct readback never lands mid-advance and the piece can never leave
+    // 'solidifying', so a scripted run could not observe demold at all.
+    if (i % Math.max(1, Math.round(0.25/SIM_DT)) === 0 && state.activeCount > 0) pollStats();
     if ((i & 63) === 63) { await new Promise(r => setTimeout(r, 0)); }
   }
   pollStats();
