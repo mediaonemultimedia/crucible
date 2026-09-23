@@ -331,12 +331,18 @@ const CAVITY_VOLUME =
   }
 })();
 
-const SPLAT_RADIUS_K = 1.05;
-function particleSpacing(particleCount){
-  return Math.cbrt(CAVITY_VOLUME / Math.max(1, particleCount));
+const SPLAT_RADIUS_K = 1.3;
+// Spacing is set by the PHYSICS, not by how many particles there are: the
+// solver packs PPC of them into every cell, so neighbours sit dx/cbrt(PPC)
+// apart whether the casting is large or small. Deriving it from
+// cavityVolume/count instead (as this did) assumed the particles spread
+// themselves through the whole cavity, which silently oversized every splat
+// at low counts and made the blur kernel step over the real structure.
+function particleSpacing(){
+  return DX / Math.cbrt(PPC);
 }
-function particleSplatRadius(particleCount){
-  return SPLAT_RADIUS_K * particleSpacing(particleCount);
+function particleSplatRadius(){
+  return SPLAT_RADIUS_K * particleSpacing();
 }
 
 const DEFAULTS = {
@@ -1040,7 +1046,7 @@ fn vsFull(@builtin(vertex_index) vi: u32) -> FullOut {
 }
 
 struct BlurOut { @location(0) depth: f32, @location(1) mat: vec2<f32> };
-const BTAPS: i32 = 8;   // per side; 17 taps per axis
+const BTAPS: i32 = 12;   // per side; 25 taps per axis
 
 // The kernel width has to track the particle's PROJECTED size, not be a fixed
 // pixel count. A splat here covers roughly 11px of radius at the default
@@ -1059,7 +1065,13 @@ fn fsBlur(input: FullOut) -> BlurOut {
 
   let projR = BU.params.x / (max(center,1e-3)*max(BU.params.y,1e-4)) * (BU.params.z*0.5);
   let radiusPx = clamp(projR*BU.params.w, 2.0, 56.0);
-  let stepPx = max(1.0, radiusPx/f32(BTAPS));
+  // The tap spacing is capped at 2px on purpose. The particles settle onto a
+  // lattice roughly dx/2 apart, which projects to ~8px; a kernel that strides
+  // 5px across that does not average the ripple away, it ALIASES it into a
+  // low-frequency beat, and the normal pass then turns that beat into a
+  // visible net over the casting. Depth looks clean either way — the artifact
+  // only shows up once normals amplify it.
+  let stepPx = clamp(radiusPx/f32(BTAPS), 1.0, 2.0);
   let sigma = max(radiusPx*0.5, 1.0);
   // Depth falloff scaled to the particle radius: separates the near surface
   // from anything a body-depth behind it, without flattening the surface.
@@ -1898,8 +1910,8 @@ function installDiagnostics(){
         // MPM needs ~8 here; below ~1 it is not a continuum at all.
         targetPerCell: +(DEFAULT_TARGET/(CAVITY_VOLUME/(DX*DX*DX))).toFixed(2),
         ppcTarget: PPC,
-        particleSpacing: +particleSpacing(DEFAULT_TARGET).toFixed(5),
-        splatRadius: +particleSplatRadius(DEFAULT_TARGET).toFixed(5),
+        particleSpacing: +particleSpacing().toFixed(5),
+        splatRadius: +particleSplatRadius().toFixed(5),
         splatRadiusInSpacings: SPLAT_RADIUS_K,
         blurScale: BLUR_SCALE,
         particleVolume: P_VOL, particleMass: P_MASS, density: DENSITY,
@@ -2068,7 +2080,7 @@ function buildRenderTargets(){
 const BLUR_SCALE = 3.0;
 function writeBlurUniforms(){
   if (!RT.blurH) return;
-  const r = particleSplatRadius(state.targetCount);
+  const r = particleSplatRadius();
   const common = [r, camera.tanHalfFovY || Math.tan(camera.fovY/2), renderH, BLUR_SCALE];
   device.queue.writeBuffer(RT.blurH, 0, new Float32Array([1/renderW, 1/renderH, 1, 0, ...common]));
   device.queue.writeBuffer(RT.blurV, 0, new Float32Array([1/renderW, 1/renderH, 0, 1, ...common]));
@@ -2090,7 +2102,7 @@ function renderFrame(){
   const P = state.params;
   ruArr.set(camera.view, 0);
   ruArr.set(camera.proj, 16);
-  ruArr.set([camera.aspect, camera.tanHalfFovY, particleSplatRadius(state.targetCount), P.exposure], 32);
+  ruArr.set([camera.aspect, camera.tanHalfFovY, particleSplatRadius(), P.exposure], 32);
   ruArr.set([renderW, renderH, state.moldOpacity, state.moldLift], 36);
   ruArr.set([P.liquidus, P.solidus, P.pourTemp, P.ambientTemp], 40);
   ruArr.set(transformDirToView([0.42,0.78,0.32]), 44);
