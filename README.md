@@ -19,7 +19,7 @@ the same either way.
 | 03 | **Mercury** | — | _pending rebuild_ |
 | 04 | **Torsion** | — | _pending rebuild_ |
 | 05 | **Torsion 2.0** | — | _pending rebuild_ |
-| 06 | **Weft** | Real-time cloth study | _pending rebuild_ |
+| 06 | **Weft** | Real-time cloth study — four scenes, four woven fabrics, drop-in image printing | [`/weft/`](./weft/) |
 | 07 | **Cast** | Kinetic typography as a cast, lit, physical object | [`/cast/`](./cast/) |
 | 08 | **Solve** | GPU compute fluid — pressure solve in WebGPU | [`/solve/`](./solve/) |
 | 09 | **Torsion Pineapple** | Imported mesh driven through a torsion field | [`/torsion-pineapple/`](./torsion-pineapple/) |
@@ -32,7 +32,7 @@ the same either way.
 | 16 | **Intaglio** | A carved height field decides where one image dissolves through another, and dwell builds visible relief | [`/intaglio/`](./intaglio/) |
 | 17 | **Riser** | Molten metal poured into a mold and solidified — a real-time WebGPU MPM phase-change study | [`/riser/`](./riser/) |
 
-Studies 03–06 were lost to a storage failure and are being rebuilt. They'll be
+Studies 03–05 were lost to a storage failure and are being rebuilt. They'll be
 added here as they land. Numbering follows build order, not merit — it starts at
 03 because the first two experiments weren't kept.
 
