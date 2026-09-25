@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07080a">
+<title>Cusp — a magnetic-liquid spike study</title>
+<meta name="description" content="A raymarched liquid-metal surface that erupts into sharp conical spikes in a hexagonal lattice where a magnetic field — centered on the cursor — is strongest, and relaxes to a mirror pool where it's weak. The Rosensweig instability, built from a smooth-min signed distance field and a damped per-spike height texture — no particles, no fluid solve.">
+<style>
+:root{
+  --bg:#07080a;
+  --ink:#e8e3d8;
+  --dim:#7b8087;
+  --faint:#4a4e54;
+  --rule:rgba(232,227,216,.11);
+  --rule-2:rgba(232,227,216,.055);
+  --accent:#c8a877;
+  --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);overflow:hidden;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+canvas#stage{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+body.is-dragging canvas#stage{cursor:grabbing}
+
+#veil{
+  position:fixed;inset:0;pointer-events:none;z-index:2;
+  background:radial-gradient(126% 92% at 50% 46%,transparent 38%,rgba(0,0,0,.34) 80%,rgba(0,0,0,.68) 100%);
+}
+
+#ui{
+  position:fixed;inset:0;z-index:5;pointer-events:none;
+  opacity:0;transition:opacity 1.1s cubic-bezier(.4,0,.2,1) .25s;
+}
+body.is-live #ui{opacity:1}
+#ui > *{pointer-events:auto}
+
+.eyebrow{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.20em;
+  text-transform:uppercase;color:var(--faint);
+}
+
+/* wordmark --------------------------------------------------------------- */
+#mark{position:absolute;top:26px;left:30px;display:flex;align-items:flex-start;gap:12px}
+#mark .w{
+  font-size:15px;font-weight:300;letter-spacing:.52em;text-transform:uppercase;
+  line-height:1;padding-top:1px;white-space:nowrap;
+}
+#mark .ix{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--accent);
+  border:1px solid rgba(200,168,119,.32);padding:2px 4px 1px;line-height:1;white-space:nowrap;
+}
+#mark .sub{margin-top:9px;display:block}
+#mark .col{display:flex;flex-direction:column}
+
+/* panel toggle ------------------------------------------------------------ */
+#panel-toggle{
+  position:absolute;top:24px;right:30px;z-index:7;
+  display:flex;align-items:center;gap:10px;
+  background:rgba(12,13,16,.55);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  border:1px solid var(--rule);color:var(--dim);
+  font-family:var(--mono);font-size:9px;letter-spacing:.20em;text-transform:uppercase;
+  padding:8px 11px;cursor:pointer;line-height:1;
+  transition:border-color .3s ease,color .3s ease,background .3s ease,opacity .35s ease;
+}
+#panel-toggle:hover{border-color:rgba(200,168,119,.45);color:var(--ink)}
+#panel-toggle .bars{display:flex;flex-direction:column;gap:2.5px;width:11px}
+#panel-toggle .bars i{display:block;height:1px;background:currentColor}
+#panel-toggle .bars i:nth-child(1){width:11px}
+#panel-toggle .bars i:nth-child(2){width:7px}
+#panel-toggle .bars i:nth-child(3){width:9px}
+#panel-toggle .key{
+  color:var(--accent);border:1px solid rgba(200,168,119,.28);
+  padding:2px 4px 1px;font-size:8px;letter-spacing:.06em;
+}
+body.panel-open #panel-toggle{opacity:0;pointer-events:none}
+
+/* control panel ----------------------------------------------------------- */
+#panel{
+  position:absolute;top:0;right:0;bottom:0;width:min(336px,90vw);z-index:8;
+  display:flex;flex-direction:column;
+  background:rgba(9,10,12,.90);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-left:1px solid var(--rule);
+  transform:translateX(101%);transition:transform .52s cubic-bezier(.4,0,.2,1);
+  will-change:transform;
+}
+body.panel-open #panel{transform:translateX(0)}
+#panel header{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+  padding:24px 22px 16px;border-bottom:1px solid var(--rule);flex:0 0 auto;
+}
+#panel header h2{
+  margin:8px 0 0;font-size:13px;font-weight:300;letter-spacing:.34em;text-transform:uppercase;
+}
+#panel-close{
+  background:none;border:1px solid var(--rule);color:var(--dim);
+  width:24px;height:24px;line-height:1;cursor:pointer;font-size:14px;
+  transition:border-color .25s ease,color .25s ease;
+}
+#panel-close:hover{border-color:rgba(200,168,119,.45);color:var(--ink)}
+
+#panel .body{overflow-y:auto;overscroll-behavior:contain;padding:0 22px 26px;flex:1 1 auto}
+#panel .body::-webkit-scrollbar{width:6px}
+#panel .body::-webkit-scrollbar-thumb{background:rgba(232,227,216,.12)}
+
+#panel section{padding:20px 0 6px;border-bottom:1px solid var(--rule-2)}
+#panel section:last-of-type{border-bottom:0}
+#panel h3{
+  margin:0 0 13px;font-family:var(--mono);font-size:9px;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--faint);font-weight:400;
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+}
+#panel h3 .ix{color:rgba(200,168,119,.5)}
+#panel .note{
+  margin:10px 0 2px;font-family:var(--mono);font-size:8.5px;line-height:1.85;
+  letter-spacing:.05em;color:var(--faint);
+}
+#panel .note b{color:var(--dim);font-weight:400}
+
+/* sliders */
+.sld{display:block;margin:13px 0 0}
+.sld .row{
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);
+}
+.sld .row output{color:var(--dim);letter-spacing:.06em;font-variant-numeric:tabular-nums}
+.sld input[type=range]{
+  appearance:none;-webkit-appearance:none;width:100%;height:12px;background:none;cursor:pointer;display:block;
+}
+.sld input[type=range]::-webkit-slider-runnable-track{height:1px;background:var(--rule)}
+.sld input[type=range]::-moz-range-track{height:1px;background:var(--rule)}
+.sld input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:9px;height:9px;margin-top:-4px;background:var(--accent);
+  border:0;border-radius:0;transform:rotate(45deg);
+}
+.sld input[type=range]::-moz-range-thumb{
+  width:8px;height:8px;background:var(--accent);border:0;border-radius:0;
+}
+.sld input[type=range]:focus{outline:none}
+.sld input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(200,168,119,.25)}
+
+/* wide action button */
+.act{
+  display:block;width:100%;margin-top:14px;background:none;border:1px solid var(--rule);
+  color:var(--dim);cursor:pointer;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;
+  padding:9px 8px 8px;transition:border-color .25s ease,color .25s ease,background .25s ease;
+}
+.act:hover{border-color:rgba(200,168,119,.45);color:var(--ink);background:rgba(200,168,119,.05)}
+
+/* readout ---------------------------------------------------------------- */
+#readout{
+  position:absolute;left:30px;bottom:74px;font-family:var(--mono);font-size:10px;
+  line-height:1.85;color:var(--dim);letter-spacing:.03em;
+}
+#readout dl{margin:0;display:grid;grid-template-columns:78px auto}
+#readout dt{color:var(--faint);text-transform:uppercase;letter-spacing:.16em;font-size:9px}
+#readout dd{margin:0;color:var(--dim);font-variant-numeric:tabular-nums}
+
+/* method note ------------------------------------------------------------ */
+#method{
+  position:absolute;right:30px;bottom:74px;width:min(330px,31vw);text-align:right;
+  font-family:var(--mono);font-size:9.5px;line-height:1.95;color:var(--faint);
+  letter-spacing:.04em;transition:opacity .4s ease;
+}
+#method b{color:var(--dim);font-weight:400}
+#method .t{
+  display:block;margin-bottom:8px;font-size:9px;letter-spacing:.20em;
+  text-transform:uppercase;color:rgba(232,227,216,.24);
+}
+body.panel-open #method{opacity:0;pointer-events:none}
+
+/* credit ----------------------------------------------------------------- */
+#credit{
+  position:absolute;left:50%;transform:translateX(-50%);bottom:26px;text-align:center;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.20em;color:var(--faint);
+  text-transform:uppercase;line-height:2;white-space:nowrap;
+}
+#credit b{color:var(--dim);font-weight:400}
+#credit .keys{color:rgba(232,227,216,.2)}
+body.is-paused #credit .keys::after{content:" · held — press space to play";color:var(--accent)}
+
+/* loader ----------------------------------------------------------------- */
+#loader{
+  position:fixed;inset:0;z-index:20;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity .9s cubic-bezier(.4,0,.2,1);
+}
+#loader.done{opacity:0;pointer-events:none}
+#loader .idx{
+  font-family:var(--mono);font-size:10px;letter-spacing:.34em;color:var(--accent);margin-bottom:30px;
+}
+#pulse{position:relative;width:64px;height:64px;margin-bottom:30px}
+#pulse .ring{
+  position:absolute;inset:0;border:1px solid var(--accent);border-radius:50%;opacity:0;
+  animation:pulse 2.2s cubic-bezier(.3,0,.4,1) infinite;
+}
+#pulse .ring:nth-child(2){animation-delay:.55s}
+#pulse .ring:nth-child(3){animation-delay:1.1s}
+#pulse .dot{
+  position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;
+  background:var(--accent);border-radius:50%;
+}
+@keyframes pulse{
+  0%{transform:scale(.2);opacity:.85}
+  100%{transform:scale(1.6);opacity:0}
+}
+#loader .word{
+  font-size:clamp(30px,6.6vw,68px);font-weight:200;letter-spacing:.38em;
+  text-transform:uppercase;text-indent:.38em;line-height:1;margin:0;text-align:center;
+}
+#loader .study{
+  margin-top:22px;font-family:var(--mono);font-size:9.5px;letter-spacing:.30em;
+  text-transform:uppercase;color:var(--dim);text-align:center;
+}
+#load-bar{margin-top:44px;width:min(290px,52vw);height:1px;background:rgba(232,227,216,.1);position:relative}
+#load-bar-fill{position:absolute;inset:0 auto 0 0;width:5%;background:var(--accent);transition:width .5s cubic-bezier(.4,0,.2,1)}
+#load-status{
+  margin-top:14px;font-family:var(--mono);font-size:8.5px;letter-spacing:.26em;
+  text-transform:uppercase;color:var(--faint);
+}
+#loader.is-error #load-status{color:#d97a6c}
+#loader.is-error #load-bar-fill{background:#d97a6c}
+#loader .rule{width:min(290px,52vw);height:1px;background:var(--rule-2);margin-top:30px}
+#loader .foot{
+  margin-top:14px;font-family:var(--mono);font-size:8px;letter-spacing:.2em;
+  text-transform:uppercase;color:rgba(232,227,216,.16);text-align:center;line-height:2;
+}
+
+@media (prefers-reduced-motion: reduce){
+  #pulse .ring{animation-duration:.01ms}
+  #loader{transition-duration:.01ms}
+  #panel{transition-duration:.01ms}
+}
+@media (max-width:1180px){
+  #method{display:none}
+}
+@media (max-width:1360px){
+  #credit{font-size:8px;letter-spacing:.14em}
+}
+@media (max-width:880px){
+  #mark{top:18px;left:18px}
+  #panel-toggle{top:16px;right:18px}
+  #panel{width:min(336px,100vw)}
+  #readout{left:18px;right:18px;bottom:96px;font-size:9px}
+  #readout dl{grid-template-columns:62px auto}
+  #credit{bottom:14px;font-size:7.5px;letter-spacing:.12em;white-space:normal;width:calc(100vw - 36px);line-height:1.9}
+}
+@media (max-height:560px){
+  #readout{display:none}
+}
+
+/* ── series navigation ─────────────────────────────────────────────── */
+#mark .sx-wrap{position:relative;display:inline-block}
+#mark a.ix{text-decoration:none;display:inline-block;cursor:pointer;
+  transition:border-color .28s ease,color .28s ease,background .28s ease}
+#mark a.ix:hover,#mark .sx-wrap:focus-within a.ix{
+  border-color:rgba(200,168,119,.62);background:rgba(200,168,119,.08)}
+#mark a.ix:focus-visible{outline:1px solid rgba(200,168,119,.7);outline-offset:2px}
+#mark .sx-menu{
+  position:absolute;top:calc(100% + 9px);left:0;z-index:20;min-width:228px;
+  background:rgba(9,10,12,.93);
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+  border:1px solid var(--rule);padding:7px 0;
+  opacity:0;visibility:hidden;transform:translateY(-5px);
+  transition:opacity .26s ease,transform .26s cubic-bezier(.4,0,.2,1),visibility 0s linear .26s;
+}
+#mark .sx-wrap:hover .sx-menu,
+#mark .sx-wrap:focus-within .sx-menu{
+  opacity:1;visibility:visible;transform:translateY(0);transition-delay:0s}
+#mark .sx-menu .sx-hd{
+  display:block;font-family:var(--mono);font-size:8px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--faint);padding:5px 13px 8px;
+  border-bottom:1px solid var(--rule-2,rgba(232,227,216,.055));margin-bottom:5px;
+  text-decoration:none;transition:color .24s ease}
+a.sx-hd:hover,a.sx-hd:focus-visible{color:var(--accent);outline:none}
+#mark .sx-menu a,#mark .sx-menu span.sx-i{
+  display:flex;align-items:baseline;gap:9px;padding:4px 13px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;
+  text-transform:uppercase;text-decoration:none;color:var(--dim);
+  transition:color .22s ease,background .22s ease}
+#mark .sx-menu a:hover,#mark .sx-menu a:focus-visible{
+  color:var(--ink);background:rgba(232,227,216,.05);outline:none}
+#mark .sx-menu .sx-n{color:var(--faint);flex:0 0 auto;transition:color .22s ease}
+#mark .sx-menu a:hover .sx-n,#mark .sx-menu a:focus-visible .sx-n{color:var(--accent)}
+#mark .sx-menu .sx-here{color:var(--accent)}
+#mark .sx-menu .sx-here .sx-n{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<canvas id="stage"></canvas>
+<div id="veil"></div>
+
+<div id="ui">
+  <div id="mark">
+    <div class="col">
+      <span class="w">Cusp</span>
+      <span class="eyebrow sub">A magnetic-liquid spike study</span>
+    </div>
+    <span class="sx-wrap"><a class="ix" href="../" aria-label="Study 18 — open series index">No. 18</a><nav class="sx-menu" aria-label="Series index"><a class="sx-hd" href="../">Crucible — index</a><a href="../mercury/"><span class="sx-n">03</span><span>Mercury</span></a><a href="../torsion/"><span class="sx-n">04</span><span>Torsion</span></a><a href="../torsion-2/"><span class="sx-n">05</span><span>Torsion 2.0</span></a><a href="../weft/"><span class="sx-n">06</span><span>Weft</span></a><a href="../cast/"><span class="sx-n">07</span><span>Cast</span></a><a href="../solve/"><span class="sx-n">08</span><span>Solve</span></a><a href="../torsion-pineapple/"><span class="sx-n">09</span><span>Torsion Pineapple</span></a><a href="../anneal/"><span class="sx-n">10</span><span>Anneal</span></a><a href="../living-bokeh/"><span class="sx-n">11</span><span>Living Bokeh</span></a><a href="../glyph/"><span class="sx-n">12</span><span>Glyph</span></a><a href="../cockle/"><span class="sx-n">13</span><span>Cockle</span></a><a href="../armature/"><span class="sx-n">14</span><span>Armature</span></a><a href="../telecine/"><span class="sx-n">15</span><span>Telecine</span></a><a href="../intaglio/"><span class="sx-n">16</span><span>Intaglio</span></a><a href="../riser/"><span class="sx-n">17</span><span>Riser</span></a><a class="sx-here" href="../cusp/" aria-current="page"><span class="sx-n">18</span><span>Cusp</span></a></nav></span>
+  </div>
+
+  <button id="panel-toggle" type="button" aria-expanded="false" aria-controls="panel">
+    <span class="bars"><i></i><i></i><i></i></span>
+    <span class="lbl">Controls</span>
+    <span class="key">C</span>
+  </button>
+
+  <aside id="panel" aria-label="Controls">
+    <header>
+      <div>
+        <span class="eyebrow">Study 18</span>
+        <h2>Cusp</h2>
+      </div>
+      <button id="panel-close" type="button" aria-label="Close controls">×</button>
+    </header>
+
+    <div class="body">
+
+      <section>
+        <h3>Field <span class="ix">01</span></h3>
+
+        <label class="sld">
+          <span class="row"><span>Field strength</span><output id="o-strength">1.35</output></span>
+          <input id="p-strength" type="range" min="0.6" max="2.4" step="0.01" value="1.35">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Reach</span><output id="o-reach">0.55</output></span>
+          <input id="p-reach" type="range" min="0.25" max="1.00" step="0.01" value="0.55">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Response</span><output id="o-response">1.00×</output></span>
+          <input id="p-response" type="range" min="0.4" max="3.0" step="0.01" value="1.0">
+        </label>
+
+        <p class="note">
+          The cursor is raycast onto the pool plane every frame, then each
+          lattice cell samples a <b>Gaussian falloff</b> from that point —
+          a stand-in for a magnetic potential, not a real field solve.
+          <b>Response</b> scales how fast a spike chases that target — it
+          rises about <b>3×</b> faster than it falls, so growth reads sharp
+          and relaxation reads like real surface tension settling.
+        </p>
+      </section>
+
+      <section>
+        <h3>Lattice <span class="ix">02</span></h3>
+
+        <label class="sld">
+          <span class="row"><span>Spike spacing</span><output id="o-spacing">0.20</output></span>
+          <input id="p-spacing" type="range" min="0.11" max="0.42" step="0.005" value="0.20">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Spike sharpness</span><output id="o-sharpness">0.55</output></span>
+          <input id="p-sharpness" type="range" min="0" max="1" step="0.01" value="0.55">
+        </label>
+
+        <p class="note">
+          Every spike sits on a fixed <b>hexagonal lattice</b> — the same
+          near-hex packing real Rosensweig spikes settle into. Each cell
+          is an exact round-cone SDF, nearest-cell assigned, smooth-min
+          welded into the pool — the same blend
+          <a href="../armature/" style="color:inherit;border-bottom:1px solid var(--rule)">Armature</a>
+          uses for its skeleton.
+        </p>
+      </section>
+
+      <section>
+        <h3>Material <span class="ix">03</span></h3>
+
+        <label class="sld">
+          <span class="row"><span>Polish</span><output id="o-polish">0.75</output></span>
+          <input id="p-polish" type="range" min="0" max="1" step="0.01" value="0.75">
+        </label>
+
+        <label class="sld">
+          <span class="row"><span>Tone</span><output id="o-tone">0.35</output></span>
+          <input id="p-tone" type="range" min="0" max="1" step="0.01" value="0.35">
+        </label>
+
+        <p class="note">
+          No environment map is loaded — the studio panels reflected in
+          the surface are a few procedural bright bands read off the
+          reflection vector. <b>Polish</b> sharpens the highlight and
+          lifts base reflectivity off near-black; <b>Tone</b> shifts the
+          metal between a cool chrome and a warmer gunmetal.
+        </p>
+      </section>
+
+      <section>
+        <h3>Session <span class="ix">04</span></h3>
+        <button class="act" id="p-reset" type="button">Reset all to defaults</button>
+      </section>
+
+    </div>
+  </aside>
+
+  <div id="readout">
+    <dl>
+      <dt>Field</dt><dd id="r-field">—</dd>
+      <dt>Spikes</dt><dd id="r-spikes">—</dd>
+      <dt>Peak</dt><dd id="r-peak">—</dd>
+      <dt>Rate</dt><dd id="r-fps">—</dd>
+    </dl>
+  </div>
+
+  <div id="method">
+    <span class="t">Method</span>
+    There is no fluid solve here — no particles, no pressure grid. The pool
+    is a flat signed-distance plane. A hexagonal lattice of cells each
+    samples the field at its own position and keeps one persistent, damped
+    <b>height</b>, eased toward its target every frame in plain JavaScript.
+    Those heights are written into a tiny floating-point texture and read
+    back with <b>texelFetch</b> inside the raymarcher, which builds an exact
+    round-cone at the nearest lattice point and smooth-min welds it into the
+    pool. The spikes are real geometry — traced, lit and reflective — just
+    never simulated as a liquid.
+  </div>
+
+  <div id="credit">
+    <b>Cusp</b> — magnetic-liquid spike study 18 &nbsp;·&nbsp; hex-lattice SDF spikes &nbsp;·&nbsp; damped height field &nbsp;·&nbsp; procedural studio reflections &nbsp;·&nbsp; webgl2<br>
+    <span class="keys">move the cursor over the pool to raise the field &nbsp; drag to orbit &nbsp; c controls &nbsp; space pause &nbsp; r reset</span>
+  </div>
+</div>
+
+<div id="loader">
+  <div class="idx">Study 18</div>
+  <div id="pulse"><i class="ring"></i><i class="ring"></i><i class="ring"></i><span class="dot"></span></div>
+  <h1 class="word">Cusp</h1>
+  <div class="study">A magnetic-liquid spike study</div>
+  <div id="load-bar"><div id="load-bar-fill"></div></div>
+  <div id="load-status">Opening a context</div>
+  <div class="rule"></div>
+  <div class="foot">
+    no fluid solve · one damped height field per lattice cell<br>
+    hex-packed round-cone spikes, smooth-min welded into the pool
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CUSP — a magnetic-liquid spike study
+   No. 18 of Crucible. Single file, raw WebGL2, no runtime network access.
+
+   The surface is one raymarched signed-distance field: a flat pool plane,
+   plus a fixed hexagonal lattice of round-cone "spikes" welded into it with
+   a smooth-min, the same blend Armature uses for its skeleton. There is no
+   fluid simulation. Each lattice cell owns one persistent scalar — its
+   current height — computed on the CPU every frame: sample a Gaussian
+   falloff from the cursor (raycast onto the pool plane) at that cell's
+   position, then exponentially damp the stored height toward that target.
+   The whole grid of heights is uploaded into a small floating-point
+   texture and sampled with texelFetch inside the fragment shader, which
+   looks up the nearest hex cell for any point analytically (axial
+   rounding) rather than looping over spikes. That is the entire technique:
+   a real per-spike spring, read back into an exact SDF primitive.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const lerp  = (a, b, t) => a + (b - a) * t;
+/* exponential smoothing toward a target at a fixed rate, independent of dt */
+const damp  = (cur, target, rate, dt) => lerp(cur, target, 1 - Math.exp(-rate * dt));
+
+const SQRT3 = Math.sqrt(3);
+
+/* ── defaults ──────────────────────────────────────────────────────────── */
+const DEFAULTS = Object.freeze({
+  strength: 1.35,   // field-strength multiplier on the raw Gaussian sample
+  reach:    0.55,   // Gaussian sigma, world units
+  response: 1.00,   // scales both rise and fall damping rates together
+  spacing:  0.20,   // hex nearest-neighbour spacing, world units
+  sharpness:0.55,   // 0 blunt .. 1 needle-sharp tip
+  polish:   0.75,   // specular sharpness + base reflectivity
+  tone:     0.35    // 0 cool chrome .. 1 warm gunmetal
+});
+const S = Object.seal(Object.assign({}, DEFAULTS));
+
+/* ── field model constants (not exposed — the curated sliders above tune
+   the same handful of knobs the field/lattice/material math actually use) */
+const MAX_HEIGHT   = 0.40;      // world units, tallest a spike can reach
+const RISE_RATE    = 7.0;       // 1/s at response = 1
+const FALL_RATE    = 2.2;       // 1/s at response = 1 — real surface tension settles slower than it rises
+const FIELD_LO     = 0.32, FIELD_HI = 0.80;  // smoothstep band = the Rosensweig critical-field onset
+const GROUND_Y     = 0.0;
+const DOME         = 0.05;      // gentle central rise, so the pool isn't a dead-flat plane
+const POOL_RADIUS  = 2.05;      // visual radius where the reflective "pool" fades to studio floor
+
+/* ── hex lattice grid ──────────────────────────────────────────────────── */
+const GRID_HALF = 44;
+const GRID_DIM  = GRID_HALF * 2 + 1;              // 89 — covers the tightest spacing out to ~2.3 units
+const heightData = new Float32Array(GRID_DIM * GRID_DIM);
+const idx = (q, r) => (r + GRID_HALF) * GRID_DIM + (q + GRID_HALF);
+
+function axialToWorld(q, r, size){
+  return [ size * (SQRT3 * q + SQRT3 * 0.5 * r), size * (1.5 * r) ];
+}
+
+/* ── dom ───────────────────────────────────────────────────────────────── */
+const $  = (id) => document.getElementById(id);
+const canvas   = $("stage");
+const loader   = $("loader");
+const barFill  = $("load-bar-fill");
+const statusEl = $("load-status");
+
+const setLoad = (pct, msg) => {
+  barFill.style.width = pct + "%";
+  if (msg) statusEl.textContent = msg;
+};
+const failLoad = (msg) => {
+  loader.classList.add("is-error");
+  setLoad(100, msg);
+};
+
+setLoad(6, "Opening a context");
+
+/* ── gl context ────────────────────────────────────────────────────────── */
+const gl = canvas.getContext("webgl2", {
+  alpha: false, antialias: false, depth: false, stencil: false,
+  premultipliedAlpha: false, preserveDrawingBuffer: false,
+  powerPreference: "high-performance"
+});
+
+if (!gl) {
+  failLoad("WebGL2 unavailable in this browser");
+  return;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SHADERS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const VERT = `#version 300 es
+precision highp float;
+void main(){
+  vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+}`;
+
+const FRAG = `#version 300 es
+precision highp float;
+precision highp int;
+precision highp sampler2D;
+
+out vec4 fragColor;
+
+uniform vec2  uRes;
+uniform vec3  uCamPos;
+uniform mat3  uCamBasis;      // columns: right, up, forward
+uniform float uFocal;
+
+uniform sampler2D uHeightTex;
+uniform float uHexSize;       // hex circumradius, world units
+uniform int   uGridHalf;
+uniform float uSpikeBaseR;
+uniform float uSpikeTipR;
+uniform float uBlendK;
+uniform float uDome;
+uniform float uPoolRadius;
+uniform float uPolish;
+uniform float uTone;
+
+uniform float uStepScale;
+uniform int   uMaxSteps;
+
+const float GROUND_Y = 0.0;
+
+/* ── primitives ────────────────────────────────────────────────────────── */
+float sdRoundCone(vec3 p, vec3 a, vec3 b, float r1, float r2){
+  vec3 ba = b - a;
+  float l2 = dot(ba, ba);
+  float rr = r1 - r2;
+  float a2 = l2 - rr * rr;
+  float il2 = 1.0 / l2;
+
+  vec3 pa = p - a;
+  float y = dot(pa, ba);
+  float z = y - l2;
+  float x2 = dot(pa * l2 - ba * y, pa * l2 - ba * y);
+  float y2 = y * y * l2;
+  float z2 = z * z * l2;
+
+  float k = sign(rr) * rr * rr * x2;
+  if (sign(z) * a2 * z2 > k) return sqrt(x2 + z2) * il2 - r2;
+  if (sign(y) * a2 * y2 < k) return sqrt(x2 + y2) * il2 - r1;
+  return (sqrt(x2 * a2 * il2) + y * rr) * il2 - r1;
+}
+
+float smin(float a, float b, float k){
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+/* ── hex lattice: analytic nearest-cell lookup, no per-spike loop ────────
+   axial coordinates, "flat-top" orientation. worldToAxial/axialToWorld are
+   exact inverses; axialRound snaps a fractional axial coordinate to its
+   nearest integer cell via the standard cube-coordinate rounding fix. */
+vec2 axialToWorld(vec2 qr, float size){
+  return vec2(size * (1.7320508 * qr.x + 0.8660254 * qr.y), size * 1.5 * qr.y);
+}
+vec2 worldToAxial(vec2 p, float size){
+  return vec2((0.5773503 * p.x - 0.3333333 * p.y) / size, (0.6666667 * p.y) / size);
+}
+vec2 axialRound(vec2 qr){
+  float x = qr.x, z = qr.y, y = -x - z;
+  float rx = floor(x + 0.5), ry = floor(y + 0.5), rz = floor(z + 0.5);
+  float dx = abs(rx - x), dy = abs(ry - y), dz = abs(rz - z);
+  if (dx > dy && dx > dz)      rx = -ry - rz;
+  else if (dy > dz)            ry = -rx - rz;
+  else                         rz = -rx - ry;
+  return vec2(rx, rz);
+}
+
+float poolHeight(vec2 xz){
+  float r2 = dot(xz, xz);
+  return GROUND_Y + uDome * exp(-r2 * 0.22);
+}
+
+float spikeHeightAt(vec2 qr){
+  int gd = uGridHalf * 2 + 1;
+  ivec2 texel = clamp(ivec2(qr) + ivec2(uGridHalf), ivec2(0), ivec2(gd - 1));
+  return texelFetch(uHeightTex, texel, 0).r;
+}
+
+/* x = distance, y = 1 where a spike primitive was the closer surface.
+   when a cell has no active spike, this returns dPool untouched rather
+   than smin(dPool, someHugeSentinel, k): smin's mix() computes
+   b + (a-b)*h, and with b in the thousands that subtraction cancels away
+   almost all of dPool's precision — invisible on the raw distance value,
+   but fatal to the finite-difference normal, which needs full precision
+   in a value that is itself only ever a few thousandths near the surface.
+   The fix is not a smaller epsilon; it's never blending against a
+   sentinel that dwarfs the thing being measured. */
+vec2 map(vec3 p){
+  float baseY = poolHeight(p.xz);
+  float dPool = p.y - baseY;
+
+  vec2 qr = axialRound(worldToAxial(p.xz, uHexSize));
+  float h = spikeHeightAt(qr);
+
+  if (h > 0.004){
+    vec2 cellXZ = axialToWorld(qr, uHexSize);
+    vec3 a = vec3(cellXZ.x, baseY, cellXZ.y);
+    vec3 b = vec3(cellXZ.x, baseY + h, cellXZ.y);
+    float dSpike = sdRoundCone(p, a, b, uSpikeBaseR, uSpikeTipR);
+    float d = smin(dPool, dSpike, uBlendK);
+    return vec2(d, dSpike < dPool ? 1.0 : 0.0);
+  }
+  return vec2(dPool, 0.0);
+}
+
+vec3 calcNormal(vec3 p){
+  vec2 e = vec2(1.0, -1.0) * 0.0006;
+  return normalize(
+    e.xyy * map(p + e.xyy).x + e.yyx * map(p + e.yyx).x +
+    e.yxy * map(p + e.yxy).x + e.xxx * map(p + e.xxx).x);
+}
+
+/* ── procedural studio environment — no textures, no network ───────────
+   deliberately a function of d.y alone (never the reflection's azimuth):
+   on a near-flat mirror viewed from above, azimuth spins through a full
+   turn within a few screen pixels near the horizon, so any azimuth-
+   periodic detail (the panels a first pass tried) aliases into a moiré
+   of fine rings the moment the pool is calm and flat. Banding purely in
+   the vertical component varies slowly and safely across the frame, and
+   still sweeps through every band on a spike's tilted facets — which is
+   exactly where the highlights should show up. */
+vec3 studioEnv(vec3 d){
+  vec3 col = mix(vec3(0.012,0.013,0.015), vec3(0.050,0.052,0.058), clamp(d.y * 0.5 + 0.5, 0.0, 1.0));
+  float p1 = smoothstep(0.04, 0.20, d.y) * smoothstep(0.58, 0.32, d.y);
+  float p2 = smoothstep(0.34, 0.50, d.y) * smoothstep(0.88, 0.62, d.y);
+  float p3 = smoothstep(-0.38, -0.20, d.y) * smoothstep(0.04, -0.14, d.y);
+  col += vec3(1.02,0.98,0.90) * p1 * 1.15;
+  col += vec3(0.80,0.88,1.02) * p2 * 0.85;
+  col += vec3(0.92,0.86,0.76) * p3 * 0.55;
+  return col;
+}
+
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+  vec3 ro = uCamPos;
+  vec3 rd = normalize(uCamBasis * vec3(uv, uFocal));
+
+  vec3 bg = studioEnv(rd) * 0.55 + vec3(0.008,0.009,0.011);
+
+  float t = 0.0;
+  bool hit = false;
+  float matId = 0.0;
+  for (int i = 0; i < 220; i++){
+    if (i >= uMaxSteps) break;
+    vec3 p = ro + rd * t;
+    vec2 res = map(p);
+    if (res.x < max(0.0003, 0.0005 * t)){ hit = true; matId = res.y; break; }
+    t += res.x * uStepScale;
+    if (t > 20.0) break;
+  }
+
+  vec3 col = bg;
+  if (hit){
+    vec3 p = ro + rd * t;
+    vec3 n = calcNormal(p);
+
+    float rr = length(p.xz);
+    float region = smoothstep(uPoolRadius + 0.45, uPoolRadius - 0.45, rr);
+
+    vec3 refl = reflect(rd, n);
+    vec3 env = studioEnv(refl);
+    vec3 envTint = mix(vec3(0.92,0.96,1.05), vec3(1.06,0.93,0.76), uTone);
+    env *= envTint;
+
+    float fres = pow(1.0 - clamp(dot(n, -rd), 0.0, 1.0), 5.0);
+    float baseRefl = mix(0.03, 0.13, uPolish);
+    float reflAmt = clamp(baseRefl + fres * (1.0 - baseRefl), 0.0, 1.0);
+
+    vec3 darkBase = mix(vec3(0.011,0.011,0.013), vec3(0.016,0.013,0.010), uTone);
+    vec3 lit = mix(darkBase, env, reflAmt);
+
+    vec3 keyDir = normalize(vec3(-0.35, 0.90, 0.24));
+    vec3 h = normalize(keyDir - rd);
+    float shin = mix(90.0, 260.0, uPolish);
+    float spec = pow(clamp(dot(n, h), 0.0, 1.0), shin);
+    lit += vec3(1.0,0.97,0.90) * spec * mix(0.9, 2.0, uPolish);
+
+    /* a second, cooler rim light so spike facets read from more angles */
+    vec3 rimDir = normalize(vec3(0.55, 0.35, -0.6));
+    float rim = pow(clamp(dot(n, rimDir), 0.0, 1.0), 3.0);
+    lit += vec3(0.30,0.34,0.42) * rim * 0.35;
+
+    /* faint AO in the troughs between spikes: cheap single extra sample */
+    float aoSample = map(p + n * 0.05).x;
+    float ao = clamp(aoSample / 0.05, 0.35, 1.0);
+    lit *= mix(0.75, 1.0, ao);
+
+    col = mix(vec3(0.010,0.010,0.012), lit, region);
+
+    float fog = 1.0 - exp(-t * 0.05);
+    col = mix(col, bg, clamp(fog, 0.0, 1.0));
+  }
+
+  col = col / (1.0 + col);
+  col = pow(col, vec3(0.4545));
+
+  /* the flat pool is otherwise a very smooth, very dark gradient — exactly
+     the case that shows visible banding in an 8-bit framebuffer. a tiny
+     screen-space dither breaks that up without being visible itself. */
+  float dither = (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
+  col += dither;
+
+  fragColor = vec4(col, 1.0);
+}`;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROGRAM
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function compile(type, src){
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
+    const log = gl.getShaderInfoLog(sh);
+    gl.deleteShader(sh);
+    throw new Error("shader compile: " + log);
+  }
+  return sh;
+}
+
+function link(vsSrc, fsSrc){
+  const p  = gl.createProgram();
+  const vs = compile(gl.VERTEX_SHADER, vsSrc);
+  const fs = compile(gl.FRAGMENT_SHADER, fsSrc);
+  gl.attachShader(p, vs); gl.attachShader(p, fs);
+  gl.linkProgram(p);
+  gl.deleteShader(vs); gl.deleteShader(fs);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)){
+    const log = gl.getProgramInfoLog(p);
+    gl.deleteProgram(p);
+    throw new Error("program link: " + log);
+  }
+  return p;
+}
+
+setLoad(20, "Compiling the distance field");
+
+let prog, vao;
+try {
+  prog = link(VERT, FRAG);
+} catch (err){
+  console.error(err);
+  failLoad("Shader compilation failed");
+  return;
+}
+
+vao = gl.createVertexArray();   // attribute-less: gl_VertexID drives the triangle
+gl.bindVertexArray(vao);
+
+const U = {};
+[
+  "uRes","uCamPos","uCamBasis","uFocal",
+  "uHeightTex","uHexSize","uGridHalf","uSpikeBaseR","uSpikeTipR","uBlendK","uDome","uPoolRadius",
+  "uPolish","uTone","uStepScale","uMaxSteps"
+].forEach(n => { U[n] = gl.getUniformLocation(prog, n); });
+
+setLoad(34, "Assembling the lattice");
+
+/* ── height texture: one float per hex cell, uploaded fresh every frame ── */
+const heightTex = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, heightTex);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, GRID_DIM, GRID_DIM, 0, gl.RED, gl.FLOAT, heightData);
+
+function uploadHeights(){
+  gl.bindTexture(gl.TEXTURE_2D, heightTex);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, GRID_DIM, GRID_DIM, gl.RED, gl.FLOAT, heightData);
+}
+
+setLoad(46, "Warming the field");
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIELD — the magnet, and the per-cell damped height model
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+let clock = 0, paused = false;
+let cw = 1, ch = 1, dpr = 1;
+
+const pointer = { nx: 0, ny: 0, active: false };
+let dragging = false, dragMoved = 0, dragStartX = 0, dragStartY = 0;
+let dragAz = 0, dragEl = 0, dragStartAz = 0, dragStartEl = 0;
+
+/* ── camera: a steep, mostly top-down 3/4 view onto the pool ─────────── */
+const CAM_R = 3.35, FOCAL = 1.95, CAM_TARGET_Y = 0.02;
+let baseAz = 0.52, elevation = 0.78;
+const AUTO_DRIFT = 0.020;
+
+function cameraAt(time){
+  const az = time * AUTO_DRIFT + baseAz + dragAz;
+  const el = clamp(elevation + dragEl, 0.12, 1.30);
+  const ce = Math.cos(el), se = Math.sin(el);
+  const pos = [CAM_R * ce * Math.sin(az), CAM_TARGET_Y + CAM_R * se, CAM_R * ce * Math.cos(az)];
+
+  let fx = -pos[0], fy = CAM_TARGET_Y - pos[1], fz = -pos[2];
+  const fl = Math.hypot(fx, fy, fz); fx /= fl; fy /= fl; fz /= fl;
+  let rx = -fz, ry = 0, rz = fx;
+  const rl = Math.hypot(rx, ry, rz); rx /= rl; ry /= rl; rz /= rl;
+  const ux = ry * fz - rz * fy, uy = rz * fx - rx * fz, uz = rx * fy - ry * fx;
+
+  return {
+    pos,
+    basis: new Float32Array([rx, ry, rz, ux, uy, uz, fx, fy, fz]),
+    fwd: [fx, fy, fz]
+  };
+}
+
+/* the pointer's ray, and where it crosses the pool plane y = GROUND_Y —
+   the same math the fragment shader uses to build rd from uv, run here on
+   the CPU so the magnet's world position matches what's on screen exactly */
+function pointerRayDir(cam){
+  const aspect = cw / ch;
+  const ux = pointer.nx * aspect * 0.5, uy = pointer.ny * 0.5;
+  const b = cam.basis; // columns: right(0-2), up(3-5), forward(6-8)
+  const rdx = ux * b[0] + uy * b[3] + FOCAL * b[6];
+  const rdy = ux * b[1] + uy * b[4] + FOCAL * b[7];
+  const rdz = ux * b[2] + uy * b[5] + FOCAL * b[8];
+  const len = Math.hypot(rdx, rdy, rdz);
+  return [rdx / len, rdy / len, rdz / len];
+}
+
+let magnetXZ = [0, 0];
+function updateMagnet(cam){
+  const rd = pointerRayDir(cam);
+  if (rd[1] >= -1e-4) return magnetXZ;      // looking level/up — keep last valid hit
+  const tPlane = (GROUND_Y - cam.pos[1]) / rd[1];
+  if (tPlane <= 0) return magnetXZ;
+  magnetXZ = [cam.pos[0] + rd[0] * tPlane, cam.pos[2] + rd[2] * tPlane];
+  return magnetXZ;
+}
+
+/* ── per-frame field update: sample the Gaussian, damp every live cell ─── */
+let liveCount = 0, peakHeight = 0, avgHeight = 0;
+
+function updateField(dt){
+  const size = S.spacing / SQRT3;
+  const sigma = S.reach;
+  const strength = pointer.active ? S.strength : 0;
+  const invTwoSigma2 = 1 / (2 * sigma * sigma);
+  const rise = RISE_RATE * S.response, fall = FALL_RATE * S.response;
+
+  const fieldRadius = sigma * 3.4 + 0.25;          // beyond this the Gaussian is negligible
+  const qMax = Math.min(GRID_HALF, Math.ceil(fieldRadius / size) + 2);
+
+  let count = 0, sum = 0, peak = 0;
+
+  for (let r = -qMax; r <= qMax; r++){
+    for (let q = -qMax; q <= qMax; q++){
+      const [x, z] = axialToWorld(q, r, size);
+      const cur = heightData[idx(q, r)];
+
+      const dx = x - magnetXZ[0], dz = z - magnetXZ[1];
+      const dist2 = dx * dx + dz * dz;
+      let target = 0;
+      if (strength > 0 && dist2 < fieldRadius * fieldRadius){
+        const raw = Math.exp(-dist2 * invTwoSigma2);
+        const scaled = raw * strength;
+        const band = clamp((scaled - FIELD_LO) / (FIELD_HI - FIELD_LO), 0, 1);
+        const eased = band * band * (3 - 2 * band);
+        target = MAX_HEIGHT * eased;
+      }
+
+      const rate = target > cur ? rise : fall;
+      const next = paused ? cur : damp(cur, target, rate, dt);
+      heightData[idx(q, r)] = next;
+
+      if (next > 0.01){ count++; sum += next; if (next > peak) peak = next; }
+    }
+  }
+
+  liveCount = count;
+  peakHeight = peak;
+  avgHeight = count ? sum / count : 0;
+}
+
+/* nearest hex-cell height at an arbitrary world point — mirrors the
+   shader's axial rounding exactly, so diagnostics read the same lattice */
+function heightAtWorld(x, z){
+  const size = S.spacing / SQRT3;
+  let q = (Math.sqrt(3) / 3 * x - 1 / 3 * z) / size;
+  let r = (2 / 3 * z) / size;
+  let cx = q, cz = r, cy = -cx - cz;
+  let rx = Math.round(cx), ry = Math.round(cy), rz = Math.round(cz);
+  const dx = Math.abs(rx - cx), dy = Math.abs(ry - cy), dz = Math.abs(rz - cz);
+  if (dx > dy && dx > dz) rx = -ry - rz;
+  else if (dy > dz) ry = -rx - rz;
+  else rz = -rx - ry;
+  const qi = clamp(Math.round(rx), -GRID_HALF, GRID_HALF);
+  const ri = clamp(Math.round(rz), -GRID_HALF, GRID_HALF);
+  return heightData[idx(qi, ri)];
+}
+
+function resetField(){
+  heightData.fill(0);
+  liveCount = 0; peakHeight = 0; avgHeight = 0;
+}
+
+function resize(){
+  const wCss = canvas.clientWidth  || window.innerWidth;
+  const hCss = canvas.clientHeight || window.innerHeight;
+  const cap  = wCss > 1600 ? 1.15 : 1.4;
+  dpr = Math.min(window.devicePixelRatio || 1, cap);
+  const w = Math.max(2, Math.round(wCss * dpr));
+  const h = Math.max(2, Math.round(hCss * dpr));
+  if (w !== cw || h !== ch){
+    cw = w; ch = h;
+    canvas.width = w; canvas.height = h;
+  }
+}
+resize();
+window.addEventListener("resize", resize, { passive: true });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DRAW
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+let lastCam = null;
+
+function drawScene(cam){
+  gl.viewport(0, 0, cw, ch);
+  gl.useProgram(prog);
+  gl.bindVertexArray(vao);
+
+  gl.uniform2f(U.uRes, cw, ch);
+  gl.uniform3fv(U.uCamPos, cam.pos);
+  gl.uniformMatrix3fv(U.uCamBasis, false, cam.basis);
+  gl.uniform1f(U.uFocal, FOCAL);
+
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, heightTex);
+  gl.uniform1i(U.uHeightTex, 0);
+
+  const size = S.spacing / SQRT3;
+  gl.uniform1f(U.uHexSize, size);
+  gl.uniform1i(U.uGridHalf, GRID_HALF);
+  gl.uniform1f(U.uSpikeBaseR, size * 0.42);
+  gl.uniform1f(U.uSpikeTipR, size * lerp(0.26, 0.065, S.sharpness));
+  gl.uniform1f(U.uBlendK, clamp(size * 0.30, 0.03, 0.11));
+  gl.uniform1f(U.uDome, DOME);
+  gl.uniform1f(U.uPoolRadius, POOL_RADIUS);
+  gl.uniform1f(U.uPolish, S.polish);
+  gl.uniform1f(U.uTone, S.tone);
+
+  gl.uniform1f(U.uStepScale, 0.68);
+  gl.uniform1i(U.uMaxSteps, 170);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MAIN LOOP
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+let last = 0, running = false;
+let fpsAcc = 0, fpsN = 0, fpsShown = 0;
+
+function step(dt){
+  dt = Math.min(dt, 0.05);
+  if (!paused) clock += dt;
+  const cam = cameraAt(clock);
+  lastCam = cam;
+  updateMagnet(cam);
+  updateField(dt);
+  uploadHeights();
+  return cam;
+}
+
+function renderOnce(dt){
+  resize();
+  const cam = step(typeof dt === "number" ? dt : 1 / 60);
+  drawScene(cam);
+  return cam;
+}
+
+function frame_(now){
+  if (!running) return;
+  const dt = last ? (now - last) / 1000 : 1 / 60;
+  last = now;
+
+  resize();
+  const cam = step(dt);
+  drawScene(cam);
+
+  fpsAcc += dt; fpsN++;
+  if (fpsAcc > 0.5){
+    fpsShown = Math.round(fpsN / fpsAcc);
+    fpsAcc = 0; fpsN = 0;
+    updateReadout();
+  }
+
+  requestAnimationFrame(frame_);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UI
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const body = document.body;
+
+function updateReadout(){
+  $("r-field").textContent = pointer.active ? (S.strength).toFixed(2) + "×" : "idle";
+  $("r-spikes").textContent = String(liveCount);
+  $("r-peak").textContent = peakHeight.toFixed(2);
+  $("r-fps").textContent = fpsShown ? fpsShown + " fps" : "—";
+}
+
+const panelToggle = $("panel-toggle"), panelClose = $("panel-close");
+function setPanel(open){
+  body.classList.toggle("panel-open", open);
+  panelToggle.setAttribute("aria-expanded", open ? "true" : "false");
+}
+panelToggle.addEventListener("click", () => setPanel(true));
+panelClose.addEventListener("click", () => setPanel(false));
+
+const fmt = {
+  strength:  v => v.toFixed(2),
+  reach:     v => v.toFixed(2),
+  response:  v => v.toFixed(2) + "×",
+  spacing:   v => v.toFixed(3),
+  sharpness: v => v.toFixed(2),
+  polish:    v => v.toFixed(2),
+  tone:      v => v.toFixed(2)
+};
+const KEYMAP = {
+  strength: "strength", reach: "reach", response: "response",
+  spacing: "spacing", sharpness: "sharpness", polish: "polish", tone: "tone"
+};
+
+function applyKey(uiKey, value){
+  const k = KEYMAP[uiKey];
+  S[k] = value;
+  const out = $("o-" + uiKey);
+  if (out) out.textContent = fmt[uiKey](value);
+  return S[k];
+}
+
+const SLIDER_KEYS = ["strength","reach","response","spacing","sharpness","polish","tone"];
+SLIDER_KEYS.forEach(uiKey => {
+  const el = $("p-" + uiKey);
+  if (!el) return;
+  el.addEventListener("input", () => { applyKey(uiKey, +el.value); });
+});
+
+function resetAll(){
+  Object.assign(S, DEFAULTS);
+  SLIDER_KEYS.forEach(uiKey => {
+    const el = $("p-" + uiKey);
+    const k = KEYMAP[uiKey];
+    if (el){ el.value = S[k]; $("o-" + uiKey).textContent = fmt[uiKey](S[k]); }
+  });
+  resetField();
+}
+$("p-reset").addEventListener("click", resetAll);
+
+/* ── pointer: continuous magnet position + explicit drag-to-orbit ─────── */
+function setPointerFromEvent(e){
+  const r = canvas.getBoundingClientRect();
+  pointer.nx =  ((e.clientX - r.left) / r.width)  * 2 - 1;
+  pointer.ny = -(((e.clientY - r.top) / r.height) * 2 - 1);
+}
+
+canvas.addEventListener("pointerenter", (e) => { setPointerFromEvent(e); pointer.active = true; }, { passive: true });
+canvas.addEventListener("pointerleave", () => { pointer.active = false; dragging = false; body.classList.remove("is-dragging"); }, { passive: true });
+
+canvas.addEventListener("pointermove", (e) => {
+  setPointerFromEvent(e);
+  pointer.active = true;
+  if (dragging){
+    const ddx = e.clientX - dragStartX, ddy = e.clientY - dragStartY;
+    dragMoved += Math.abs(e.movementX || 0) + Math.abs(e.movementY || 0);
+    dragAz = dragStartAz + ddx * 0.0048;
+    dragEl = clamp(dragStartEl - ddy * 0.0042, -0.66, 0.52);
+  }
+}, { passive: true });
+
+canvas.addEventListener("pointerdown", (e) => {
+  setPointerFromEvent(e);
+  dragging = true; dragMoved = 0;
+  dragStartX = e.clientX; dragStartY = e.clientY;
+  dragStartAz = dragAz; dragStartEl = dragEl;
+  body.classList.add("is-dragging");
+  canvas.setPointerCapture(e.pointerId);
+});
+
+canvas.addEventListener("pointerup", () => {
+  dragging = false;
+  body.classList.remove("is-dragging");
+});
+
+canvas.addEventListener("pointercancel", () => {
+  dragging = false;
+  body.classList.remove("is-dragging");
+});
+
+/* ── keys ──────────────────────────────────────────────────────────────── */
+window.addEventListener("keydown", (e) => {
+  const tag = (e.target && e.target.tagName) || "";
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  const k = e.key.toLowerCase();
+  if (k === "c"){ setPanel(!body.classList.contains("panel-open")); }
+  else if (k === "escape"){ setPanel(false); }
+  else if (k === "r"){ resetAll(); }
+  else if (k === " "){ e.preventDefault(); paused = !paused; body.classList.toggle("is-paused", paused); }
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden){ running = false; }
+  else if (!running){ running = true; last = 0; requestAnimationFrame(frame_); }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DIAGNOSTIC SURFACE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+window.__cusp = {
+  version: "1.0.0",
+  title: "Cusp — a magnetic-liquid spike study",
+
+  settings: S,
+  defaults: Object.assign({}, DEFAULTS),
+  set(key, value){
+    if (!(key in S)) throw new Error("unknown setting: " + key);
+    S[key] = value;
+    const out = $("o-" + key);
+    if (out && fmt[key]) out.textContent = fmt[key](value);
+    const el = $("p-" + key);
+    if (el) el.value = value;
+    return S[key];
+  },
+  reset(){ resetAll(); return Object.assign({}, S); },
+
+  get clock(){ return clock; },
+  get paused(){ return paused; },
+  pause(v){ paused = (v === undefined) ? !paused : !!v; body.classList.toggle("is-paused", paused); return paused; },
+  get resolution(){ return [cw, ch]; },
+  get camera(){ return lastCam ? { pos: Array.from(lastCam.pos), az: baseAz + dragAz, el: elevation + dragEl } : null; },
+  orbit(az, el){ dragAz = az; if (el !== undefined) dragEl = el; return { az: baseAz + dragAz, el: elevation + dragEl }; },
+
+  /* cursor injection in NDC [-1,1] — testable without real mouse events */
+  setPointer(nx, ny){ pointer.nx = clamp(nx, -1, 1); pointer.ny = clamp(ny, -1, 1); pointer.active = true; return [pointer.nx, pointer.ny]; },
+  setPointerActive(v){ pointer.active = !!v; return pointer.active; },
+  get pointerNDC(){ return [pointer.nx, pointer.ny]; },
+  get pointerActive(){ return pointer.active; },
+  get magnetWorld(){ return magnetXZ.slice(); },
+
+  /* the field/lattice state a reviewer or test actually needs to check */
+  heightAt(x, z){ return heightAtWorld(x, z); },
+  get spikeStats(){ return { liveCount, peakHeight, avgHeight, maxHeight: MAX_HEIGHT }; },
+  get gridInfo(){ return { half: GRID_HALF, dim: GRID_DIM, hexSize: S.spacing / SQRT3, spacing: S.spacing }; },
+
+  /* force a simulation step + render, off the rAF loop — for deterministic testing */
+  step(dt){ renderOnce(dt); return this.spikeStats; },
+  render(){ renderOnce(1 / 60); return true; },
+
+  info(){
+    return {
+      fps: fpsShown,
+      resolution: [cw, ch],
+      dpr,
+      liveCount, peakHeight, avgHeight,
+      pointerActive: pointer.active,
+      magnetWorld: magnetXZ.slice(),
+      settings: Object.assign({}, S),
+      renderer: (() => {
+        const d = gl.getExtension("WEBGL_debug_renderer_info");
+        return d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : "unavailable";
+      })()
+    };
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOOT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+
+(async function boot(){
+  try {
+    setLoad(58, "Seeding the lattice");
+    await wait(180);
+
+    // warm the pipeline: one throwaway frame so first paint is not a hitch
+    setLoad(78, "Warming the march");
+    resize();
+    renderOnce(0);
+    gl.finish();
+    await wait(180);
+
+    setLoad(92, "Waking up");
+    updateReadout();
+    await wait(220);
+
+    setLoad(100, "Live");
+    await wait(260);
+
+    loader.classList.add("done");
+    body.classList.add("is-live");
+    setTimeout(() => { loader.style.display = "none"; }, 1000);
+
+    running = true;
+    last = 0;
+    requestAnimationFrame(frame_);
+  } catch (err){
+    console.error(err);
+    failLoad("Could not start the study");
+  }
+})();
+
+})();
+</script>
+</body>
+</html>
