@@ -31,6 +31,7 @@ the same either way.
 | 15 | **Telecine** | Live playback of exported keyframe animation data — a canvas engine that interpolates a hand-authored JSON schema at any point on the timeline, fully scrubbable | [`/telecine/`](./telecine/) |
 | 16 | **Intaglio** | A carved height field decides where one image dissolves through another, and dwell builds visible relief | [`/intaglio/`](./intaglio/) |
 | 17 | **Riser** | Molten metal poured into a mold and solidified — a real-time WebGPU MPM phase-change study | [`/riser/`](./riser/) |
+| 18 | **Cusp** | A raymarched liquid-metal pool erupts into a hexagonal lattice of sharp spikes wherever a cursor-driven magnetic field is strongest — the Rosensweig instability, no fluid solve | [`/cusp/`](./cusp/) |
 
 Studies 03–05 were lost to a storage failure and are being rebuilt. They'll be
 added here as they land. Numbering follows build order, not merit — it starts at
