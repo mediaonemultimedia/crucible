@@ -460,7 +460,6 @@ function rotateAxisAngle(v, axis, theta){
 }
 
 /* ── layout constants — shared with the shader's own copies below ───────── */
-const TRACK_LENGTH = 56;
 const REEL_Z = 10, GATE_Z = 24, LENS_Z = 44;
 const HOLE_PERIOD = 1.6;
 const GEAR_TEETH = 12;
@@ -491,8 +490,8 @@ const Z_KEYS = [
   [0.33, 20],   // fast transit
   [0.56, 27],   // dwell — gate (crosses GATE_Z = 24)
   [0.61, 37],   // fast transit
-  [0.90, 48],   // dwell — lens (crosses LENS_Z = 44)
-  [1.00, 56],   // finale rush into the bulb
+  [0.90, 42],   // dwell — lens (approaches LENS_Z = 44 head-on)
+  [1.00, 47],   // finale rush through the bulb at 44.85 — ends immersed in it
 ];
 function pacedZ(t){
   t = clamp(t, 0, 1);
@@ -505,6 +504,7 @@ function pacedZ(t){
   }
   return Z_KEYS[Z_KEYS.length - 1][1];
 }
+const TRACK_LENGTH = Z_KEYS[Z_KEYS.length - 1][1];
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DOM / LOADER
@@ -1049,7 +1049,7 @@ function frame(ts){
 
   rRaw.textContent = (target * 100).toFixed(1) + "%";
   rVirtual.textContent = (virtual * 100).toFixed(1) + "%";
-  const st = stationAt(virtual * TRACK_LENGTH);
+  const st = stationAt(pacedZ(virtual));
   rStation.textContent = st ? st.name : "—";
   progressFill.style.width = (target * 100) + "%";
   progressVirtual.style.left = (virtual * 100) + "%";
@@ -1177,7 +1177,7 @@ window.__sprocket = {
   get rawScroll(){ return target; },
   get virtualScroll(){ return virtual; },
   get sceneProgress(){
-    const z = virtual * TRACK_LENGTH;
+    const z = pacedZ(virtual);
     const st = stationAt(z);
     return {
       t: virtual, z,

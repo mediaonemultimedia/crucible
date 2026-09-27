@@ -32,6 +32,7 @@ the same either way.
 | 16 | **Intaglio** | A carved height field decides where one image dissolves through another, and dwell builds visible relief | [`/intaglio/`](./intaglio/) |
 | 17 | **Riser** | Molten metal poured into a mold and solidified — a real-time WebGPU MPM phase-change study | [`/riser/`](./riser/) |
 | 18 | **Repoussé** | A wordmark that reads as flat, printed type at rest and gains real extruded depth, letter by letter, the longer the cursor dwells | [`/repousse/`](./repousse/) |
+| 19 | **Sprocket** | A raymarched camera flythrough locked to a from-scratch virtual-scroll engine — real scroll eases into a virtual value that alone drives the camera, a rotating sprocket gear, and every set-piece | [`/sprocket/`](./sprocket/) |
 
 Studies 03–05 were lost to a storage failure and are being rebuilt. They'll be
 added here as they land. Numbering follows build order, not merit — it starts at
