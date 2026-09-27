@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0806">
+<title>Sprocket — a scroll-synced WebGL flythrough</title>
+<meta name="description" content="A from-scratch smooth-scroll engine — raw page scroll eases into a virtual value every frame — drives a raymarched WebGL2 camera flythrough past a sprocket wheel, a film reel and a projector lens. The virtual value alone drives the scene, so it stays exactly scrubbable at any position.">
+<style>
+:root{
+  --bg:#0a0806;
+  --ink:#efe6d8;
+  --dim:#8a8074;
+  --faint:#4d463d;
+  --rule:rgba(239,230,216,.11);
+  --rule-2:rgba(239,230,216,.055);
+  --accent:#e0a458;
+  --accent-2:#6fb3c9;
+  --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+canvas#stage{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
+
+/* the real scroll driver — an in-flow spacer that gives the document height
+   to scroll through; everything visual is fixed and reads the resulting
+   scrollTop, never this element directly */
+#scrollspace{position:relative;height:600vh;z-index:0}
+
+#veil{
+  position:fixed;inset:0;pointer-events:none;z-index:2;
+  background:radial-gradient(122% 88% at 50% 46%,transparent 40%,rgba(0,0,0,.32) 80%,rgba(0,0,0,.66) 100%);
+}
+#grain{
+  position:fixed;inset:0;pointer-events:none;z-index:3;opacity:.05;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='.5'/></svg>");
+}
+
+#ui{
+  position:fixed;inset:0;z-index:5;pointer-events:none;
+  opacity:0;transition:opacity 1.1s cubic-bezier(.4,0,.2,1) .2s;
+}
+body.is-live #ui{opacity:1}
+#ui > *{pointer-events:auto}
+
+.eyebrow{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.20em;
+  text-transform:uppercase;color:var(--faint);
+}
+
+/* wordmark ---------------------------------------------------------------- */
+#mark{position:absolute;top:26px;left:30px;display:flex;align-items:flex-start;gap:12px}
+#mark .w{
+  font-size:15px;font-weight:300;letter-spacing:.52em;text-transform:uppercase;
+  line-height:1;padding-top:1px;white-space:nowrap;
+}
+#mark .ix{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--accent);
+  border:1px solid rgba(224,164,88,.32);padding:2px 4px 1px;line-height:1;white-space:nowrap;
+}
+#mark .sub{margin-top:9px;display:block}
+#mark .col{display:flex;flex-direction:column}
+#mark .sx-wrap{position:relative;display:inline-block}
+#mark a.ix{text-decoration:none;display:inline-block;cursor:pointer;transition:border-color .28s ease,color .28s ease,background .28s ease}
+#mark a.ix:hover,#mark .sx-wrap:focus-within a.ix{border-color:rgba(224,164,88,.62);background:rgba(224,164,88,.08)}
+#mark a.ix:focus-visible{outline:1px solid rgba(224,164,88,.7);outline-offset:2px}
+#mark .sx-menu{
+  position:absolute;top:calc(100% + 9px);left:0;z-index:20;min-width:232px;max-height:70vh;overflow-y:auto;
+  background:rgba(10,8,6,.94);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+  border:1px solid var(--rule);padding:7px 0;
+  opacity:0;visibility:hidden;transform:translateY(-5px);
+  transition:opacity .26s ease,transform .26s cubic-bezier(.4,0,.2,1),visibility 0s linear .26s;
+}
+#mark .sx-wrap:hover .sx-menu,#mark .sx-wrap:focus-within .sx-menu{opacity:1;visibility:visible;transform:translateY(0);transition-delay:0s}
+#mark .sx-menu .sx-hd{
+  display:block;font-family:var(--mono);font-size:8px;letter-spacing:.22em;text-transform:uppercase;color:var(--faint);
+  padding:5px 13px 8px;border-bottom:1px solid var(--rule-2);margin-bottom:5px;text-decoration:none;transition:color .24s ease}
+#mark .sx-menu .sx-hd:hover,#mark .sx-menu .sx-hd:focus-visible{color:var(--accent);outline:none}
+#mark .sx-menu a{
+  display:flex;align-items:baseline;gap:9px;padding:4px 13px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;text-transform:uppercase;text-decoration:none;color:var(--dim);
+  transition:color .22s ease,background .22s ease}
+#mark .sx-menu a:hover,#mark .sx-menu a:focus-visible{color:var(--ink);background:rgba(239,230,216,.05);outline:none}
+#mark .sx-menu .sx-n{color:var(--faint);flex:0 0 auto;transition:color .22s ease}
+#mark .sx-menu a:hover .sx-n,#mark .sx-menu a:focus-visible .sx-n{color:var(--accent)}
+#mark .sx-menu .sx-here{color:var(--accent)}
+#mark .sx-menu .sx-here .sx-n{color:var(--accent)}
+
+/* panel toggle -------------------------------------------------------------*/
+#panel-toggle{
+  position:absolute;top:24px;right:30px;z-index:7;
+  display:flex;align-items:center;gap:10px;
+  background:rgba(12,10,8,.55);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  border:1px solid var(--rule);color:var(--dim);
+  font-family:var(--mono);font-size:9px;letter-spacing:.20em;text-transform:uppercase;
+  padding:8px 11px;cursor:pointer;line-height:1;
+  transition:border-color .3s ease,color .3s ease,background .3s ease,opacity .35s ease;
+}
+#panel-toggle:hover{border-color:rgba(224,164,88,.45);color:var(--ink)}
+#panel-toggle .bars{display:flex;flex-direction:column;gap:2.5px;width:11px}
+#panel-toggle .bars i{display:block;height:1px;background:currentColor}
+#panel-toggle .bars i:nth-child(1){width:11px}
+#panel-toggle .bars i:nth-child(2){width:7px}
+#panel-toggle .bars i:nth-child(3){width:9px}
+#panel-toggle .key{color:var(--accent);border:1px solid rgba(224,164,88,.28);padding:2px 4px 1px;font-size:8px;letter-spacing:.06em}
+body.panel-open #panel-toggle{opacity:0;pointer-events:none}
+
+/* control panel --------------------------------------------------------------*/
+#panel{
+  position:absolute;top:0;right:0;bottom:0;width:min(336px,90vw);z-index:8;
+  display:flex;flex-direction:column;
+  background:rgba(11,9,7,.90);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-left:1px solid var(--rule);
+  transform:translateX(101%);transition:transform .52s cubic-bezier(.4,0,.2,1);
+  will-change:transform;
+}
+body.panel-open #panel{transform:translateX(0)}
+#panel header{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+  padding:24px 22px 16px;border-bottom:1px solid var(--rule);flex:0 0 auto;
+}
+#panel header h2{margin:8px 0 0;font-size:13px;font-weight:300;letter-spacing:.34em;text-transform:uppercase}
+#panel-close{
+  background:none;border:1px solid var(--rule);color:var(--dim);
+  width:24px;height:24px;line-height:1;cursor:pointer;font-size:14px;
+  transition:border-color .25s ease,color .25s ease;
+}
+#panel-close:hover{border-color:rgba(224,164,88,.45);color:var(--ink)}
+#panel .body{overflow-y:auto;overscroll-behavior:contain;padding:0 22px 26px;flex:1 1 auto}
+#panel .body::-webkit-scrollbar{width:6px}
+#panel .body::-webkit-scrollbar-thumb{background:rgba(239,230,216,.12)}
+#panel section{padding:20px 0 6px;border-bottom:1px solid var(--rule-2)}
+#panel section:last-of-type{border-bottom:0}
+#panel h3{
+  margin:0 0 13px;font-family:var(--mono);font-size:9px;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--faint);font-weight:400;
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+}
+#panel h3 .ix{color:rgba(224,164,88,.5)}
+#panel .note{margin:10px 0 2px;font-family:var(--mono);font-size:8.5px;line-height:1.85;letter-spacing:.05em;color:var(--faint)}
+#panel .note b{color:var(--dim);font-weight:400}
+
+/* sliders */
+.sld{display:block;margin:13px 0 0}
+.sld .row{
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);
+}
+.sld .row output{color:var(--dim);letter-spacing:.06em;font-variant-numeric:tabular-nums}
+.sld input[type=range]{appearance:none;-webkit-appearance:none;width:100%;height:12px;background:none;cursor:pointer;display:block}
+.sld input[type=range]::-webkit-slider-runnable-track{height:1px;background:var(--rule)}
+.sld input[type=range]::-moz-range-track{height:1px;background:var(--rule)}
+.sld input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:9px;height:9px;margin-top:-4px;background:var(--accent);border:0;transform:rotate(45deg)}
+.sld input[type=range]::-moz-range-thumb{width:8px;height:8px;background:var(--accent);border:0;transform:rotate(45deg)}
+.sld input[type=range]:focus{outline:none}
+.sld input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(224,164,88,.25)}
+
+.act{
+  display:block;width:100%;margin-top:10px;background:none;border:1px solid var(--rule);color:var(--dim);
+  font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;
+  padding:10px 12px;cursor:pointer;transition:border-color .2s ease,color .2s ease,background .2s ease;
+}
+.act:hover{border-color:rgba(224,164,88,.45);color:var(--ink);background:rgba(224,164,88,.05)}
+.act.on{border-color:var(--accent);color:var(--ink);background:rgba(224,164,88,.10)}
+
+.scenes{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.scene-btn{
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  background:none;border:1px solid var(--rule);color:var(--dim);
+  font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-align:left;
+  padding:9px 11px;cursor:pointer;transition:border-color .2s ease,color .2s ease,background .2s ease;
+}
+.scene-btn:hover{border-color:rgba(224,164,88,.4);color:var(--ink)}
+.scene-btn.active{border-color:var(--accent);color:var(--ink);background:rgba(224,164,88,.06)}
+.scene-btn .k{color:var(--faint);font-size:9px}
+.scene-btn.active .k{color:var(--accent)}
+
+/* readout ------------------------------------------------------------------*/
+#readout{
+  position:absolute;top:70px;right:30px;z-index:6;
+  font-family:var(--mono);font-size:9px;letter-spacing:.08em;color:var(--faint);text-align:right;
+}
+#readout dl{margin:0;display:flex;gap:14px;flex-wrap:wrap;justify-content:flex-end}
+#readout dt{display:none}
+#readout .stat{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+#readout .stat b{color:var(--dim);font-size:8px;letter-spacing:.18em;text-transform:uppercase;font-weight:400}
+#readout .stat span{color:var(--ink);font-variant-numeric:tabular-nums;font-size:11px}
+body.panel-open #readout{opacity:0;pointer-events:none}
+
+/* progress rail ------------------------------------------------------------*/
+#progress{position:fixed;left:0;right:0;bottom:0;height:2px;background:var(--rule-2);z-index:6}
+#progress-fill{position:absolute;left:0;top:0;bottom:0;width:0%;background:var(--accent);transition:none}
+#progress-virtual{position:absolute;top:0;bottom:0;width:2px;background:var(--accent-2);left:0%}
+
+/* method / credit ------------------------------------------------------------*/
+#method{
+  position:absolute;left:30px;bottom:44px;z-index:6;max-width:300px;
+  font-family:var(--mono);font-size:9px;line-height:1.85;letter-spacing:.03em;color:var(--faint);opacity:.92;
+}
+#method .t{display:block;color:var(--dim);letter-spacing:.2em;text-transform:uppercase;font-size:8.5px;margin-bottom:8px}
+#method b{color:var(--dim);font-weight:400}
+body.panel-open #method{opacity:0;pointer-events:none}
+@media (max-width:900px){#method{display:none}}
+
+#credit{
+  position:absolute;left:50%;transform:translateX(-50%);bottom:16px;text-align:center;z-index:6;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.18em;color:var(--faint);text-transform:uppercase;line-height:1.8;white-space:nowrap;
+}
+#credit b{color:var(--dim);font-weight:400}
+#credit .keys{color:rgba(239,230,216,.22)}
+body.is-autoplay #credit .keys::after{content:" · auto-scroll running — space to stop";color:var(--accent)}
+body.panel-open #credit{opacity:0;pointer-events:none}
+
+@media (max-width:720px){
+  #mark{top:18px;left:18px}
+  #panel-toggle{top:16px;right:18px}
+  #panel{width:min(336px,100vw)}
+  #readout{display:none}
+  #method{display:none}
+  #credit{font-size:7.5px;letter-spacing:.1em;white-space:normal;width:calc(100vw - 36px);line-height:1.9}
+}
+
+/* boot loader ---------------------------------------------------------------*/
+#loader{
+  position:fixed;inset:0;z-index:20;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
+  transition:opacity .7s cubic-bezier(.4,0,.2,1),visibility 0s linear .7s;
+}
+body.is-live #loader{opacity:0;visibility:hidden;pointer-events:none}
+#loader .idx{font-family:var(--mono);font-size:10px;letter-spacing:.34em;color:var(--accent);margin-bottom:30px}
+#pulse{position:relative;width:64px;height:64px;margin-bottom:30px}
+#pulse .ring{position:absolute;inset:0;border:1px solid var(--accent);border-radius:50%;opacity:0;animation:pulse 2.2s cubic-bezier(.3,0,.4,1) infinite}
+#pulse .ring:nth-child(2){animation-delay:.55s}
+#pulse .ring:nth-child(3){animation-delay:1.1s}
+#pulse .dot{position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;background:var(--accent);border-radius:50%}
+@keyframes pulse{0%{transform:scale(.2);opacity:.85}100%{transform:scale(1.6);opacity:0}}
+#loader .word{font-size:clamp(30px,6.6vw,68px);font-weight:200;letter-spacing:.38em;text-transform:uppercase;text-indent:.38em;line-height:1;margin:0;text-align:center}
+#loader .study{margin-top:22px;font-family:var(--mono);font-size:9.5px;letter-spacing:.30em;text-transform:uppercase;color:var(--dim);text-align:center}
+#load-bar{margin-top:44px;width:min(290px,52vw);height:1px;background:rgba(239,230,216,.1);position:relative}
+#load-bar-fill{position:absolute;inset:0 auto 0 0;width:5%;background:var(--accent);transition:width .5s cubic-bezier(.4,0,.2,1)}
+#load-status{margin-top:14px;font-family:var(--mono);font-size:8.5px;letter-spacing:.26em;text-transform:uppercase;color:var(--faint)}
+#loader.is-error #load-status{color:#d97a6c}
+#loader.is-error #load-bar-fill{background:#d97a6c}
+#loader .rule{width:min(290px,52vw);height:1px;background:var(--rule-2);margin-top:30px}
+#loader .foot{margin-top:14px;font-family:var(--mono);font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:rgba(239,230,216,.16);text-align:center;line-height:2}
+
+@media (prefers-reduced-motion: reduce){
+  #pulse .ring{animation-duration:.01ms}
+  #loader,#panel{transition-duration:.01ms}
+}
+</style>
+</head>
+<body>
+
+<canvas id="stage"></canvas>
+<div id="veil"></div>
+<div id="grain"></div>
+
+<div id="ui">
+  <div id="mark">
+    <div class="col">
+      <span class="w">Sprocket</span>
+      <span class="eyebrow sub">A scroll-synced WebGL flythrough</span>
+    </div>
+    <span class="sx-wrap">
+      <a class="ix" href="../" aria-label="Study 19 — open series index">No. 19</a>
+      <nav class="sx-menu" aria-label="Series index">
+        <a class="sx-hd" href="../">Crucible — index</a>
+        <a href="../mercury/"><span class="sx-n">03</span><span>Mercury</span></a>
+        <a href="../torsion/"><span class="sx-n">04</span><span>Torsion</span></a>
+        <a href="../torsion-2/"><span class="sx-n">05</span><span>Torsion 2.0</span></a>
+        <a href="../weft/"><span class="sx-n">06</span><span>Weft</span></a>
+        <a href="../cast/"><span class="sx-n">07</span><span>Cast</span></a>
+        <a href="../solve/"><span class="sx-n">08</span><span>Solve</span></a>
+        <a href="../torsion-pineapple/"><span class="sx-n">09</span><span>Torsion Pineapple</span></a>
+        <a href="../anneal/"><span class="sx-n">10</span><span>Anneal</span></a>
+        <a href="../living-bokeh/"><span class="sx-n">11</span><span>Living Bokeh</span></a>
+        <a href="../glyph/"><span class="sx-n">12</span><span>Glyph</span></a>
+        <a href="../cockle/"><span class="sx-n">13</span><span>Cockle</span></a>
+        <a href="../armature/"><span class="sx-n">14</span><span>Armature</span></a>
+        <a href="../telecine/"><span class="sx-n">15</span><span>Telecine</span></a>
+        <a href="../intaglio/"><span class="sx-n">16</span><span>Intaglio</span></a>
+        <a href="../riser/"><span class="sx-n">17</span><span>Riser</span></a>
+        <a href="../repousse/"><span class="sx-n">18</span><span>Repoussé</span></a>
+        <a class="sx-here" href="../sprocket/" aria-current="page"><span class="sx-n">19</span><span>Sprocket</span></a>
+      </nav>
+    </span>
+  </div>
+
+  <button id="panel-toggle" type="button" aria-expanded="false" aria-controls="panel">
+    <span class="bars"><i></i><i></i><i></i></span>
+    <span class="lbl">Controls</span>
+    <span class="key">C</span>
+  </button>
+
+  <div id="readout">
+    <dl>
+      <div class="stat"><b>Raw</b><span id="r-raw">—</span></div>
+      <div class="stat"><b>Virtual</b><span id="r-virtual">—</span></div>
+      <div class="stat"><b>Station</b><span id="r-station">—</span></div>
+      <div class="stat"><b>FPS</b><span id="r-fps">—</span></div>
+    </dl>
+  </div>
+
+  <aside id="panel" aria-label="Controls">
+    <header>
+      <div>
+        <span class="eyebrow">Study 19</span>
+        <h2>Sprocket</h2>
+      </div>
+      <button id="panel-close" type="button" aria-label="Close controls">×</button>
+    </header>
+
+    <div class="body">
+
+      <section>
+        <h3>Scroll engine <span class="ix">01</span></h3>
+        <label class="sld">
+          <span class="row"><span>Follow rate</span><output id="o-rate">4.20</output></span>
+          <input id="p-rate" type="range" min="0.6" max="14" step="0.1" value="4.2">
+        </label>
+        <p class="note">
+          Raw scroll position is a <b>target</b>. A second value, <b>virtual</b>,
+          eases toward that target every frame — <b>virtual += (target − virtual)
+          × rate</b>, frame-rate independent. Every camera position, gear angle
+          and set-piece state below reads only the virtual value, never the raw
+          one. Drag this low and the lag becomes obvious; drag it high and the
+          two converge almost instantly.
+        </p>
+      </section>
+
+      <section>
+        <h3>Playback <span class="ix">02</span></h3>
+        <button class="act" id="p-play" type="button">Auto-scroll</button>
+        <label class="sld">
+          <span class="row"><span>Auto-scroll speed</span><output id="o-speed">1.00×</output></span>
+          <input id="p-speed" type="range" min="0.2" max="3" step="0.05" value="1">
+        </label>
+        <button class="act" id="p-reset" type="button">Reset to top</button>
+        <p class="note">
+          <b>Space</b> starts or stops an automatic scroll through the piece at
+          a constant rate — a programmatic drive of the real scrollbar, not a
+          separate playback mode. Scrolling manually stops it. <b>R</b> snaps
+          straight back to the top.
+        </p>
+      </section>
+
+      <section>
+        <h3>Stations <span class="ix">03</span></h3>
+        <div class="scenes" id="station-picker"></div>
+        <p class="note">
+          Jump straight to a set-piece. Each jump moves the real scrollbar —
+          the scene always renders the exact frame that scroll position maps
+          to, whether you scrolled there by hand, by key, or by script.
+        </p>
+      </section>
+
+      <section>
+        <h3>Method <span class="ix">04</span></h3>
+        <p class="note">
+          Named for the toothed wheel that feeds a film reel through a
+          projector in exact lockstep with playback position. The camera's
+          dolly, the gear's rotation, and every set-piece's state are pure
+          functions of one number — the virtual scroll progress — so jumping
+          anywhere renders precisely that frame. No mesh here either: rails,
+          gear, reel, gate and lens are all one raymarched signed-distance
+          field, smooth-min blended where <b>Armature</b> (No. 14) proved it.
+        </p>
+      </section>
+
+    </div>
+  </aside>
+
+  <div id="method">
+    <span class="t">Method</span>
+    Two numbers: <b>raw</b> (the page's real scrollTop, 0–1) and <b>virtual</b>
+    (raw, eased). The shader only ever reads virtual — camera dolly, gear
+    rotation, reel spin, gate glow, lens bloom. Jump anywhere and the scene
+    snaps to that exact state; scroll normally and it glides.
+  </div>
+
+  <div id="credit">
+    <b>Sprocket</b> — scroll-synced WebGL flythrough, study 19 &nbsp;·&nbsp; raymarched SDF &nbsp;·&nbsp; virtual-scroll camera &nbsp;·&nbsp; webgl2<br>
+    <span class="keys">scroll to advance &nbsp; c controls &nbsp; space auto-scroll &nbsp; r reset</span>
+  </div>
+</div>
+
+<div id="progress"><div id="progress-fill"></div><div id="progress-virtual"></div></div>
+
+<div id="loader">
+  <div class="idx">Study 19</div>
+  <div id="pulse"><i class="ring"></i><i class="ring"></i><i class="ring"></i><span class="dot"></span></div>
+  <h1 class="word">Sprocket</h1>
+  <div class="study">A scroll-synced WebGL flythrough</div>
+  <div id="load-bar"><div id="load-bar-fill"></div></div>
+  <div id="load-status">Opening a context</div>
+  <div class="rule"></div>
+  <div class="foot">
+    no scroll library · a from-scratch virtual-scroll engine<br>
+    camera, gear and every set-piece read only the eased value
+  </div>
+</div>
+
+<div id="scrollspace"></div>
+
+<script>
+(() => {
+"use strict";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SPROCKET — a scroll-synced WebGL flythrough
+   No. 19 of Crucible. Single file, raw WebGL2, no runtime network access.
+
+   Named for the toothed wheel that advances a film reel through a projector
+   in exact lockstep with playback position. This piece makes a raymarched
+   3D scene advance in exact lockstep with scroll position — the same
+   relationship. The technique behind it (the one darkroom.engineering's
+   Lenis library popularised for high-end WebGL sites) is to decouple raw
+   scroll from a lerped "virtual" scroll value and drive everything off the
+   virtual value alone: target = real scroll fraction; virtual eases toward
+   target every frame. Camera pose, gear rotation, reel spin, gate glow and
+   lens bloom are ALL pure functions of virtual — never of raw deltas, never
+   of wall-clock time — so the scene is exactly scrubbable at any position,
+   reached by hand, by key, or by script.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const lerp  = (a, b, t) => a + (b - a) * t;
+const $ = (id) => document.getElementById(id);
+const body = document.body;
+
+function smoothstep(e0, e1, x){
+  const t = clamp((x - e0) / (e1 - e0), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+function sub(a,b){ return [a[0]-b[0],a[1]-b[1],a[2]-b[2]]; }
+function add(a,b){ return [a[0]+b[0],a[1]+b[1],a[2]+b[2]]; }
+function scl(a,s){ return [a[0]*s,a[1]*s,a[2]*s]; }
+function cross(a,b){ return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+function len3(a){ return Math.sqrt(a[0]*a[0]+a[1]*a[1]+a[2]*a[2]); }
+function norm3(a){ const l = len3(a) || 1e-6; return [a[0]/l, a[1]/l, a[2]/l]; }
+/* Rodrigues' rotation formula — rotate vector v by angle theta around a
+   unit axis. Used to pitch the camera's forward vector by a clamped angle
+   rather than blending toward a Cartesian target point (see cameraPose). */
+function rotateAxisAngle(v, axis, theta){
+  const c = Math.cos(theta), s = Math.sin(theta);
+  const k = axis, kd = k[0]*v[0] + k[1]*v[1] + k[2]*v[2];
+  const kxv = cross(k, v);
+  return [
+    v[0]*c + kxv[0]*s + k[0]*kd*(1-c),
+    v[1]*c + kxv[1]*s + k[1]*kd*(1-c),
+    v[2]*c + kxv[2]*s + k[2]*kd*(1-c),
+  ];
+}
+
+/* ── layout constants — shared with the shader's own copies below ───────── */
+const TRACK_LENGTH = 56;
+const REEL_Z = 10, GATE_Z = 24, LENS_Z = 44;
+const HOLE_PERIOD = 1.6;
+const GEAR_TEETH = 12;
+const OBJ_Y = -1.1;
+const REEL_X = 0.0, GATE_X = 0.0, LENS_X = 0.0;
+function gauss(z, c, w){ const d = (z - c) / w; return Math.exp(-d * d); }
+/* t is the scroll fraction that lands mid-dwell at each station — the
+   pacing curve below is what actually produces that z, this is just where
+   to jump the scrollbar to land there directly */
+const STATIONS = [
+  { id:"reel", name:"Reel",  z: REEL_Z, t: 0.175, label:"A spool feeds the strip forward" },
+  { id:"gate", name:"Gate",  z: GATE_Z, t: 0.445, label:"The frame gate, held on one image" },
+  { id:"lens", name:"Lens",  z: LENS_Z, t: 0.755, label:"Light collapses through the lens" },
+];
+
+/* ── track pacing: z is a piecewise-smoothstep function of t, NOT a linear
+   t*TRACK_LENGTH. Each keyframe pair eases in and out (smoothstep has zero
+   derivative at both ends of its own segment), so world-space camera speed
+   naturally settles to near-zero right at every waypoint before the next
+   segment picks it back up — an arrive/linger/depart cadence timed entirely
+   by scroll fraction, with long low-Δz/Δt spans dwelling at each station
+   and short high-Δz/Δt spans rushing the transit between them. Still a
+   pure, stateless function of t: same t always yields the same z. ── */
+const Z_KEYS = [
+  [0.00, 0],
+  [0.07, 6],
+  [0.28, 13],   // dwell — reel (crosses REEL_Z = 10)
+  [0.33, 20],   // fast transit
+  [0.56, 27],   // dwell — gate (crosses GATE_Z = 24)
+  [0.61, 37],   // fast transit
+  [0.90, 48],   // dwell — lens (crosses LENS_Z = 44)
+  [1.00, 56],   // finale rush into the bulb
+];
+function pacedZ(t){
+  t = clamp(t, 0, 1);
+  for (let i = 0; i < Z_KEYS.length - 1; i++){
+    const [t0, z0] = Z_KEYS[i], [t1, z1] = Z_KEYS[i + 1];
+    if (t <= t1 || i === Z_KEYS.length - 2){
+      const u = smoothstep(t0, t1, t);
+      return lerp(z0, z1, u);
+    }
+  }
+  return Z_KEYS[Z_KEYS.length - 1][1];
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DOM / LOADER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const canvas = $("stage");
+const loader = $("loader");
+const barFill = $("load-bar-fill");
+const statusEl = $("load-status");
+const setLoad = (pct, msg) => { barFill.style.width = pct + "%"; if (msg) statusEl.textContent = msg; };
+const failLoad = (msg) => { loader.classList.add("is-error"); setLoad(100, msg); };
+
+setLoad(6, "Opening a context");
+
+const gl = canvas.getContext("webgl2", {
+  alpha:false, antialias:false, depth:false, stencil:false,
+  premultipliedAlpha:false, preserveDrawingBuffer:false, powerPreference:"high-performance"
+});
+if (!gl){ failLoad("WebGL2 unavailable in this browser"); return; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SHADERS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const VERT = `#version 300 es
+precision highp float;
+void main(){
+  vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+}`;
+
+const FRAG = `#version 300 es
+precision highp float;
+out vec4 fragColor;
+
+uniform vec2  uRes;
+uniform vec3  uCamPos;
+uniform mat3  uCamBasis;   // columns: right, up, forward
+uniform float uFocal;
+uniform vec3  uGearPos;    // world-space gear centre (camera-relative, computed on CPU)
+uniform float uGearAngle;
+uniform float uReelSpin;
+uniform float uReelProg;
+uniform float uGateProg;
+uniform float uLensProg;
+uniform vec3  uMoodColor;
+uniform float uTime;
+
+const float PI = 3.14159265359;
+const float HOLE_PERIOD = 1.6;
+const float REEL_Z = 10.0;
+const float GATE_Z = 24.0;
+const float LENS_Z = 44.0;
+/* every set-piece sits low, clear of the camera's own flight line — the
+   corridor's rails are the only geometry the camera path itself weaves
+   past; everything else is a fixed distance below it and can never be
+   flown through by accident */
+const float OBJ_Y = -1.1;
+const float REEL_X = 0.0;
+const float GATE_X = 0.0;
+
+/* ── primitives (exact SDFs; smooth-min needs an exact metric to blend) ── */
+float sdBox(vec3 p, vec3 b){
+  vec3 q = abs(p) - b;
+  return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+float sdCylZ(vec3 p, float r, float h){
+  vec2 d = abs(vec2(length(p.xy), p.z)) - vec2(r, h);
+  return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
+}
+float sdSphere(vec3 p, float r){ return length(p) - r; }
+float sdCapsule(vec3 p, vec3 a, vec3 b, float r){
+  vec3 pa = p - a, ba = b - a;
+  float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
+  return length(pa - ba * h) - r;
+}
+float sdTorusZ(vec3 p, vec2 t){
+  vec2 q = vec2(length(p.xy) - t.x, p.z);
+  return length(q) - t.y;
+}
+/* Inigo Quilez's exact capped-cone distance — the standard closed form for
+   a cone with a different radius at each cap, used here for the lens barrel */
+float sdCappedCone(vec3 p, float h, float r1, float r2){
+  vec2 q = vec2(length(p.xy), p.z);
+  vec2 k1 = vec2(r2, h);
+  vec2 k2 = vec2(r2 - r1, 2.0 * h);
+  vec2 ca = vec2(q.x - min(q.x, (q.y < 0.0) ? r1 : r2), abs(q.y) - h);
+  vec2 cb = q - k1 + k2 * clamp(dot(k1 - q, k2) / dot(k2, k2), 0.0, 1.0);
+  float s = (cb.x < 0.0 && ca.y < 0.0) ? -1.0 : 1.0;
+  return s * sqrt(min(dot(ca, ca), dot(cb, cb)));
+}
+float smin(float a, float b, float k){
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+float opS(float a, float b){ return max(a, -b); }
+mat2 rot2(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
+/* fold the plane into one wedge of an n-fold polar repeat, keeping radius —
+   used for the gear's teeth and the reel's spokes */
+vec2 polarFold(vec2 p, float n){
+  float a = atan(p.y, p.x);
+  float period = 2.0 * PI / n;
+  float a2 = mod(a + period * 0.5, period) - period * 0.5;
+  return vec2(cos(a2), sin(a2)) * length(p);
+}
+
+/* ── rails: two perforated strips, top and bottom, running the whole track.
+   Static in world space — the only thing that changes as scroll advances is
+   where the camera is looking from, exactly like real sprocket-fed film. ── */
+float sdRail(vec3 p, float railY){
+  vec3 rp = vec3(p.x, p.y - railY, p.z);
+  float rail = sdBox(rp, vec3(1.05, 0.09, 1.0e4));
+  float pz = mod(p.z, HOLE_PERIOD) - HOLE_PERIOD * 0.5;
+  vec3 hp = vec3(p.x, p.y - railY, pz);
+  float hole = sdBox(hp, vec3(0.30, 0.16, 0.42));
+  return opS(rail, hole);
+}
+float sdRails(vec3 p){ return min(sdRail(p, 1.55), sdRail(p, -1.55)); }
+
+/* ── the sprocket gear itself: a disc + hub + a 12-fold ring of teeth,
+   sampled in its own rotating frame so the shape stays static while the
+   angle (a pure function of the camera's track position) turns it. It
+   rides in camera space, off to one side, like a HUD companion — small
+   enough not to dominate the set-pieces it accompanies. ── */
+float sdGear(vec3 lp){
+  float disc = sdCylZ(lp, 0.40, 0.07);
+  float hub  = sdCylZ(lp, 0.16, 0.10);
+  float body = min(disc, hub);
+  vec2 wedge = polarFold(lp.xy, 12.0);
+  vec3 tp = vec3(wedge.x - 0.49, wedge.y, lp.z);
+  float tooth = sdBox(tp, vec3(0.095, 0.055, 0.07));
+  return min(body, tooth);
+}
+
+/* ── station 1: a reel, spun up and unwound as camera progress crosses it — */
+float sdReel(vec3 p, float prog, float spin){
+  vec3 rp = p - vec3(REEL_X, OBJ_Y, REEL_Z);
+  rp.xy = rot2(spin) * rp.xy;
+  float gap = 0.36, flangeR = 0.72, flangeTh = 0.035;
+  float f1 = sdCylZ(rp - vec3(0.0, 0.0, -gap), flangeR, flangeTh);
+  float f2 = sdCylZ(rp - vec3(0.0, 0.0,  gap), flangeR, flangeTh);
+  float hub = sdCylZ(rp, 0.18, gap + flangeTh);
+  float d = smin(f1, f2, 0.08);
+  d = smin(d, hub, 0.10);
+  vec2 wedge = polarFold(rp.xy, 6.0);
+  float rMid = (0.18 + flangeR * 0.85) * 0.5;
+  float rHalf = (flangeR * 0.85 - 0.18) * 0.5;
+  vec3 sp = vec3(wedge.x - rMid, wedge.y, rp.z);
+  float spoke = sdBox(sp, vec3(rHalf, 0.032, gap * 0.85));
+  d = smin(d, spoke, 0.08);
+  float tapeR = mix(flangeR * 0.86, 0.28, clamp(prog, 0.0, 1.0));
+  float tape = sdTorusZ(rp, vec2(tapeR, 0.10));
+  d = smin(d, tape, 0.11);
+  return d;
+}
+
+/* ── station 2: a frame gate, and a small smooth-min figure held behind it —
+   the same welded-primitive technique Armature (No. 14) used for a whole
+   creature, borrowed here for a silhouette glimpsed through the aperture ── */
+float sdGateFrame(vec3 p){
+  vec3 gp = p - vec3(GATE_X, OBJ_Y, GATE_Z);
+  float outer = sdBox(gp, vec3(0.85, 0.55, 0.11));
+  float inner = sdBox(gp, vec3(0.58, 0.38, 0.24));
+  return opS(outer, inner);
+}
+float sdFigure(vec3 p){
+  vec3 fp = p - vec3(GATE_X, OBJ_Y - 0.05, GATE_Z + 0.85);
+  float head = sdSphere(fp - vec3(0.0, 0.44, 0.0), 0.115);
+  float torso = sdCapsule(fp, vec3(0.0, 0.07, 0.0), vec3(0.0, 0.35, 0.0), 0.145);
+  float armL = sdCapsule(fp, vec3(0.0, 0.30, 0.0), vec3(-0.23, 0.07, 0.0), 0.055);
+  float armR = sdCapsule(fp, vec3(0.0, 0.30, 0.0), vec3( 0.23, 0.07, 0.0), 0.055);
+  float legs = sdCapsule(fp, vec3(0.0, 0.07, 0.0), vec3(0.0, -0.30, 0.0), 0.075);
+  float d = smin(head, torso, 0.08);
+  d = smin(d, armL, 0.06);
+  d = smin(d, armR, 0.06);
+  d = smin(d, legs, 0.08);
+  return d;
+}
+
+/* ── station 3: the projector lens — a hard-edged cone and two glass rings,
+   converging on the bulb the whole track has been travelling toward ── */
+float sdLensBody(vec3 p){
+  vec3 lp = p - vec3(0.0, OBJ_Y, LENS_Z);
+  float cone  = sdCappedCone(lp - vec3(0.0, 0.0, -0.22), 0.65, 0.68, 0.20);
+  float ring1 = sdTorusZ(lp - vec3(0.0, 0.0, -0.65), vec2(0.68, 0.035));
+  float ring2 = sdTorusZ(lp - vec3(0.0, 0.0,  0.40), vec2(0.24, 0.032));
+  return min(cone, min(ring1, ring2));
+}
+float sdBulb(vec3 p, float prog){
+  vec3 lp = p - vec3(0.0, OBJ_Y, LENS_Z + 0.85);
+  float r = mix(0.10, 0.19, clamp(prog, 0.0, 1.0));
+  return sdSphere(lp, r);
+}
+const vec3 BULB_POS = vec3(0.0, -1.1, 44.0 + 0.85);
+
+struct Scene{ float d; float mat; };
+Scene sceneMap(vec3 p){
+  Scene s; s.d = 1.0e5; s.mat = 0.0;
+  float d;
+
+  d = sdRails(p);
+  if (d < s.d){ s.d = d; s.mat = 1.0; }
+
+  vec3 toGear = p - uGearPos;
+  vec3 gp = vec3(dot(toGear, uCamBasis[0]), dot(toGear, uCamBasis[1]), dot(toGear, uCamBasis[2]));
+  gp.xy = rot2(-uGearAngle) * gp.xy;
+  d = sdGear(gp);
+  if (d < s.d){ s.d = d; s.mat = 2.0; }
+
+  d = sdReel(p, uReelProg, uReelSpin);
+  if (d < s.d){ s.d = d; s.mat = 3.0; }
+
+  d = sdGateFrame(p);
+  if (d < s.d){ s.d = d; s.mat = 4.0; }
+
+  d = sdFigure(p);
+  if (d < s.d){ s.d = d; s.mat = 5.0; }
+
+  d = sdLensBody(p);
+  if (d < s.d){ s.d = d; s.mat = 6.0; }
+
+  d = sdBulb(p, uLensProg);
+  if (d < s.d){ s.d = d; s.mat = 7.0; }
+
+  return s;
+}
+
+vec3 calcNormal(vec3 p){
+  vec2 e = vec2(0.0016, 0.0);
+  return normalize(vec3(
+    sceneMap(p + e.xyy).d - sceneMap(p - e.xyy).d,
+    sceneMap(p + e.yxy).d - sceneMap(p - e.yxy).d,
+    sceneMap(p + e.yyx).d - sceneMap(p - e.yyx).d
+  ));
+}
+
+vec3 background(vec3 rd){
+  float g = clamp(rd.y * 0.4 + 0.42, 0.0, 1.0);
+  vec3 base = mix(vec3(0.02, 0.017, 0.014), vec3(0.06, 0.05, 0.045), g);
+  return base + uMoodColor * 0.05;
+}
+
+vec3 shade(vec3 p, vec3 n, vec3 rd, float mat){
+  vec3 keyDir = normalize(uCamBasis[2] * -0.55 + uCamBasis[1] * 0.65 + uCamBasis[0] * 0.35);
+  float key = max(dot(n, keyDir), 0.0);
+  float fill = clamp(n.y * 0.5 + 0.5, 0.0, 1.0);
+  float rim = pow(1.0 - max(dot(n, -rd), 0.0), 2.2);
+
+  vec3 base;
+  float spec = 0.0;
+  if (mat < 1.5){ base = vec3(0.50, 0.47, 0.43); spec = 0.25; }
+  else if (mat < 2.5){ base = vec3(0.78, 0.62, 0.34); spec = 0.55; }
+  else if (mat < 3.5){ base = vec3(0.58, 0.38, 0.20); spec = 0.15; }
+  else if (mat < 4.5){ base = vec3(0.14, 0.14, 0.16); spec = 0.45; }
+  else if (mat < 5.5){ base = vec3(0.04, 0.045, 0.06); spec = 0.05; }
+  else if (mat < 6.5){ base = vec3(0.32, 0.37, 0.44); spec = 0.65; }
+  else { return vec3(1.0, 0.93, 0.78) * (1.6 + uLensProg * 2.4); }
+
+  vec3 halfV = normalize(keyDir - rd);
+  float sp = pow(max(dot(n, halfV), 0.0), 28.0) * spec;
+
+  vec3 col = base * (0.16 + key * 0.85 + fill * 0.14) + uMoodColor * 0.10;
+  col += vec3(1.0, 0.85, 0.6) * sp;
+  col += (mat > 4.5 && mat < 5.5 ? vec3(0.5, 0.6, 0.7) : vec3(0.9, 0.75, 0.5)) * rim * 0.35;
+  return col;
+}
+
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5 * uRes.xy) / uRes.y;
+  vec3 rd = normalize(uCamBasis * vec3(uv, uFocal));
+  vec3 ro = uCamPos;
+
+  float t = 0.0;
+  float hitMat = -1.0;
+  const float MAXD = 90.0;
+  for (int i = 0; i < 150; i++){
+    Scene s = sceneMap(ro + rd * t);
+    if (s.d < 0.0016){ hitMat = s.mat; break; }
+    t += s.d * 0.82;
+    if (t > MAXD){ t = MAXD; break; }
+  }
+
+  vec3 col;
+  if (hitMat >= 0.0){
+    vec3 p = ro + rd * t;
+    vec3 n = calcNormal(p);
+    col = shade(p, n, rd, hitMat);
+    float fog = 1.0 - exp(-t * 0.042);
+    col = mix(col, background(rd), fog);
+  } else {
+    col = background(rd);
+  }
+
+  /* cheap additive bulb glow — bleeds through/around geometry near the lens,
+     the way a bright point source would, independent of the raymarch hit */
+  vec3 toBulb = BULB_POS - ro;
+  float proj = clamp(dot(toBulb, rd), 0.0, MAXD);
+  vec3 closest = ro + rd * proj;
+  float distToBulb = length(closest - BULB_POS);
+  float glow = (0.028 + uLensProg * 0.10) / (1.0 + distToBulb * distToBulb * 3.2);
+  col += vec3(1.0, 0.85, 0.6) * glow;
+
+  /* vignette + a light dither to break up banding — cosmetic only, never
+     structural: removing this changes zero scene state */
+  vec2 vc = (gl_FragCoord.xy / uRes.xy) - 0.5;
+  col *= 1.0 - dot(vc, vc) * 0.55;
+  float grain = fract(sin(dot(gl_FragCoord.xy + uTime, vec2(12.9898, 78.233))) * 43758.5453);
+  col += (grain - 0.5) * 0.018;
+
+  fragColor = vec4(col, 1.0);
+}`;
+
+function compile(type, src){
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
+    const log = gl.getShaderInfoLog(sh);
+    gl.deleteShader(sh);
+    throw new Error(log);
+  }
+  return sh;
+}
+
+let prog;
+try {
+  setLoad(22, "Compiling raymarcher");
+  const vs = compile(gl.VERTEX_SHADER, VERT);
+  const fs = compile(gl.FRAGMENT_SHADER, FRAG);
+  prog = gl.createProgram();
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)){
+    throw new Error(gl.getProgramInfoLog(prog));
+  }
+} catch (err){
+  console.error(err);
+  failLoad("Shader compile failed — see console");
+  return;
+}
+gl.useProgram(prog);
+
+const U = {};
+["uRes","uCamPos","uCamBasis","uFocal","uGearPos","uGearAngle","uReelSpin","uReelProg","uGateProg","uLensProg","uMoodColor","uTime"]
+  .forEach(name => { U[name] = gl.getUniformLocation(prog, name); });
+
+const vao = gl.createVertexArray();
+gl.bindVertexArray(vao);
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCROLL ENGINE — the actual point of this study.
+
+   `target`  — the raw scroll fraction (0..1), read straight off the real
+               page scroll position (or driven there programmatically).
+   `virtual` — target, eased. Every frame: virtual += (target - virtual) *
+               (1 - exp(-rate * dt)) — an exponential decay toward target,
+               frame-rate independent (see Armature's `damp`, same formula).
+
+   Nothing downstream ever reads `target` directly except the readout and
+   the diagnostic object. Camera pose, gear angle, station progress — all of
+   it is a pure function of `virtual`, computed fresh from scratch each
+   frame. Jump `virtual` (or, via a scroll jump, `target`) anywhere and the
+   next frame renders exactly that state — there is no hidden momentum, no
+   accumulated time, nothing that would make the same virtual value render
+   two different frames.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+let target = 0, virtual = 0;
+let followRate = 4.2;
+let autoplay = false, autoplaySpeed = 1;
+let lastProgrammaticTs = -1;
+
+function maxScroll(){
+  return Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
+}
+function computeTarget(){
+  return clamp(window.scrollY / maxScroll(), 0, 1);
+}
+function scrollToFraction(f, instant){
+  lastProgrammaticTs = performance.now();
+  window.scrollTo({ top: clamp(f, 0, 1) * maxScroll(), behavior: instant ? "auto" : "auto" });
+}
+
+window.addEventListener("scroll", () => {
+  target = computeTarget();
+  const isProgrammatic = (performance.now() - lastProgrammaticTs) < 60;
+  if (!isProgrammatic && autoplay) setAutoplay(false);
+}, { passive:true });
+
+window.addEventListener("resize", () => { target = computeTarget(); });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CAMERA PATH — a pure function of virtual scroll progress t ∈ [0,1].
+   No wall-clock time anywhere in here.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function lateral(t){
+  return [
+    Math.sin(t * Math.PI * 2 * 1.15) * 0.42 + Math.sin(t * Math.PI * 2 * 2.7) * 0.09,
+    0.38 + Math.cos(t * Math.PI * 2 * 0.85) * 0.10
+  ];
+}
+/* the camera's default gaze is straight down its own path tangent, but
+   every set-piece sits below that line (see OBJ_Y) — close enough during a
+   dwell that "straight ahead" would leave it below frame. So the look
+   direction blends toward whichever station is nearest in z, weighted by
+   proximity, exactly like the mood-colour blend below: still a pure
+   function of camera z, which is itself a pure function of t. */
+function cameraPose(t){
+  const z = pacedZ(t);
+  const cur = lateral(t);
+  const pos = [cur[0], cur[1], z];
+
+  const dt = 0.0016;
+  const t2 = Math.min(t + dt, 1);
+  const nxt = lateral(t2);
+  const dz = Math.max(pacedZ(t2) - z, 1e-5);
+  const fwd0 = norm3([nxt[0] - cur[0], nxt[1] - cur[1], dz]);
+
+  const wReel = gauss(z, REEL_Z, 6), wGate = gauss(z, GATE_Z, 6), wLens = gauss(z, LENS_Z, 7);
+  const wSum = wReel + wGate + wLens;
+  const wMax = Math.max(wReel, wGate, wLens);
+  const stationX = wSum > 1e-6 ? (REEL_X * wReel + GATE_X * wGate + LENS_X * wLens) / wSum : 0;
+  const stationZ = wSum > 1e-6 ? (REEL_Z * wReel + GATE_Z * wGate + LENS_Z * wLens) / wSum : z;
+
+  /* pitch toward whichever station is nearest — computed as a clamped
+     ANGLE off the true bearing, not a blended target point. A blended
+     Cartesian target degenerates the instant the station's z falls behind
+     the camera (which happens constantly mid-dwell, since the camera
+     keeps advancing through the station's own z); an angle stays well
+     behaved no matter where the station is, because it's clamped before
+     it's ever applied. */
+  const toStation = sub([stationX, OBJ_Y, stationZ], pos);
+  const horiz = Math.hypot(toStation[0], toStation[2]);
+  const desiredPitch = clamp(Math.atan2(-toStation[1], Math.max(horiz, 1e-4)), 0, 0.55);
+  const appliedPitch = desiredPitch * clamp(wMax * 1.3, 0, 1);
+
+  const pitchAxis = norm3(cross([0, 1, 0], fwd0)); // rotating around this by +angle tilts fwd0 downward
+  const fwd = rotateAxisAngle(fwd0, pitchAxis, appliedPitch);
+
+  let right = norm3(cross(fwd, [0, 1, 0]));
+  let up = cross(right, fwd);
+  const roll = -(nxt[0] - cur[0]) * 2.4;
+  const cr = Math.cos(roll), sr = Math.sin(roll);
+  const right2 = norm3(add(scl(right, cr), scl(up, sr)));
+  const up2 = norm3(add(scl(up, cr), scl(right, -sr)));
+  return { pos, right: right2, up: up2, fwd, z };
+}
+
+const GEAR_OFFSET = [1.00, -0.66, 5.5]; // right, up, forward — camera-relative
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RENDER LOOP
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+let dpr = Math.min(window.devicePixelRatio || 1, 2);
+function resize(){
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.round(window.innerWidth * dpr), h = Math.round(window.innerHeight * dpr);
+  if (canvas.width !== w || canvas.height !== h){
+    canvas.width = w; canvas.height = h;
+    gl.viewport(0, 0, w, h);
+  }
+}
+window.addEventListener("resize", resize);
+resize();
+
+let camPoseCache = cameraPose(0);
+let gearAngleCache = 0;
+let reelProgCache = 0, gateProgCache = 0, lensProgCache = 0;
+let fpsShown = 0, fpsAccum = 0, fpsFrames = 0, lastTs = 0;
+
+function stationAt(z){
+  for (const st of STATIONS){
+    if (z > st.z - 6 && z < st.z + 6) return st;
+  }
+  return null;
+}
+
+const rRaw = $("r-raw"), rVirtual = $("r-virtual"), rStation = $("r-station"), rFps = $("r-fps");
+const progressFill = $("progress-fill"), progressVirtual = $("progress-virtual");
+
+function updateUniformsAndDraw(){
+  const pose = cameraPose(virtual);
+  camPoseCache = pose;
+
+  const gearPos = add(pose.pos, add(scl(pose.right, GEAR_OFFSET[0]), add(scl(pose.up, GEAR_OFFSET[1]), scl(pose.fwd, GEAR_OFFSET[2]))));
+  const gearAngle = pose.z * (2 * Math.PI / GEAR_TEETH) / HOLE_PERIOD;
+  gearAngleCache = gearAngle;
+
+  const reelProg = smoothstep(REEL_Z - 7, REEL_Z + 5, pose.z);
+  const gateProg = smoothstep(GATE_Z - 7, GATE_Z + 5, pose.z);
+  const lensProg = smoothstep(LENS_Z - 9, LENS_Z + 10, pose.z);
+  reelProgCache = reelProg; gateProgCache = gateProg; lensProgCache = lensProg;
+  const reelSpin = reelProg * Math.PI * 4;
+
+  function gauss(z, c, w){ const d = (z - c) / w; return Math.exp(-d * d); }
+  const wReel = gauss(pose.z, REEL_Z, 9), wGate = gauss(pose.z, GATE_Z, 9), wLens = gauss(pose.z, LENS_Z, 10);
+  const wSum = wReel + wGate + wLens + 0.15;
+  const cReel = [0.85,0.55,0.22], cGate = [0.35,0.55,0.75], cLens = [1.0,0.85,0.55];
+  const mood = [0,1,2].map(i => (cReel[i]*wReel + cGate[i]*wGate + cLens[i]*wLens) / wSum);
+
+  gl.uniform2f(U.uRes, canvas.width, canvas.height);
+  gl.uniform3fv(U.uCamPos, pose.pos);
+  gl.uniformMatrix3fv(U.uCamBasis, false, [...pose.right, ...pose.up, ...pose.fwd]);
+  gl.uniform1f(U.uFocal, 1.92);
+  gl.uniform3fv(U.uGearPos, gearPos);
+  gl.uniform1f(U.uGearAngle, gearAngle);
+  gl.uniform1f(U.uReelSpin, reelSpin);
+  gl.uniform1f(U.uReelProg, reelProg);
+  gl.uniform1f(U.uGateProg, gateProg);
+  gl.uniform1f(U.uLensProg, lensProg);
+  gl.uniform3fv(U.uMoodColor, mood);
+  gl.uniform1f(U.uTime, performance.now() * 0.001);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+function frame(ts){
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min((ts - lastTs) / 1000, 0.1);
+  lastTs = ts;
+
+  if (autoplay){
+    const next = clamp(target + autoplaySpeed * 0.055 * dt, 0, 1);
+    scrollToFraction(next);
+    target = next;
+    if (next >= 1) setAutoplay(false);
+  }
+
+  const followAmt = 1 - Math.exp(-followRate * dt);
+  virtual = lerp(virtual, target, followAmt);
+  if (Math.abs(virtual - target) < 0.00005) virtual = target;
+
+  updateUniformsAndDraw();
+
+  rRaw.textContent = (target * 100).toFixed(1) + "%";
+  rVirtual.textContent = (virtual * 100).toFixed(1) + "%";
+  const st = stationAt(virtual * TRACK_LENGTH);
+  rStation.textContent = st ? st.name : "—";
+  progressFill.style.width = (target * 100) + "%";
+  progressVirtual.style.left = (virtual * 100) + "%";
+
+  fpsAccum += dt; fpsFrames++;
+  if (fpsAccum >= 0.5){
+    fpsShown = Math.round(fpsFrames / fpsAccum);
+    rFps.textContent = String(fpsShown);
+    fpsAccum = 0; fpsFrames = 0;
+  }
+
+  requestAnimationFrame(frame);
+}
+
+document.addEventListener("visibilitychange", () => { if (!document.hidden) lastTs = 0; });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UI WIRING
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function setPanel(open){
+  body.classList.toggle("panel-open", open);
+  $("panel-toggle").setAttribute("aria-expanded", String(open));
+}
+$("panel-toggle").addEventListener("click", () => setPanel(true));
+$("panel-close").addEventListener("click", () => setPanel(false));
+
+function setAutoplay(v){
+  autoplay = v;
+  body.classList.toggle("is-autoplay", autoplay);
+  const btn = $("p-play");
+  btn.textContent = autoplay ? "Stop auto-scroll" : "Auto-scroll";
+  btn.classList.toggle("on", autoplay);
+}
+$("p-play").addEventListener("click", () => setAutoplay(!autoplay));
+
+const rateSlider = $("p-rate"), rateOut = $("o-rate");
+rateSlider.addEventListener("input", () => {
+  followRate = +rateSlider.value;
+  rateOut.textContent = followRate.toFixed(2);
+});
+
+const speedSlider = $("p-speed"), speedOut = $("o-speed");
+speedSlider.addEventListener("input", () => {
+  autoplaySpeed = +speedSlider.value;
+  speedOut.textContent = autoplaySpeed.toFixed(2) + "×";
+});
+
+function doReset(){
+  setAutoplay(false);
+  scrollToFraction(0);
+  target = 0; virtual = 0;
+}
+$("p-reset").addEventListener("click", doReset);
+
+function buildStationPicker(){
+  const wrap = $("station-picker");
+  wrap.innerHTML = "";
+  STATIONS.forEach((st, i) => {
+    const btn = document.createElement("button");
+    btn.className = "scene-btn";
+    btn.type = "button";
+    btn.innerHTML = `<span>${st.name} — ${st.label}</span><span class="k">${i + 1}</span>`;
+    btn.addEventListener("click", () => {
+      setAutoplay(false);
+      scrollToFraction(st.t);
+      target = st.t;
+    });
+    wrap.appendChild(btn);
+  });
+}
+buildStationPicker();
+
+window.addEventListener("keydown", (e) => {
+  const tag = (e.target && e.target.tagName) || "";
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  const k = e.key.toLowerCase();
+  if (k === " "){ e.preventDefault(); setAutoplay(!autoplay); }
+  else if (k === "r"){ e.preventDefault(); doReset(); }
+  else if (k === "c"){ setPanel(!body.classList.contains("panel-open")); }
+  else if (k === "escape"){ setPanel(false); }
+  else if (k >= "1" && k <= "3"){
+    const st = STATIONS[+k - 1];
+    if (st){ setAutoplay(false); scrollToFraction(st.t); target = st.t; }
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOOT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function boot(){
+  const steps = [
+    [40, "Building the sprocket track"],
+    [64, "Priming the raymarcher"],
+    [86, "Reading scroll position"],
+    [100, "Ready"],
+  ];
+  let i = 0;
+  const tick = () => {
+    if (i >= steps.length){
+      target = computeTarget();
+      virtual = target;
+      updateUniformsAndDraw();
+      requestAnimationFrame(frame);
+      requestAnimationFrame(() => body.classList.add("is-live"));
+      return;
+    }
+    const [pct, label] = steps[i++];
+    setLoad(pct, label);
+    setTimeout(tick, 90);
+  };
+  tick();
+}
+boot();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DIAGNOSTIC SURFACE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+window.__sprocket = {
+  version: "1.0.0",
+  title: "Sprocket — a scroll-synced WebGL flythrough",
+
+  get rawScroll(){ return target; },
+  get virtualScroll(){ return virtual; },
+  get sceneProgress(){
+    const z = virtual * TRACK_LENGTH;
+    const st = stationAt(z);
+    return {
+      t: virtual, z,
+      station: st ? st.id : null,
+      reelProgress: reelProgCache, gateProgress: gateProgCache, lensProgress: lensProgCache,
+      gearAngle: gearAngleCache,
+    };
+  },
+
+  get smoothing(){ return followRate; },
+  setSmoothing(v){ followRate = clamp(+v, 0.1, 30); rateSlider.value = String(followRate); rateOut.textContent = followRate.toFixed(2); return followRate; },
+
+  get playing(){ return autoplay; },
+  play(v){ setAutoplay(v === undefined ? true : !!v); return autoplay; },
+  pause(){ setAutoplay(false); return true; },
+  get autoplaySpeed(){ return autoplaySpeed; },
+  setAutoplaySpeed(v){ autoplaySpeed = Math.max(0.01, +v || 1); speedSlider.value = String(autoplaySpeed); speedOut.textContent = autoplaySpeed.toFixed(2) + "×"; return autoplaySpeed; },
+
+  /* jump the REAL page scroll position — proves the scene reacts correctly
+     to a programmatic scrollTo, not merely to simulated wheel deltas */
+  jump(t){ setAutoplay(false); scrollToFraction(t); target = clamp(+t, 0, 1); return target; },
+  reset(){ doReset(); return true; },
+
+  get camera(){ return { position: camPoseCache.pos.slice(), forward: camPoseCache.fwd.slice(), right: camPoseCache.right.slice(), up: camPoseCache.up.slice() }; },
+  get gearAngle(){ return gearAngleCache; },
+  get trackLength(){ return TRACK_LENGTH; },
+  get stations(){ return STATIONS.map(s => ({ id: s.id, name: s.name, z: s.z, scrollFraction: s.t })); },
+  get fps(){ return fpsShown; },
+};
+
+})();
+</script>
+</body>
+</html>
