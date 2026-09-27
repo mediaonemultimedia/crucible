@@ -882,7 +882,6 @@ gl.bindVertexArray(vao);
 let target = 0, virtual = 0;
 let followRate = 4.2;
 let autoplay = false, autoplaySpeed = 1;
-let lastProgrammaticTs = -1;
 
 function maxScroll(){
   return Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
@@ -890,18 +889,21 @@ function maxScroll(){
 function computeTarget(){
   return clamp(window.scrollY / maxScroll(), 0, 1);
 }
-function scrollToFraction(f, instant){
-  lastProgrammaticTs = performance.now();
-  window.scrollTo({ top: clamp(f, 0, 1) * maxScroll(), behavior: instant ? "auto" : "auto" });
+function scrollToFraction(f){
+  window.scrollTo({ top: clamp(f, 0, 1) * maxScroll(), behavior: "auto" });
 }
 
-window.addEventListener("scroll", () => {
-  target = computeTarget();
-  const isProgrammatic = (performance.now() - lastProgrammaticTs) < 60;
-  if (!isProgrammatic && autoplay) setAutoplay(false);
-}, { passive:true });
-
+/* the 'scroll' event fires for both autoplay's own programmatic scrollTo
+   calls and real user scrolling, and there's no reliable way to tell those
+   apart from the event alone — a timing-window guess is exactly the kind
+   of race that breaks under load (slow frames, headless rendering). So
+   autoplay is stopped only by the actual input gestures a person scrolls
+   with (wheel, touch, the keyboard's own scroll keys), never inferred
+   from the scroll event itself. */
+window.addEventListener("scroll", () => { target = computeTarget(); }, { passive:true });
 window.addEventListener("resize", () => { target = computeTarget(); });
+window.addEventListener("wheel", () => { if (autoplay) setAutoplay(false); }, { passive:true });
+window.addEventListener("touchstart", () => { if (autoplay) setAutoplay(false); }, { passive:true });
 
 /* ═══════════════════════════════════════════════════════════════════════════
    CAMERA PATH — a pure function of virtual scroll progress t ∈ [0,1].
@@ -1140,6 +1142,9 @@ window.addEventListener("keydown", (e) => {
   else if (k >= "1" && k <= "3"){
     const st = STATIONS[+k - 1];
     if (st){ setAutoplay(false); scrollToFraction(st.t); target = st.t; }
+  }
+  else if (["arrowup","arrowdown","pageup","pagedown","home","end"].includes(k)){
+    if (autoplay) setAutoplay(false);
   }
 });
 
