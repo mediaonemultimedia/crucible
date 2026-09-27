@@ -464,8 +464,8 @@ const TRACK_LENGTH = 56;
 const REEL_Z = 10, GATE_Z = 24, LENS_Z = 44;
 const HOLE_PERIOD = 1.6;
 const GEAR_TEETH = 12;
-const OBJ_Y = -1.1;
-const REEL_X = 0.0, GATE_X = 0.0, LENS_X = 0.0;
+const OBJ_Y = -0.55;
+const REEL_X = 1.1, GATE_X = -1.1, LENS_X = 0.0;
 function gauss(z, c, w){ const d = (z - c) / w; return Math.exp(-d * d); }
 /* t is the scroll fraction that lands mid-dwell at each station — the
    pacing curve below is what actually produces that z, this is just where
@@ -562,9 +562,9 @@ const float LENS_Z = 44.0;
    corridor's rails are the only geometry the camera path itself weaves
    past; everything else is a fixed distance below it and can never be
    flown through by accident */
-const float OBJ_Y = -1.1;
-const float REEL_X = 0.0;
-const float GATE_X = 0.0;
+const float OBJ_Y = -0.55;
+const float REEL_X = 1.1;
+const float GATE_X = -1.1;
 
 /* ── primitives (exact SDFs; smooth-min needs an exact metric to blend) ── */
 float sdBox(vec3 p, vec3 b){
@@ -643,21 +643,21 @@ float sdGear(vec3 lp){
 float sdReel(vec3 p, float prog, float spin){
   vec3 rp = p - vec3(REEL_X, OBJ_Y, REEL_Z);
   rp.xy = rot2(spin) * rp.xy;
-  float gap = 0.36, flangeR = 0.72, flangeTh = 0.035;
+  float gap = 0.18, flangeR = 0.36, flangeTh = 0.018;
   float f1 = sdCylZ(rp - vec3(0.0, 0.0, -gap), flangeR, flangeTh);
   float f2 = sdCylZ(rp - vec3(0.0, 0.0,  gap), flangeR, flangeTh);
-  float hub = sdCylZ(rp, 0.18, gap + flangeTh);
-  float d = smin(f1, f2, 0.08);
-  d = smin(d, hub, 0.10);
+  float hub = sdCylZ(rp, 0.09, gap + flangeTh);
+  float d = smin(f1, f2, 0.04);
+  d = smin(d, hub, 0.05);
   vec2 wedge = polarFold(rp.xy, 6.0);
-  float rMid = (0.18 + flangeR * 0.85) * 0.5;
-  float rHalf = (flangeR * 0.85 - 0.18) * 0.5;
+  float rMid = (0.09 + flangeR * 0.85) * 0.5;
+  float rHalf = (flangeR * 0.85 - 0.09) * 0.5;
   vec3 sp = vec3(wedge.x - rMid, wedge.y, rp.z);
-  float spoke = sdBox(sp, vec3(rHalf, 0.032, gap * 0.85));
-  d = smin(d, spoke, 0.08);
-  float tapeR = mix(flangeR * 0.86, 0.28, clamp(prog, 0.0, 1.0));
-  float tape = sdTorusZ(rp, vec2(tapeR, 0.10));
-  d = smin(d, tape, 0.11);
+  float spoke = sdBox(sp, vec3(rHalf, 0.016, gap * 0.85));
+  d = smin(d, spoke, 0.04);
+  float tapeR = mix(flangeR * 0.86, 0.14, clamp(prog, 0.0, 1.0));
+  float tape = sdTorusZ(rp, vec2(tapeR, 0.05));
+  d = smin(d, tape, 0.055);
   return d;
 }
 
@@ -666,21 +666,21 @@ float sdReel(vec3 p, float prog, float spin){
    creature, borrowed here for a silhouette glimpsed through the aperture ── */
 float sdGateFrame(vec3 p){
   vec3 gp = p - vec3(GATE_X, OBJ_Y, GATE_Z);
-  float outer = sdBox(gp, vec3(0.85, 0.55, 0.11));
-  float inner = sdBox(gp, vec3(0.58, 0.38, 0.24));
+  float outer = sdBox(gp, vec3(0.44, 0.29, 0.06));
+  float inner = sdBox(gp, vec3(0.30, 0.20, 0.13));
   return opS(outer, inner);
 }
 float sdFigure(vec3 p){
-  vec3 fp = p - vec3(GATE_X, OBJ_Y - 0.05, GATE_Z + 0.85);
-  float head = sdSphere(fp - vec3(0.0, 0.44, 0.0), 0.115);
-  float torso = sdCapsule(fp, vec3(0.0, 0.07, 0.0), vec3(0.0, 0.35, 0.0), 0.145);
-  float armL = sdCapsule(fp, vec3(0.0, 0.30, 0.0), vec3(-0.23, 0.07, 0.0), 0.055);
-  float armR = sdCapsule(fp, vec3(0.0, 0.30, 0.0), vec3( 0.23, 0.07, 0.0), 0.055);
-  float legs = sdCapsule(fp, vec3(0.0, 0.07, 0.0), vec3(0.0, -0.30, 0.0), 0.075);
-  float d = smin(head, torso, 0.08);
-  d = smin(d, armL, 0.06);
-  d = smin(d, armR, 0.06);
-  d = smin(d, legs, 0.08);
+  vec3 fp = p - vec3(GATE_X, OBJ_Y - 0.03, GATE_Z + 0.45);
+  float head = sdSphere(fp - vec3(0.0, 0.23, 0.0), 0.06);
+  float torso = sdCapsule(fp, vec3(0.0, 0.04, 0.0), vec3(0.0, 0.18, 0.0), 0.075);
+  float armL = sdCapsule(fp, vec3(0.0, 0.155, 0.0), vec3(-0.12, 0.04, 0.0), 0.028);
+  float armR = sdCapsule(fp, vec3(0.0, 0.155, 0.0), vec3( 0.12, 0.04, 0.0), 0.028);
+  float legs = sdCapsule(fp, vec3(0.0, 0.04, 0.0), vec3(0.0, -0.15, 0.0), 0.038);
+  float d = smin(head, torso, 0.04);
+  d = smin(d, armL, 0.03);
+  d = smin(d, armR, 0.03);
+  d = smin(d, legs, 0.04);
   return d;
 }
 
@@ -698,7 +698,7 @@ float sdBulb(vec3 p, float prog){
   float r = mix(0.10, 0.19, clamp(prog, 0.0, 1.0));
   return sdSphere(lp, r);
 }
-const vec3 BULB_POS = vec3(0.0, -1.1, 44.0 + 0.85);
+const vec3 BULB_POS = vec3(0.0, -0.55, 44.0 + 0.85);
 
 struct Scene{ float d; float mat; };
 Scene sceneMap(vec3 p){
@@ -931,20 +931,25 @@ function cameraPose(t){
   const stationX = wSum > 1e-6 ? (REEL_X * wReel + GATE_X * wGate + LENS_X * wLens) / wSum : 0;
   const stationZ = wSum > 1e-6 ? (REEL_Z * wReel + GATE_Z * wGate + LENS_Z * wLens) / wSum : z;
 
-  /* pitch toward whichever station is nearest — computed as a clamped
+  /* glance toward whichever station is nearest — computed as a clamped
      ANGLE off the true bearing, not a blended target point. A blended
      Cartesian target degenerates the instant the station's z falls behind
      the camera (which happens constantly mid-dwell, since the camera
      keeps advancing through the station's own z); an angle stays well
      behaved no matter where the station is, because it's clamped before
-     it's ever applied. */
+     it's ever applied. Each station sits a modest distance off the flight
+     line (see REEL_X/GATE_X/OBJ_Y) specifically so this glance only ever
+     has to cover a small angle — the pacing dwell already does the work
+     of giving it time in frame. */
   const toStation = sub([stationX, OBJ_Y, stationZ], pos);
   const horiz = Math.hypot(toStation[0], toStation[2]);
-  const desiredPitch = clamp(Math.atan2(-toStation[1], Math.max(horiz, 1e-4)), 0, 0.55);
-  const appliedPitch = desiredPitch * clamp(wMax * 1.3, 0, 1);
+  const desiredYaw = clamp(Math.atan2(toStation[0], toStation[2]) - Math.atan2(fwd0[0], fwd0[2]), -0.6, 0.6);
+  const desiredPitch = clamp(Math.atan2(-toStation[1], Math.max(horiz, 1e-4)), 0, 0.5);
+  const proximity = clamp(wMax * 1.3, 0, 1);
 
-  const pitchAxis = norm3(cross([0, 1, 0], fwd0)); // rotating around this by +angle tilts fwd0 downward
-  const fwd = rotateAxisAngle(fwd0, pitchAxis, appliedPitch);
+  const yawed = rotateAxisAngle(fwd0, [0, 1, 0], desiredYaw * proximity);
+  const pitchAxis = norm3(cross([0, 1, 0], yawed)); // rotating around this by +angle tilts yawed downward
+  const fwd = rotateAxisAngle(yawed, pitchAxis, desiredPitch * proximity);
 
   let right = norm3(cross(fwd, [0, 1, 0]));
   let up = cross(right, fwd);
