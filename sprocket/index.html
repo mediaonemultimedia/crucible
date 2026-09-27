@@ -688,7 +688,13 @@ float sdFigure(vec3 p){
    converging on the bulb the whole track has been travelling toward ── */
 float sdLensBody(vec3 p){
   vec3 lp = p - vec3(0.0, OBJ_Y, LENS_Z);
-  float cone  = sdCappedCone(lp - vec3(0.0, 0.0, -0.22), 0.65, 0.68, 0.20);
+  /* a barrel, not a block — the camera flies straight down its axis into
+     the bulb, so the cone has to be a hollow shell (outer minus a taller,
+     narrower inner cone that punches clean through both end caps) or the
+     raymarch origin ends up inside solid geometry and degenerates */
+  float outer = sdCappedCone(lp - vec3(0.0, 0.0, -0.22), 0.65, 0.68, 0.20);
+  float inner = sdCappedCone(lp - vec3(0.0, 0.0, -0.22), 0.78, 0.58, 0.11);
+  float cone = opS(outer, inner);
   float ring1 = sdTorusZ(lp - vec3(0.0, 0.0, -0.65), vec2(0.68, 0.035));
   float ring2 = sdTorusZ(lp - vec3(0.0, 0.0,  0.40), vec2(0.24, 0.032));
   return min(cone, min(ring1, ring2));
