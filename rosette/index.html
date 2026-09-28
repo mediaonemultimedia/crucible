@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0908">
+<title>Rosette — a halftone / metallic-flake material study</title>
+<meta name="description" content="A genuine per-pixel halftone dot screen — four ink plates at classic printing angles overlapping into visible rosette patterns — rendered over a raymarched automotive-metallic-flake material with real Fresnel flip-flop color shift and angle-driven sparkle. Raw WebGL2, no textures, no filters.">
+<style>
+:root{
+  --bg:#0a0908;
+  --ink:#efe6d8;
+  --dim:#8a8074;
+  --faint:#4d463d;
+  --rule:rgba(239,230,216,.11);
+  --rule-2:rgba(239,230,216,.055);
+  --accent:#d68a4a;
+  --accent-2:#5fa8c9;
+  --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  overflow:hidden;
+}
+canvas#stage{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0;cursor:crosshair}
+canvas#stage.dragging{cursor:grabbing}
+
+#grain{
+  position:fixed;inset:0;pointer-events:none;z-index:3;opacity:.045;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='.5'/></svg>");
+}
+
+#ui{position:fixed;inset:0;z-index:5;pointer-events:none;opacity:0;transition:opacity 1s cubic-bezier(.4,0,.2,1) .15s}
+body.is-live #ui{opacity:1}
+#ui > *{pointer-events:auto}
+
+.eyebrow{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.20em;
+  text-transform:uppercase;color:var(--faint);
+}
+
+/* wordmark ---------------------------------------------------------------- */
+#mark{position:absolute;top:26px;left:30px;display:flex;align-items:flex-start;gap:12px}
+#mark .col{display:flex;flex-direction:column}
+#mark .w{font-size:15px;font-weight:300;letter-spacing:.44em;text-transform:uppercase;line-height:1;padding-top:1px;white-space:nowrap;color:var(--ink)}
+#mark .sub{margin-top:9px;display:block}
+#mark .ix{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--accent);
+  border:1px solid rgba(214,138,74,.34);padding:2px 4px 1px;line-height:1;white-space:nowrap;
+  text-decoration:none;display:inline-block;
+  background:rgba(10,9,8,.4);
+}
+#mark .ix:hover{border-color:rgba(214,138,74,.65);background:rgba(214,138,74,.1)}
+
+/* panel toggle -------------------------------------------------------------*/
+#panel-toggle{
+  position:absolute;top:24px;right:30px;z-index:7;
+  display:flex;align-items:center;gap:10px;
+  background:rgba(12,10,8,.55);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  border:1px solid var(--rule);color:var(--dim);
+  font-family:var(--mono);font-size:9px;letter-spacing:.20em;text-transform:uppercase;
+  padding:8px 11px;cursor:pointer;line-height:1;
+  transition:border-color .3s ease,color .3s ease,background .3s ease,opacity .35s ease;
+}
+#panel-toggle:hover{border-color:rgba(214,138,74,.45);color:var(--ink)}
+#panel-toggle .bars{display:flex;flex-direction:column;gap:2.5px;width:11px}
+#panel-toggle .bars i{display:block;height:1px;background:currentColor}
+#panel-toggle .bars i:nth-child(1){width:11px}
+#panel-toggle .bars i:nth-child(2){width:7px}
+#panel-toggle .bars i:nth-child(3){width:9px}
+#panel-toggle .key{color:var(--accent);border:1px solid rgba(214,138,74,.28);padding:2px 4px 1px;font-size:8px;letter-spacing:.06em}
+body.panel-open #panel-toggle{opacity:0;pointer-events:none}
+
+/* control panel --------------------------------------------------------------*/
+#panel{
+  position:absolute;top:0;right:0;bottom:0;width:min(340px,90vw);z-index:8;
+  display:flex;flex-direction:column;
+  background:rgba(11,9,7,.92);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-left:1px solid var(--rule);
+  transform:translateX(101%);transition:transform .5s cubic-bezier(.4,0,.2,1);
+}
+body.panel-open #panel{transform:translateX(0)}
+#panel header{display:flex;align-items:flex-start;justify-content:space-between;padding:22px 20px 14px;border-bottom:1px solid var(--rule-2)}
+#panel header h2{margin:2px 0 0;font-size:19px;font-weight:300;letter-spacing:.01em}
+#panel-close{background:none;border:none;color:var(--dim);font-size:20px;cursor:pointer;line-height:1;padding:2px}
+#panel-close:hover{color:var(--ink)}
+#panel .body{flex:1;overflow-y:auto;padding:6px 20px 26px}
+#panel section{padding:16px 0;border-bottom:1px solid var(--rule-2)}
+#panel section:last-child{border-bottom:none}
+#panel h3{font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:0 0 12px;display:flex;align-items:center;gap:7px}
+#panel h3 .ix{font-family:var(--mono);font-size:8.5px;color:var(--faint);border:1px solid var(--rule);padding:1px 4px;letter-spacing:.05em}
+label.sld{display:block;margin:0 0 12px}
+label.sld:last-child{margin-bottom:0}
+label.sld .row{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink);margin-bottom:6px}
+label.sld output{font-family:var(--mono);color:var(--accent-2);font-size:10.5px}
+input[type=range]{
+  -webkit-appearance:none;width:100%;height:2px;background:var(--rule);border-radius:2px;outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--accent);cursor:pointer;
+  box-shadow:0 0 0 3px rgba(214,138,74,.18);
+}
+input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--accent);border:none;cursor:pointer}
+.seg{display:flex;gap:6px;margin-bottom:12px}
+.seg button{
+  flex:1;background:rgba(239,230,216,.04);border:1px solid var(--rule);color:var(--dim);
+  font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+  padding:7px 4px;cursor:pointer;transition:border-color .2s,color .2s,background .2s;
+}
+.seg button.active{border-color:rgba(214,138,74,.55);color:var(--ink);background:rgba(214,138,74,.09)}
+.swatches{display:flex;gap:7px;margin-bottom:12px}
+.swatches button{
+  flex:1;height:30px;border-radius:3px;border:1px solid var(--rule);cursor:pointer;position:relative;
+  transition:border-color .2s,transform .15s;
+}
+.swatches button:hover{transform:translateY(-1px)}
+.swatches button.active{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.act{
+  width:100%;background:rgba(239,230,216,.04);border:1px solid var(--rule);color:var(--ink);
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  padding:9px 10px;cursor:pointer;margin-top:4px;transition:border-color .2s,background .2s;
+}
+.act:hover{border-color:rgba(214,138,74,.5);background:rgba(214,138,74,.08)}
+.note{font-size:11.5px;line-height:1.55;color:var(--dim);margin:10px 0 0}
+.note b{color:var(--ink);font-weight:500}
+
+/* readout ------------------------------------------------------------------*/
+#readout{
+  position:absolute;bottom:26px;right:30px;z-index:6;
+  background:rgba(12,10,8,.55);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  border:1px solid var(--rule);padding:9px 13px;
+}
+#readout dl{display:flex;gap:16px;margin:0}
+#readout .stat{display:flex;flex-direction:column;gap:3px;font-family:var(--mono)}
+#readout .stat b{font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:500}
+#readout .stat span{font-size:11px;color:var(--ink)}
+
+/* credit --------------------------------------------------------------------*/
+#credit{
+  position:absolute;bottom:26px;left:30px;z-index:6;max-width:400px;
+  font-family:var(--mono);font-size:9.5px;line-height:1.6;color:var(--faint);
+}
+#credit b{color:var(--dim)}
+#credit .keys{display:block;margin-top:4px;color:var(--faint)}
+
+/* loader --------------------------------------------------------------------*/
+#loader{
+  position:fixed;inset:0;z-index:20;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;
+  transition:opacity .6s ease,visibility 0s linear .6s;
+}
+body.is-live #loader{opacity:0;visibility:hidden;pointer-events:none}
+#loader .idx{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--faint);text-transform:uppercase}
+#loader h1{font-size:34px;font-weight:300;letter-spacing:.06em;margin:0;color:var(--ink)}
+#loader .study{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.03em}
+#load-bar{width:200px;height:2px;background:var(--rule);margin-top:6px}
+#load-bar-fill{height:100%;width:0%;background:var(--accent);transition:width .25s ease}
+#load-status{font-family:var(--mono);font-size:9.5px;color:var(--faint);letter-spacing:.05em}
+
+@media (max-width:640px){
+  #mark{top:18px;left:16px}
+  #panel-toggle{top:16px;right:16px}
+  #readout{display:none}
+  #credit{bottom:16px;left:16px;max-width:60vw}
+}
+@media (prefers-reduced-motion:reduce){
+  #panel,#loader{transition-duration:.01ms}
+}
+</style>
+</head>
+<body>
+
+<canvas id="stage"></canvas>
+<div id="grain"></div>
+
+<div id="ui">
+  <div id="mark">
+    <div class="col">
+      <span class="w">Rosette</span>
+      <span class="eyebrow sub">Halftone rosette on a metallic-flake material</span>
+    </div>
+    <a class="ix" href="../" aria-label="Study 20 — open series index">No. 20</a>
+  </div>
+
+  <button id="panel-toggle" type="button" aria-expanded="false" aria-controls="panel">
+    <span class="bars"><i></i><i></i><i></i></span>
+    <span class="lbl">Controls</span>
+    <span class="key">C</span>
+  </button>
+
+  <div id="readout">
+    <dl>
+      <div class="stat"><b>Pitch</b><span id="r-pitch">—</span></div>
+      <div class="stat"><b>Screens</b><span id="r-screens">—</span></div>
+      <div class="stat"><b>Fresnel</b><span id="r-fresnel">—</span></div>
+      <div class="stat"><b>FPS</b><span id="r-fps">—</span></div>
+    </dl>
+  </div>
+
+  <aside id="panel" aria-label="Controls">
+    <header>
+      <div>
+        <span class="eyebrow">Study 20</span>
+        <h2>Rosette</h2>
+      </div>
+      <button id="panel-close" type="button" aria-label="Close controls">×</button>
+    </header>
+
+    <div class="body">
+
+      <section>
+        <h3>Halftone screen <span class="ix">01</span></h3>
+        <div class="seg" id="screens-seg">
+          <button data-screens="1" type="button">1 channel</button>
+          <button data-screens="4" type="button" class="active">4 &middot; CMYK</button>
+        </div>
+        <label class="sld">
+          <span class="row"><span>Screen ruling (dot pitch)</span><output id="o-pitch">9.0 px</output></span>
+          <input id="p-pitch" type="range" min="4" max="22" step="0.5" value="9">
+        </label>
+        <label class="sld">
+          <span class="row"><span>Ink gain</span><output id="o-gain">1.05</output></span>
+          <input id="p-gain" type="range" min="0.7" max="1.4" step="0.01" value="1.05">
+        </label>
+        <p class="note">
+          Each plate is its own angled grid — <b>C 15° · M 75° · Y 0° · K 45°</b>,
+          the classic offset that keeps four independent dot screens from
+          beating against each other. Every dot's radius comes from the real
+          scene's ink density sampled fresh at that plate's own cell — nothing
+          here is a texture or a filter.
+        </p>
+      </section>
+
+      <section>
+        <h3>Flake &amp; clearcoat <span class="ix">02</span></h3>
+        <label class="sld">
+          <span class="row"><span>Flake density</span><output id="o-fscale">1.00</output></span>
+          <input id="p-fscale" type="range" min="0.3" max="2.4" step="0.01" value="1">
+        </label>
+        <label class="sld">
+          <span class="row"><span>Sparkle intensity</span><output id="o-fint">0.55</output></span>
+          <input id="p-fint" type="range" min="0" max="1.2" step="0.01" value="0.55">
+        </label>
+        <label class="sld">
+          <span class="row"><span>Clearcoat</span><output id="o-clear">0.45</output></span>
+          <input id="p-clear" type="range" min="0" max="1" step="0.01" value="0.45">
+        </label>
+        <p class="note">
+          Every micro-facet is a random unit normal read from a 3D hash field,
+          blended into the surface normal. The sharp specular lobe only lights
+          up the facets currently aligned with the light/view half-vector — so
+          which flecks sparkle changes continuously as either angle moves.
+        </p>
+      </section>
+
+      <section>
+        <h3>Flip-flop paint <span class="ix">03</span></h3>
+        <div class="swatches" id="pair-swatches">
+          <button data-pair="0" class="active" style="background:linear-gradient(90deg,#2c5aa8,#8a4fc4)" aria-label="Blue to violet"></button>
+          <button data-pair="1" style="background:linear-gradient(90deg,#1f7a52,#c9a13a)" aria-label="Green to gold"></button>
+          <button data-pair="2" style="background:linear-gradient(90deg,#a03a2f,#d68a4a)" aria-label="Copper to amber"></button>
+          <button data-pair="3" style="background:linear-gradient(90deg,#3a3f45,#c7cdd4)" aria-label="Graphite to pearl"></button>
+        </div>
+        <label class="sld">
+          <span class="row"><span>Flip-flop sharpness</span><output id="o-ffpow">3.2</output></span>
+          <input id="p-ffpow" type="range" min="1" max="8" step="0.1" value="3.2">
+        </label>
+        <p class="note">
+          The base tint isn't the flake sparkle — it's a separate Fresnel mix
+          between a face color and a flop color, driven by the clean geometric
+          normal. Real pearlescent automotive paint shifts hue this way as the
+          panel tilts under a light; tilt the camera or move the light here to
+          see the same effect.
+        </p>
+      </section>
+
+      <section>
+        <h3>Light &amp; camera <span class="ix">04</span></h3>
+        <p class="note">
+          <b>Move the cursor</b> over the canvas to swing the key light —
+          continuous, no click required. <b>Drag</b> instead orbits the
+          camera, which changes the Fresnel angle the same way. <b>Space</b>
+          pauses the idle drift, <b>R</b> resets light and camera to their
+          starting angle.
+        </p>
+        <button class="act" id="p-reset" type="button">Reset view</button>
+      </section>
+
+    </div>
+  </aside>
+
+  <div id="credit">
+    <b>Rosette</b> — halftone / metallic-flake material study, No. 20 &middot; raymarched WebGL2<br>
+    <span class="keys">move to light &nbsp; drag to orbit &nbsp; c controls &nbsp; space pause &nbsp; r reset</span>
+  </div>
+</div>
+
+<div id="loader">
+  <div class="idx">Study 20</div>
+  <h1>Rosette</h1>
+  <div class="study">A halftone / metallic-flake material study</div>
+  <div id="load-bar"><div id="load-bar-fill"></div></div>
+  <div id="load-status">Opening a WebGL2 context</div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ROSETTE — a halftone / metallic-flake material study
+   No. 20 of Crucible. Single file, raw WebGL2, no runtime network access.
+
+   Two real printing/paint phenomena stacked in one pass:
+   1. A raymarched sphere shaded as automotive metallic-flake paint — a
+      hash-perturbed micro-facet normal drives sparkle, and a Fresnel mix
+      between two tuned tones drives the "flip-flop" hue shift.
+   2. That scene, rendered to a texture, is re-drawn through four
+      independently angled halftone screens (C 15° / M 75° / Y 0° / K 45°)
+      whose dot radii are sampled fresh, per plate, from the real scene
+      color — the classic print rosette, computed, not faked.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const canvas = document.getElementById("stage");
+const gl = canvas.getContext("webgl2", { antialias: false, alpha: false, powerPreference: "high-performance", preserveDrawingBuffer: true });
+if (!gl) {
+  document.getElementById("load-status").textContent = "WebGL2 is not available in this browser.";
+  throw new Error("WebGL2 unavailable");
+}
+
+const body = document.body;
+
+/* ── shader sources ────────────────────────────────────────────────────── */
+
+const FULLSCREEN_VERT = `#version 300 es
+void main(){
+  vec2 pos[3] = vec2[3](vec2(-1.0,-1.0), vec2(3.0,-1.0), vec2(-1.0,3.0));
+  gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0);
+}`;
+
+const SCENE_FRAG = `#version 300 es
+precision highp float;
+out vec4 fragColor;
+
+uniform vec2 uRes;
+uniform float uTime;
+uniform vec3 uCamPos, uCamRight, uCamUp, uCamFwd;
+uniform float uFovScale;
+uniform vec3 uLightDir;
+uniform float uFlakeScale, uFlakeIntensity, uFlakeShininess;
+uniform float uClearcoatIntensity, uClearcoatShininess;
+uniform vec3 uFaceColor, uFlopColor;
+uniform float uFlipFlopPower;
+
+const float SPHERE_R = 1.4;
+
+vec3 hash33(vec3 p3){
+  p3 = fract(p3*vec3(0.1031,0.1030,0.0973));
+  p3 += dot(p3, p3.yxz+33.33);
+  return fract((p3.xxy+p3.yxx)*p3.zyx);
+}
+
+vec2 mapScene(vec3 p){
+  float sph = length(p) - SPHERE_R;
+  float pl  = p.y + SPHERE_R;
+  if (sph < pl) return vec2(sph, 0.0);
+  return vec2(pl, 1.0);
+}
+float mapDist(vec3 p){ return mapScene(p).x; }
+
+vec3 calcNormal(vec3 p){
+  vec2 e = vec2(1.0,-1.0)*0.0006;
+  return normalize(
+    e.xyy*mapDist(p+e.xyy) + e.yyx*mapDist(p+e.yyx) +
+    e.yxy*mapDist(p+e.yxy) + e.xxx*mapDist(p+e.xxx));
+}
+
+vec2 raymarch(vec3 ro, vec3 rd){
+  float t = 0.0, mat = -1.0;
+  for (int i=0;i<110;i++){
+    vec3 p = ro + rd*t;
+    vec2 m = mapScene(p);
+    if (m.x < 0.0008){ mat = m.y; break; }
+    t += m.x;
+    if (t > 45.0) break;
+  }
+  return vec2(t, mat);
+}
+
+/* random unit-normal micro-facets, two frequencies mixed for size variance */
+vec3 flakeNormal(vec3 p, vec3 n){
+  vec3 gp1 = p * uFlakeScale;
+  vec3 gp2 = p * uFlakeScale * 2.63;
+  vec3 r1 = hash33(floor(gp1)) * 2.0 - 1.0;
+  vec3 r2 = hash33(floor(gp2) + 11.0) * 2.0 - 1.0;
+  vec3 dn = r1*0.72 + r2*0.28;
+  return normalize(n + dn * uFlakeIntensity * 0.9);
+}
+
+vec3 skyColor(vec3 rd, float t){
+  float h = clamp(rd.y*0.5+0.5, 0.0, 1.0);
+  vec3 top = vec3(0.030,0.033,0.044);
+  vec3 horizon = vec3(0.30,0.275,0.245) + 0.01*sin(t*0.15);
+  return mix(horizon, top, pow(h, 0.55));
+}
+
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5*uRes) / uRes.y;
+  vec3 rd = normalize(uCamFwd + uv.x*uFovScale*uCamRight + uv.y*uFovScale*uCamUp);
+  vec3 ro = uCamPos;
+
+  vec2 hit = raymarch(ro, rd);
+  vec3 col;
+
+  if (hit.y < 0.0){
+    col = skyColor(rd, uTime);
+  } else {
+    vec3 p = ro + rd*hit.x;
+    vec3 N = calcNormal(p);
+    vec3 V = normalize(-rd);
+    vec3 L = normalize(uLightDir);
+    vec3 H = normalize(L+V);
+    float NdotV = clamp(dot(N,V), 0.0, 1.0);
+    float NdotL = clamp(dot(N,L), 0.0, 1.0);
+
+    if (hit.y < 0.5){
+      vec3 Nf = flakeNormal(p, N);
+      float fresnel = pow(1.0 - NdotV, uFlipFlopPower);
+      vec3 base = mix(uFaceColor, uFlopColor, fresnel);
+
+      float ambient = 0.15;
+      vec3 diffuse = base * (NdotL*0.85 + ambient);
+
+      float specFlake = pow(max(dot(Nf,H),0.0), uFlakeShininess);
+      float specClear = pow(max(dot(N,H),0.0), uClearcoatShininess);
+      vec3 rim = vec3(0.85,0.9,1.0) * pow(1.0-NdotV, 4.0) * 0.10;
+
+      col = diffuse
+          + specFlake * uFlakeIntensity * 2.4 * vec3(1.0)
+          + specClear * uClearcoatIntensity * vec3(1.0)
+          + rim;
+    } else {
+      vec3 floorBase = vec3(0.095,0.095,0.105);
+      vec2 gf = abs(fract(p.xz*0.9)-0.5);
+      float line = smoothstep(0.03,0.0, min(gf.x,gf.y));
+      floorBase = mix(floorBase, vec3(0.155,0.155,0.165), line*0.5);
+      float fog = clamp(1.0 - hit.x/40.0, 0.0, 1.0);
+      col = floorBase*(NdotL*0.5+0.22)*fog + skyColor(rd, uTime)*(1.0-fog);
+    }
+  }
+
+  col = col / (1.0 + col*0.35);
+  col = pow(clamp(col, 0.0, 1.0), vec3(0.92));
+  fragColor = vec4(col, 1.0);
+}`;
+
+const HALFTONE_FRAG = `#version 300 es
+precision highp float;
+out vec4 fragColor;
+
+uniform sampler2D uScene;
+uniform vec2 uRes;
+uniform float uPitch;
+uniform vec4 uAngles;   // C, M, Y, K in radians
+uniform float uScreens; // 1.0 or 4.0
+uniform float uInkGain;
+uniform vec3 uPaper;
+
+vec2 rot(vec2 v, float a){
+  float c = cos(a), s = sin(a);
+  return mat2(c,-s,s,c) * v;
+}
+
+/* samples the source at the CENTER of the rotated grid cell the current
+   pixel falls in — so dot size is decided by real scene color, sampled
+   once per cell, not by anything baked or filtered. */
+float plateMask(vec2 fragPx, float angle, float density){
+  vec2 p = rot(fragPx, angle);
+  vec2 idx = floor(p/uPitch);
+  vec2 centerRot = (idx+0.5)*uPitch;
+  float d = length(p - centerRot);
+  float r = uPitch*0.5*uInkGain*sqrt(clamp(density,0.0,1.0));
+  return 1.0 - smoothstep(r-1.0, r+1.0, d);
+}
+
+vec3 sampleCell(vec2 fragPx, float angle){
+  vec2 p = rot(fragPx, angle);
+  vec2 idx = floor(p/uPitch);
+  vec2 centerRot = (idx+0.5)*uPitch;
+  vec2 centerPx = rot(centerRot, -angle);
+  return texture(uScene, clamp(centerPx/uRes, 0.0, 1.0)).rgb;
+}
+
+void main(){
+  vec2 fragPx = gl_FragCoord.xy;
+
+  if (uScreens < 1.5){
+    vec3 c = sampleCell(fragPx, uAngles.w);
+    float lum = dot(c, vec3(0.299,0.587,0.114));
+    float m = plateMask(fragPx, uAngles.w, 1.0-lum);
+    fragColor = vec4(mix(uPaper, vec3(0.045,0.045,0.05), m), 1.0);
+    return;
+  }
+
+  vec3 sC = sampleCell(fragPx, uAngles.x);
+  vec3 sM = sampleCell(fragPx, uAngles.y);
+  vec3 sY = sampleCell(fragPx, uAngles.z);
+  vec3 sK = sampleCell(fragPx, uAngles.w);
+
+  float kC = 1.0 - max(max(sC.r,sC.g),sC.b);
+  float kM = 1.0 - max(max(sM.r,sM.g),sM.b);
+  float kY = 1.0 - max(max(sY.r,sY.g),sY.b);
+  float kK = 1.0 - max(max(sK.r,sK.g),sK.b);
+
+  float cyan    = (1.0 - sC.r - kC) / max(1.0-kC, 0.0001);
+  float magenta = (1.0 - sM.g - kM) / max(1.0-kM, 0.0001);
+  float yellow  = (1.0 - sY.b - kY) / max(1.0-kY, 0.0001);
+  float black   = kK;
+
+  float mC = plateMask(fragPx, uAngles.x, cyan);
+  float mM = plateMask(fragPx, uAngles.y, magenta);
+  float mY = plateMask(fragPx, uAngles.z, yellow);
+  float mK = plateMask(fragPx, uAngles.w, black);
+
+  vec3 col = uPaper;
+  col -= mC * vec3(1.0,0.0,0.0) * 0.92;
+  col -= mM * vec3(0.0,1.0,0.0) * 0.92;
+  col -= mY * vec3(0.0,0.0,1.0) * 0.85;
+  col *= (1.0 - mK*0.94);
+  fragColor = vec4(clamp(col,0.0,1.0), 1.0);
+}`;
+
+/* ── GL plumbing ───────────────────────────────────────────────────────── */
+
+function compile(type, src){
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)){
+    const info = gl.getShaderInfoLog(s);
+    gl.deleteShader(s);
+    throw new Error("shader compile error: " + info);
+  }
+  return s;
+}
+function link(vsSrc, fsSrc){
+  const p = gl.createProgram();
+  const vs = compile(gl.VERTEX_SHADER, vsSrc);
+  const fs = compile(gl.FRAGMENT_SHADER, fsSrc);
+  gl.attachShader(p, vs);
+  gl.attachShader(p, fs);
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)){
+    const info = gl.getProgramInfoLog(p);
+    gl.deleteProgram(p);
+    throw new Error("program link error: " + info);
+  }
+  return p;
+}
+function uniforms(program, names){
+  const u = {};
+  for (const n of names) u[n] = gl.getUniformLocation(program, n);
+  return u;
+}
+
+const sceneProgram = link(FULLSCREEN_VERT, SCENE_FRAG);
+const postProgram = link(FULLSCREEN_VERT, HALFTONE_FRAG);
+
+const sceneU = uniforms(sceneProgram, [
+  "uRes","uTime","uCamPos","uCamRight","uCamUp","uCamFwd","uFovScale",
+  "uLightDir","uFlakeScale","uFlakeIntensity","uFlakeShininess",
+  "uClearcoatIntensity","uClearcoatShininess","uFaceColor","uFlopColor","uFlipFlopPower",
+]);
+const postU = uniforms(postProgram, [
+  "uScene","uRes","uPitch","uAngles","uScreens","uInkGain","uPaper",
+]);
+
+const emptyVAO = gl.createVertexArray();
+
+let sceneTex = null, sceneFBO = null;
+let fbW = 0, fbH = 0;
+
+function ensureFBO(w, h){
+  if (w === fbW && h === fbH && sceneFBO) return;
+  fbW = w; fbH = h;
+  if (sceneTex) gl.deleteTexture(sceneTex);
+  if (sceneFBO) gl.deleteFramebuffer(sceneFBO);
+  sceneTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, sceneTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  sceneFBO = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, sceneFBO);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, sceneTex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+function resize(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.max(1, Math.round(window.innerWidth * dpr));
+  const h = Math.max(1, Math.round(window.innerHeight * dpr));
+  if (canvas.width !== w || canvas.height !== h){
+    canvas.width = w; canvas.height = h;
+    canvas.style.width = window.innerWidth + "px";
+    canvas.style.height = window.innerHeight + "px";
+    ensureFBO(w, h);
+  }
+}
+window.addEventListener("resize", resize);
+resize();
+
+/* ── vector helpers ───────────────────────────────────────────────────── */
+
+function sub(a,b){ return [a[0]-b[0], a[1]-b[1], a[2]-b[2]]; }
+function cross(a,b){ return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+function norm(v){ const l = Math.hypot(v[0],v[1],v[2]) || 1; return [v[0]/l, v[1]/l, v[2]/l]; }
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function lerp(a,b,t){ return a + (b-a)*t; }
+function hsl2rgb(h,s,l){
+  const c = (1-Math.abs(2*l-1))*s, x = c*(1-Math.abs((h/60)%2-1)), m = l-c/2;
+  let r=0,g=0,b=0;
+  if (h<60){r=c;g=x;b=0;} else if (h<120){r=x;g=c;b=0;} else if (h<180){r=0;g=c;b=x;}
+  else if (h<240){r=0;g=x;b=c;} else if (h<300){r=x;g=0;b=c;} else {r=c;g=0;b=x;}
+  return [r+m, g+m, b+m];
+}
+
+/* ── state ────────────────────────────────────────────────────────────── */
+
+const DEFAULTS = {
+  camYaw: 0.55, camPitch: 0.24, camRadius: 7.4,
+  lightAz: 0.35, lightEl: 0.75,
+};
+
+const state = {
+  camYaw: DEFAULTS.camYaw, camPitch: DEFAULTS.camPitch, camRadius: DEFAULTS.camRadius,
+  targetYaw: DEFAULTS.camYaw, targetPitch: DEFAULTS.camPitch,
+  lightAz: DEFAULTS.lightAz, lightEl: DEFAULTS.lightEl,
+  targetLightAz: DEFAULTS.lightAz, targetLightEl: DEFAULTS.lightEl,
+
+  dotPitch: 9.0, screens: 4, inkGain: 1.05,
+  flakeScale: 1.0, flakeIntensity: 0.55, flakeShininess: 420, clearcoatIntensity: 0.45, clearcoatShininess: 90,
+  flipFlopPower: 3.2,
+  pairIndex: 0,
+
+  paused: false,
+  dragging: false,
+  time: 0,
+  fresnelLast: 0,
+};
+
+const PAIRS = [
+  { face: [0.20,0.34,0.72], flop: [0.56,0.28,0.82] },
+  { face: [0.11,0.46,0.30], flop: [0.79,0.63,0.20] },
+  { face: [0.62,0.22,0.16], flop: [0.84,0.55,0.28] },
+  { face: [0.20,0.22,0.24], flop: [0.78,0.80,0.83] },
+];
+
+const target = [0, -0.20, 0];
+const angles = [15, 75, 0, 45].map(d => d * Math.PI/180); // C, M, Y, K
+
+let camPos = [0,0,0], camRight = [1,0,0], camUp = [0,1,0], camFwd = [0,0,-1];
+function updateCamera(){
+  const cy = Math.cos(state.camPitch);
+  const x = state.camRadius * cy * Math.sin(state.camYaw);
+  const y = state.camRadius * Math.sin(state.camPitch);
+  const z = state.camRadius * cy * Math.cos(state.camYaw);
+  camPos = [target[0]+x, target[1]+y, target[2]+z];
+  camFwd = norm(sub(target, camPos));
+  camRight = norm(cross(camFwd, [0,1,0]));
+  camUp = cross(camRight, camFwd);
+}
+
+function lightDirFromAngles(az, el){
+  const cel = Math.cos(el);
+  return [cel*Math.sin(az), Math.sin(el), cel*Math.cos(az)];
+}
+
+/* ── interaction ──────────────────────────────────────────────────────── */
+
+let lastPointer = null;
+
+canvas.addEventListener("pointerdown", (e) => {
+  state.dragging = true;
+  canvas.classList.add("dragging");
+  lastPointer = [e.clientX, e.clientY];
+  canvas.setPointerCapture(e.pointerId);
+});
+window.addEventListener("pointerup", () => {
+  state.dragging = false;
+  canvas.classList.remove("dragging");
+  lastPointer = null;
+});
+canvas.addEventListener("pointermove", (e) => {
+  if (state.dragging && lastPointer){
+    const dx = e.clientX - lastPointer[0];
+    const dy = e.clientY - lastPointer[1];
+    lastPointer = [e.clientX, e.clientY];
+    state.targetYaw += dx * 0.006;
+    state.targetPitch = clamp(state.targetPitch - dy * 0.006, -0.55, 1.30);
+  } else {
+    const nx = (e.clientX / window.innerWidth) * 2 - 1;
+    const ny = (e.clientY / window.innerHeight) * 2 - 1;
+    state.targetLightAz = nx * 1.3;
+    state.targetLightEl = clamp(0.75 - ny * 0.65, 0.12, 1.35);
+  }
+});
+canvas.addEventListener("pointerleave", () => {
+  if (!state.dragging){
+    state.targetLightAz = DEFAULTS.lightAz;
+    state.targetLightEl = DEFAULTS.lightEl;
+  }
+});
+
+function doReset(){
+  state.targetYaw = DEFAULTS.camYaw;
+  state.targetPitch = DEFAULTS.camPitch;
+  state.targetLightAz = DEFAULTS.lightAz;
+  state.targetLightEl = DEFAULTS.lightEl;
+}
+
+window.addEventListener("keydown", (e) => {
+  const tag = (e.target && e.target.tagName) || "";
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  const k = e.key.toLowerCase();
+  if (k === " "){ e.preventDefault(); setPaused(!state.paused); }
+  else if (k === "r"){ e.preventDefault(); doReset(); }
+  else if (k === "c"){ setPanel(!body.classList.contains("panel-open")); }
+  else if (k === "escape"){ setPanel(false); }
+});
+
+/* ── panel wiring ─────────────────────────────────────────────────────── */
+
+const panelToggle = document.getElementById("panel-toggle");
+const panelClose = document.getElementById("panel-close");
+function setPanel(open){ body.classList.toggle("panel-open", open); }
+panelToggle.addEventListener("click", () => setPanel(true));
+panelClose.addEventListener("click", () => setPanel(false));
+
+function bindSlider(id, outId, fmt, onInput){
+  const input = document.getElementById(id);
+  const out = document.getElementById(outId);
+  const update = () => { out.textContent = fmt(+input.value); onInput(+input.value); };
+  input.addEventListener("input", update);
+  return { input, update };
+}
+
+const pitchSld = bindSlider("p-pitch", "o-pitch", v => v.toFixed(1) + " px", v => state.dotPitch = v);
+const gainSld = bindSlider("p-gain", "o-gain", v => v.toFixed(2), v => state.inkGain = v);
+const fscaleSld = bindSlider("p-fscale", "o-fscale", v => v.toFixed(2), v => state.flakeScale = v);
+const fintSld = bindSlider("p-fint", "o-fint", v => v.toFixed(2), v => state.flakeIntensity = v);
+const clearSld = bindSlider("p-clear", "o-clear", v => v.toFixed(2), v => state.clearcoatIntensity = v);
+const ffpowSld = bindSlider("p-ffpow", "o-ffpow", v => v.toFixed(1), v => state.flipFlopPower = v);
+
+document.querySelectorAll("#screens-seg button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    state.screens = +btn.dataset.screens;
+    document.querySelectorAll("#screens-seg button").forEach(b => b.classList.toggle("active", b === btn));
+  });
+});
+
+document.querySelectorAll("#pair-swatches button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    state.pairIndex = +btn.dataset.pair;
+    document.querySelectorAll("#pair-swatches button").forEach(b => b.classList.toggle("active", b === btn));
+  });
+});
+
+document.getElementById("p-reset").addEventListener("click", doReset);
+
+/* ── boot sequence ────────────────────────────────────────────────────── */
+
+const loadBar = document.getElementById("load-bar-fill");
+const loadStatus = document.getElementById("load-status");
+function setLoad(pct, label){ loadBar.style.width = pct + "%"; loadStatus.textContent = label; }
+
+function boot(){
+  const steps = [
+    [35, "Compiling the raymarcher"],
+    [62, "Building the halftone plates"],
+    [85, "Priming the flake field"],
+    [100, "Ready"],
+  ];
+  let i = 0;
+  const tick = () => {
+    if (i >= steps.length){
+      updateCamera();
+      requestAnimationFrame(frame);
+      requestAnimationFrame(() => body.classList.add("is-live"));
+      return;
+    }
+    const [pct, label] = steps[i++];
+    setLoad(pct, label);
+    setTimeout(tick, 90);
+  };
+  tick();
+}
+
+/* ── main loop ────────────────────────────────────────────────────────── */
+
+const rPitch = document.getElementById("r-pitch");
+const rScreens = document.getElementById("r-screens");
+const rFresnel = document.getElementById("r-fresnel");
+const rFps = document.getElementById("r-fps");
+
+let lastT = performance.now();
+let fpsAcc = 0, fpsN = 0, fpsShown = 0;
+
+function setPaused(p){ state.paused = p; }
+
+function frame(now){
+  const dt = Math.min((now - lastT) / 1000, 0.05);
+  lastT = now;
+
+  if (!state.paused){
+    state.time += dt;
+    const followLight = 6.0;
+    state.lightAz = lerp(state.lightAz, state.targetLightAz, 1 - Math.exp(-followLight*dt));
+    state.lightEl = lerp(state.lightEl, state.targetLightEl, 1 - Math.exp(-followLight*dt));
+    const followCam = 5.0;
+    state.camYaw = lerp(state.camYaw, state.targetYaw, 1 - Math.exp(-followCam*dt));
+    state.camPitch = lerp(state.camPitch, state.targetPitch, 1 - Math.exp(-followCam*dt));
+    if (!state.dragging) state.targetYaw += dt * 0.045;
+  }
+  updateCamera();
+
+  const w = canvas.width, h = canvas.height;
+  const fovScale = Math.tan((36 * Math.PI/180) / 2);
+  const lightDir = lightDirFromAngles(state.lightAz, state.lightEl);
+  const pair = PAIRS[state.pairIndex];
+
+  /* pass 1 — raymarched metallic-flake scene, into an offscreen texture */
+  gl.bindFramebuffer(gl.FRAMEBUFFER, sceneFBO);
+  gl.viewport(0, 0, w, h);
+  gl.useProgram(sceneProgram);
+  gl.bindVertexArray(emptyVAO);
+  gl.uniform2f(sceneU.uRes, w, h);
+  gl.uniform1f(sceneU.uTime, state.time);
+  gl.uniform3fv(sceneU.uCamPos, camPos);
+  gl.uniform3fv(sceneU.uCamRight, camRight);
+  gl.uniform3fv(sceneU.uCamUp, camUp);
+  gl.uniform3fv(sceneU.uCamFwd, camFwd);
+  gl.uniform1f(sceneU.uFovScale, fovScale);
+  gl.uniform3fv(sceneU.uLightDir, lightDir);
+  gl.uniform1f(sceneU.uFlakeScale, state.flakeScale * 26.0);
+  gl.uniform1f(sceneU.uFlakeIntensity, state.flakeIntensity);
+  gl.uniform1f(sceneU.uFlakeShininess, state.flakeShininess);
+  gl.uniform1f(sceneU.uClearcoatIntensity, state.clearcoatIntensity);
+  gl.uniform1f(sceneU.uClearcoatShininess, state.clearcoatShininess);
+  gl.uniform3fv(sceneU.uFaceColor, pair.face);
+  gl.uniform3fv(sceneU.uFlopColor, pair.flop);
+  gl.uniform1f(sceneU.uFlipFlopPower, state.flipFlopPower);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  /* pass 2 — reconstruct through angled halftone screens */
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, w, h);
+  gl.useProgram(postProgram);
+  gl.bindVertexArray(emptyVAO);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, sceneTex);
+  gl.uniform1i(postU.uScene, 0);
+  gl.uniform2f(postU.uRes, w, h);
+  gl.uniform1f(postU.uPitch, state.dotPitch * Math.min(window.devicePixelRatio || 1, 2));
+  gl.uniform4f(postU.uAngles, angles[0], angles[1], angles[2], angles[3]);
+  gl.uniform1f(postU.uScreens, state.screens);
+  gl.uniform1f(postU.uInkGain, state.inkGain);
+  gl.uniform3f(postU.uPaper, 0.93, 0.925, 0.90);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  /* readout */
+  fpsAcc += dt; fpsN++;
+  if (fpsAcc >= 0.4){ fpsShown = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; }
+  const fresnelApprox = Math.pow(1 - Math.cos(state.camPitch), state.flipFlopPower);
+  state.fresnelLast = fresnelApprox;
+  rPitch.textContent = state.dotPitch.toFixed(1) + " px";
+  rScreens.textContent = state.screens === 4 ? "C M Y K" : "1 (K)";
+  rFresnel.textContent = fresnelApprox.toFixed(2);
+  rFps.textContent = fpsShown;
+
+  requestAnimationFrame(frame);
+}
+
+boot();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DIAGNOSTIC SURFACE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+window.__rosette = {
+  version: "1.0.0",
+  title: "Rosette — halftone rosette over a metallic-flake paint material",
+
+  get halftone(){
+    return {
+      dotPitchPx: state.dotPitch,
+      screens: state.screens,
+      anglesDeg: { c: 15, m: 75, y: 0, k: 45 },
+      inkGain: state.inkGain,
+    };
+  },
+  setDotPitch(px){ state.dotPitch = clamp(+px, 2, 40); pitchSld.input.value = state.dotPitch; pitchSld.update(); return state.dotPitch; },
+  setScreens(n){ state.screens = (+n === 1) ? 1 : 4; return state.screens; },
+  setInkGain(g){ state.inkGain = clamp(+g, 0.3, 2.0); gainSld.input.value = state.inkGain; gainSld.update(); return state.inkGain; },
+
+  get flake(){
+    return {
+      scale: state.flakeScale, intensity: state.flakeIntensity, shininess: state.flakeShininess,
+      clearcoatIntensity: state.clearcoatIntensity, clearcoatShininess: state.clearcoatShininess,
+    };
+  },
+  setFlakeScale(v){ state.flakeScale = clamp(+v, 0.1, 5); fscaleSld.input.value = state.flakeScale; fscaleSld.update(); return state.flakeScale; },
+  setFlakeIntensity(v){ state.flakeIntensity = clamp(+v, 0, 2); fintSld.input.value = state.flakeIntensity; fintSld.update(); return state.flakeIntensity; },
+  setClearcoat(v){ state.clearcoatIntensity = clamp(+v, 0, 1.5); clearSld.input.value = state.clearcoatIntensity; clearSld.update(); return state.clearcoatIntensity; },
+
+  get flipFlop(){
+    const pair = PAIRS[state.pairIndex];
+    return { faceColor: pair.face.slice(), flopColor: pair.flop.slice(), power: state.flipFlopPower, pairIndex: state.pairIndex };
+  },
+  setFlipFlopPower(v){ state.flipFlopPower = clamp(+v, 0.5, 12); ffpowSld.input.value = state.flipFlopPower; ffpowSld.update(); return state.flipFlopPower; },
+  setPair(i){ state.pairIndex = clamp(Math.round(+i), 0, PAIRS.length-1); return state.pairIndex; },
+
+  get light(){ return { az: state.lightAz, el: state.lightEl, targetAz: state.targetLightAz, targetEl: state.targetLightEl }; },
+  setLightAngle(az, el){
+    state.targetLightAz = clamp(+az, -1.5, 1.5);
+    state.targetLightEl = clamp(+el, 0.05, 1.5);
+    state.lightAz = state.targetLightAz;
+    state.lightEl = state.targetLightEl;
+    return { az: state.lightAz, el: state.lightEl };
+  },
+
+  get camera(){ return { yaw: state.camYaw, pitch: state.camPitch, radius: state.camRadius, position: camPos.slice() }; },
+  setCamera(yaw, pitch, radius){
+    state.targetYaw = +yaw; state.targetPitch = clamp(+pitch, -0.55, 1.3);
+    state.camYaw = state.targetYaw; state.camPitch = state.targetPitch;
+    if (radius !== undefined) state.camRadius = clamp(+radius, 2, 12);
+    updateCamera();
+    return { yaw: state.camYaw, pitch: state.camPitch, radius: state.camRadius };
+  },
+
+  get paused(){ return state.paused; },
+  pause(){ setPaused(true); return true; },
+  play(){ setPaused(false); return true; },
+  reset(){ doReset(); return true; },
+
+  get fps(){ return fpsShown; },
+  get resolution(){ return [canvas.width, canvas.height]; },
+};
+
+})();
+</script>
+</body>
+</html>
