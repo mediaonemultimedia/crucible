@@ -46,6 +46,16 @@ test('a grab target that jumps across the scene drags, never explodes', () => {
   assert.ok(!b.nanResets, 'needed a NaN reset');
 });
 
+test('uneven browser frame times still settle (fixed-step clock)', () => {
+  const b = new SoftBody(buildRig());
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let t = 0; t < 6; ) { const dt = (1 / 60) * (0.6 + rnd() * 0.8); b.advance(dt); t += dt; }
+  let peak = 0;
+  for (let k = 0; k < 60; k++) { b.advance((1 / 60) * (0.6 + rnd() * 0.8)); peak = Math.max(peak, b.kinetic()); }
+  assert.ok(peak < 2e-2, `still jittering: peak kinetic ${peak}`);
+});
+
 test('fast frame', () => {
   const b = new SoftBody(buildRig());
   const t = performance.now();

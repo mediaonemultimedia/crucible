@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import { buildRig } from './rig.js';
 import { SoftBody } from './softbody.js';
 import { Grasp } from './grasp.js';
+import { Idle } from './idle.js';
 import { Groom } from './groom.js';
 import { Body } from './body.js';
 import {
@@ -47,6 +48,7 @@ async function start() {
   const rig = buildRig();
   const soft = new SoftBody(rig);
   const grasp = new Grasp(soft);
+  const idle = new Idle(soft);
   const groom = new Groom();
   const body = new Body(rig, soft);
 
@@ -121,6 +123,7 @@ async function start() {
   slider('stuffing', (v) => v.toFixed(2), (v) => { soft.params.stuffing = v; });
   slider('damping', (v) => v.toFixed(2), (v) => { soft.params.damping = v; });
   slider('grip', (v) => v.toFixed(2), (v) => { grasp.params.grip = v; });
+  slider('idle', (v) => (v === 0 ? 'still' : v.toFixed(2)), (v) => { idle.amount = v; });
 
   const HINTS = {
     hand: '<b>Hand</b>Grab the head or any arm and pull — it stretches, then springs back. Shift as you let go to pin that point, then grab another.',
@@ -252,14 +255,16 @@ async function start() {
       camera.setViewOffset(innerWidth, innerHeight, frame.shift, 0, innerWidth, innerHeight);
     }
 
-    if (dt > 0) {
-      runAction(dt);
-      tools.update(dt);
-      grasp.update(dt);
-      soft.step(dt);
-    }
-    body.pressPoints = tools.pressPoints();
-    body.update(dt);
+    // fixed-step simulation; the fur-lag spring rides the same clock, since
+    // it differentiates positions twice and uneven steps read as jolts
+    soft.advance(dt, (h) => {
+      runAction(h);
+      tools.update(h);
+      grasp.update(h);
+    }, (h) => {
+      body.pressPoints = tools.pressPoints();
+      body.update(h);
+    });
     groom.relax(real);
     if (groom.dirty) { groomTex.needsUpdate = true; groom.dirty = false; }
     // the camera drifts after the octopus so play never walks it out of frame
@@ -320,7 +325,7 @@ async function start() {
   });
 
   document.body.classList.add('is-live');
-  window.__flock = { soft, grasp, groom, body, tools, renderer, fur, scene, camera, shells };
+  window.__flock = { soft, grasp, idle, groom, body, tools, renderer, fur, scene, camera, shells };
 }
 
 start().catch((err) => {
