@@ -34,6 +34,7 @@ the same either way.
 | 18 | **Repoussé** | A wordmark that reads as flat, printed type at rest and gains real extruded depth, letter by letter, the longer the cursor dwells | [`/repousse/`](./repousse/) |
 | 19 | **Sprocket** | A raymarched camera flythrough locked to a from-scratch virtual-scroll engine — real scroll eases into a virtual value that alone drives the camera, a rotating sprocket gear, and every set-piece | [`/sprocket/`](./sprocket/) |
 | 20 | **Rosette** | A genuine four-plate halftone screen — angled C/M/Y/K dot grids sampled per-pixel from real scene luminance — over a raymarched automotive metallic-flake material with Fresnel flip-flop color shift and angle-driven sparkle | [`/rosette/`](./rosette/) |
+| 21 | **Flock** | A plush octopus as a position-based soft body — a shape-matched head cloud and eight tethered arm chains — under 64 instanced shells of fur with a paintable groom map, fur-lag springs and Kajiya-Kay strand lighting; arms reach for and coil around a stick | [`/flock/`](./flock/) |
 
 Studies 03–05 were lost to a storage failure and are being rebuilt. They'll be
 added here as they land. Numbering follows build order, not merit — it starts at
