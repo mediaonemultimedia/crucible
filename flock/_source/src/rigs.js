@@ -1,16 +1,17 @@
 /* The other three plush toys, and the builder they share.
 
-   Each character is a handful of shape-matched clouds (a sitting torso, a
-   head) plus appendage chains, written the same way the octopus is so the one
-   SoftBody and one Body drive them all. Proportions are a chunky, friendly
-   toy's: big round heads, short muzzles, stubby legs.
+   Each character is one or two shape-matched clouds plus appendage chains,
+   written the same way the octopus is so the one SoftBody and one Body drive
+   them all. The wolf and lion are a single firmly stuffed cloud, torso and
+   head together; the llama's small head is a second cloud riding on its neck
+   chain. Proportions are a chunky, friendly toy's: big round heads, short
+   muzzles, stubby legs.
 
    Chains carry their own stiffness: `bend` scales the window shape-matching,
    `mem` the pull back to the sewn pose (relative to their cloud), `stretch`
    the tether limit. `inCloud` chains (legs that carry weight) are also
    members of their cloud, so the stuffing holds them like the torso.       */
 
-const TAU = Math.PI * 2;
 const GOLDEN = Math.PI * (3 - Math.sqrt(5));
 
 export function smooth(a, b, x) {
@@ -38,26 +39,15 @@ const dist3 = (a, b) => len3(sub3(a, b));
 
 /* 3×3 bases as column triples [ex, ey, ez] */
 export function rotX(a) { const c = Math.cos(a), s = Math.sin(a); return [[1, 0, 0], [0, c, s], [0, -s, c]]; }
-export function rotY(a) { const c = Math.cos(a), s = Math.sin(a); return [[c, 0, -s], [0, 1, 0], [s, 0, c]]; }
 const apply = (B, l) => B
   ? [B[0][0] * l[0] + B[1][0] * l[1] + B[2][0] * l[2], B[0][1] * l[0] + B[1][1] * l[1] + B[2][1] * l[2], B[0][2] * l[0] + B[1][2] * l[1] + B[2][2] * l[2]]
   : l;
-const unapply = (B, w) => B
-  ? [B[0][0] * w[0] + B[0][1] * w[1] + B[0][2] * w[2], B[1][0] * w[0] + B[1][1] * w[1] + B[1][2] * w[2], B[2][0] * w[0] + B[2][1] * w[1] + B[2][2] * w[2]]
-  : w;
-
 /* point on an ellipsoid part from a unit direction (sinφ sinθ, cosφ, sinφ cosθ) */
 export function ellipsoidPoint(E, d, inset = 0) {
   const phi = Math.acos(Math.max(-1, Math.min(1, d[1])));
   const b = E.bulge ? E.bulge(phi) : 1;
   const l = [(E.r[0] - inset) * d[0] * b, (E.r[1] - inset) * d[1], (E.r[2] - inset) * d[2] * b];
   return add3(E.c, apply(E.B, l));
-}
-
-/* local unit-ish direction of a world point relative to an ellipsoid part */
-export function ellipsoidLocal(E, p) {
-  const l = unapply(E.B, sub3(p, E.c));
-  return [l[0] / E.r[0], l[1] / E.r[1], l[2] / E.r[2]];
 }
 
 const one = () => 1;
@@ -120,15 +110,6 @@ export class RigBuilder {
       if (cut && cut(d)) continue;
       this.clouds[k].ix.push(this.add(ellipsoidPoint(E, d, rr), rr));
     }
-  }
-
-  /* add the `count` points of cloud `from` nearest `at` to cloud `to`: shared
-     points stitch two clouds into a soft joint                              */
-  share(from, to, at, count) {
-    const best = this.clouds[from].ix
-      .filter((i) => i !== this.clouds[from].center)
-      .map((i) => [dist3(this.p(i), at), i]).sort((a, b) => a[0] - b[0]).slice(0, count);
-    for (const [, i] of best) this.clouds[to].ix.push(i);
   }
 
   /* an appendage: n points along path(u), u ∈ [0, 1], root first. The root
@@ -401,9 +382,9 @@ export function buildLion() {
   b.chain({
     name: 'tail', kind: 'tail', cloud: 0, n: 10, anchor: [-0.1, 0.45, -0.4],
     path: spline([[-0.15, 0.4, -0.64], [-0.5, 0.12, -1.0], [-1.0, 0.11, -0.82], [-1.22, 0.11, -0.28], [-1.12, 0.14, 0.22], [-0.86, 0.3, 0.55]]),
-    radius: (u) => 0.085 + 0.05 * smooth(0.82, 0.95, u) * (1 - 0.4 * smooth(0.95, 1, u)),
+    radius: (u) => 0.085 + 0.035 * smooth(0.84, 0.95, u) * (1 - 0.4 * smooth(0.95, 1, u)),
     ref: [0, -1, 0], bend: 1.6, mem: 0.6, stretch: 1.25, AS: 40, AA: 16, CAP: 7,
-    pile: (u) => 1 + 0.9 * smooth(0.8, 0.92, u), accent: (u) => smooth(0.8, 0.9, u),
+    pile: (u) => 1 + 0.6 * smooth(0.84, 0.94, u), accent: (u) => smooth(0.82, 0.92, u),
     groom: { ruf: 0.05 },
   });
 
@@ -450,7 +431,7 @@ export function buildLlama() {
   // small head on top, facing the camera
   const hc = [nTop[0] + 0.02, nTop[1] + 0.2, nTop[2] + 0.1];
   const HEAD = { c: hc, r: [0.36, 0.33, 0.4], B: null, bulge: null };
-  const head = b.cloud(HEAD, { shell: 34, core: 6, parent: 0, mem: 6 });
+  const head = b.cloud(HEAD, { shell: 34, core: 6, parent: 0, mem: 6, k: 2, k0: 0.05 });
   // the neck's last two points belong to the head too: it sits on the neck
   for (const j of [neck.idx.length - 1, neck.idx.length - 2]) b.clouds[head].ix.push(neck.idx[j]);
   b.grid({ name: 'head', cloud: head, ...HEAD, U: 48, V: 32, eye: true, accent: () => 1, pile: () => 0.8,

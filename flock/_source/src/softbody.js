@@ -4,9 +4,10 @@
    constraint per substep. The head (or torso) is a shape-matched cloud
    (stuffing sets how hard it pulls back to shape); each arm, ear, tail or
    neck is a chain of three-point shape-matched windows (bending + rest curl)
-   plus stretch links. A second cloud — a head on a torso — shares points
-   with its parent and keeps a gentle memory of its pose there. Everything
-   else — grabs, the finger, the stick, the floor — is a projection on top. */
+   plus stretch links. A second cloud — the llama's head on its neck — shares
+   points with the chain it sits on and keeps a gentle memory of its pose
+   relative to the body. Everything else — grabs, the finger, the stick, the
+   floor — is a projection on top.                                          */
 
 import { extractRotation, quatToMat, invert3, det3, mulMat3, segParam } from './math.js';
 
