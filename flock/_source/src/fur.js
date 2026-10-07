@@ -36,6 +36,7 @@ export function makeFurMaterial(groomTex, maskTex) {
     color: uniform(new THREE.Color(FUR_COLORS.coral.fur)),
     under: uniform(new THREE.Color(FUR_COLORS.coral.under)),
     accent: uniform(new THREE.Color(FUR_COLORS.coral.fur)),
+    stitch: uniform(new THREE.Color().setRGB(0.16, 0.08, 0.07, THREE.LinearSRGBColorSpace)),
     key: uniform(KEY.clone()),
     fill: uniform(FILL.clone()),
     meshView: uniform(0),
@@ -118,7 +119,7 @@ export function makeFurMaterial(groomTex, maskTex) {
     const he = clamp(hh.div(max(vPile, float(0.05))), 0, 1);
     const base = mix(mix(vec3(U.color), vec3(U.accent), vAccent), vec3(U.under), vUnder).toVar();
     base.assign(mix(base, vec3(0.95, 0.42, 0.45), m.g.mul(0.7)));            // blush
-    base.assign(mix(base, vec3(0.16, 0.08, 0.07), m.b));                       // stitching
+    base.assign(mix(base, vec3(U.stitch), m.b));                               // stitching
     base.mulAssign(strandRand.mul(0.16).add(0.92));
     base.mulAssign(mix(float(0.5), float(1.0), pow(he, float(0.8))));          // dark roots
     base.assign(mix(base, base.mul(1.18).add(0.04), smoothstep(0.72, 1.0, he).mul(0.35))); // frosted tips

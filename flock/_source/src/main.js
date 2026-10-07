@@ -230,6 +230,8 @@ async function start() {
     canvas.setAttribute('aria-label', info.aria);
     $('#title p').textContent = info.blurb;
     $('#l-hold').textContent = info.readout;
+    $('#r-hold').innerHTML = `0<small>${info.unit[1]}</small>`;
+    fur.uniforms.stitch.value.setRGB(...info.stitch, THREE.LinearSRGBColorSpace);
     $('#b-stick').disabled = true;
     setTool(tools.mode === 'stick' && name !== 'octopus' ? 'hand' : tools.mode);
     // re-aim the camera at the newcomer

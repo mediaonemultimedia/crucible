@@ -61,13 +61,13 @@ export class Idle {
     if (ch.kind === 'tail') {
       // bursts of wagging: a fast wag under a slow on/off swell
       const swell = Math.max(0, Math.sin(TAU * 0.09 * t + k)) ** 2;
-      f = Math.sin(TAU * 2.1 * t) * swell * 900 * a;
+      f = Math.sin(TAU * 1.4 * t) * swell * 300 * a;
     } else if (ch.kind === 'ear') {
       // a flick every few seconds, one ear at a time
       const ph = (t * 0.23 + k * 0.37) % 1;
-      f = ph < 0.06 ? Math.sin(ph / 0.06 * Math.PI) * 2200 * a : 0;
+      f = ph < 0.06 ? Math.sin(ph / 0.06 * Math.PI) * 400 * a : 0;
     } else if (ch.kind === 'neck') {
-      f = (0.7 * Math.sin(TAU * 0.11 * t) + 0.3 * Math.sin(TAU * 0.047 * t + 1.3)) * 260 * a;
+      f = (0.7 * Math.sin(TAU * 0.11 * t) + 0.3 * Math.sin(TAU * 0.047 * t + 1.3)) * 900 * a;
     } else return;
     if (!f) return;
     // sideways: perpendicular to the chain and to the cloud's up

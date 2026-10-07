@@ -1,4 +1,5 @@
-/* Everything about a character that isn't physics or mesh: its colourways,
+/* Everything about a character that isn't physics or mesh: its colourways
+   (fur, belly/muzzle `under`, mane/saddle `accent`; stitch in linear RGB),
    where its bead eyes sit, its embroidered face (painted into the mask
    atlas), and the words around it.
 
@@ -16,7 +17,7 @@ export const CHARACTER_INFO = {
       oat: { fur: '#d6c2a0', under: '#f6efe2', accent: '#d6c2a0' },
     },
     eyes: { part: 'head', u: 0.068, v: 0.5, lift: 0.035, scale: [0.15, 0.175, 0.1] },
-    unit: ['arm', 'arms'], readout: 'Holding on',
+    unit: ['arm', 'arms'], readout: 'Holding on', stitch: [0.16, 0.08, 0.07],
     aria: 'A plush octopus you can pull, poke, comb and hand a stick',
     blurb: 'Eight soft arms in a coat of flock. Pull it and it gives; let go and it comes back. Comb it against the nap and it stays ruffled. Offer it a stick.',
     hand: 'Grab the head or any arm and pull — it stretches, then springs back. Shift as you let go to pin that point, then grab another.',
@@ -31,7 +32,7 @@ export const CHARACTER_INFO = {
       dusk: { fur: '#6d6f7c', under: '#d9d3cb', accent: '#3d3f4a' },
     },
     eyes: { part: 'head', u: 0.074, v: 0.45, lift: 0.03, scale: [0.12, 0.135, 0.08] },
-    unit: ['part', 'parts'], readout: 'Held',
+    unit: ['part', 'parts'], readout: 'Held', stitch: [0.045, 0.04, 0.045],
     aria: 'A plush wolf you can pull, poke and comb',
     blurb: 'A sitting wolf in a grey coat, ears up. Tug an ear and it springs back; comb the tail against the nap and it stays rough.',
     hand: 'Grab the head, an ear or the tail and pull — it gives, then springs back. Shift as you let go to pin that point, then grab another.',
@@ -46,7 +47,7 @@ export const CHARACTER_INFO = {
       snow: { fur: '#efe7d8', under: '#fdf9f0', accent: '#d7c4a2' },
     },
     eyes: { part: 'head', u: 0.074, v: 0.47, lift: 0.03, scale: [0.12, 0.135, 0.08] },
-    unit: ['part', 'parts'], readout: 'Held',
+    unit: ['part', 'parts'], readout: 'Held', stitch: [0.11, 0.045, 0.035],
     aria: 'A plush lion with a long mane you can pull, poke and comb',
     blurb: 'A golden lion with a long mane. Comb the mane out from the face and it lies glossy; brush it back the wrong way and it stands up wild.',
     hand: 'Grab the head, an ear or the tail and pull — it gives, then springs back. Shift as you let go to pin that point, then grab another.',
@@ -60,8 +61,8 @@ export const CHARACTER_INFO = {
       mint: { fur: '#bfe3d0', under: '#fbf6ec', accent: '#ecdcc0' },
       lavender: { fur: '#cfc3ec', under: '#fbf6ec', accent: '#ecdcc0' },
     },
-    eyes: { part: 'head', u: 0.1, v: 0.44, lift: 0.02, scale: [0.08, 0.095, 0.055] },
-    unit: ['part', 'parts'], readout: 'Held',
+    eyes: { part: 'head', u: 0.1, v: 0.45, lift: 0.02, scale: [0.09, 0.105, 0.06] },
+    unit: ['part', 'parts'], readout: 'Held', stitch: [0.13, 0.085, 0.075],
     aria: 'A plush llama in a shaggy fleece you can pull, poke and comb',
     blurb: 'A llama in a shaggy fleece. Pull its long neck and it sways back up; comb the fleece flat, or rough it up again.',
     hand: 'Grab the head, the neck, an ear or the body and pull — it gives, then sways back. Shift as you let go to pin that point, then grab another.',
@@ -156,8 +157,8 @@ function wolfFace(g, size, { blob, eyeRing, stitch }) {
   blob('snout', 0.5, 0.36, 0.25, 0.15, 'rgb(0,0,255)');
   blob('snout', 0.5, 0.29, 0.17, 0.08, 'rgb(0,0,255)');
   // mouth: down from the nose, then a small smile each way
-  stitch('snout', [[0.5, 0.42], [0.5, 0.6]], 0.016);
-  stitch('snout', [[0.44, 0.66], [0.47, 0.645], [0.5, 0.6], [0.53, 0.645], [0.56, 0.66]], 0.016);
+  stitch('snout', [[0.5, 0.42], [0.5, 0.6]], 0.05);
+  stitch('snout', [[0.42, 0.67], [0.46, 0.66], [0.5, 0.6], [0.54, 0.66], [0.58, 0.67]], 0.05);
 }
 
 function lionFace(g, size, { blob, eyeRing, stitch }) {
@@ -168,8 +169,8 @@ function lionFace(g, size, { blob, eyeRing, stitch }) {
   blob('head', 0.615, 0.6, 0.24, 0.13, 'rgba(0,200,0,0.75)');
   // broad nose pad, mouth and the classic split muzzle
   blob('muzzle', 0.5, 0.3, 0.24, 0.13, 'rgb(0,0,255)');
-  stitch('muzzle', [[0.5, 0.36], [0.5, 0.56]], 0.016);
-  stitch('muzzle', [[0.42, 0.6], [0.46, 0.6], [0.5, 0.56], [0.54, 0.6], [0.58, 0.6]], 0.016);
+  stitch('muzzle', [[0.5, 0.36], [0.5, 0.56]], 0.035);
+  stitch('muzzle', [[0.41, 0.61], [0.46, 0.61], [0.5, 0.56], [0.54, 0.61], [0.59, 0.61]], 0.035);
   // whisker dots
   for (const s of [-1, 1])
     for (const [du, dv] of [[0.1, 0.42], [0.13, 0.5], [0.095, 0.53]]) blob('muzzle', 0.5 + s * du, dv, 0.03, 0.03, 'rgb(0,0,200)');
@@ -183,6 +184,6 @@ function llamaFace(g, size, { blob, eyeRing, stitch }) {
   // little nostrils, and the llama's Y: a stitch down, then a soft smile
   blob('snout', 0.46, 0.33, 0.05, 0.03, 'rgb(0,0,255)');
   blob('snout', 0.54, 0.33, 0.05, 0.03, 'rgb(0,0,255)');
-  stitch('snout', [[0.5, 0.4], [0.5, 0.55]], 0.012);
-  stitch('snout', [[0.43, 0.6], [0.47, 0.59], [0.5, 0.55], [0.53, 0.59], [0.57, 0.6]], 0.012);
+  stitch('snout', [[0.5, 0.4], [0.5, 0.55]], 0.028);
+  stitch('snout', [[0.42, 0.6], [0.47, 0.59], [0.5, 0.55], [0.53, 0.59], [0.58, 0.6]], 0.028);
 }

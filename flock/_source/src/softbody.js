@@ -121,8 +121,18 @@ export class SoftBody {
     const { i: I, lim, from, cloud } = this._tethers;
     // each cloud is hauled by its single worst violation, not their sum —
     // summing a whole stretched arm's worth overshoots and diverges
-    const H = this._haul || (this._haul = this.rig.clouds.map(() => new Float64Array(4)));
+    const nc = this.rig.clouds.length;
+    const H = this._haul || (this._haul = [...this.rig.clouds.map(() => new Float64Array(4)), new Float64Array(4)]);
     for (const h of H) h.fill(0);
+    // a toy of several clouds is hauled whole by its appendages: pulling a
+    // wolf's ear moves the wolf, not a head that then has to be wrestled
+    // back onto its body. (A head's own tether to the torso hauls the torso.)
+    const whole = this.rig.haulAll, M = this.cloudMask;
+    // the octopus splits a violation 35 : 65 between the arm point and the
+    // body (tuned in Phase 1). The others split it by mass, which conserves
+    // momentum: a light ear can't fling a heavy torso up past the hand.
+    const pw = whole ? this._pointShare || (this._pointShare = 1 - 1 / (this._allCloudPoints().length + 1)) : 0.35;
+    const bw = whole ? 1 - pw : 0.65;
     for (let k = 0; k < I.length; k++) {
       const i = I[k], c = from[k];
       const dx = x[i * 3] - x[c * 3], dy = x[i * 3 + 1] - x[c * 3 + 1], dz = x[i * 3 + 2] - x[c * 3 + 2];
@@ -130,14 +140,15 @@ export class SoftBody {
       if (d <= L) continue;
       const e = (d - L) / d;
       // the arm point gives a little; the body as a whole is hauled the rest
-      x[i * 3] -= dx * e * 0.35; x[i * 3 + 1] -= dy * e * 0.35; x[i * 3 + 2] -= dz * e * 0.35;
-      const h = H[cloud[k]];
-      if (e * d > h[3]) { h[3] = e * d; h[0] = dx * e * 0.65; h[1] = dy * e * 0.65; h[2] = dz * e * 0.65; }
+      x[i * 3] -= dx * e * pw; x[i * 3 + 1] -= dy * e * pw; x[i * 3 + 2] -= dz * e * pw;
+      const h = H[whole && !M[i] ? nc : cloud[k]];
+      if (e * d > h[3]) { h[3] = e * d; h[0] = dx * e * bw; h[1] = dy * e * bw; h[2] = dz * e * bw; }
     }
     for (let k = 0; k < H.length; k++) {
       const [sx, sy, sz] = H[k];
       if (sx || sy || sz) {
-        for (const i of this.rig.clouds[k].ix) { x[i * 3] += sx; x[i * 3 + 1] += sy; x[i * 3 + 2] += sz; }
+        const ix = k === nc ? (this._all || (this._all = this._allCloudPoints())) : this.rig.clouds[k].ix;
+        for (const i of ix) { x[i * 3] += sx; x[i * 3 + 1] += sy; x[i * 3 + 2] += sz; }
       }
     }
   }
@@ -152,10 +163,14 @@ export class SoftBody {
       if (arm.inCloud) continue;
       if (arm.cloud !== gk) { gk = arm.cloud; g = this.clouds[gk]; R = quatToMat(g.q4, _R); c = g.c; c0 = g.c0; }
       const idx = arm.idx;
+      const react = this.rig.react;
       let sx = 0, sy = 0, sz = 0;
       for (let j = 2; j < idx.length; j++) {
         const i = idx[j];
         if (this.w[i] === 0) continue;
+        // where the floor holds a point, the floor has the say: a push it
+        // would cancel can't be paid back to the body
+        if (react && this.contact[i]) continue;
         const qx = rest[i * 3] - c0[0], qy = rest[i * 3 + 1] - c0[1], qz = rest[i * 3 + 2] - c0[2];
         const a = alpha * (0.4 + 0.6 * j / idx.length) * arm.mem;
         const dx = (c[0] + R[0] * qx + R[1] * qy + R[2] * qz - x[i * 3]) * a;
@@ -166,7 +181,7 @@ export class SoftBody {
       }
       // a lone tail pulled back to pose must push the body the other way,
       // or it walks the toy across the floor (eight symmetric arms cancel)
-      if (this.rig.react) this._shift(this.rig.clouds[gk].ix, -sx, -sy, -sz);
+      if (react) this._shift(this.rig.clouds[gk].ix, -sx, -sy, -sz);
     }
     // a head remembers how it sat on its torso
     for (let k = 1; k < this.clouds.length; k++) {
@@ -175,8 +190,13 @@ export class SoftBody {
       const Rp = quatToMat(p.q4, _R), cp = p.c, c0p = p.c0;
       const a = alpha * spec.mem;
       let sx = 0, sy = 0, sz = 0;
+      const pm = 1 << spec.parent;
       for (const i of spec.ix) {
         if (this.w[i] === 0) continue;
+        // points it shares with the torso are the torso's: moving them would
+        // move the very frame this memory is measured in, and feed back
+        if (this.cloudMask[i] & pm) continue;
+        if (this.rig.react && this.contact[i]) continue;
         const qx = rest[i * 3] - c0p[0], qy = rest[i * 3 + 1] - c0p[1], qz = rest[i * 3 + 2] - c0p[2];
         const dx = (cp[0] + Rp[0] * qx + Rp[1] * qy + Rp[2] * qz - x[i * 3]) * a;
         const dy = (cp[1] + Rp[3] * qx + Rp[4] * qy + Rp[5] * qz - x[i * 3 + 1]) * a;
@@ -184,10 +204,14 @@ export class SoftBody {
         x[i * 3] += dx; x[i * 3 + 1] += dy; x[i * 3 + 2] += dz;
         sx += dx; sy += dy; sz += dz;
       }
-      // a head on a short neck pushes back on its torso (a head on a long
-      // neck doesn't: the lever is too long, and the push rocks the body)
       if (this.rig.react) this._shift(this.rig.clouds[spec.parent].ix, -sx, -sy, -sz);
     }
+  }
+
+  _allCloudPoints() {
+    const out = [];
+    for (let i = 0; i < this.n; i++) if (this.cloudMask[i]) out.push(i);
+    return Int32Array.from(out);
   }
 
   /* spread a total displacement evenly over a set of points */
@@ -381,6 +405,15 @@ export class SoftBody {
     for (let i = 0; i < n; i++) {
       const sp = Math.hypot(v[i * 3], v[i * 3 + 1], v[i * 3 + 2]);
       if (sp > VMAX) { const f = VMAX / sp; v[i * 3] *= f; v[i * 3 + 1] *= f; v[i * 3 + 2] *= f; }
+    }
+    if (this.rig.restV) {
+      // static friction, at the velocity level: a point on the floor creeping
+      // slower than this stops. Kinetic friction alone lets a toy whose
+      // stuffing can't quite reach its pose (an ear pressed into the floor
+      // when it lands on its side) walk itself along forever. (Snapping
+      // positions instead rocks the four-legged llama like an uneven table.)
+      const vs = this.rig.restV;
+      for (let i = 0; i < n; i++) if (this.contact[i] && Math.hypot(v[i * 3], v[i * 3 + 2]) < vs) { v[i * 3] = 0; v[i * 3 + 2] = 0; }
     }
     const kd = Math.exp(-(0.4 + 14 * P.damping * P.damping) * h);
     const ka = Math.exp(-0.25 * h);

@@ -62,8 +62,7 @@ export class Body {
         for (let j = 0; j < P.V; j++)
           for (let i = 0; i < P.U; i++) {
             const a = P.o + j * W + i;
-            if (P.torus) quad(a, a + W, a + 1, a + W + 1);   // torus grid runs the other way round
-            else quad(a, a + 1, a + W, a + W + 1);
+            quad(a, a + 1, a + W, a + W + 1);
           }
       } else {
         const W = P.AA + 1;
@@ -257,7 +256,6 @@ export class Body {
         let ux = pos[ir * 3] - pos[il * 3], uy = pos[ir * 3 + 1] - pos[il * 3 + 1], uz = pos[ir * 3 + 2] - pos[il * 3 + 2];
         let vx = pos[ju * 3] - pos[jd * 3], vy = pos[ju * 3 + 1] - pos[jd * 3 + 1], vz = pos[ju * 3 + 2] - pos[jd * 3 + 2];
         let nx = vy * uz - vz * uy, ny = vz * ux - vx * uz, nz = vx * uy - vy * ux;
-        if (P.torus) { nx = -nx; ny = -ny; nz = -nz; }
         let nl = Math.hypot(nx, ny, nz);
         if (nl < 1e-6 || (!wrapV && (j === 0 || j === HV))) {
           nx = pos[v * 3] - c[0]; ny = pos[v * 3 + 1] - c[1]; nz = pos[v * 3 + 2] - c[2];

@@ -184,7 +184,7 @@ export class RigBuilder {
     }
   }
 
-  finish({ camY = 0, react = true } = {}) {
+  finish({ camY = 0, react = true, restV = 0.25 } = {}) {
     const n = this.rad.length;
     const rest = Float64Array.from(this.pos);
     const windows = [], windowK = [], links = [], linkK = [];
@@ -249,7 +249,7 @@ export class RigBuilder {
         len: Float64Array.from(T.map((t) => t.len)), stretch: Float64Array.from(T.map((t) => t.stretch)),
         cloud: Int32Array.from(T.map((t) => t.cloud)),
       },
-      restSkip: true, react, parts, regions, camY,
+      restSkip: true, react, haulAll: true, restV, parts, regions, camY,
     };
   }
 }
@@ -279,6 +279,13 @@ function frontLegs(b, { x = 0.3, top = 1.05, z0 = 0.34, z1 = 0.6, r = 0.17, acce
   return legs;
 }
 
+/* a big head on a sitting torso, part of the torso's cloud (cloud 0) */
+function headBulk(b, HEAD) {
+  b.bulk(0, HEAD, 62, (d) => d[1] < -0.6);
+  b.bulk(0, { ...HEAD, r: HEAD.r.map((v) => v * 0.55) }, 8);
+  return 0;
+}
+
 /* haunches and hind paws: display grids, and physical bulk in the torso cloud
    so the toy sits on a broad base instead of rocking on a round bottom      */
 function haunches(b, { pile = one, accent = zero, under = zero } = {}) {
@@ -298,8 +305,8 @@ export function buildWolf() {
   const b = new RigBuilder('wolf');
   const torso = sittingTorso(b);
   const HEAD = { c: [0, 2.22, 0.1], r: [0.8, 0.7, 0.72], B: null, bulge: (phi) => 1 + 0.06 * Math.sin(phi * 1.3) };
-  const head = b.cloud(HEAD, { shell: 64, core: 10, parent: 0, mem: 5, k: 2.5, k0: 0.12 });
-  b.share(0, head, [0, 1.75, 0.05], 10);
+  // one stuffed cloud, head and torso together: a firmly sewn plush head
+  const head = headBulk(b, HEAD);
 
   // grey with a cream chest and belly, a darker saddle up the back
   const belly = (l) => smooth(0.15, 0.55, l[2]) * smooth(0.75, 0.2, l[1]);
@@ -309,7 +316,8 @@ export function buildWolf() {
   b.grid({
     name: 'head', cloud: head, ...HEAD, U: 64, V: 40, eye: true,
     under: (u, v, l) => smooth(0.25, 0.7, l[2]) * smooth(0.05, -0.45, l[1]),
-    accent: (u, v, l) => smooth(0.3, 0.95, l[1]) * smooth(0.6, -0.1, l[2]) * 0.6,
+    accent: (u, v, l) => Math.max(smooth(0.3, 0.95, l[1]) * smooth(0.6, -0.1, l[2]) * 0.6,
+      smooth(0.15, 0.45, l[1]) * smooth(0.3, 0.05, Math.abs(l[0])) * smooth(0.5, 0.85, l[2]) * 0.55),
     pile: (u, v, l) => 1 + 0.35 * smooth(0.2, -0.5, l[1]) * smooth(0.6, 0.95, Math.abs(l[0])),   // cheek ruffs
   });
   b.grid({ name: 'snout', cloud: head, c: [0, 2.03, 0.7], r: [0.31, 0.24, 0.34], B: rotX(0.1), U: 32, V: 22, under: () => 1, pile: () => 0.7 });
@@ -318,7 +326,6 @@ export function buildWolf() {
 
   // pointed upright ears: stiff, flattened front-to-back, cream inside
   for (const s of [-1, 1]) {
-    const root = [s * 0.34, 2.62, 0.06];
     b.chain({
       name: s < 0 ? 'left ear' : 'right ear', kind: 'ear', cloud: head, n: 5,
       anchor: [s * 0.24, 2.4, 0.04],
@@ -334,14 +341,13 @@ export function buildWolf() {
   // bushy tail curled round the right haunch onto the floor
   b.chain({
     name: 'tail', kind: 'tail', cloud: 0, n: 9, anchor: [0.1, 0.5, -0.35],
-    path: spline([[0.15, 0.45, -0.6], [0.5, 0.3, -0.98], [1.0, 0.3, -0.76], [1.2, 0.3, -0.25], [1.13, 0.38, 0.2]]),
+    path: spline([[0.15, 0.45, -0.6], [0.6, 0.31, -0.8], [1.1, 0.3, -0.6], [1.5, 0.32, -0.28], [1.72, 0.42, 0.02]]),
     radius: (u) => 0.13 + 0.15 * Math.pow(Math.sin(Math.PI * Math.min(1, 0.15 + u * 0.95)), 0.8),
-    ref: [0, -1, 0], bend: 1.3, mem: 2.2, stretch: 1.25, AS: 36, AA: 20, CAP: 7,
-    pile: () => 1.45, accent: (u) => smooth(0.8, 0.97, u) * 0.9, under: (u, c) => smooth(0.2, 0.8, c) * 0.5 * (1 - smooth(0.75, 0.9, u)),
+    ref: [0, -1, 0], bend: 1.6, mem: 0.6, stretch: 1.25, AS: 36, AA: 20, CAP: 7,
+    pile: () => 1.45, accent: (u) => smooth(0.86, 0.98, u) * 0.85, under: (u, c) => smooth(0.2, 0.8, c) * 0.5 * (1 - smooth(0.75, 0.9, u)),
     groom: { ruf: 0.12 },
   });
 
-  b.tetherCloud(head, b.clouds[0].center, 1.12, 0);
   return b.finish({ camY: 0.15 });
 }
 
@@ -351,8 +357,8 @@ export function buildLion() {
   const b = new RigBuilder('lion');
   const torso = sittingTorso(b, { w: 0.82, h: 0.96, d: 0.76 });
   const HEAD = { c: [0, 2.2, 0.12], r: [0.74, 0.7, 0.68], B: null, bulge: (phi) => 1 + 0.07 * Math.sin(phi * 1.25) };
-  const head = b.cloud(HEAD, { shell: 64, core: 10, parent: 0, mem: 5, k: 2.5, k0: 0.12 });
-  b.share(0, head, [0, 1.75, 0.05], 10);
+  // one stuffed cloud, head and torso together: a firmly sewn plush head
+  const head = headBulk(b, HEAD);
 
   const belly = (l) => smooth(0.2, 0.6, l[2]) * smooth(0.7, 0.1, l[1]);
   b.grid({ name: 'torso', cloud: 0, ...torso, U: 56, V: 36, under: (u, v, l) => belly(l) * 0.8,
@@ -367,7 +373,7 @@ export function buildLion() {
     accent: (u, v, l) => smooth(0.35, -0.2, l[2]),                    // the back of the head is all mane
     pile: (u, v, l) => 1 + 1.2 * smooth(0.35, -0.2, l[2]),
   });
-  b.grid({ name: 'muzzle', cloud: head, c: [0, 1.99, 0.62], r: [0.36, 0.24, 0.27], B: rotX(0.08), U: 32, V: 22, under: () => 1, pile: () => 0.65 });
+  b.grid({ name: 'muzzle', cloud: head, c: [0, 1.98, 0.73], r: [0.36, 0.24, 0.27], B: rotX(0.08), U: 32, V: 22, under: () => 1, pile: () => 0.65 });
   // the mane: a fat torus framing the face, long pile, combed out radially
   const MC = [0, 2.2, -0.08];
   b.grid({
@@ -382,10 +388,10 @@ export function buildLion() {
   for (const s of [-1, 1]) {
     b.chain({
       name: s < 0 ? 'left ear' : 'right ear', kind: 'ear', cloud: head, n: 4,
-      anchor: [s * 0.4, 2.5, 0.1],
-      path: (u) => [s * (0.5 + 0.08 * u), 2.68 + 0.26 * u, 0.24 + 0.06 * u],
-      radius: (u) => 0.08 + 0.1 * Math.sin(Math.PI * Math.min(1, 0.2 + u * 0.75)),
-      ref: [0, 0, 1], flat: 0.55, bend: 3, mem: 6, stretch: 1.12, skip: 2, AS: 14, AA: 16, CAP: 6,
+      anchor: [s * 0.36, 2.5, 0.12],
+      path: (u) => [s * (0.47 + 0.1 * u), 2.66 + 0.3 * u, 0.3 + 0.08 * u],
+      radius: (u) => 0.09 + 0.12 * Math.sin(Math.PI * Math.min(1, 0.2 + u * 0.75)),
+      ref: [0, 0, 1], flat: 0.55, bend: 3, mem: 6, stretch: 1.05, skip: 2, AS: 14, AA: 16, CAP: 6,
       under: (u, c) => smooth(0.3, 0.75, c) * smooth(0.25, 0.45, u),
       pile: () => 0.75,
     });
@@ -395,13 +401,12 @@ export function buildLion() {
   b.chain({
     name: 'tail', kind: 'tail', cloud: 0, n: 10, anchor: [-0.1, 0.45, -0.4],
     path: spline([[-0.15, 0.4, -0.64], [-0.5, 0.12, -1.0], [-1.0, 0.11, -0.82], [-1.22, 0.11, -0.28], [-1.12, 0.14, 0.22], [-0.86, 0.3, 0.55]]),
-    radius: (u) => 0.085 + 0.09 * smooth(0.8, 0.95, u) * (1 - 0.4 * smooth(0.95, 1, u)),
-    ref: [0, -1, 0], bend: 1.1, mem: 1.8, stretch: 1.25, AS: 40, AA: 16, CAP: 7,
-    pile: (u) => 1 + 1.3 * smooth(0.78, 0.92, u), accent: (u) => smooth(0.78, 0.9, u),
+    radius: (u) => 0.085 + 0.05 * smooth(0.82, 0.95, u) * (1 - 0.4 * smooth(0.95, 1, u)),
+    ref: [0, -1, 0], bend: 1.6, mem: 0.6, stretch: 1.25, AS: 40, AA: 16, CAP: 7,
+    pile: (u) => 1 + 0.9 * smooth(0.8, 0.92, u), accent: (u) => smooth(0.8, 0.9, u),
     groom: { ruf: 0.05 },
   });
 
-  b.tetherCloud(head, b.clouds[0].center, 1.12, 0);
   return b.finish({ camY: 0.15 });
 }
 
@@ -415,30 +420,30 @@ export function buildLlama() {
   const sd = [-Math.sin(yaw), 0, Math.cos(yaw)];  // the near side
   const B = [f, [0, 1, 0], sd];
   const at = (C, a, y, s) => add3(add3(add3(C, mul3(f, a)), [0, y, 0]), mul3(sd, s));
-  const BODY = { c: [-0.15, 1.42, -0.2], r: [0.98, 0.6, 0.6], B, bulge: null };
+  const BODY = { c: [-0.15, 1.3, -0.2], r: [0.95, 0.6, 0.62], B, bulge: (phi) => 1 + 0.06 * Math.sin(phi) };
   b.cloud(BODY, { shell: 80, core: 12 });
   const C = BODY.c;
 
   // four stuffed legs that carry the body
   for (const [a, s] of [[0.55, 0.3], [0.55, -0.3], [-0.6, 0.3], [-0.6, -0.3]]) {
-    const top = at(C, a, -0.32, s), foot = at(C, a * 1.04, 0, s * 1.08);
-    foot[1] = 0.19;
+    const top = at(C, a, -0.3, s), foot = at(C, a * 1.04, 0, s * 1.08);
+    foot[1] = 0.21;
     b.chain({
       name: 'leg', kind: 'leg', cloud: 0, n: 4, inCloud: true,
       anchor: at(C, a * 0.8, -0.05, s * 0.6),
       path: (u) => lerp3(top, foot, u),
-      radius: (u) => 0.165 + 0.02 * smooth(0.7, 1, u), ref: [0, 0, 1], bend: 2, mem: 2,
+      radius: (u) => 0.19 + 0.02 * smooth(0.7, 1, u), ref: [0, 0, 1], bend: 2, mem: 2,
       AS: 14, AA: 16, CAP: 7, accent: () => 1, pile: () => 0.85, under: (u) => 0.35 * smooth(0.8, 1, u),
     });
   }
 
   // the long neck, rising from the front of the body
   const nRoot = at(C, 0.62, 0.18, 0.06);
-  const nTop = [nRoot[0] + 0.12, 2.98, nRoot[2] + 0.12];
+  const nTop = [nRoot[0] + 0.12, 2.92, nRoot[2] + 0.12];
   const neck = b.chain({
     name: 'neck', kind: 'neck', cloud: 0, n: 7, anchor: at(C, 0.35, 0.0, 0.0),
     path: (u) => { const p = lerp3(nRoot, nTop, u); p[0] += 0.08 * Math.sin(u * Math.PI); return p; },
-    radius: (u) => 0.29 - 0.07 * u, ref: [0, 0, 1], bend: 2.6, mem: 8, stretch: 1.2, AS: 26, AA: 22, CAP: 0,
+    radius: (u) => 0.27 - 0.07 * u, ref: [0, 0, 1], bend: 2.6, mem: 8, stretch: 1.2, AS: 26, AA: 22, CAP: 0,
     pile: () => 1.9, groom: { ruf: 0.32 },
   });
 
@@ -450,17 +455,17 @@ export function buildLlama() {
   for (const j of [neck.idx.length - 1, neck.idx.length - 2]) b.clouds[head].ix.push(neck.idx[j]);
   b.grid({ name: 'head', cloud: head, ...HEAD, U: 48, V: 32, eye: true, accent: () => 1, pile: () => 0.8,
     under: (u, v, l) => smooth(0.3, 0.8, l[2]) * smooth(0.1, -0.5, l[1]) * 0.6 });
-  b.grid({ name: 'snout', cloud: head, c: add3(hc, [0, -0.12, 0.33]), r: [0.23, 0.19, 0.21], U: 28, V: 20, accent: () => 1, under: () => 0.75, pile: () => 0.6 });
-  b.grid({ name: 'topknot', cloud: head, c: add3(hc, [0, 0.3, -0.02]), r: [0.24, 0.15, 0.23], U: 28, V: 18,
-    pile: () => 2.6, groom: { lv: 0.12, ruf: 0.62 } });
+  b.grid({ name: 'snout', cloud: head, c: add3(hc, [0, -0.12, 0.36]), r: [0.23, 0.19, 0.22], U: 28, V: 20, accent: () => 1, under: () => 0.85, pile: () => 0.55 });
+  b.grid({ name: 'topknot', cloud: head, c: add3(hc, [0, 0.31, -0.08]), r: [0.22, 0.14, 0.2], U: 28, V: 18,
+    pile: () => 1.8, groom: { lv: 0.08, ruf: 0.6 } });
 
   // banana ears: up, out, then curving back in at the tip
   for (const s of [-1, 1]) {
     b.chain({
       name: s < 0 ? 'left ear' : 'right ear', kind: 'ear', cloud: head, n: 5,
       anchor: add3(hc, [s * 0.1, 0.12, -0.02]),
-      path: (u) => add3(hc, [s * (0.2 + 0.2 * Math.sin(u * 2.2) - 0.1 * u * u), 0.26 + 0.52 * u, -0.04 + 0.03 * u]),
-      radius: (u) => 0.05 + 0.055 * Math.sin(Math.PI * Math.min(1, 0.3 + u * 0.7)),
+      path: (u) => add3(hc, [s * (0.19 + 0.2 * Math.sin(u * 2.3) - 0.14 * u * u), 0.24 + 0.66 * u, -0.04 + 0.04 * u]),
+      radius: (u) => 0.035 + 0.05 * Math.sin(Math.PI * Math.min(1, 0.3 + u * 0.7)),
       ref: [0, 0, 1], flat: 0.6, bend: 2, mem: 3, stretch: 1.12, skip: 2, AS: 18, AA: 14, CAP: 6,
       accent: () => 1, pile: () => 0.7, under: (u, c) => smooth(0.3, 0.8, c) * smooth(0.15, 0.35, u) * (1 - smooth(0.75, 0.95, u)),
     });
