@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#e6e0d7">
 <title>Flock — a groomable plush study</title>
-<meta name="description" content="A plush octopus as a position-based soft body under a coat of shell-rendered fur you can groom like velvet. Pull it, poke it, comb it, hand it a stick.">
+<meta name="description" content="Plush toys — an octopus, a wolf, a lion and a llama — as position-based soft bodies under a coat of shell-rendered fur you can groom like velvet. Pull them, poke them, comb them; hand the octopus a stick.">
 <style>
 :root{
   --stage:#e6e0d7;
@@ -147,6 +147,17 @@ body.panel-open #panel{transform:translateX(0)}
 .sld input[type=range]:focus{outline:none}
 .sld input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(200,168,119,.25)}
 
+#p-char{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:16px}
+#p-char button{background:rgba(232,227,216,.028);border:1px solid var(--rule-2);color:var(--dim);cursor:pointer;padding:8px 5px 7px;text-align:left;transition:border-color .25s ease,color .25s ease,background .25s ease}
+#p-char button b{display:block;font-size:10.5px;font-weight:400;letter-spacing:.06em}
+#p-char button i{display:block;font-style:normal;font-family:var(--mono);font-size:7.5px;letter-spacing:.12em;color:var(--faint);margin-top:4px}
+#p-char button:hover{border-color:rgba(200,168,119,.34);color:var(--ink)}
+#p-char button[aria-pressed="true"]{border-color:rgba(200,168,119,.62);background:rgba(200,168,119,.09);color:var(--ink)}
+#p-char button[aria-pressed="true"] i{color:var(--accent)}
+.sub-h{margin:0 0 9px;font-family:var(--mono);font-size:8px;letter-spacing:.22em;text-transform:uppercase;color:var(--faint);opacity:.8}
+/* the stick is the octopus's alone */
+body:not([data-char="octopus"]) #tools{grid-template-columns:repeat(3,1fr)}
+body:not([data-char="octopus"]) [data-octopus-only]{display:none}
 #p-fur{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 #p-fur button{background:rgba(232,227,216,.028);border:1px solid var(--rule-2);color:var(--dim);cursor:pointer;padding:7px 5px 6px;text-align:left;transition:border-color .25s ease,color .25s ease}
 #p-fur button .sw{display:block;height:16px;margin-bottom:6px}
@@ -207,7 +218,7 @@ body.panel-open #panel{transform:translateX(0)}
       <div><span>Mass</span><output id="r-mass">80<small>g</small></output></div>
       <div><span>Volume</span><output id="r-vol">100<small>%</small></output></div>
       <div><span>Kinetic</span><output id="r-ke">0.00<small>mJ</small></output></div>
-      <div><span>Holding on</span><output id="r-hold">0<small>arms</small></output></div>
+      <div><span id="l-hold">Holding on</span><output id="r-hold">0<small>arms</small></output></div>
     </div>
   </div>
 
@@ -215,7 +226,7 @@ body.panel-open #panel{transform:translateX(0)}
     <button data-tool="hand" aria-pressed="true"><b>Hand</b><i>1</i></button>
     <button data-tool="finger" aria-pressed="false"><b>Finger</b><i>2</i></button>
     <button data-tool="comb" aria-pressed="false"><b>Comb</b><i>3</i></button>
-    <button data-tool="stick" aria-pressed="false"><b>Stick</b><i>4</i></button>
+    <button data-tool="stick" aria-pressed="false" data-octopus-only><b>Stick</b><i>4</i></button>
   </div>
 
   <button id="panel-toggle" aria-controls="panel" aria-expanded="false">
@@ -229,7 +240,9 @@ body.panel-open #panel{transform:translateX(0)}
     </header>
     <div class="body">
       <section>
-        <h3>Fur <span class="ix">01</span></h3>
+        <h3>Character <span class="ix">01</span></h3>
+        <div id="p-char" role="group" aria-label="Character"></div>
+        <p class="sub-h">Fur</p>
         <div id="p-fur"></div>
         <label class="sld"><span class="row">Pile<output id="o-pile"></output></span><input id="s-pile" type="range" min="3" max="22" step="0.5" value="11"><span class="ends"><span>cropped</span><span>shaggy</span></span></label>
         <label class="sld"><span class="row">Density<output id="o-density"></output></span><input id="s-density" type="range" min="40" max="160" step="1" value="95"><span class="ends"><span>sparse</span><span>dense</span></span></label>
@@ -240,7 +253,7 @@ body.panel-open #panel{transform:translateX(0)}
         <label class="sld"><span class="row">Stuffing<output id="o-stuffing"></output></span><input id="s-stuffing" type="range" min="0" max="1" step="0.01" value="0.42"><span class="ends"><span>loose</span><span>packed</span></span></label>
         <label class="sld"><span class="row">Internal damping<output id="o-damping"></output></span><input id="s-damping" type="range" min="0" max="1" step="0.01" value="0.45"><span class="ends"><span>bouncy</span><span>sleepy</span></span></label>
         <label class="sld"><span class="row">Idle motion<output id="o-idle"></output></span><input id="s-idle" type="range" min="0" max="1" step="0.01" value="0.5"><span class="ends"><span>still</span><span>fidgety</span></span></label>
-        <label class="sld"><span class="row">Grip<output id="o-grip"></output></span><input id="s-grip" type="range" min="0" max="1" step="0.01" value="0.6"><span class="ends"><span>slips</span><span>clings</span></span></label>
+        <label class="sld" data-octopus-only><span class="row">Grip<output id="o-grip"></output></span><input id="s-grip" type="range" min="0" max="1" step="0.01" value="0.6"><span class="ends"><span>slips</span><span>clings</span></span></label>
       </section>
       <section>
         <h3>Play <span class="ix">03</span></h3>
@@ -249,7 +262,7 @@ body.panel-open #panel{transform:translateX(0)}
           <button id="b-squish">Squish</button>
           <button id="b-toss">Toss</button>
           <button id="b-reset">Reset<i>R</i></button>
-          <button id="b-stick" class="span" disabled>Take the stick away</button>
+          <button id="b-stick" class="span" disabled data-octopus-only>Take the stick away</button>
         </div>
       </section>
       <section>
@@ -264,6 +277,7 @@ body.panel-open #panel{transform:translateX(0)}
       <section>
         <h3>Inside the experiment <span class="ix">05</span></h3>
         <p class="note">The body is a <b>position-based soft body</b>: a shape-matched point cloud for the head (stuffing is how hard it springs back to shape) and eight arms of overlapping three-point shape-matched windows, held by long-range tethers so they stretch but never snap.</p>
+        <p class="note">The wolf, lion and llama are built the same way: a torso cloud, a head cloud sewn onto it, and <b>appendage chains</b> — ears, tails, legs, a neck — of the same windows, tethers and shape memory as the arms, each with its own stiffness. The lion's mane and the llama's fleece are <b>long pile</b>, with their own default lie in the groom map.</p>
         <p class="note">The fur is the body drawn <b>64 times</b>, each shell pushed a little further out and cut into strands by a jittered cell pattern. Each strand bends with a <b>groom map</b> you paint with the comb, trails the surface on a damped spring, and is lit along its own axis (<b>Kajiya-Kay</b>), so brushed patches catch light like velvet.</p>
         <p class="note">Arms near the stick reach for it, then wrap from the tip on a helix around the wood. Pull harder than the grip and they let go.</p>
       </section>

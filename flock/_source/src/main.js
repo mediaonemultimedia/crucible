@@ -1,15 +1,22 @@
 import * as THREE from 'three/webgpu';
-import { buildRig } from './rig.js';
+import { buildRig, CHARACTERS } from './rig.js';
 import { SoftBody } from './softbody.js';
 import { Grasp } from './grasp.js';
 import { Idle } from './idle.js';
 import { Groom } from './groom.js';
 import { Body } from './body.js';
 import {
-  SHELLS, FUR_COLORS, makeFurMaterial, makeMaskTexture, makeGroomTexture,
+  SHELLS, makeFurMaterial, makeMaskTexture, makeGroomTexture,
   makeEyeMaterial, Floor, makeStick, poseStick,
 } from './fur.js';
 import { Tools } from './tools.js';
+import { CHARACTER_INFO, paintFace } from './characters.js';
+
+/* the stick is the octopus's: the others get a grasp that never grasps */
+const NO_GRASP = {
+  params: { grip: 0.6, reach: 1.25 }, arms: [],
+  update() {}, releaseAll() {}, holdingCount() { return 0; }, armState() { return 'idle'; },
+};
 
 const $ = (s) => document.querySelector(s);
 
@@ -45,18 +52,14 @@ async function start() {
   scene.background = new THREE.Color().setRGB(0.83, 0.8, 0.765, THREE.LinearSRGBColorSpace);
   const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.1, 120);
 
-  const rig = buildRig();
-  const soft = new SoftBody(rig);
-  const grasp = new Grasp(soft);
-  const idle = new Idle(soft);
+  // the current character: rebuilt whole by setCharacter()
+  let rig, soft, grasp, idle, body;
   const groom = new Groom();
-  const body = new Body(rig, soft);
 
   const groomTex = makeGroomTexture(groom);
   const maskTex = makeMaskTexture();
   const fur = makeFurMaterial(groomTex, maskTex);
-  body.geometry.instanceCount = SHELLS;
-  const shells = new THREE.Mesh(body.geometry, fur.material);
+  const shells = new THREE.Mesh(undefined, fur.material);
   shells.frustumCulled = false;
   scene.add(shells);
 
@@ -67,7 +70,7 @@ async function start() {
   const eyeGeo = new THREE.SphereGeometry(1, 40, 28);
   const eyes = [-1, 1].map((s) => {
     const m = new THREE.Mesh(eyeGeo, eyeMat);
-    m.userData.u = 0.5 + s * 0.068;
+    m.userData.side = s;
     scene.add(m);
     return m;
   });
@@ -75,43 +78,61 @@ async function start() {
   const stickMesh = makeStick();
   scene.add(stickMesh);
 
-  // rig view: points + links
-  const rigGeo = new THREE.BufferGeometry();
-  const rigPos = new Float32Array(rig.n * 3);
-  rigGeo.setAttribute('position', new THREE.BufferAttribute(rigPos, 3).setUsage(THREE.DynamicDrawUsage));
-  const linkIdx = [];
-  for (let l = 0; l < rig.linkA.length; l++) linkIdx.push(rig.linkA[l], rig.linkB[l]);
-  rigGeo.setIndex(linkIdx);
-  const rigLines = new THREE.LineSegments(rigGeo, new THREE.LineBasicMaterial({ color: 0x1d1a17, depthTest: false, transparent: true, opacity: 0.9 }));
-  // WebGPU points are always one pixel, so the rig's points are tiny spheres
-  const rigPts = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 8),
-    new THREE.MeshBasicMaterial({ color: 0xc8a877, depthTest: false, transparent: true, opacity: 0.95 }), rig.n);
+  // rig view: points + links, rebuilt per character
+  const rigLineMat = new THREE.LineBasicMaterial({ color: 0x1d1a17, depthTest: false, transparent: true, opacity: 0.9 });
+  const rigPtGeo = new THREE.SphereGeometry(1, 10, 8);
+  const rigPtMat = new THREE.MeshBasicMaterial({ color: 0xc8a877, depthTest: false, transparent: true, opacity: 0.95 });
   const rigM = new THREE.Matrix4();
-  rigLines.renderOrder = rigPts.renderOrder = 10;
-  rigLines.visible = rigPts.visible = false;
-  rigLines.frustumCulled = rigPts.frustumCulled = false;
-  scene.add(rigLines, rigPts);
+  let rigGeo, rigPos, rigLines, rigPts;
+  const buildRigView = () => {
+    if (rigLines) {
+      scene.remove(rigLines, rigPts);
+      rigGeo.dispose();
+      rigPts.dispose();
+    }
+    rigGeo = new THREE.BufferGeometry();
+    rigPos = new Float32Array(rig.n * 3);
+    rigGeo.setAttribute('position', new THREE.BufferAttribute(rigPos, 3).setUsage(THREE.DynamicDrawUsage));
+    const linkIdx = [];
+    for (let l = 0; l < rig.linkA.length; l++) linkIdx.push(rig.linkA[l], rig.linkB[l]);
+    rigGeo.setIndex(linkIdx);
+    rigLines = new THREE.LineSegments(rigGeo, rigLineMat);
+    // WebGPU points are always one pixel, so the rig's points are tiny spheres
+    rigPts = new THREE.InstancedMesh(rigPtGeo, rigPtMat, rig.n);
+    rigLines.renderOrder = rigPts.renderOrder = 10;
+    rigLines.visible = rigPts.visible = state.mesh;
+    rigLines.frustumCulled = rigPts.frustumCulled = false;
+    scene.add(rigLines, rigPts);
+  };
 
-  const tools = new Tools({
-    canvas, camera, body, soft, grasp, groom, stickMesh,
-    onStick: (on) => { $('#b-stick').disabled = !on; },
-  });
+  let tools = null;
 
   /* ── panel ──────────────────────────────────────────────────────────────── */
-  const state = { speed: 1, paused: false, mesh: false, color: 'coral' };
+  const state = { speed: 1, paused: false, mesh: false, character: null, color: {}, stuffing: 0.42, damping: 0.45, grip: 0.6, idle: 0.5 };
   const furBox = $('#p-fur');
-  for (const [name, c] of Object.entries(FUR_COLORS)) {
-    const b = document.createElement('button');
-    b.innerHTML = `<span class="sw" style="background:linear-gradient(90deg,${c.fur} 62%,${c.under} 62%)"></span><b>${name[0].toUpperCase() + name.slice(1)}</b>`;
-    b.setAttribute('aria-pressed', String(name === state.color));
-    b.onclick = () => {
-      state.color = name;
-      fur.uniforms.color.value.set(c.fur);
-      fur.uniforms.under.value.set(c.under);
-      for (const x of furBox.children) x.setAttribute('aria-pressed', String(x === b));
-    };
-    furBox.appendChild(b);
-  }
+  const cap = (s) => s[0].toUpperCase() + s.slice(1);
+  // four swatches, re-dealt for each character
+  const buildSwatches = () => {
+    const info = CHARACTER_INFO[state.character];
+    furBox.textContent = '';
+    for (const [name, c] of Object.entries(info.colors)) {
+      const b = document.createElement('button');
+      const bands = c.accent !== c.fur
+        ? `${c.fur} 0 44%,${c.accent} 44% 70%,${c.under} 70%`
+        : `${c.fur} 62%,${c.under} 62%`;
+      b.innerHTML = `<span class="sw" style="background:linear-gradient(90deg,${bands})"></span><b>${cap(name)}</b>`;
+      b.setAttribute('aria-pressed', String(name === state.color[state.character]));
+      b.onclick = () => {
+        state.color[state.character] = name;
+        fur.uniforms.color.value.set(c.fur);
+        fur.uniforms.under.value.set(c.under);
+        fur.uniforms.accent.value.set(c.accent);
+        for (const x of furBox.children) x.setAttribute('aria-pressed', String(x === b));
+      };
+      furBox.appendChild(b);
+      if (name === state.color[state.character]) b.onclick();
+    }
+  };
   const slider = (id, fmt, apply) => {
     const s = $('#s-' + id), o = $('#o-' + id);
     const set = () => { const v = parseFloat(s.value); o.textContent = fmt(v); apply(v); };
@@ -120,24 +141,32 @@ async function start() {
   };
   slider('pile', (v) => `${v} mm`, (v) => { fur.uniforms.pile.value = v / 90; });   // 1 unit = 9 cm
   slider('density', (v) => String(v), (v) => { fur.uniforms.density.value = v; });
-  slider('stuffing', (v) => v.toFixed(2), (v) => { soft.params.stuffing = v; });
-  slider('damping', (v) => v.toFixed(2), (v) => { soft.params.damping = v; });
-  slider('grip', (v) => v.toFixed(2), (v) => { grasp.params.grip = v; });
-  slider('idle', (v) => (v === 0 ? 'still' : v.toFixed(2)), (v) => { idle.amount = v; });
+  slider('stuffing', (v) => v.toFixed(2), (v) => { state.stuffing = v; if (soft) soft.params.stuffing = v; });
+  slider('damping', (v) => v.toFixed(2), (v) => { state.damping = v; if (soft) soft.params.damping = v; });
+  slider('grip', (v) => v.toFixed(2), (v) => { state.grip = v; if (grasp) grasp.params.grip = v; });
+  slider('idle', (v) => (v === 0 ? 'still' : v.toFixed(2)), (v) => { state.idle = v; if (idle) idle.amount = v; });
+  // body sliders remember their values across characters
+  const applyBody = () => {
+    soft.params.stuffing = state.stuffing;
+    soft.params.damping = state.damping;
+    grasp.params.grip = state.grip;
+    idle.amount = state.idle;
+  };
 
   const HINTS = {
-    hand: '<b>Hand</b>Grab the head or any arm and pull — it stretches, then springs back. Shift as you let go to pin that point, then grab another.',
+    hand: '',
     finger: '<b>Finger</b>Press into the plush. Hold to push deeper; it fills back out when you lift.',
     comb: '<b>Comb</b>Brush the fur. With the nap it lies flat and shines; against it, it stands up and stays ruffled.',
     stick: '<b>Stick</b>Click the floor to lay a stick near an arm. Drag the stick to lift — whatever it is holding comes too.',
   };
   const setTool = (m) => {
+    if (m === 'stick' && state.character !== 'octopus') return;
     tools.setMode(m);
     for (const b of document.querySelectorAll('#tools button')) b.setAttribute('aria-pressed', String(b.dataset.tool === m));
+    HINTS.hand = '<b>Hand</b>' + CHARACTER_INFO[state.character].hand;
     $('#hint').innerHTML = HINTS[m];
   };
   for (const b of document.querySelectorAll('#tools button')) b.onclick = () => setTool(b.dataset.tool);
-  setTool('hand');
 
   // when the panel is open, slide the framing left so the octopus sits in
   // the visible part of the stage rather than half under the panel
@@ -151,8 +180,64 @@ async function start() {
   $('#panel-close').onclick = () => togglePanel(false);
   if (innerWidth > 1180) togglePanel(true);
 
-  /* ── actions ────────────────────────────────────────────────────────────── */
+  /* ── characters ─────────────────────────────────────────────────────────── */
   let action = null;   // {name, t, ...}
+  const charBox = $('#p-char');
+  CHARACTERS.forEach((name, k) => {
+    const b = document.createElement('button');
+    b.dataset.char = name;
+    b.innerHTML = `<b>${CHARACTER_INFO[name].label}</b><i>⇧${k + 1}</i>`;
+    b.onclick = () => setCharacter(name);
+    charBox.appendChild(b);
+  });
+
+  /* swap the whole specimen: physics, mesh, groom, mask, stick, UI. The old
+     geometry is disposed (the renderer frees its GPU buffers); the groom and
+     mask textures are reused and repainted, so nothing else leaks.        */
+  const setCharacter = (name) => {
+    if (!CHARACTER_INFO[name] || name === state.character) return;
+    const info = CHARACTER_INFO[name];
+    state.character = name;
+    if (!state.color[name]) state.color[name] = Object.keys(info.colors)[0];
+    action = null;
+    const old = body;
+    rig = buildRig(name);
+    soft = new SoftBody(rig);
+    grasp = name === 'octopus' ? new Grasp(soft) : NO_GRASP;
+    idle = new Idle(soft);
+    applyBody();
+    body = new Body(rig, soft);
+    body.geometry.instanceCount = state.mesh ? 1 : SHELLS;
+    shells.geometry = body.geometry;
+    old?.dispose();
+    groom.setLayout(rig.regions);
+    groomTex.needsUpdate = true;
+    paintFace(maskTex, name, rig);
+    buildRigView();
+    if (!tools) {
+      tools = new Tools({
+        canvas, camera, body, soft, grasp, groom, stickMesh,
+        onStick: (on) => { $('#b-stick').disabled = !on; },
+      });
+    } else tools.attach({ body, soft, grasp });
+    tools.stickEnabled = name === 'octopus';
+    stickMesh.visible = false;
+
+    // UI
+    for (const b of charBox.children) b.setAttribute('aria-pressed', String(b.dataset.char === name));
+    document.body.dataset.char = name;
+    buildSwatches();
+    canvas.setAttribute('aria-label', info.aria);
+    $('#title p').textContent = info.blurb;
+    $('#l-hold').textContent = info.readout;
+    $('#b-stick').disabled = true;
+    setTool(tools.mode === 'stick' && name !== 'octopus' ? 'hand' : tools.mode);
+    // re-aim the camera at the newcomer
+    const o = tools.orbit;
+    o.target.set(soft.headC[0], THREE.MathUtils.clamp(soft.headC[1] * 0.55 + 0.2, 0.6, 2.4) + rig.camY, soft.headC[2]);
+    tools.applyOrbit();
+  };
+
   const reset = () => {
     tools.releasePins();
     soft.reset();
@@ -166,7 +251,7 @@ async function start() {
   $('#b-shake').onclick = () => {
     // pick it up by the crown and shake, the way you would a toy
     let top = rig.head[0];
-    for (const i of rig.head) if (soft.x[i * 3 + 1] > soft.x[top * 3 + 1]) top = i;
+    for (const c of rig.clouds) for (const i of c.ix) if (soft.x[i * 3 + 1] > soft.x[top * 3 + 1]) top = i;
     const at = [soft.x[top * 3], soft.x[top * 3 + 1], soft.x[top * 3 + 2]];
     soft.grab('shake', top, at, 0.3);
     action = { name: 'shake', t: 0, at };
@@ -195,12 +280,22 @@ async function start() {
   addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT') return;
     const k = e.key.toLowerCase();
-    if (k >= '1' && k <= '4') setTool(['hand', 'finger', 'comb', 'stick'][+k - 1]);
+    const digit = /^Digit([1-4])$/.exec(e.code);
+    if (e.shiftKey && digit) setCharacter(CHARACTERS[+digit[1] - 1]);
+    else if (k >= '1' && k <= '4') setTool(['hand', 'finger', 'comb', 'stick'][+k - 1]);
     else if (k === 'c') togglePanel(!document.body.classList.contains('panel-open'));
     else if (k === 'r') reset();
     else if (k === ' ') { e.preventDefault(); pause.onclick(); }
     else if (k === 'escape') tools.releasePins();
   });
+
+  // the octopus is squished from 2.75 to 1.0 (Phase 1); others in proportion
+  const squishSpan = () => {
+    if (rig.name === 'octopus') return [2.75, 1.0];
+    let top = 0;
+    for (const c of rig.clouds) for (const i of c.ix) top = Math.max(top, soft.x[i * 3 + 1] + soft.r[i]);
+    return [top + 0.2, top * 0.45];
+  };
 
   const runAction = (dt) => {
     if (!action) return;
@@ -213,14 +308,17 @@ async function start() {
       soft.moveGrab('shake', [a[0] + Math.sin((t - 0.35) * 2 * Math.PI * 3.4) * 0.75 * amp, a[1] + 1.6 * lift - (t > 1.6 ? (t - 1.6) * 3 : 0), a[2]]);
       if (t > 1.9) { soft.release('shake'); action = null; }
     } else if (action.name === 'squish') {
-      let top = 0;
-      for (const i of rig.head) top = Math.max(top, soft.x[i * 3 + 1] + soft.r[i]);
       const down = t < 0.45 ? t / 0.45 : t < 0.9 ? 1 : Math.max(0, 1 - (t - 0.9) / 0.45);
       const ease = down * down * (3 - 2 * down);
-      soft.planes[0].y = THREE.MathUtils.lerp(2.75, 1.0, ease);
+      // press from just above the toy's top down to a bit over a third of it
+      const sq = action.span || (action.span = squishSpan());
+      soft.planes[0].y = THREE.MathUtils.lerp(sq[0], sq[1], ease);
       if (t > 1.4) { soft.planes = []; action = null; }
     }
   };
+
+  const first = new URLSearchParams(location.search).get('character');
+  setCharacter(CHARACTERS.includes(first) ? first : 'octopus');
 
   /* ── loop ───────────────────────────────────────────────────────────────── */
   const backend = renderer.backend && renderer.backend.isWebGPUBackend ? 'WebGPU' : 'WebGL 2';
@@ -243,12 +341,7 @@ async function start() {
   addEventListener('resize', resize);
   resize();
 
-  renderer.setAnimationLoop(() => {
-    // a hidden or collapsed pane has no swapchain to draw into
-    if (!canvas.clientWidth || !canvas.clientHeight) return;
-    const now = performance.now();
-    const real = Math.min(0.05, (now - last) / 1000);
-    last = now;
+  const frameFn = (real, draw = true) => {
     const dt = state.paused ? 0 : real * state.speed;
     if (Math.abs(frame.shift - frame.target) > 0.5) {
       frame.shift += (frame.target - frame.shift) * Math.min(1, real * 6);
@@ -273,22 +366,24 @@ async function start() {
       const k = Math.min(1, real * 1.4);
       ft.x += (hc[0] - ft.x) * k;
       ft.z += (hc[2] - ft.z) * k;
-      ft.y += (THREE.MathUtils.clamp(hc[1] * 0.55 + 0.2, 0.6, 2.4) - ft.y) * k;
+      ft.y += (THREE.MathUtils.clamp(hc[1] * 0.55 + 0.2, 0.6, 2.4) + rig.camY - ft.y) * k;
       tools.applyOrbit();
     }
     floor.paint(soft, soft.stick);
 
     // eyes ride the head surface
-    const R = soft.headR;
+    const ey = CHARACTER_INFO[rig.name].eyes;
+    const eyePart = body.parts.find((q) => q.name === ey.part);
+    const R = soft.cloudR[eyePart.cloud];
     up.set(R[1], R[4], R[7]);
     for (const e of eyes) {
-      body.headPoint(e.userData.u, 0.5, P, N);
-      e.position.copy(P).addScaledVector(N, 0.035);
+      body.surfacePoint(eyePart.name, 0.5 + e.userData.side * ey.u, ey.v, P, N);
+      e.position.copy(P).addScaledVector(N, ey.lift);
       X.crossVectors(up, N).normalize();
       const Y = new THREE.Vector3().crossVectors(N, X);
       M.makeBasis(X, Y, N);
       e.quaternion.setFromRotationMatrix(M);
-      e.scale.set(0.15, 0.175, 0.1);
+      e.scale.set(...ey.scale);
     }
 
     if (soft.stick) { stickMesh.visible = true; poseStick(stickMesh, soft.stick); }
@@ -305,6 +400,7 @@ async function start() {
       rigPts.instanceMatrix.needsUpdate = true;
     }
 
+    if (!draw) return;
     renderer.render(scene, camera);
 
     frames++; fpsT += real; readT += real;
@@ -320,12 +416,34 @@ async function start() {
       const arms = new Set();
       for (const g of soft.grabs.values()) if (rig.armOf[g.i] >= 0) arms.add(rig.armOf[g.i]);
       grasp.arms.forEach((a, k) => { if (a.state === 'grip') arms.add(k); });
-      $('#r-hold').innerHTML = `${arms.size}<small>${arms.size === 1 ? 'arm' : 'arms'}</small>`;
+      const unit = CHARACTER_INFO[rig.name].unit;
+      $('#r-hold').innerHTML = `${arms.size}<small>${arms.size === 1 ? unit[0] : unit[1]}</small>`;
     }
+  };
+
+  renderer.setAnimationLoop(() => {
+    // a hidden or collapsed pane has no swapchain to draw into
+    if (!canvas.clientWidth || !canvas.clientHeight) return;
+    const now = performance.now();
+    const real = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    frameFn(real);
   });
 
   document.body.classList.add('is-live');
-  window.__flock = { soft, grasp, idle, groom, body, tools, renderer, fur, scene, camera, shells };
+  // the current character's objects are getters: they change on a switch
+  window.__flock = {
+    get soft() { return soft; }, get grasp() { return grasp; }, get idle() { return idle; },
+    get body() { return body; }, get rig() { return rig; }, get character() { return state.character; },
+    groom, tools, renderer, fur, scene, camera, shells,
+    setCharacter,
+    /* advance the piece by `seconds` without drawing (for slow or headless
+       hosts: tests, screenshots), then optionally draw one frame          */
+    step(seconds, draw = false) {
+      for (let t = 0; t < seconds - 1e-9; t += 1 / 60) frameFn(1 / 60, false);
+      if (draw) frameFn(0, true);
+    },
+  };
 }
 
 start().catch((err) => {

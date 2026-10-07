@@ -1,10 +1,12 @@
-/* Position-based soft body for the octopus.
+/* Position-based soft body for the plush toys.
 
    Small-steps PBD (Macklin et al. 2019): many substeps, one pass of every
-   constraint per substep. The head is one shape-matched cloud (stuffing sets
-   how hard it pulls back to shape); each arm is a chain of three-point
-   shape-matched windows (bending + rest curl) plus stretch links. Everything
-   else — grabs, the finger, the stick, the floor — is a projection on top.   */
+   constraint per substep. The head (or torso) is a shape-matched cloud
+   (stuffing sets how hard it pulls back to shape); each arm, ear, tail or
+   neck is a chain of three-point shape-matched windows (bending + rest curl)
+   plus stretch links. A second cloud — a head on a torso — shares points
+   with its parent and keeps a gentle memory of its pose there. Everything
+   else — grabs, the finger, the stick, the floor — is a projection on top. */
 
 import { extractRotation, quatToMat, invert3, det3, mulMat3, segParam } from './math.js';
 
@@ -26,6 +28,9 @@ export class SoftBody {
     this.w = new Float64Array(n).fill(1);         // inverse mass
     this.inHead = new Uint8Array(n);
     for (const i of rig.head) this.inHead[i] = 1;
+    // cloud membership as bits: a shared point belongs to two clouds
+    this.cloudMask = new Uint8Array(n);
+    rig.clouds.forEach((c, k) => { for (const i of c.ix) this.cloudMask[i] |= 1 << k; });
 
     this.params = { stuffing: 0.42, damping: 0.45, gravity: 38 };
     this.grabs = new Map();                        // id → {i, t:[x,y,z], k}
@@ -40,6 +45,10 @@ export class SoftBody {
     this.headC = new Float64Array(3);
     this.headR = new Float64Array(9).fill(0);
     this.headR[0] = this.headR[4] = this.headR[8] = 1;
+    // clouds[0] is the head; any further clouds (a head on a torso) follow
+    this.clouds = [this.head, ...rig.clouds.slice(1).map((c) => this._group(c.ix))];
+    this.cloudC = [this.headC, ...this.clouds.slice(1).map(() => new Float64Array(3))];
+    this.cloudR = [this.headR, ...this.clouds.slice(1).map(() => Float64Array.of(1, 0, 0, 0, 1, 0, 0, 0, 1))];
 
     this._pairs = this._collisionPairs();
     this._tethers = this._buildTethers();
@@ -61,14 +70,18 @@ export class SoftBody {
   }
 
   _collisionPairs() {
-    const { armOf, armJ } = this.rig;
+    const { armOf, armJ, arms, rest, restSkip } = this.rig;
+    const M = this.cloudMask, r = this.r;
     const a = [], b = [];
     for (let i = 0; i < this.n; i++)
       for (let j = i + 1; j < this.n; j++) {
-        if (this.inHead[i] && this.inHead[j]) continue;
+        if (M[i] & M[j]) continue;
         if (armOf[i] >= 0 && armOf[i] === armOf[j] && Math.abs(armJ[i] - armJ[j]) < 3) continue;
         // an arm's first two points live inside the head by design
-        if ((this.inHead[i] && armJ[j] >= 0 && armJ[j] < 3) || (this.inHead[j] && armJ[i] >= 0 && armJ[i] < 3)) continue;
+        if ((M[i] && armJ[j] >= 0 && armJ[j] < arms[armOf[j]].skip) || (M[j] && armJ[i] >= 0 && armJ[i] < arms[armOf[i]].skip)) continue;
+        // and anything sewn overlapping (an ear root in a head, a head on a
+        // torso) was meant to: never push it apart
+        if (restSkip && Math.hypot(rest[i * 3] - rest[j * 3], rest[i * 3 + 1] - rest[j * 3 + 1], rest[i * 3 + 2] - rest[j * 3 + 2]) < (r[i] + r[j]) * 1.08) continue;
         a.push(i); b.push(j);
       }
     return { a: Int32Array.from(a), b: Int32Array.from(b) };
@@ -80,39 +93,52 @@ export class SoftBody {
      like chewing gum, and an arm holding the stick could never lift the body. */
   _buildTethers() {
     const { rest, arms, center } = this.rig;
-    const T = [];
-    const d = (a, b) => Math.hypot(rest[a * 3] - rest[b * 3], rest[a * 3 + 1] - rest[b * 3 + 1], rest[a * 3 + 2] - rest[b * 3 + 2]);
-    for (const arm of arms) {
-      let arc = d(center, arm.idx[0]);
-      for (let j = 1; j < arm.idx.length; j++) {
-        arc += d(arm.idx[j - 1], arm.idx[j]);
-        if (j >= 2) T.push([arm.idx[j], arc]);
+    let T = this.rig.tethers;
+    if (!T) {
+      const L = [];
+      const d = (a, b) => Math.hypot(rest[a * 3] - rest[b * 3], rest[a * 3 + 1] - rest[b * 3 + 1], rest[a * 3 + 2] - rest[b * 3 + 2]);
+      for (const arm of arms) {
+        let arc = d(center, arm.idx[0]);
+        for (let j = 1; j < arm.idx.length; j++) {
+          arc += d(arm.idx[j - 1], arm.idx[j]);
+          if (j >= 2) L.push([arm.idx[j], arc, arm.stretch, arm.from, arm.cloud]);
+        }
       }
+      T = {
+        i: Int32Array.from(L.map((t) => t[0])), len: Float64Array.from(L.map((t) => t[1])),
+        stretch: Float64Array.from(L.map((t) => t[2])), from: Int32Array.from(L.map((t) => t[3])),
+        cloud: Int32Array.from(L.map((t) => t[4])),
+      };
     }
-    return { i: Int32Array.from(T.map((t) => t[0])), len: Float64Array.from(T.map((t) => t[1])) };
+    // the limit is fixed: precompute it once (same product the loop took)
+    const lim = new Float64Array(T.i.length);
+    for (let k = 0; k < lim.length; k++) lim[k] = T.len[k] * T.stretch[k];
+    return { ...T, lim };
   }
 
   _tether() {
     const { x } = this;
-    const c = this.rig.center;
-    const head = this.rig.head;
-    const maxStretch = 1.32;
-    const { i: I, len } = this._tethers;
-    // the body is hauled by the single worst violation, not their sum —
+    const { i: I, lim, from, cloud } = this._tethers;
+    // each cloud is hauled by its single worst violation, not their sum —
     // summing a whole stretched arm's worth overshoots and diverges
-    let sx = 0, sy = 0, sz = 0, worst = 0;
+    const H = this._haul || (this._haul = this.rig.clouds.map(() => new Float64Array(4)));
+    for (const h of H) h.fill(0);
     for (let k = 0; k < I.length; k++) {
-      const i = I[k];
+      const i = I[k], c = from[k];
       const dx = x[i * 3] - x[c * 3], dy = x[i * 3 + 1] - x[c * 3 + 1], dz = x[i * 3 + 2] - x[c * 3 + 2];
-      const d = Math.hypot(dx, dy, dz), L = len[k] * maxStretch;
+      const d = Math.hypot(dx, dy, dz), L = lim[k];
       if (d <= L) continue;
       const e = (d - L) / d;
       // the arm point gives a little; the body as a whole is hauled the rest
       x[i * 3] -= dx * e * 0.35; x[i * 3 + 1] -= dy * e * 0.35; x[i * 3 + 2] -= dz * e * 0.35;
-      if (e * d > worst) { worst = e * d; sx = dx * e * 0.65; sy = dy * e * 0.65; sz = dz * e * 0.65; }
+      const h = H[cloud[k]];
+      if (e * d > h[3]) { h[3] = e * d; h[0] = dx * e * 0.65; h[1] = dy * e * 0.65; h[2] = dz * e * 0.65; }
     }
-    if (sx || sy || sz) {
-      for (const i of head) { x[i * 3] += sx; x[i * 3 + 1] += sy; x[i * 3 + 2] += sz; }
+    for (let k = 0; k < H.length; k++) {
+      const [sx, sy, sz] = H[k];
+      if (sx || sy || sz) {
+        for (const i of this.rig.clouds[k].ix) { x[i * 3] += sx; x[i * 3 + 1] += sy; x[i * 3 + 2] += sz; }
+      }
     }
   }
 
@@ -120,19 +146,57 @@ export class SoftBody {
      the head — tips curling up again — however it was left lying           */
   _memory(alpha) {
     const { x } = this;
-    const g = this.head, R = quatToMat(g.q4, _R), c = g.c, c0 = g.c0, rest = this.rig.rest;
+    const rest = this.rig.rest;
+    let gk = -1, g, R, c, c0;
     for (const arm of this.rig.arms) {
+      if (arm.inCloud) continue;
+      if (arm.cloud !== gk) { gk = arm.cloud; g = this.clouds[gk]; R = quatToMat(g.q4, _R); c = g.c; c0 = g.c0; }
       const idx = arm.idx;
+      let sx = 0, sy = 0, sz = 0;
       for (let j = 2; j < idx.length; j++) {
         const i = idx[j];
         if (this.w[i] === 0) continue;
         const qx = rest[i * 3] - c0[0], qy = rest[i * 3 + 1] - c0[1], qz = rest[i * 3 + 2] - c0[2];
-        const a = alpha * (0.4 + 0.6 * j / idx.length);
-        x[i * 3] += (c[0] + R[0] * qx + R[1] * qy + R[2] * qz - x[i * 3]) * a;
-        x[i * 3 + 1] += (c[1] + R[3] * qx + R[4] * qy + R[5] * qz - x[i * 3 + 1]) * a;
-        x[i * 3 + 2] += (c[2] + R[6] * qx + R[7] * qy + R[8] * qz - x[i * 3 + 2]) * a;
+        const a = alpha * (0.4 + 0.6 * j / idx.length) * arm.mem;
+        const dx = (c[0] + R[0] * qx + R[1] * qy + R[2] * qz - x[i * 3]) * a;
+        const dy = (c[1] + R[3] * qx + R[4] * qy + R[5] * qz - x[i * 3 + 1]) * a;
+        const dz = (c[2] + R[6] * qx + R[7] * qy + R[8] * qz - x[i * 3 + 2]) * a;
+        x[i * 3] += dx; x[i * 3 + 1] += dy; x[i * 3 + 2] += dz;
+        sx += dx; sy += dy; sz += dz;
       }
+      // a lone tail pulled back to pose must push the body the other way,
+      // or it walks the toy across the floor (eight symmetric arms cancel)
+      if (this.rig.react) this._shift(this.rig.clouds[gk].ix, -sx, -sy, -sz);
     }
+    // a head remembers how it sat on its torso
+    for (let k = 1; k < this.clouds.length; k++) {
+      const spec = this.rig.clouds[k];
+      const p = this.clouds[spec.parent];
+      const Rp = quatToMat(p.q4, _R), cp = p.c, c0p = p.c0;
+      const a = alpha * spec.mem;
+      let sx = 0, sy = 0, sz = 0;
+      for (const i of spec.ix) {
+        if (this.w[i] === 0) continue;
+        const qx = rest[i * 3] - c0p[0], qy = rest[i * 3 + 1] - c0p[1], qz = rest[i * 3 + 2] - c0p[2];
+        const dx = (cp[0] + Rp[0] * qx + Rp[1] * qy + Rp[2] * qz - x[i * 3]) * a;
+        const dy = (cp[1] + Rp[3] * qx + Rp[4] * qy + Rp[5] * qz - x[i * 3 + 1]) * a;
+        const dz = (cp[2] + Rp[6] * qx + Rp[7] * qy + Rp[8] * qz - x[i * 3 + 2]) * a;
+        x[i * 3] += dx; x[i * 3 + 1] += dy; x[i * 3 + 2] += dz;
+        sx += dx; sy += dy; sz += dz;
+      }
+      // a head on a short neck pushes back on its torso (a head on a long
+      // neck doesn't: the lever is too long, and the push rocks the body)
+      if (this.rig.react) this._shift(this.rig.clouds[spec.parent].ix, -sx, -sy, -sz);
+    }
+  }
+
+  /* spread a total displacement evenly over a set of points */
+  _shift(ix, sx, sy, sz) {
+    const m = ix.length;
+    if (!m || !(sx || sy || sz)) return;
+    sx /= m; sy /= m; sz /= m;
+    const x = this.x;
+    for (const i of ix) { if (this.w[i] === 0) continue; x[i * 3] += sx; x[i * 3 + 1] += sy; x[i * 3 + 2] += sz; }
   }
 
   reset() {
@@ -140,7 +204,7 @@ export class SoftBody {
     this.p.set(this.rig.rest);
     this.v.fill(0);
     this.grabs.clear();
-    this.head.q4 = [0, 0, 0, 1];
+    for (const g of this.clouds) g.q4 = [0, 0, 0, 1];
     for (const w of this.windows) w.q4 = [0, 0, 0, 1];
   }
 
@@ -215,8 +279,10 @@ export class SoftBody {
       this.nanResets = (this.nanResets || 0) + 1;
     }
     this.time += dt;
-    quatToMat(this.head.q4, this.headR);
-    this.headC.set(this.head.c);
+    for (let k = 0; k < this.clouds.length; k++) {
+      quatToMat(this.clouds[k].q4, this.cloudR[k]);
+      this.cloudC[k].set(this.clouds[k].c);
+    }
   }
 
   _substep(h) {
@@ -232,14 +298,17 @@ export class SoftBody {
 
     // stuffing: loose (0) lets the head slump and dent, packed (1) holds shape
     const st = P.stuffing;
-    this._match(this.head, 0.012 + 0.16 * st * st + 0.02 * st);
+    const cloudK = 0.012 + 0.16 * st * st + 0.02 * st;
+    this._match(this.head, this.rig.clouds[0].k === 1 ? cloudK : Math.min(0.9, cloudK * this.rig.clouds[0].k + this.rig.clouds[0].k0));
+    for (let k = 1; k < this.clouds.length; k++) this._match(this.clouds[k], Math.min(0.9, cloudK * this.rig.clouds[k].k + this.rig.clouds[k].k0));
     const bend = 0.08 + 0.26 * st;
-    for (const w of this.windows) this._match(w, bend, true);
+    const W = this.windows, WK = this.rig.windowK;
+    for (let k = 0; k < W.length; k++) this._match(W[k], Math.min(0.9, bend * WK[k]), true);
     this._memory(0.0015 + 0.006 * st);
 
-    const { linkA, linkB, linkLen } = this.rig;
-    const stretchK = 0.1;
+    const { linkA, linkB, linkLen, linkK } = this.rig;
     for (let l = 0; l < linkA.length; l++) {
+      const stretchK = linkK[l];
       const a = linkA[l], b = linkB[l];
       const dx = x[b * 3] - x[a * 3], dy = x[b * 3 + 1] - x[a * 3 + 1], dz = x[b * 3 + 2] - x[a * 3 + 2];
       const d = Math.hypot(dx, dy, dz) || 1e-9;

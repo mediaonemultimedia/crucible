@@ -15,8 +15,9 @@ export class Tools {
     this.ptrs = new Map();
     this.pins = new Map();
     this.ray = new THREE.Raycaster();
-    this.pick = new THREE.Mesh(body.geometry, new THREE.MeshBasicMaterial());
-    this.pick.updateMatrixWorld();
+    this.pickMat = new THREE.MeshBasicMaterial();
+    this.stickEnabled = true;
+    this.attach({ body, soft, grasp });
     this.orbit = { az: 0.0, el: 0.4, dist: 12.4, target: new THREE.Vector3(0, 0.75, 0) };
     this._applyOrbit();
     this.combing = false;
@@ -34,6 +35,22 @@ export class Tools {
   }
 
   setMode(m) { this.mode = m; this.canvas.dataset.tool = m; }
+
+  /* a new character: drop every pointer's hold on the old one */
+  attach({ body, soft, grasp }) {
+    if (this.soft) {
+      this.releasePins();
+      for (const id of this.ptrs.keys()) this.soft.release(id);
+      this.soft.spheres = [];
+      this.soft.stick = null;
+      this.onStick?.(false);
+    }
+    this.ptrs?.clear();
+    Object.assign(this, { body, soft, grasp });
+    this.pick = new THREE.Mesh(body.geometry, this.pickMat);
+    this.pick.updateMatrixWorld();
+    if (this.canvas) this.canvas.dataset.grabbing = '';
+  }
 
   releasePins() {
     for (const id of this.pins.keys()) this.soft.release(id);
@@ -117,7 +134,7 @@ export class Tools {
     const sh = this._stickHit(e);
     if (sh || this.mode === 'stick') {
       if (sh) return this._startStickDrag(p, e, sh);
-      if (this.mode === 'stick') {
+      if (this.mode === 'stick' && this.stickEnabled) {
         const floor = this._onPlane(e, new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
         if (floor) {
           this._placeStick(floor);
@@ -238,17 +255,8 @@ export class Tools {
     const tu = new THREE.Vector3(interp(B.tu, 3, 0), interp(B.tu, 3, 1), interp(B.tu, 3, 2)).normalize();
     const tv = new THREE.Vector3(interp(B.tv, 3, 0), interp(B.tv, 3, 1), interp(B.tv, 3, 2)).normalize();
     const S = this.groom.size;
-    let rx, ry;
-    if (v < 0.5) {
-      const phi = v * 2 * Math.PI;
-      rx = (BRUSH / (2 * Math.PI * Math.max(0.25, Math.sin(phi)))) * S;
-      ry = (BRUSH / (Math.PI * 1.07)) * (S / 2);
-    } else {
-      const s = (v - 0.5) * 2;
-      const r = 0.065 + 0.19 * Math.pow(1 - s, 0.9);
-      rx = Math.min(S / 16, (BRUSH / (2 * Math.PI * r)) * (S / 8));
-      ry = (BRUSH / 2.75) * (S / 2);
-    }
+    // the brush is the same size in the world wherever it lands in the atlas
+    const [rx, ry] = this.body.brushTexels(u, v, BRUSH, S);
     const steps = Math.max(1, Math.ceil(d.length() / (BRUSH * 0.3)));
     for (let k = 0; k < steps; k++) this.groom.paint(u, v, d.dot(tu), d.dot(tv), 0.42, rx, ry);
   }

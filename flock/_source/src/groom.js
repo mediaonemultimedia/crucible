@@ -1,33 +1,62 @@
 /* The groom map — which way every patch of fur is lying, and how roughed-up it is.
 
-   One texture in the body's UV atlas: the head fills v ∈ [0, ½); arm k fills
+   One texture in the body's UV atlas, cut into one rectangle per part (the
+   rig's `regions`). The octopus: the head fills v ∈ [0, ½); arm k fills
    u ∈ [k/8, (k+1)/8), v ∈ [½, 1). Per texel:
      R,G  lean, in the surface's own (u, v) tangent frame, −1…1
      B    ruffle 0…1 — fibres brushed up against their nap, standing and crossed
 
    The float copy is the truth; the byte texture is what the GPU samples.
-   Default nap: lying toward +v (down the head, out toward the arm tips).   */
+   Default nap: lying toward +v (down the head, out toward the arm tips) —
+   unless a region says otherwise: the lion's mane leans hard out from the
+   face, the llama's fleece stands up a little ruffled. Left alone, fur
+   drifts back to its region's default.                                     */
 
 export const GROOM_SIZE = 512;
 export const NAP = 0.38;
 
+/* the octopus atlas: head on top, eight arm strips below */
+export const OCTOPUS_REGIONS = [{ x0: 0, x1: 1, y0: 0, y1: 0.5 }];
+for (let k = 0; k < 8; k++) OCTOPUS_REGIONS.push({ x0: k / 8, x1: (k + 1) / 8, y0: 0.5, y1: 1 });
+
 export class Groom {
-  constructor(size = GROOM_SIZE) {
+  constructor(size = GROOM_SIZE, regions = OCTOPUS_REGIONS) {
     this.size = size;
     const n = size * size;
     this.lean = new Float32Array(n * 2);
     this.ruffle = new Float32Array(n);
     this.bytes = new Uint8Array(n * 4);
+    // the resting groom, per texel
+    this.dLean = new Float32Array(n * 2);
+    this.dRuffle = new Float32Array(n);
     this.dirty = true;
     this.smoothing = 0;
     this._row = 0;
+    this.setLayout(regions);
+  }
+
+  /* a new atlas (a new character): regions in uv, with optional default
+     lean (lu, lv) and ruffle (ruf); then everything back to its default   */
+  setLayout(regions) {
+    const S = this.size;
+    this.regions = regions.map((r) => ({
+      x0: Math.round(r.x0 * S), x1: Math.round(r.x1 * S), y0: Math.round(r.y0 * S), y1: Math.round(r.y1 * S),
+      lu: r.lu ?? 0, lv: r.lv ?? NAP, ruf: r.ruf ?? 0,
+    }));
+    for (let i = 0; i < S * S; i++) { this.dLean[i * 2] = 0; this.dLean[i * 2 + 1] = NAP; this.dRuffle[i] = 0; }
+    for (const R of this.regions)
+      for (let y = R.y0; y < R.y1; y++)
+        for (let x = R.x0; x < R.x1; x++) {
+          const i = y * S + x;
+          this.dLean[i * 2] = R.lu; this.dLean[i * 2 + 1] = R.lv; this.dRuffle[i] = R.ruf;
+        }
+    this.smoothing = 0;
     this.reset();
   }
 
   reset() {
-    for (let i = 0; i < this.size * this.size; i++) {
-      this.lean[i * 2] = 0; this.lean[i * 2 + 1] = NAP; this.ruffle[i] = 0;
-    }
+    this.lean.set(this.dLean);
+    this.ruffle.set(this.dRuffle);
     this._encodeAll();
   }
 
@@ -36,9 +65,9 @@ export class Groom {
   /* region bounds in texels for a uv: [x0, x1) wrap range, y0, y1 */
   region(u, v) {
     const S = this.size;
-    if (v < 0.5) return { x0: 0, x1: S, y0: 0, y1: S / 2 };
-    const k = Math.min(7, Math.max(0, Math.floor(u * 8)));
-    return { x0: (k * S) / 8, x1: ((k + 1) * S) / 8, y0: S / 2, y1: S };
+    const x = Math.min(S - 1, Math.max(0, Math.floor(u * S))), y = Math.min(S - 1, Math.max(0, Math.floor(v * S)));
+    for (const R of this.regions) if (x >= R.x0 && x < R.x1 && y >= R.y0 && y < R.y1) return R;
+    return { x0: 0, x1: S, y0: 0, y1: S };
   }
 
   /* comb stroke at (u, v), direction (du, dv) in the tangent frame,
@@ -94,12 +123,13 @@ export class Groom {
       for (let x = 0; x < S; x++) {
         const i = y * S + x;
         const lx = this.lean[i * 2], ly = this.lean[i * 2 + 1], rf = this.ruffle[i];
-        if (lx === 0 && ly === NAP && rf === 0) continue;
-        this.lean[i * 2] = lx - lx * kLean;
-        this.lean[i * 2 + 1] = ly + (NAP - ly) * kLean;
-        this.ruffle[i] = rf - rf * kRuf;
-        if (Math.abs(this.lean[i * 2]) < 1e-3 && Math.abs(this.lean[i * 2 + 1] - NAP) < 1e-3 && this.ruffle[i] < 1e-3) {
-          this.lean[i * 2] = 0; this.lean[i * 2 + 1] = NAP; this.ruffle[i] = 0;
+        const dx = this.dLean[i * 2], dy = this.dLean[i * 2 + 1], dr = this.dRuffle[i];
+        if (lx === dx && ly === dy && rf === dr) continue;
+        this.lean[i * 2] = lx + (dx - lx) * kLean;
+        this.lean[i * 2 + 1] = ly + (dy - ly) * kLean;
+        this.ruffle[i] = rf + (dr - rf) * kRuf;
+        if (Math.abs(this.lean[i * 2] - dx) < 1e-3 && Math.abs(this.lean[i * 2 + 1] - dy) < 1e-3 && Math.abs(this.ruffle[i] - dr) < 1e-3) {
+          this.lean[i * 2] = dx; this.lean[i * 2 + 1] = dy; this.ruffle[i] = dr;
         }
         this._encode(i);
       }

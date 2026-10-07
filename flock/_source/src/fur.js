@@ -35,6 +35,7 @@ export function makeFurMaterial(groomTex, maskTex) {
     density: uniform(95),
     color: uniform(new THREE.Color(FUR_COLORS.coral.fur)),
     under: uniform(new THREE.Color(FUR_COLORS.coral.under)),
+    accent: uniform(new THREE.Color(FUR_COLORS.coral.fur)),
     key: uniform(KEY.clone()),
     fill: uniform(FILL.clone()),
     meshView: uniform(0),
@@ -48,13 +49,15 @@ export function makeFurMaterial(groomTex, maskTex) {
   const tv = tvU.xyz, underA = tvU.w;
   const uvA = uvfp.xy, fpA = uvfp.zw;
   const lag = attribute('lag', 'vec3');
+  const look = attribute('look', 'vec4');
+  const accentA = look.x, pileMul = look.y;
 
   const h = float(instanceIndex).div(U.shells.sub(1));
   const gV = texture(groomTex, uvA).level(0);
   const mV = texture(maskTex, uvA).level(0);
   const leanV = tu.mul(gV.r.mul(2).sub(1)).add(tv.mul(gV.g.mul(2).sub(1)));
   const ruffleV = gV.b;
-  const pileLocal = U.pile.mul(mV.r).mul(float(1).sub(mV.b.mul(0.75))).mul(mix(float(1), float(0.72), underA));
+  const pileLocal = U.pile.mul(mV.r).mul(float(1).sub(mV.b.mul(0.75))).mul(mix(float(1), float(0.72), underA)).mul(pileMul);
   const down = vec3(0, -1, 0);
   const gT = down.sub(n.mul(dot(n, down)));
   // how far the fibres bow over: lean from the groom, trailing lag, a little sag
@@ -75,6 +78,7 @@ export function makeFurMaterial(groomTex, maskTex) {
   const vTu = varying(tu);
   const vTv = varying(tv);
   const vUnder = varying(underA);
+  const vAccent = varying(accentA);
   const vFp = varying(fpA);
   const vUv = varying(uvA);
   const vPile = varying(mV.r.mul(float(1).sub(mV.b.mul(0.75))));
@@ -112,7 +116,7 @@ export function makeFurMaterial(groomTex, maskTex) {
 
     // ── albedo ──────────────────────────────────────────────────────────────
     const he = clamp(hh.div(max(vPile, float(0.05))), 0, 1);
-    const base = mix(vec3(U.color), vec3(U.under), vUnder).toVar();
+    const base = mix(mix(vec3(U.color), vec3(U.accent), vAccent), vec3(U.under), vUnder).toVar();
     base.assign(mix(base, vec3(0.95, 0.42, 0.45), m.g.mul(0.7)));            // blush
     base.assign(mix(base, vec3(0.16, 0.08, 0.07), m.b));                       // stitching
     base.mulAssign(strandRand.mul(0.16).add(0.92));
@@ -167,44 +171,17 @@ export function makeFurMaterial(groomTex, maskTex) {
 }
 
 /* face + pile mask, in the same atlas as the groom map:
-   R pile multiplier, G blush, B stitch                                       */
+   R pile multiplier, G blush, B stitch. One canvas, repainted per character
+   (faces.js draws each face).                                              */
 export function makeMaskTexture(size = 512) {
   const c = document.createElement('canvas');
   c.width = c.height = size;
-  const g = c.getContext('2d');
-  g.fillStyle = 'rgb(255,0,0)';
-  g.fillRect(0, 0, size, size);
-  // head occupies v ∈ [0, ½): x = u·size, y = v·size; face centre at u = ½
-  const H = (u, v) => [u * size, v * size * 0.5];
-  // eyes: short fur ring so the beads sit proud
-  for (const s of [-1, 1]) {
-    const [x, y] = H(0.5 + s * 0.068, 0.5);
-    const gr = g.createRadialGradient(x, y, 0, x, y, size * 0.05);
-    gr.addColorStop(0, 'rgb(40,0,0)'); gr.addColorStop(0.6, 'rgb(90,0,0)'); gr.addColorStop(1, 'rgb(255,0,0)');
-    g.fillStyle = gr;
-    g.beginPath(); g.ellipse(x, y, size * 0.05, size * 0.05, 0, 0, Math.PI * 2); g.fill();
-  }
-  g.globalCompositeOperation = 'lighter';
-  // blush
-  for (const s of [-1, 1]) {
-    const [x, y] = H(0.5 + s * 0.112, 0.575);
-    const gr = g.createRadialGradient(x, y, 0, x, y, size * 0.04);
-    gr.addColorStop(0, 'rgba(0,255,0,0.9)'); gr.addColorStop(1, 'rgba(0,255,0,0)');
-    g.fillStyle = gr;
-    g.beginPath(); g.ellipse(x, y, size * 0.045, size * 0.03, 0, 0, Math.PI * 2); g.fill();
-  }
-  // embroidered smile: a short shallow arc of satin stitch
-  g.strokeStyle = 'rgb(0,0,255)';
-  g.lineCap = 'round';
-  g.lineWidth = size * 0.009;
-  const [sx, sy] = H(0.5, 0.585);
-  g.beginPath();
-  g.ellipse(sx, sy - size * 0.016, size * 0.036, size * 0.02, 0, 0.14 * Math.PI, 0.86 * Math.PI);
-  g.stroke();
   const tex = new THREE.CanvasTexture(c);
   tex.flipY = false;
   tex.colorSpace = THREE.NoColorSpace;
   tex.wrapS = THREE.RepeatWrapping;
+  tex.userData.ctx = c.getContext('2d');
+  tex.userData.size = size;
   return tex;
 }
 

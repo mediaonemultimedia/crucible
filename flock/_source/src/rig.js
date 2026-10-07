@@ -1,6 +1,22 @@
-/* The rest shape of the octopus — where every physics point sits before anything
-   touches it. Units: 1 = 9 cm (head is ~18 cm across, a large plush). +z faces
-   the camera, +y is up, floor at y = 0.                                       */
+/* The rest shapes — where every physics point sits before anything touches
+   it. Units: 1 = 9 cm (the octopus head is ~18 cm across, a large plush).
+   +z faces the camera, +y is up, floor at y = 0.
+
+   Every character produces the same structure for SoftBody and Body:
+     clouds   shape-matched point clouds (clouds[0] is the main one, `head`)
+     arms     appendage chains — arms, ears, tails, legs, necks — each a run of
+              points held by 3-point shape-matched windows, stretch links,
+              long-range tethers and shape memory
+     parts    the display mesh: ellipsoid (or torus) grids skinned to a cloud,
+              and tubes swept along chains
+     regions  the groom/mask atlas layout, one rectangle per part, with the
+              fur's default lean and ruffle there
+   The octopus below is the Phase 1 rig, unchanged; the others live in
+   rigs.js and are built with RigBuilder.                                     */
+
+import { buildWolf, buildLion, buildLlama } from './rigs.js';
+
+export const CHARACTERS = ['octopus', 'wolf', 'lion', 'llama'];
 
 export const HEAD = { cx: 0, cy: 1.32, cz: 0, rx: 1.0, ry: 1.07, rz: 0.97 };
 export const ARMS = 8;
@@ -26,7 +42,16 @@ export function armAngle(k) {
   return (k + 0.5) * (2 * Math.PI / ARMS);
 }
 
-export function buildRig() {
+export function buildRig(name = 'octopus') {
+  if (name === 'wolf') return buildWolf();
+  if (name === 'lion') return buildLion();
+  if (name === 'llama') return buildLlama();
+  return buildOctopus();
+}
+
+const armUnder = (s, c) => smooth(0.15, 0.6, c) * smooth(0.0, 0.08, s);
+
+function buildOctopus() {
   const pos = [];
   const radius = [];
   const head = [];
@@ -115,14 +140,42 @@ export function buildRig() {
   const armJ = new Int16Array(n).fill(-1);
   for (const arm of arms) arm.idx.forEach((i, j) => { if (j > 0) { armOf[i] = arm.k; armJ[i] = j; } });
 
+  // the generalised fields, all at their Phase 1 values
+  for (const arm of arms) Object.assign(arm, {
+    kind: 'arm', cloud: 0, from: center, len: ARM_LEN, seg, radius: armRadius,
+    ref: [0, -1, 0], flat: 1, bend: 1, mem: 1, stretch: 1.32, skip: 3, inCloud: false,
+    under: armUnder, pile: one, accent: zero,
+  });
+  const headIx = Int32Array.from(head);
+  const parts = [{
+    kind: 'grid', name: 'head', cloud: 0, U: 72, V: 46, region: 0,
+    c: [HEAD.cx, HEAD.cy, HEAD.cz], r: [HEAD.rx, HEAD.ry, HEAD.rz], B: null,
+    bulge: (phi) => 1 + 0.05 * Math.sin(phi * 1.4),
+    pile: one, under: zero, accent: zero,
+  }];
+  const regions = [{ x0: 0, x1: 1, y0: 0, y1: 0.5 }];
+  for (const arm of arms) {
+    parts.push({ kind: 'tube', chain: arm.k, AS: 54, AA: 22, CAP: 6, region: regions.length });
+    regions.push({ x0: arm.k / 8, x1: (arm.k + 1) / 8, y0: 0.5, y1: 1 });
+  }
+
   return {
+    name: 'octopus',
     n, rest, radius: Float64Array.from(radius),
-    head: Int32Array.from(head), center, arms, windows,
+    head: headIx, center, arms, windows,
     linkA, linkB, linkLen, armOf, armJ, seg,
+    clouds: [{ ix: headIx, center, parent: -1, mem: 0, k: 1, k0: 0 }],
+    windowK: new Float64Array(windows.length).fill(1),
+    linkK: new Float64Array(linkA.length).fill(0.1),
+    tethers: null, restSkip: false, react: false, camY: 0,
+    parts, regions,
   };
 }
 
-function smooth(a, b, x) {
+const one = () => 1;
+const zero = () => 0;
+
+export function smooth(a, b, x) {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
 }
