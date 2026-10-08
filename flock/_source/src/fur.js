@@ -240,8 +240,9 @@ export class Floor {
     this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(80, 80).rotateX(-Math.PI / 2), mat);
   }
 
-  /* paint soft shadow blobs under every physics point (and the stick) */
-  paint(soft, stick) {
+  /* paint soft shadow blobs under every physics point (and the stick, and
+     any toy: `extra` is [[x, y, z, r], …]) */
+  paint(soft, stick, extra = []) {
     const g = this.ctx, S = this.canvas.width, ext = this.extent;
     g.clearRect(0, 0, S, S);
     // the shadow map rides along under the octopus
@@ -274,6 +275,7 @@ export class Floor {
         blob(px, py, pz, stick.r * 2, 0.1);
       }
     }
+    for (const [px, py, pz, pr] of extra) blob(px, py, pz, pr, 0.16);
     this.tex.needsUpdate = true;
   }
 }

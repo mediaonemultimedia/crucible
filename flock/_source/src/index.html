@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#e6e0d7">
 <title>Flock — a groomable plush study</title>
-<meta name="description" content="Plush toys — an octopus, a fox, a lion and a llama — as position-based soft bodies under a coat of shell-rendered fur you can groom like velvet. Pull them, poke them, comb them; hand the octopus a stick.">
+<meta name="description" content="Plush toys — an octopus, a fox, a lion and a llama — as position-based soft bodies under a coat of shell-rendered fur you can groom like velvet. Pull them, poke them, comb them; hand the octopus a stick, dangle a feather for the fox, roll the lion some yarn, offer the llama a carrot.">
 <style>
 :root{
   --stage:#e6e0d7;
@@ -35,7 +35,7 @@ canvas#stage[data-hover="body"]{cursor:grab}
 canvas#stage[data-grabbing="1"]{cursor:grabbing}
 canvas#stage[data-tool="finger"]{cursor:pointer}
 canvas#stage[data-tool="comb"]{cursor:crosshair}
-canvas#stage[data-tool="stick"]{cursor:copy}
+canvas#stage[data-tool="toy"]{cursor:copy}
 canvas#stage[data-hover="stick"]{cursor:move}
 
 #ui{position:fixed;inset:0;z-index:5;pointer-events:none;opacity:0;transition:opacity 1.1s cubic-bezier(.4,0,.2,1) .25s}
@@ -155,9 +155,9 @@ body.panel-open #panel{transform:translateX(0)}
 #p-char button[aria-pressed="true"]{border-color:rgba(200,168,119,.62);background:rgba(200,168,119,.09);color:var(--ink)}
 #p-char button[aria-pressed="true"] i{color:var(--accent)}
 .sub-h{margin:0 0 9px;font-family:var(--mono);font-size:8px;letter-spacing:.22em;text-transform:uppercase;color:var(--faint);opacity:.8}
-/* the stick is the octopus's alone */
-body:not([data-char="octopus"]) #tools{grid-template-columns:repeat(3,1fr)}
+/* the grip is the octopus's alone (the others' toys need none) */
 body:not([data-char="octopus"]) [data-octopus-only]{display:none}
+#toy-state{font-style:italic;color:var(--ink-s)}
 #p-fur{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 #p-fur button{background:rgba(232,227,216,.028);border:1px solid var(--rule-2);color:var(--dim);cursor:pointer;padding:7px 5px 6px;text-align:left;transition:border-color .25s ease,color .25s ease}
 #p-fur button .sw{display:block;height:16px;margin-bottom:6px}
@@ -226,7 +226,7 @@ body:not([data-char="octopus"]) [data-octopus-only]{display:none}
     <button data-tool="hand" aria-pressed="true"><b>Hand</b><i>1</i></button>
     <button data-tool="finger" aria-pressed="false"><b>Finger</b><i>2</i></button>
     <button data-tool="comb" aria-pressed="false"><b>Comb</b><i>3</i></button>
-    <button data-tool="stick" aria-pressed="false" data-octopus-only><b>Stick</b><i>4</i></button>
+    <button data-tool="toy" aria-pressed="false"><b id="toy-label">Stick</b><i>4</i></button>
   </div>
 
   <button id="panel-toggle" aria-controls="panel" aria-expanded="false">
@@ -262,7 +262,7 @@ body:not([data-char="octopus"]) [data-octopus-only]{display:none}
           <button id="b-squish">Squish</button>
           <button id="b-toss">Toss</button>
           <button id="b-reset">Reset<i>R</i></button>
-          <button id="b-stick" class="span" disabled data-octopus-only>Take the stick away</button>
+          <button id="b-stick" class="span" disabled>Take the stick away</button>
         </div>
       </section>
       <section>
@@ -280,6 +280,7 @@ body:not([data-char="octopus"]) [data-octopus-only]{display:none}
         <p class="note">The fox, lion and llama are built the same way: a torso cloud, a head cloud sewn onto it, and <b>appendage chains</b> — ears, tails, legs, a neck — of the same windows, tethers and shape memory as the arms, each with its own stiffness. The lion's mane and the llama's fleece are <b>long pile</b>, with their own default lie in the groom map.</p>
         <p class="note">The fur is the body drawn <b>64 times</b>, each shell pushed a little further out and cut into strands by a jittered cell pattern. Each strand bends with a <b>groom map</b> you paint with the comb, trails the surface on a damped spring, and is lit along its own axis (<b>Kajiya-Kay</b>), so brushed patches catch light like velvet.</p>
         <p class="note">Arms near the stick reach for it, then wrap from the tip on a helix around the wood. Pull harder than the grip and they let go.</p>
+        <p class="note">The others each have a <b>toy</b>. Nothing they do is keyframed: a toy nearby <b>re-poses the sewn shape</b> the stuffing pulls toward — the head turned to look, the ears after it, a neck stretched out, a crouch, a paw raised — and the soft body gets there on its own, wobbling as it goes. The fox's hop and the lion's swipe are impulses; the feather is a rope, the yarn a rolling ball that bumps the plush.</p>
       </section>
     </div>
   </aside>

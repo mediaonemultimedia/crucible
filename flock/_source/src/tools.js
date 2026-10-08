@@ -1,4 +1,6 @@
-/* Pointer input → the four tools, plus camera orbit and zoom.
+/* Pointer input → the four tools, plus camera orbit and zoom. The fourth
+   tool is the character's toy: the octopus's stick, or a Play toy.
+
 
    Every pointer is tracked on its own, so two fingers (or a mouse plus a
    pinned grab — Shift on release pins a Hand grab in place) can hold the
@@ -9,7 +11,7 @@ import * as THREE from 'three/webgpu';
 const BRUSH = 0.24;
 
 export class Tools {
-  constructor({ canvas, camera, body, soft, grasp, groom, stickMesh, onStick }) {
+  constructor({ canvas, camera, body, soft, grasp, groom, stickMesh, onStick, play = null }) {
     Object.assign(this, { canvas, camera, body, soft, grasp, groom, stickMesh, onStick });
     this.mode = 'hand';
     this.ptrs = new Map();
@@ -17,7 +19,7 @@ export class Tools {
     this.ray = new THREE.Raycaster();
     this.pickMat = new THREE.MeshBasicMaterial();
     this.stickEnabled = true;
-    this.attach({ body, soft, grasp });
+    this.attach({ body, soft, grasp, play });
     this.orbit = { az: 0.0, el: 0.4, dist: 12.4, target: new THREE.Vector3(0, 0.75, 0) };
     this._applyOrbit();
     this.combing = false;
@@ -37,7 +39,7 @@ export class Tools {
   setMode(m) { this.mode = m; this.canvas.dataset.tool = m; }
 
   /* a new character: drop every pointer's hold on the old one */
-  attach({ body, soft, grasp }) {
+  attach({ body, soft, grasp, play = null }) {
     if (this.soft) {
       this.releasePins();
       for (const id of this.ptrs.keys()) this.soft.release(id);
@@ -46,7 +48,7 @@ export class Tools {
       this.onStick?.(false);
     }
     this.ptrs?.clear();
-    Object.assign(this, { body, soft, grasp });
+    Object.assign(this, { body, soft, grasp, play });
     this.pick = new THREE.Mesh(body.geometry, this.pickMat);
     this.pick.updateMatrixWorld();
     if (this.canvas) this.canvas.dataset.grabbing = '';
@@ -132,13 +134,31 @@ export class Tools {
 
     // the stick is grabbable whichever tool is active
     const sh = this._stickHit(e);
-    if (sh || this.mode === 'stick') {
+    if (sh || (this.mode === 'toy' && this.stickEnabled)) {
       if (sh) return this._startStickDrag(p, e, sh);
-      if (this.mode === 'stick' && this.stickEnabled) {
+      if (this.mode === 'toy' && this.stickEnabled) {
         const floor = this._onPlane(e, new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
         if (floor) {
           this._placeStick(floor);
           return this._startStickDrag(p, e, new THREE.Vector3(...this.soft.stick.a).lerp(new THREE.Vector3(...this.soft.stick.b), 0.5));
+        }
+      }
+    }
+
+    // so is a toy; with the Toy tool, the floor is where a new one goes
+    if (this.play) {
+      const th = this._toyHit(e);
+      if (th) return this._startToyDrag(p, th);
+      if (this.mode === 'toy') {
+        const floor = this._onPlane(e, new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
+        if (floor) {
+          const dir = new THREE.Vector3();
+          this.camera.getWorldDirection(dir);
+          const toCam = new THREE.Vector2(-dir.x, -dir.z).normalize();
+          this.play.place([floor.x, 0, floor.z], [toCam.x, 0, toCam.y]);
+          this.onStick?.(true);
+          const a = this.play.target();
+          return this._startToyDrag(p, new THREE.Vector3(...a));
         }
       }
     }
@@ -195,7 +215,32 @@ export class Tools {
 
   removeStick() {
     this.soft.stick = null;
+    this.play?.remove();
     this.onStick?.(false);
+  }
+
+  /* nearest point on a toy under the pointer, if any */
+  _toyHit(e) {
+    const segs = this.play?.segments();
+    if (!segs?.length) return null;
+    this.ray.setFromCamera(this._ndc(e), this.camera);
+    const onRay = new THREE.Vector3(), onSeg = new THREE.Vector3();
+    let best = null, bd = 1e9;
+    for (const s of segs) {
+      const a = new THREE.Vector3(...s.a), b = new THREE.Vector3(...s.b);
+      let d2;
+      if (a.distanceToSquared(b) < 1e-10) { d2 = this.ray.ray.distanceSqToPoint(a); onSeg.copy(a); }
+      else d2 = this.ray.ray.distanceSqToSegment(a, b, onRay, onSeg);
+      const r = s.r * 1.6;
+      if (d2 < r * r && d2 / (r * r) < bd) { bd = d2 / (r * r); best = onSeg.clone(); }
+    }
+    return best;
+  }
+
+  _startToyDrag(p, point) {
+    p.kind = 'toy';
+    p.plane = this._camPlane(point);
+    this.play.dragStart([point.x, point.y, point.z]);
   }
 
   _startStickDrag(p, e, point) {
@@ -232,6 +277,9 @@ export class Tools {
       const lowest = Math.min(p.a0[1], p.b0[1]) + d.y;
       if (lowest < s.r) d.y += s.r - lowest;   // never through the floor
       for (let k = 0; k < 3; k++) { s.a[k] = p.a0[k] + d.getComponent(k); s.b[k] = p.b0[k] + d.getComponent(k); }
+    } else if (p.kind === 'toy') {
+      const at = this._onPlane(e, p.plane);
+      if (at) this.play.dragTo([at.x, at.y, at.z]);
     } else if (p.kind === 'comb') {
       const hit = this._cast(e);
       if (!hit) { p.last = null; return; }
@@ -262,7 +310,8 @@ export class Tools {
   }
 
   _hover(e) {
-    if (this.mode === 'stick' || this._stickHit(e)) { this.canvas.dataset.hover = this._stickHit(e) ? 'stick' : ''; return; }
+    if (this._toyHit(e)) { this.canvas.dataset.hover = 'stick'; return; }
+    if (this.mode === 'toy' || this._stickHit(e)) { this.canvas.dataset.hover = this._stickHit(e) ? 'stick' : ''; return; }
     this.canvas.dataset.hover = this._cast(e) ? 'body' : '';
   }
 
@@ -276,6 +325,8 @@ export class Tools {
       this.canvas.dataset.grabbing = this.soft.grabs.size ? '1' : '';
     } else if (p.kind === 'finger') {
       this.soft.spheres = this.soft.spheres.filter((s) => s !== p.sphere);
+    } else if (p.kind === 'toy') {
+      this.play?.dragEnd();
     }
   }
 

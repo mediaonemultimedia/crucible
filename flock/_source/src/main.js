@@ -11,6 +11,8 @@ import {
 } from './fur.js';
 import { Tools } from './tools.js';
 import { CHARACTER_INFO, paintFace } from './characters.js';
+import { Play, TOYS, ROPE } from './toys.js';
+import { ToyView } from './toymesh.js';
 
 /* the stick is the octopus's: the others get a grasp that never grasps */
 const NO_GRASP = {
@@ -53,7 +55,7 @@ async function start() {
   const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.1, 120);
 
   // the current character: rebuilt whole by setCharacter()
-  let rig, soft, grasp, idle, body;
+  let rig, soft, grasp, idle, body, play = null;
   const groom = new Groom();
 
   const groomTex = makeGroomTexture(groom);
@@ -77,6 +79,7 @@ async function start() {
 
   const stickMesh = makeStick();
   scene.add(stickMesh);
+  const toyView = new ToyView(scene, ROPE);
 
   // rig view: points + links, rebuilt per character
   const rigLineMat = new THREE.LineBasicMaterial({ color: 0x1d1a17, depthTest: false, transparent: true, opacity: 0.9 });
@@ -157,13 +160,15 @@ async function start() {
     hand: '',
     finger: '<b>Finger</b>Press into the plush. Hold to push deeper; it fills back out when you lift.',
     comb: '<b>Comb</b>Brush the fur. With the nap it lies flat and shines; against it, it stands up and stays ruffled.',
-    stick: '<b>Stick</b>Click the floor to lay a stick near an arm. Drag the stick to lift — whatever it is holding comes too.',
+    toy: '',
   };
+  const STICK = '<b>Stick</b>Click the floor to lay a stick near an arm. Drag the stick to lift — whatever it is holding comes too.';
   const setTool = (m) => {
-    if (m === 'stick' && state.character !== 'octopus') return;
     tools.setMode(m);
     for (const b of document.querySelectorAll('#tools button')) b.setAttribute('aria-pressed', String(b.dataset.tool === m));
-    HINTS.hand = '<b>Hand</b>' + CHARACTER_INFO[state.character].hand;
+    const info = CHARACTER_INFO[state.character];
+    HINTS.hand = '<b>Hand</b>' + info.hand;
+    HINTS.toy = info.toy ? `<b>${TOYS[state.character].label}</b>${info.toy}<span id="toy-state"></span>` : STICK;
     $('#hint').innerHTML = HINTS[m];
   };
   for (const b of document.querySelectorAll('#tools button')) b.onclick = () => setTool(b.dataset.tool);
@@ -205,6 +210,8 @@ async function start() {
     soft = new SoftBody(rig);
     grasp = name === 'octopus' ? new Grasp(soft) : NO_GRASP;
     idle = new Idle(soft);
+    // the others' toys: attention and a signature move each (toys.js)
+    play = TOYS[name] ? new Play(soft) : null;
     applyBody();
     body = new Body(rig, soft);
     body.geometry.instanceCount = state.mesh ? 1 : SHELLS;
@@ -216,10 +223,10 @@ async function start() {
     buildRigView();
     if (!tools) {
       tools = new Tools({
-        canvas, camera, body, soft, grasp, groom, stickMesh,
+        canvas, camera, body, soft, grasp, groom, stickMesh, play,
         onStick: (on) => { $('#b-stick').disabled = !on; },
       });
-    } else tools.attach({ body, soft, grasp });
+    } else tools.attach({ body, soft, grasp, play });
     tools.stickEnabled = name === 'octopus';
     stickMesh.visible = false;
 
@@ -233,11 +240,29 @@ async function start() {
     $('#r-hold').innerHTML = `0<small>${info.unit[1]}</small>`;
     fur.uniforms.stitch.value.setRGB(...info.stitch, THREE.LinearSRGBColorSpace);
     $('#b-stick').disabled = true;
-    setTool(tools.mode === 'stick' && name !== 'octopus' ? 'hand' : tools.mode);
+    $('#b-stick').textContent = play ? 'Take the toy away' : 'Take the stick away';
+    $('#toy-label').textContent = play ? TOYS[name].label : 'Stick';
+    setTool(tools.mode);
     // re-aim the camera at the newcomer
     const o = tools.orbit;
     o.target.set(soft.headC[0], THREE.MathUtils.clamp(soft.headC[1] * 0.55 + 0.2, 0.6, 2.4) + rig.camY, soft.headC[2]);
     tools.applyOrbit();
+  };
+
+  /* write a dent into the groom map where a ball landed: the nearest
+     vertex of the part it hit gives the atlas spot                       */
+  const dent = (ev) => {
+    const pos = body.pos;
+    let best = -1, bd = 0.6 * 0.6;
+    for (let v = 0; v < body.count; v++) {
+      const dx = pos[v * 3] - ev.at[0], dy = pos[v * 3 + 1] - ev.at[1], dz = pos[v * 3 + 2] - ev.at[2];
+      const d = dx * dx + dy * dy + dz * dz;
+      if (d < bd) { bd = d; best = v; }
+    }
+    if (best < 0) return;
+    const u = body.uv[best * 2], v = body.uv[best * 2 + 1];
+    const [rx, ry] = body.brushTexels(u, v, 0.34, groom.size);
+    groom.dent(u, v, rx, ry, ev.strength);
   };
 
   const reset = () => {
@@ -245,6 +270,7 @@ async function start() {
     soft.reset();
     grasp.releaseAll();
     soft.planes = [];
+    play?.reset();
     action = null;
   };
   $('#b-reset').onclick = reset;
@@ -284,7 +310,7 @@ async function start() {
     const k = e.key.toLowerCase();
     const digit = /^Digit([1-4])$/.exec(e.code);
     if (e.shiftKey && digit) setCharacter(CHARACTERS[+digit[1] - 1]);
-    else if (k >= '1' && k <= '4') setTool(['hand', 'finger', 'comb', 'stick'][+k - 1]);
+    else if (k >= '1' && k <= '4') setTool(['hand', 'finger', 'comb', 'toy'][+k - 1]);
     else if (k === 'c') togglePanel(!document.body.classList.contains('panel-open'));
     else if (k === 'r') reset();
     else if (k === ' ') { e.preventDefault(); pause.onclick(); }
@@ -327,7 +353,7 @@ async function start() {
   $('#o-backend').textContent = backend;
   const P = new THREE.Vector3(), N = new THREE.Vector3(), up = new THREE.Vector3(), X = new THREE.Vector3();
   const M = new THREE.Matrix4();
-  const _q = new THREE.Quaternion(), _z = new THREE.Vector3(0, 0, 1);
+  const _q = new THREE.Quaternion(), _z = new THREE.Vector3(0, 0, 1), G = new THREE.Vector3();
   let last = performance.now(), frames = 0, fpsT = 0, readT = 0;
 
   const resize = () => {
@@ -357,6 +383,7 @@ async function start() {
       runAction(h);
       tools.update(h);
       grasp.update(h);
+      play?.update(h);
     }, (h) => {
       body.pressPoints = tools.pressPoints();
       body.update(h);
@@ -372,16 +399,31 @@ async function start() {
       ft.y += (THREE.MathUtils.clamp(hc[1] * 0.55 + 0.2, 0.6, 2.4) + rig.camY - ft.y) * k;
       tools.applyOrbit();
     }
-    floor.paint(soft, soft.stick);
+    // a ball of yarn dropped on the mane dents the fur where it lands
+    if (play?.events.length) {
+      for (const ev of play.events) if (ev.kind === 'dent') dent(ev);
+      play.events.length = 0;
+    }
+    toyView.update(play, soft.time);
+    floor.paint(soft, soft.stick, toyView.shadows(play));
 
     // eyes ride the head surface
     const ey = CHARACTER_INFO[rig.name].eyes;
     const eyePart = body.parts.find((q) => q.name === ey.part);
     const R = soft.cloudR[eyePart.cloud];
     up.set(R[1], R[4], R[7]);
+    const gaze = play?.gaze;
     for (const e of eyes) {
       body.surfacePoint(eyePart.name, 0.5 + e.userData.side * ey.u, ey.v, P, N);
       e.position.copy(P).addScaledVector(N, ey.lift);
+      if (gaze) {
+        // the beads roll toward the toy: slid a touch across the face and
+        // turned to it, as far as a bead sewn into fur can go
+        G.set(...gaze.at).sub(e.position).normalize();
+        G.addScaledVector(N, -G.dot(N));
+        e.position.addScaledVector(G, 0.045 * gaze.amount);
+        N.addScaledVector(G, 0.6 * gaze.amount).normalize();
+      }
       X.crossVectors(up, N).normalize();
       const Y = new THREE.Vector3().crossVectors(N, X);
       M.makeBasis(X, Y, N);
@@ -423,6 +465,8 @@ async function start() {
       grasp.arms.forEach((a, k) => { if (a.state === 'grip') arms.add(k); });
       const unit = CHARACTER_INFO[rig.name].unit;
       $('#r-hold').innerHTML = `${arms.size}<small>${arms.size === 1 ? unit[0] : unit[1]}</small>`;
+      const ts = $('#toy-state');
+      if (ts && play) ts.textContent = play.toy ? ` — ${play.status()}` : '';
     }
   };
 
@@ -440,6 +484,7 @@ async function start() {
   window.__flock = {
     get soft() { return soft; }, get grasp() { return grasp; }, get idle() { return idle; },
     get body() { return body; }, get rig() { return rig; }, get character() { return state.character; },
+    get play() { return play; },
     groom, tools, renderer, fur, scene, camera, shells,
     setCharacter,
     /* advance the piece by `seconds` without drawing (for slow or headless

@@ -36,6 +36,7 @@ export const CHARACTER_INFO = {
     aria: 'A plush fox with a big bushy tail you can pull, poke and comb',
     blurb: 'A sitting fox in a red coat, its big brush of a tail curled round its paws. Tug an ear and it springs back; comb the tail against the nap and it stays rough.',
     hand: 'Grab the head, an ear or the tail and pull — it gives, then springs back. Shift as you let go to pin that point, then grab another.',
+    toy: 'Click the floor to dangle a feather on a string; drag to swing it. The fox watches. Hold the feather still near the floor in front of it for a second and it pounces.',
     face: foxFace,
   },
   lion: {
@@ -51,6 +52,7 @@ export const CHARACTER_INFO = {
     aria: 'A plush lion with a long mane you can pull, poke and comb',
     blurb: 'A golden lion with a long mane. Comb the mane out from the face and it lies glossy; brush it back the wrong way and it stands up wild.',
     hand: 'Grab the head, an ear or the tail and pull — it gives, then springs back. Shift as you let go to pin that point, then grab another.',
+    toy: 'Click the floor to roll out a ball of yarn; drag it, and let go mid-drag to flick it. Roll it to the lion’s front paws and it bats it back. Drop it on the mane and the fur dents.',
     face: lionFace,
   },
   llama: {
@@ -66,6 +68,7 @@ export const CHARACTER_INFO = {
     aria: 'A plush llama in a shaggy fleece you can pull, poke and comb',
     blurb: 'A llama in a shaggy fleece. Pull its long neck and it sways back up; comb the fleece flat, or rough it up again.',
     hand: 'Grab the head, the neck, an ear or the body and pull — it gives, then sways back. Shift as you let go to pin that point, then grab another.',
+    toy: 'Click the floor to hold out a carrot on a stick; drag it about. The llama stretches for it — keep it at its mouth and it nibbles. Take it away and offer a fresh one.',
     face: llamaFace,
   },
 };

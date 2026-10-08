@@ -164,7 +164,8 @@ export class Pose {
 
 const STUB = 0.18, CARROT = 0.9, BITE = 0.18;
 const BALL_R = 0.3, BALL_M = 4;
-const ROPE = 6, ROPE_LEN = 1.55;
+export const ROPE = 6;
+const ROPE_LEN = 1.55;
 const HOP = 5.4;   // the fox's take-off speed, straight up
 
 export class Play {
@@ -293,18 +294,19 @@ export class Play {
     } else if (kind === 'yarn') {
       this.toy = { kind, x: [at[0], BALL_R + 0.5, at[2]], v: [0, 0, 0], p: [0, 0, 0], r: BALL_R, held: false, q: [0, 0, 0, 1], vel: [0, 0, 0], last: null };
     } else {
+      // held by its tip end: that's the point the hand moves (and the llama
+      // bites at); the carrot and its stick run back from there
       const tip = [at[0], 2.9, at[2]];
-      let dx = tip[0] - hc[0], dz = tip[2] - hc[2];
-      const dl = Math.hypot(dx, dz) || 1;
-      dx /= dl; dz /= dl;
-      const dir = [dx * 0.95, 0.3, dz * 0.95];
-      const dn = Math.hypot(...dir);
+      const m = this.name === 'llama' ? this.mouth() : hc;
+      const side = [toCam[2], 0, -toCam[0]];
+      const s = (tip[0] - m[0]) * side[0] + (tip[2] - m[2]) * side[2] >= 0 ? 1 : -1;
       this.toy = {
-        kind, len: CARROT, held: false, dir: dir.map((v) => v / dn),
-        base: [tip[0] + dir[0] / dn * CARROT, tip[1] + dir[1] / dn * CARROT, tip[2] + dir[2] / dn * CARROT],
-        tip() { return [this.base[0] - this.dir[0] * this.len, this.base[1] - this.dir[1] * this.len, this.base[2] - this.dir[2] * this.len]; },
-        handle() { return [this.base[0] + this.dir[0] * 1.15, this.base[1] + this.dir[1] * 1.15, this.base[2] + this.dir[2] * 1.15]; },
+        kind, len: CARROT, held: false, end: tip, dir: [0, 1, 0], side, s,
+        get base() { return [this.end[0] + this.dir[0] * this.len, this.end[1] + this.dir[1] * this.len, this.end[2] + this.dir[2] * this.len]; },
+        tip() { return [...this.end]; },
+        handle() { const b = this.base; return [b[0] + this.dir[0] * 1.15, b[1] + this.dir[1] * 1.15, b[2] + this.dir[2] * 1.15]; },
       };
+      this._aimCarrot(this.toy, 1);
     }
     this.state = 'watch'; this.t = 0; this.hold = 0;
   }
@@ -332,7 +334,7 @@ export class Play {
 
   _anchor() {
     const t = this.toy;
-    return t.kind === 'feather' ? t.top : t.kind === 'yarn' ? t.x : t.base;
+    return t.kind === 'feather' ? t.top : t.kind === 'yarn' ? t.x : t.end;
   }
 
   dragStart(p) {
@@ -447,7 +449,7 @@ export class Play {
       for (const e of cfg.ears) bones.push({ ix: e.ix, rv: [this.perk.x * 0.5, 0, 0], pivot: e.pivot });
     } else {
       bones.push({ ix: cfg.head, rv: [-pitch, yaw, roll], pivot: cfg.pivot });
-      cfg.ears.forEach((e) => bones.push({ ix: e.ix, rv: [this.perk.x * 0.3, this.earTurn.x * 0.55, 0], pivotIx: e.root }));
+      cfg.ears.forEach((e) => bones.push({ ix: e.ix, rv: [this.perk.x * 0.3, this.earTurn.x * 0.35, 0], pivotIx: e.root }));
       if (this.pawBones) this.pawBones.forEach((b, k) => {
         const on = this.swipeLeg === k ? 1 : 0;
         bones.push({ ...b, rv: [-this.paw.x * on, 0, this.swing.x * on] });
@@ -668,20 +670,23 @@ export class Play {
       }
       if (![...t.x, ...t.v].every(Number.isFinite)) { t.x = [this.soft.cloudC[0][0], 2, this.soft.cloudC[0][2] + 2]; t.v = [0, 0, 0]; }
     } else {
-      // the carrot keeps pointing its tip at the llama's mouth
-      const m = this.mouth(), tip = t.tip();
-      let dx = t.base[0] - m[0], dz = t.base[2] - m[2];
-      const dl = Math.hypot(dx, dz);
-      if (dl > 0.3) {
-        dx /= dl; dz /= dl;
-        const want = [dx * 0.95, 0.3, dz * 0.95], wn = Math.hypot(...want);
-        const k = Math.min(1, dt * 3);
-        for (let d = 0; d < 3; d++) t.dir[d] += (want[d] / wn - t.dir[d]) * k;
-        const n = Math.hypot(...t.dir);
-        for (let d = 0; d < 3; d++) t.dir[d] /= n;
-      }
-      void tip;
+      this._aimCarrot(t, Math.min(1, dt * 3));
     }
+  }
+
+  /* the carrot points its tip at the llama's mouth, its stick coming in
+     from the side it was offered on (so it reads end to end, not end-on) */
+  _aimCarrot(t, k) {
+    const m = this.mouth();
+    let dx = t.end[0] - m[0], dz = t.end[2] - m[2];
+    const dl = Math.hypot(dx, dz);
+    if (dl < 1e-3) { dx = 0; dz = 1; } else { dx /= dl; dz /= dl; }
+    dx = dx * 0.55 + t.side[0] * t.s; dz = dz * 0.55 + t.side[2] * t.s;
+    const dn = Math.hypot(dx, dz) || 1;
+    const want = [dx / dn * 0.95, 0.3, dz / dn * 0.95], wn = Math.hypot(...want);
+    for (let d = 0; d < 3; d++) t.dir[d] += (want[d] / wn - t.dir[d]) * k;
+    const n = Math.hypot(...t.dir);
+    for (let d = 0; d < 3; d++) t.dir[d] /= n;
   }
 
   /* a feather on a short rope: verlet, light and draggy, pushed off the
@@ -791,10 +796,15 @@ export class Play {
      the body pushed back the same amount, so it doesn't drag itself over */
   _reachForce(hh) {
     const C = this.toy.tip(), m = this.mouth();
-    let fx = C[0] - m[0], fy = C[1] - m[1], fz = C[2] - m[2];
-    const d = Math.hypot(fx, fy, fz);
-    if (d > 1) { fx /= d; fy /= d; fz /= d; }
-    const k = 26 * this.reach.x * hh;
+    let gx = C[0] - m[0], gy = C[1] - m[1], gz = C[2] - m[2];
+    const d = Math.hypot(gx, gy, gz);
+    if (d > 1) { gx /= d; gy /= d; gz /= d; }
+    // the pull itself is eased (a carrot whisked past the face mustn't jerk
+    // the head after it)
+    const F = this._pull || (this._pull = [0, 0, 0]), e = Math.min(1, 6 * Math.sqrt(hh));
+    F[0] += (gx - F[0]) * e; F[1] += (gy - F[1]) * e; F[2] += (gz - F[2]) * e;
+    const [fx, fy, fz] = F;
+    const k = 22 * this.reach.x * hh;
     const x = this.soft.x, ix = this.cfg.core;
     for (const i of ix) { x[i * 3] += fx * k; x[i * 3 + 1] += fy * k; x[i * 3 + 2] += fz * k; }
     this.soft._shift(this.rig.clouds[0].ix, -fx * k * ix.length, -fy * k * ix.length, -fz * k * ix.length);

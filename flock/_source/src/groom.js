@@ -109,6 +109,33 @@ export class Groom {
     this.dirty = true;
   }
 
+  /* a dent: something landed here. The fibres under it splay out from the
+     middle and stand ruffled, a crater in the pile that grows back slowly */
+  dent(u, v, rx, ry, strength = 1) {
+    const S = this.size;
+    const R = this.region(u, v);
+    const W = R.x1 - R.x0;
+    const cx = u * S, cy = v * S;
+    const iy0 = Math.max(R.y0, Math.floor(cy - ry)), iy1 = Math.min(R.y1 - 1, Math.ceil(cy + ry));
+    for (let y = iy0; y <= iy1; y++) {
+      const ny = (y + 0.5 - cy) / ry;
+      for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
+        const nx = (x + 0.5 - cx) / rx;
+        const d2 = nx * nx + ny * ny;
+        if (d2 >= 1) continue;
+        const f = (1 - d2) * strength;
+        const wx = R.x0 + ((((x - R.x0) % W) + W) % W);
+        const i = y * S + wx;
+        const d = Math.sqrt(d2) || 1;
+        this.lean[i * 2] += (nx / d * 0.8 - this.lean[i * 2]) * f;
+        this.lean[i * 2 + 1] += (ny / d * 0.8 - this.lean[i * 2 + 1]) * f;
+        this.ruffle[i] = Math.min(1, Math.max(this.ruffle[i], 0.85 * f));
+        this._encode(i);
+      }
+    }
+    this.dirty = true;
+  }
+
   /* slow drift back toward the default nap; fast when smoothing */
   relax(dt) {
     const S = this.size;
