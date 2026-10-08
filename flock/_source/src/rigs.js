@@ -165,7 +165,7 @@ export class RigBuilder {
     }
   }
 
-  finish({ camY = 0, react = true, restV = 0.25 } = {}) {
+  finish({ camY = 0, react = true, restV = 0.25, toy = null } = {}) {
     const n = this.rad.length;
     const rest = Float64Array.from(this.pos);
     const windows = [], windowK = [], links = [], linkK = [];
@@ -230,7 +230,7 @@ export class RigBuilder {
         len: Float64Array.from(T.map((t) => t.len)), stretch: Float64Array.from(T.map((t) => t.stretch)),
         cloud: Int32Array.from(T.map((t) => t.cloud)),
       },
-      restSkip: true, react, haulAll: true, restV, parts, regions, camY,
+      restSkip: true, react, haulAll: true, restV, parts, regions, camY, toy,
     };
   }
 }
@@ -267,6 +267,25 @@ function headBulk(b, HEAD) {
   return 0;
 }
 
+/* what the toys need to know about a sitting toy whose head is part of the
+   torso's cloud: which points are the head (its bulk, plus the ears riding
+   on it), where the neck pivots, the ears, tail and front legs           */
+function sittingToy(b, h0, h1, { pivot, chest }) {
+  const core = [];
+  for (let i = h0; i < h1; i++) core.push(i);
+  const ears = b.chains.filter((c) => c.kind === 'ear');
+  const head = [...core];
+  for (const e of ears) head.push(e.anchor, ...e.idx);
+  const tail = b.chains.find((c) => c.kind === 'tail');
+  return {
+    posed: 0, core: Int32Array.from(core), head: Int32Array.from(head), pivot, chest,
+    ears: ears.map((e) => ({ k: e.k, ix: Int32Array.from(e.idx.slice(1)), root: e.idx[0] })),
+    tail: tail.k, tailIx: Int32Array.from(tail.idx),
+    legs: b.chains.filter((c) => c.kind === 'leg').map((c) => c.k),
+    hip: [0, 0.32, -0.3],
+  };
+}
+
 /* haunches and hind paws: display grids, and physical bulk in the torso cloud
    so the toy sits on a broad base instead of rocking on a round bottom      */
 function haunches(b, { pile = one, accent = zero, under = zero, paw = { under: () => 0.6 } } = {}) {
@@ -288,7 +307,9 @@ export function buildFox() {
   const torso = sittingTorso(b, { w: 0.74, h: 0.96, d: 0.7 });
   const HEAD = { c: [0, 2.2, 0.1], r: [0.72, 0.64, 0.66], B: null, bulge: (phi) => 1 + 0.08 * Math.sin(phi * 1.3) };
   // one stuffed cloud, head and torso together: a firmly sewn plush head
+  const h0 = b.rad.length;
   const head = headBulk(b, HEAD);
+  const h1 = b.rad.length;
 
   // red-orange with a cream bib from the chin down the chest
   const bib = (l) => smooth(0.15, 0.55, l[2]) * smooth(0.85, 0.25, l[1]) * smooth(0.55, 0.2, Math.abs(l[0]));
@@ -336,7 +357,7 @@ export function buildFox() {
     groom: { ruf: 0.1 },
   });
 
-  return b.finish({ camY: 0.2 });
+  return b.finish({ camY: 0.2, toy: sittingToy(b, h0, h1, { pivot: [0, 1.86, 0.02], chest: [0, 1.25, 0.62] }) });
 }
 
 /* ── lion ───────────────────────────────────────────────────────────────────── */
@@ -346,7 +367,9 @@ export function buildLion() {
   const torso = sittingTorso(b, { w: 0.82, h: 0.96, d: 0.76 });
   const HEAD = { c: [0, 2.2, 0.12], r: [0.74, 0.7, 0.68], B: null, bulge: (phi) => 1 + 0.07 * Math.sin(phi * 1.25) };
   // one stuffed cloud, head and torso together: a firmly sewn plush head
+  const h0 = b.rad.length;
   const head = headBulk(b, HEAD);
+  const h1 = b.rad.length;
 
   const belly = (l) => smooth(0.2, 0.6, l[2]) * smooth(0.7, 0.1, l[1]);
   b.grid({ name: 'torso', cloud: 0, ...torso, U: 56, V: 36, under: (u, v, l) => belly(l) * 0.8,
@@ -395,7 +418,7 @@ export function buildLion() {
     groom: { ruf: 0.05 },
   });
 
-  return b.finish({ camY: 0.15 });
+  return b.finish({ camY: 0.15, toy: sittingToy(b, h0, h1, { pivot: [0, 1.86, 0.02], chest: [0, 1.25, 0.66] }) });
 }
 
 /* ── llama ──────────────────────────────────────────────────────────────────── */
@@ -474,5 +497,15 @@ export function buildLlama() {
   b.parts.unshift(b.parts.pop());
 
   b.tetherCloud(head, b.clouds[0].center, 1.22, 0);
-  return b.finish({ camY: 0.55, react: false });
+  // what the toys need to know: the head is its own cloud on the neck
+  const ears = b.chains.filter((c) => c.kind === 'ear');
+  const headIx = [...new Set(b.clouds[head].ix)];
+  const toy = {
+    posed: -1, head: Int32Array.from(headIx),
+    core: Int32Array.from(headIx.filter((i) => !neck.idx.includes(i) && !ears.some((e) => e.anchor === i || e.idx[0] === i))),
+    pivot: nTop, neck: neck.k, mouth: add3(hc, [0, -0.17, 0.62]),
+    ears: ears.map((e) => ({ k: e.k, ix: Int32Array.from(e.idx.slice(1)), pivot: b.p(e.idx[0]) })),
+    tail: b.chains.find((c) => c.kind === 'tail').k,
+  };
+  return b.finish({ camY: 0.55, react: false, toy });
 }

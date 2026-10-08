@@ -230,6 +230,10 @@ export class Body {
     const x = this.soft.x, R = this.soft.cloudR[P.cloud], rest = this.rig.rest;
     const { pos } = this;
     const { hRest, hIdx, hW, o } = P;
+    // a cloud re-posed by a toy (a head turned to look) carries each point's
+    // own turn: the skin offsets turn with the points they hang from
+    const M = this.soft.poseRot;
+    if (M && this.soft.posedCloud === P.cloud) return this._gridPosed(P, M);
     for (let k = 0; k < P.count; k++) {
       let px = 0, py = 0, pz = 0;
       const rx = hRest[k * 3], ry = hRest[k * 3 + 1], rz = hRest[k * 3 + 2];
@@ -243,6 +247,36 @@ export class Body {
       const v = o + k;
       pos[v * 3] = px; pos[v * 3 + 1] = py; pos[v * 3 + 2] = pz;
     }
+    this._gridFrame(P);
+  }
+
+  _gridPosed(P, M) {
+    const x = this.soft.x, R = this.soft.cloudR[P.cloud], rest = this.rig.rest;
+    const { pos } = this;
+    const { hRest, hIdx, hW, o } = P;
+    for (let k = 0; k < P.count; k++) {
+      let px = 0, py = 0, pz = 0;
+      const rx = hRest[k * 3], ry = hRest[k * 3 + 1], rz = hRest[k * 3 + 2];
+      for (let q = 0; q < 4; q++) {
+        const i = hIdx[k * 4 + q], w = hW[k * 4 + q], m = i * 9;
+        const ax = rx - rest[i * 3], ay = ry - rest[i * 3 + 1], az = rz - rest[i * 3 + 2];
+        const ox = M[m] * ax + M[m + 1] * ay + M[m + 2] * az;
+        const oy = M[m + 3] * ax + M[m + 4] * ay + M[m + 5] * az;
+        const oz = M[m + 6] * ax + M[m + 7] * ay + M[m + 8] * az;
+        px += w * (x[i * 3] + R[0] * ox + R[1] * oy + R[2] * oz);
+        py += w * (x[i * 3 + 1] + R[3] * ox + R[4] * oy + R[5] * oz);
+        pz += w * (x[i * 3 + 2] + R[6] * ox + R[7] * oy + R[8] * oz);
+      }
+      const v = o + k;
+      pos[v * 3] = px; pos[v * 3 + 1] = py; pos[v * 3 + 2] = pz;
+    }
+    this._gridFrame(P);
+  }
+
+  _gridFrame(P) {
+    const R = this.soft.cloudR[P.cloud];
+    const { pos } = this;
+    const o = P.o;
     // frame from grid differences
     const HU = P.U, HV = P.V, W = HU + 1;
     const c = this._partCenter(P);

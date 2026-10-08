@@ -39,6 +39,9 @@ export class SoftBody {
     this.planes = [];                              // {y, k} pressing down from above
     this.stick = null;                             // {a:[3], b:[3], r}
     this.hooks = [];                               // fn(h) run every substep
+    this.pose = null;                              // re-posed rest shape, while a toy is in play
+    this.poseRot = null;                           // …and each point's rotation into it (3×3 rows)
+    this.posedCloud = -1;                          // the cloud whose shape follows the pose
     this.contact = new Uint8Array(n);              // touching floor this step
 
     this.head = this._group(rig.head);
@@ -158,7 +161,9 @@ export class SoftBody {
      the head — tips curling up again — however it was left lying           */
   _memory(alpha) {
     const { x } = this;
-    const rest = this.rig.rest;
+    // a toy in play may re-pose the sewn shape (a head turned to look): the
+    // memory then pulls toward that pose instead (see toys.js)
+    const rest = this.pose || this.rig.rest;
     let gk = -1, g, R, c, c0;
     for (const arm of this.rig.arms) {
       if (arm.inCloud) continue;
