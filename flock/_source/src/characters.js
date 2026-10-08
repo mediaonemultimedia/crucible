@@ -23,20 +23,20 @@ export const CHARACTER_INFO = {
     hand: 'Grab the head or any arm and pull — it stretches, then springs back. Shift as you let go to pin that point, then grab another.',
     face: octopusFace,
   },
-  wolf: {
-    label: 'Wolf',
+  fox: {
+    label: 'Fox',
     colors: {
-      grey: { fur: '#9a9ca3', under: '#f1e9da', accent: '#5f626b' },
-      timber: { fur: '#a08670', under: '#efe2cc', accent: '#6b5544' },
-      arctic: { fur: '#e8e6e1', under: '#fbf8f1', accent: '#b9bcc4' },
-      dusk: { fur: '#6d6f7c', under: '#d9d3cb', accent: '#3d3f4a' },
+      red: { fur: '#dc6a2c', under: '#f8eddd', accent: '#2c2220' },
+      arctic: { fur: '#eeeae3', under: '#fdfbf7', accent: '#c4bdb3' },
+      silver: { fur: '#5a5b63', under: '#ece8e2', accent: '#1c1c21' },
+      fennec: { fur: '#e3c393', under: '#f9f0e1', accent: '#c28f5e' },
     },
-    eyes: { part: 'head', u: 0.074, v: 0.45, lift: 0.03, scale: [0.12, 0.135, 0.08] },
-    unit: ['part', 'parts'], readout: 'Held', stitch: [0.045, 0.04, 0.045],
-    aria: 'A plush wolf you can pull, poke and comb',
-    blurb: 'A sitting wolf in a grey coat, ears up. Tug an ear and it springs back; comb the tail against the nap and it stays rough.',
+    eyes: { part: 'head', u: 0.082, v: 0.46, lift: 0.03, scale: [0.12, 0.1, 0.075], tilt: 0.22 },
+    unit: ['part', 'parts'], readout: 'Held', stitch: [0.03, 0.024, 0.026],
+    aria: 'A plush fox with a big bushy tail you can pull, poke and comb',
+    blurb: 'A sitting fox in a red coat, its big brush of a tail curled round its paws. Tug an ear and it springs back; comb the tail against the nap and it stays rough.',
     hand: 'Grab the head, an ear or the tail and pull — it gives, then springs back. Shift as you let go to pin that point, then grab another.',
-    face: wolfFace,
+    face: foxFace,
   },
   lion: {
     label: 'Lion',
@@ -150,15 +150,21 @@ function octopusFace(g, size) {
   g.stroke();
 }
 
-function wolfFace(g, size, { blob, eyeRing, stitch }) {
-  eyeRing('head', 0.074, 0.45, 0.32);
+function foxFace(g, size, { at, blob, eyeRing, stitch }) {
+  eyeRing('head', 0.082, 0.46, 0.28);
   g.globalCompositeOperation = 'lighter';
-  // nose: a big soft satin-stitched pad on the end of the snout
-  blob('snout', 0.5, 0.36, 0.25, 0.15, 'rgb(0,0,255)');
-  blob('snout', 0.5, 0.29, 0.17, 0.08, 'rgb(0,0,255)');
-  // mouth: down from the nose, then a small smile each way
-  stitch('snout', [[0.5, 0.42], [0.5, 0.6]], 0.05);
-  stitch('snout', [[0.42, 0.67], [0.46, 0.66], [0.5, 0.6], [0.54, 0.66], [0.58, 0.67]], 0.05);
+  blob('head', 0.38, 0.6, 0.18, 0.1, 'rgba(0,170,0,0.6)');
+  blob('head', 0.62, 0.6, 0.18, 0.1, 'rgba(0,170,0,0.6)');
+  // the snout's tip is its pole (v = 0): a small black satin nose all round it
+  const [, y0] = at('snout', 0, 0), [, y1] = at('snout', 0, 0.24);
+  const [x0] = at('snout', 0, 0), [x1] = at('snout', 1, 0);
+  g.fillStyle = 'rgb(0,0,255)';
+  // (from a few texels above the region: the pole row is its very edge, and
+  // the filtered lookup there would otherwise mix in the head's chin)
+  g.fillRect(x0, y0 - 4, x1 - x0, y1 - y0 + 4);
+  // mouth: a short stitch down from the nose under the chin, then a smile
+  stitch('snout', [[0.5, 0.18], [0.5, 0.3]], 0.03);
+  stitch('snout', [[0.38, 0.36], [0.44, 0.34], [0.5, 0.3], [0.56, 0.34], [0.62, 0.36]], 0.03);
 }
 
 function lionFace(g, size, { blob, eyeRing, stitch }) {

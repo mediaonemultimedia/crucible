@@ -126,7 +126,7 @@ export class SoftBody {
     const H = this._haul || (this._haul = [...this.rig.clouds.map(() => new Float64Array(4)), new Float64Array(4)]);
     for (const h of H) h.fill(0);
     // a toy of several clouds is hauled whole by its appendages: pulling a
-    // wolf's ear moves the wolf, not a head that then has to be wrestled
+    // fox's ear moves the fox, not a head that then has to be wrestled
     // back onto its body. (A head's own tether to the torso hauls the torso.)
     const whole = this.rig.haulAll, M = this.cloudMask;
     // the octopus splits a violation 35 : 65 between the arm point and the

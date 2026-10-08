@@ -58,6 +58,7 @@ export class Idle {
     const idx = ch.idx, N = idx.length;
     const k = ch.k, TAU = Math.PI * 2;
     let f = 0;
+    if (ch.kind === 'tail' && ch.swish) return this._swish(ch, t, a, hh);
     if (ch.kind === 'tail') {
       // bursts of wagging: a fast wag under a slow on/off swell
       const swell = Math.max(0, Math.sin(TAU * 0.09 * t + k)) ** 2;
@@ -85,6 +86,25 @@ export class Idle {
       x[i * 3] += sx * f * w * hh;
       x[i * 3 + 1] += sy * f * w * hh;
       x[i * 3 + 2] += sz * f * w * hh;
+    }
+  }
+
+  /* a big brush of a tail lying on the floor sweeps along it rather than
+     flapping: each point is pushed sideways in the floor plane, across its
+     own run of the chain, with the tip lifting a little as it goes        */
+  _swish(ch, t, a, hh) {
+    const { x } = this.body;
+    const idx = ch.idx, N = idx.length, TAU = Math.PI * 2;
+    const swell = 0.45 + 0.55 * Math.max(0, Math.sin(TAU * 0.07 * t + ch.k)) ** 2;
+    const f = (0.75 * Math.sin(TAU * 0.42 * t) + 0.25 * Math.sin(TAU * 0.9 * t + 0.7)) * swell * 260 * a * (1 + (this.excite || 0) * 1.6);
+    for (let j = 2; j < N; j++) {
+      const i = idx[j], ip = idx[j - 1];
+      const tx = x[i * 3] - x[ip * 3], tz = x[i * 3 + 2] - x[ip * 3 + 2];
+      const tl = Math.hypot(tx, tz) || 1;
+      const w = Math.pow(j / (N - 1), 1.4);
+      x[i * 3] += (-tz / tl) * f * w * hh;
+      x[i * 3 + 1] += Math.abs(f) * 0.25 * w * w * hh;
+      x[i * 3 + 2] += (tx / tl) * f * w * hh;
     }
   }
 }

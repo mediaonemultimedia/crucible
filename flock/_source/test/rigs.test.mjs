@@ -25,9 +25,9 @@ const local = (b, ch, i) => {
 };
 
 // the appendage each character is most often pulled by
-const PULL = { wolf: ['right ear', 'tail'], lion: ['tail', 'left ear'], llama: ['neck', 'left ear'] };
+const PULL = { fox: ['right ear', 'tail'], lion: ['tail', 'left ear'], llama: ['neck', 'left ear'] };
 
-for (const name of ['wolf', 'lion', 'llama']) {
+for (const name of ['fox', 'lion', 'llama']) {
   test(`${name}: settles without sinking, nothing through the floor`, () => {
     for (const stuffing of [0, 0.42, 1]) {
       const rig = buildRig(name);
@@ -151,7 +151,7 @@ for (const name of ['wolf', 'lion', 'llama']) {
 }
 
 test('every rig has the structure SoftBody and Body consume', () => {
-  for (const name of ['octopus', 'wolf', 'lion', 'llama']) {
+  for (const name of ['octopus', 'fox', 'lion', 'llama']) {
     const rig = buildRig(name);
     assert.equal(rig.rest.length, rig.n * 3);
     assert.ok(rig.clouds[0].ix === rig.head || rig.clouds[0].ix.every((v, k) => v === rig.head[k]));

@@ -14,9 +14,9 @@
    The octopus below is the Phase 1 rig, unchanged; the others live in
    rigs.js and are built with RigBuilder.                                     */
 
-import { buildWolf, buildLion, buildLlama } from './rigs.js';
+import { buildFox, buildLion, buildLlama } from './rigs.js';
 
-export const CHARACTERS = ['octopus', 'wolf', 'lion', 'llama'];
+export const CHARACTERS = ['octopus', 'fox', 'lion', 'llama'];
 
 export const HEAD = { cx: 0, cy: 1.32, cz: 0, rx: 1.0, ry: 1.07, rz: 0.97 };
 export const ARMS = 8;
@@ -43,7 +43,7 @@ export function armAngle(k) {
 }
 
 export function buildRig(name = 'octopus') {
-  if (name === 'wolf') return buildWolf();
+  if (name === 'fox') return buildFox();
   if (name === 'lion') return buildLion();
   if (name === 'llama') return buildLlama();
   return buildOctopus();

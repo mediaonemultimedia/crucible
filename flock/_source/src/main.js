@@ -327,6 +327,7 @@ async function start() {
   $('#o-backend').textContent = backend;
   const P = new THREE.Vector3(), N = new THREE.Vector3(), up = new THREE.Vector3(), X = new THREE.Vector3();
   const M = new THREE.Matrix4();
+  const _q = new THREE.Quaternion(), _z = new THREE.Vector3(0, 0, 1);
   let last = performance.now(), frames = 0, fpsT = 0, readT = 0;
 
   const resize = () => {
@@ -385,6 +386,8 @@ async function start() {
       const Y = new THREE.Vector3().crossVectors(N, X);
       M.makeBasis(X, Y, N);
       e.quaternion.setFromRotationMatrix(M);
+      // almond eyes slant up toward the temples
+      if (ey.tilt) e.quaternion.multiply(_q.setFromAxisAngle(_z, -e.userData.side * ey.tilt));
       e.scale.set(...ey.scale);
     }
 
