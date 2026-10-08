@@ -38,7 +38,7 @@ const SCENES = {
     character: 'leopard',
     run: async (G) => {
       await G(`__grommet.step(2)`);
-      const r = await G(`(() => { const g = __grommet.game; for (let k = 0; k < 6; k++) { g.reset(); __grommet.step(1); g.launch({ aim: [0.05, 2.6], speed: 24 }); g.timingErr = 0.25; for (let j = 0; j < 150 && !g.outcome; j++) __grommet.step(1/60); if (g.outcome === 'bonk') break; } __grommet.step(0.55, true); return [g.outcome, g.state, g.daze]; })()`);
+      const r = await G(`(() => { const g = __grommet.game; for (let k = 0; k < 6; k++) { g.reset(); __grommet.step(1); g.launch({ aim: [0.05, 2.6], speed: 25 }); for (let j = 0; j < 150 && !g.outcome; j++) __grommet.step(1/60); if (g.outcome === 'bonk') break; } __grommet.step(0.55, true); return [g.outcome, g.state, g.daze]; })()`);
       console.log('  bonk', r);
     },
   },
@@ -62,7 +62,7 @@ const SCENES = {
     character: 'bear',
     run: async (G) => {
       await G(`__grommet.step(2)`);
-      const r = await G(`(() => { const g = __grommet.game; g.launch({ aim: [-2.9, 2.85], speed: 24 }); for (let k = 0; k < 400; k++) { __grommet.step(1/60); if (g.outcome) break; } __grommet.step(0.3, true); return [g.outcome, g.state]; })()`);
+      const r = await G(`(() => { const g = __grommet.game; g.launch({ aim: [2.75, 0.45], speed: 26 }); for (let k = 0; k < 400; k++) { __grommet.step(1/60); if (g.outcome) break; } __grommet.step(0.3, true); return [g.outcome, g.state]; })()`);
       console.log('  goal', r);
     },
   },
@@ -94,6 +94,12 @@ for (const name of names) {
   const errs = [];
   page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
   page.on('pageerror', (e) => errs.push(String(e)));
+  // reproducible scenes: the game's reaction jitter and timing wobble use
+  // Math.random, so seed it
+  await page.addInitScript(() => {
+    let seed = 20261008;
+    Math.random = () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  });
   page.on('request', (r) => { if (!r.url().startsWith('file:') && !r.url().startsWith('data:')) errs.push('network request: ' + r.url()); });
   await page.goto(`${url}?character=${S.character}&webgl`);
   await page.waitForFunction(() => document.body.classList.contains('is-live') && window.__grommet, null, { timeout: 120000 });

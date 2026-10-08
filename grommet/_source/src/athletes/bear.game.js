@@ -19,7 +19,7 @@ import { Athlete, clamp, spring, ease } from './game.js';
 import { Ball } from '../ball.js';
 import { makeGoalSpec, Net } from '../net.js';
 import { BEAR } from './bear.rig.js';
-import { rightUp } from '../balance.js';
+import { rightUp, settle } from '../balance.js';
 
 export const FOOTBALL_R = 0.3;
 export const SHOOTER = [0, FOOTBALL_R, 11.5];
@@ -243,6 +243,8 @@ export class BearGame extends Athlete {
         }
       }
     }
+    // a landing flops rather than rolls on
+    if (this.state === 'down' && this.t < 0.45) settle(soft, h, 7);
     // hauling himself back up
     if (this.state === 'getup') rightUp(soft, h, { standY: this.c0[1], k: 6 * Math.min(1, this.t / 0.5) });
     // the posts and crossbar are solid to him too, and he stays out in

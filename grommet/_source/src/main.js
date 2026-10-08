@@ -378,7 +378,7 @@ async function start() {
     camera.fov = narrow ? 42 : 30;
     if (tools && state.character) {
       const cam = CHARACTER_INFO[state.character].camera;
-      tools.orbit.dist = narrow ? cam.dist * (game.net ? 1.75 : 1.45) : cam.dist;
+      tools.orbit.dist = narrow ? cam.dist * (game.net ? 1.7 : 1.25) : cam.dist;
       tools.applyOrbit();
     }
     camera.setViewOffset(innerWidth, innerHeight, frame.shift, 0, innerWidth, innerHeight);
@@ -475,7 +475,7 @@ async function start() {
 
     frames++; fpsT += real; readT += real;
     if (fpsT > 0.5) { $('#fps').textContent = Math.round(frames / fpsT); frames = 0; fpsT = 0; }
-    if (readT > 0.12) {
+    if (readT > 0.12 || real === 0) {
       readT = 0;
       const [r0, r1] = game.readout();
       $('#r-a').textContent = r0[1];

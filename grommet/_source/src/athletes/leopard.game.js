@@ -401,7 +401,8 @@ export class LeopardGame extends Athlete {
       this.best = Math.max(this.best, this.rally);
     } else {
       this.rally = 0;
-      if (kind === 'miss') this.msg = this.plan && Math.abs(this.plan.move) > 2.4 ? 'out of reach' : 'missed it';
+      if (kind === 'miss') this.msg = this.plan && Math.abs(this.plan.move) > 0.4 ? 'out of reach' : 'missed it';
+      if (kind === 'body') this.msg = 'jammed — it hit him';
     }
     if (this.state === 'track') this._go('recover');
   }

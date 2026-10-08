@@ -153,7 +153,9 @@ export class Athlete {
   _footwork(h) {
     const s = this.soft, x = s.x, v = s.v, c = s.cloudC[0], ix = this.rig.clouds[0].ix;
     const D = this.drive;
-    if (!D && !this._moving) { s.params.mu = 0.55; return; }
+    // no target, no servo: whatever else is moving him (a dive, a hand, a
+    // knock) has the body to itself
+    if (!D) { s.params.mu = 0.55; this._moving = false; return; }
     const want = D ? [D.x - c[0], D.z - c[2]] : [0, 0];
     const dist = Math.hypot(want[0], want[1]);
     const vmax = D ? D.speed ?? 3 : 0;

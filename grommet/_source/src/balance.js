@@ -100,3 +100,19 @@ export function rightUp(soft, h, { k = 7, maxTurn = 2, standY = null, maxLift = 
     x[i * 3] += dvx * h; x[i * 3 + 1] += dvy * h; x[i * 3 + 2] += dvz * h;
   }
 }
+
+/* A landing: the stuffing soaks up the tumble. Each point's velocity is
+   eased toward the body's mean velocity (so spin and jiggle die, the slide
+   doesn't) — a damper, adding nothing.                                   */
+export function settle(soft, h, k = 8) {
+  const ix = soft.rig.clouds[0].ix, v = soft.v, x = soft.x;
+  let mx = 0, my = 0, mz = 0;
+  for (const i of ix) { mx += v[i * 3]; my += v[i * 3 + 1]; mz += v[i * 3 + 2]; }
+  mx /= ix.length; my /= ix.length; mz /= ix.length;
+  const e = Math.min(1, k * h);
+  for (const i of ix) {
+    x[i * 3] += (mx - v[i * 3]) * e * h;
+    x[i * 3 + 1] += (my - v[i * 3 + 1]) * e * h;
+    x[i * 3 + 2] += (mz - v[i * 3 + 2]) * e * h;
+  }
+}

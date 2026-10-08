@@ -158,8 +158,7 @@ test('leopard: a fast ball to the head bonks him — squashed, dazed, no runaway
   // where the head is, before
   const hc0 = game.headCentre();
   game.launch({ aim: [0.05, 2.6], speed: 24 });
-  let peak = 0, minVol = 9;
-  const g = { ...soft.clouds[0] };
+  let peak = 0;
   tick(A, 1.2, () => { peak = Math.max(peak, soft.kinetic()); });
   assert.equal(game.outcome, 'bonk', `outcome ${game.outcome}`);
   assert.ok(game.daze > 0.3, 'not dazed');
@@ -172,7 +171,6 @@ test('leopard: a fast ball to the head bonks him — squashed, dazed, no runaway
   const hc = game.headCentre();
   assert.ok(Math.abs(hc[1] - hc0[1]) < 0.2, 'head not back up');
   assert.ok(!soft.nanResets);
-  void minVol; void g;
 }));
 
 test('leopard: an auto rally of serves never runs away', () => seeded(13, () => {
