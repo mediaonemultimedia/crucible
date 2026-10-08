@@ -35,6 +35,7 @@ the same either way.
 | 19 | **Sprocket** | A raymarched camera flythrough locked to a from-scratch virtual-scroll engine — real scroll eases into a virtual value that alone drives the camera, a rotating sprocket gear, and every set-piece | [`/sprocket/`](./sprocket/) |
 | 20 | **Rosette** | A genuine four-plate halftone screen — angled C/M/Y/K dot grids sampled per-pixel from real scene luminance — over a raymarched automotive metallic-flake material with Fresnel flip-flop color shift and angle-driven sparkle | [`/rosette/`](./rosette/) |
 | 21 | **Flock** | A plush octopus as a position-based soft body — a shape-matched head cloud and eight tethered arm chains — under 64 instanced shells of fur with a paintable groom map, fur-lag springs and Kajiya-Kay strand lighting; arms reach for and coil around a stick | [`/flock/`](./flock/) |
+| 22 | **Grommet** | Plush athletes playing against you — standing position-based soft bodies under shell fur, in a cloth kit with no fur beneath it: a leopard returns your serve with a wooden racquet (string-plane contact, forehand or backhand, a bonk on the head), a polar bear goalkeeper dives for your shot and hauls himself back up | [`/grommet/`](./grommet/) |
 
 Studies 03–05 were lost to a storage failure and are being rebuilt. They'll be
 added here as they land. Numbering follows build order, not merit — it starts at
