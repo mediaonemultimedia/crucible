@@ -100,7 +100,7 @@ const SCENES = {
     character: 'crow',
     run: async (G) => {
       await G(`__grommet.step(2)`);
-      const r = await G(`(() => { const g = __grommet.game; g.launch({ aim: [-4, 1], kind: 'food', speed: 26 }); for (let k = 0; k < 1200; k++) { __grommet.step(1/120); if (g.state === 'peck' && g.t > 0.32) break; } __grommet.step(0, true); return [g.state, g.mouth[1]]; })()`);
+      const r = await G(`(() => { const g = __grommet.game; g.launch({ aim: [-4, 1], kind: 'food', speed: 26 }); for (let k = 0; k < 1200; k++) { __grommet.step(1/120); if (g.state === 'peck' && g.t > 0.32) break; } const o = __grommet.tools.orbit, c = __grommet.soft.cloudC[0]; o.dist = 7.5; o.az = g.face + 0.95; o.el = 0.28; o.target.set(c[0], 1.0, c[2]); __grommet.tools.applyOrbit(); __grommet.step(0, true); return [g.state, g.mouth[1]]; })()`);
       console.log('  peck', r);
     },
   },
@@ -116,7 +116,7 @@ const SCENES = {
     character: 'crow',
     run: async (G) => {
       await G(`__grommet.step(1.5)`);
-      const r = await G(`(() => { const g = __grommet.game; for (const a of [[0.2, 1.9], [-0.5, 2.0], [0.6, 1.8]]) { g.launch({ aim: a, kind: 'shiny', speed: 15 }); __grommet.step(5.5); } const it = g.items.find((q) => q.inNest); g.grabItem(it.id); for (let k = 0; k <= 40; k++) { const u = k / 40; g.moveItem(it.id, [2.3 - 3.0 * u, 0.5 + Math.sin(u * Math.PI) * 0.9, -1.05 + 2.4 * u]); __grommet.step(1/60); } g.releaseItem(it.id); for (let k = 0; k < 1200; k++) { __grommet.step(1/120); if (g.state === 'carry' && g.t > 0.5) break; } __grommet.step(0, true); return [g.state, it.state, g.msg]; })()`);
+      const r = await G(`(() => { const g = __grommet.game; for (const a of [[0.2, 1.9], [-0.5, 2.0], [0.6, 1.8]]) { g.launch({ aim: a, kind: 'shiny', speed: 15 }); __grommet.step(5.5); } const it = g.items.find((q) => q.inNest); g.grabItem(it.id); for (let k = 0; k <= 40; k++) { const u = k / 40; g.moveItem(it.id, [2.3 - 3.0 * u, 0.5 + Math.sin(u * Math.PI) * 0.9, -1.05 + 2.4 * u]); __grommet.step(1/60); } g.releaseItem(it.id); for (let k = 0; k < 1200; k++) { __grommet.step(1/120); if (g.state === 'peck' && g.t > 0.3) break; } const o = __grommet.tools.orbit, c = __grommet.soft.cloudC[0]; o.dist = 7.5; o.az = g.face + 0.95; o.el = 0.28; o.target.set(c[0], 1.0, c[2]); __grommet.tools.applyOrbit(); __grommet.step(0, true); return [g.state, it.state, g.msg]; })()`);
       console.log('  steal', r);
     },
   },

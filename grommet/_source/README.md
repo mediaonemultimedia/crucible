@@ -2,7 +2,8 @@
 
 Readable source for **Grommet** (Crucible No. 22): plush athletes, each a soft
 body under shell fur, each playing one little sport against you. Stage 1 is the
-**leopard** (tennis) and the **polar bear** (goalkeeping).
+**leopard** (tennis) and the **polar bear** (goalkeeping); then the **crow**
+(catch & hoard).
 
 This tree lives on the `grommet-source` branch only. What ships to `main` is
 the single built file, `grommet/index.html`.
@@ -14,7 +15,7 @@ npm run build            # → final.html (self-contained; the build fails on an
 node tools/shots.mjs     # headless Chromium screenshots → shots/ (WebGL 2 on SwiftShader)
 ```
 
-Open `final.html?character=leopard|bear` (add `&webgl` to force the WebGL 2
+Open `final.html?character=leopard|bear|crow` (add `&webgl` to force the WebGL 2
 path). Copy it to `grommet/index.html` on the release branch to publish.
 
 ## What came from Flock
@@ -62,9 +63,34 @@ src/athletes/
   leopard.game.js   tennis
   bear.rig.js       rest shape, gloves, furMask
   bear.game.js      goalkeeping
+  crow.rig.js       round body, head, flat wing chains, tail fan, felt feet
+  crow.game.js      catch & hoard: tosses, the beak, the lunge, the nest
 characters.js       per-athlete colours, eyes, face, pattern, court, words
 props.js            what they play with (three.js)
+crowprops.js        the crow's beak, nest and treasures (three.js)
 ```
+
+### The crow (how he differs)
+
+- **Beak**: not stuffing. Two rigid felt mandibles (`crowprops.js`) ride the
+  head's frame, which `CrowGame._headFrame()` measures every substep by
+  shape-matching the head's stuffing to its sewn shape. `beak` (0…1) is the
+  gape; `mouth` (between the mandibles) is what catches.
+- **Wings** are flat `arm` chains. A beat re-poses them (out, up, round) and
+  turns the chain's `ref` with the same rotation, so the flat cross-section
+  turns with the wing (`_posture()`); the tips are also driven toward the pose.
+- **Peck**: the head bows about `PECK_PIVOT` (low, in the chest) while the
+  body leans — a round plush can't reach the floor otherwise.
+- **Lunge**: a hop impulse, then per substep the beats hold up `LIFT` of his
+  weight and servo the body's velocity toward where the toss comes down to
+  his mouth (a capped velocity servo, as in `_footwork`).
+- **Turning** is rate-limited (`faceT` → `face`) and the bow is on springs: a
+  big balance-facing jump while bowed spun him at 20 rad/s.
+- **Things** (food, shiny) are light `Ball`s with their own soft collision
+  (`_softCollide`: they give way, the plush hardly does), the nest's bowl and
+  rim, each other, and the edge of the mat (`STAGE`). The Hand picks them up
+  through `Tools`' optional `items` hook (null for everyone else).
+- `fur.js` has a `sheen` uniform (black = none, so the others are unchanged).
 
 ### Adding one (stage 2: penguin batter, otter juggler, panda drummer)
 
@@ -106,7 +132,12 @@ the server; mistimed swings don't; out of reach is a miss; a fast ball to the
 head bonks him with bounded energy and he recovers; a 20 s auto rally never runs
 away. Bear: corner dives get a glove to the ball and he gets back up (no
 frame-to-frame jumps); a body shot is saved without a dive; faster corner shots
-score more; a run of shots never runs away.
+score more; a run of shots never runs away. Crow: well-aimed food is snapped
+out of the air (beak opens on the way in, shuts on it, then a gulp); wide
+tosses get a flap-and-lunge with the wings out, bounded energy, back on his
+feet; a miss is pecked off the floor; shiny things end up resting in the nest
+(several, none overlapping); a treasure dragged out is stolen back (and
+snatched from your hand if you hold it low); a long mixed run never runs away.
 
 There is no GPU in the build sandbox: screenshots are SwiftShader, and frame
 rate / WebGPU behaviour have to be checked on real hardware.
