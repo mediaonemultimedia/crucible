@@ -11,6 +11,8 @@ import { CHARACTER_INFO, paintAthlete } from './characters.js';
 import { makeRacquet, poseRacquet, makeTennisBall, makeFootball, poseBall, makeStars, poseStars, makeGoal } from './props.js';
 import { TENNIS_R } from './athletes/leopard.game.js';
 import { FOOTBALL_R } from './athletes/bear.game.js';
+import { CROW } from './athletes/crow.rig.js';
+import { makeBeak, poseBeak, makeNest, makeItems, poseItems } from './crowprops.js';
 
 const $ = (s) => document.querySelector(s);
 
@@ -82,6 +84,11 @@ async function start() {
   const stars = makeStars();
   scene.add(tennisBall, football, stars);
   let goal = null;
+  // the crow's: his beak, his nest, the things you toss him
+  const beak = makeBeak(CROW.BEAK);
+  const nest = makeNest();
+  const items = makeItems();
+  scene.add(beak, nest, items);
 
   // rig view: points + links, rebuilt per athlete
   const rigLineMat = new THREE.LineBasicMaterial({ color: 0x1d1a17, depthTest: false, transparent: true, opacity: 0.9 });
@@ -113,7 +120,7 @@ async function start() {
   let tools = null;
 
   /* ── panel ──────────────────────────────────────────────────────────────── */
-  const state = { speed: 1, paused: false, mesh: false, character: null, color: {}, stuffing: 0.42, damping: 0.45, idle: 0.5, pace: 15, auto: false, pile: {} };
+  const state = { speed: 1, paused: false, mesh: false, character: null, color: {}, stuffing: 0.42, damping: 0.45, idle: 0.5, pace: 15, auto: false, pile: {}, shiny: false, beakScale: 1 };
   const furBox = $('#p-fur');
   const cap = (s) => s[0].toUpperCase() + s.slice(1);
   const applyColor = (c) => {
@@ -124,6 +131,9 @@ async function start() {
     fur.uniforms.nose.value.set(c.nose);
     clothMat.uniforms.cloth.value.set(c.cloth);
     clothMat.uniforms.trim.value.set(c.trim);
+    fur.uniforms.sheen.value.set(c.sheen || '#000000');
+    beak.userData.color.value.set(c.nose);
+    state.beakScale = c.beak || 1;
   };
   // four swatches, re-dealt for each athlete
   const buildSwatches = () => {
@@ -164,6 +174,7 @@ async function start() {
     idle.amount = state.idle;
     game.speed = state.pace;
     game.auto = state.auto;
+    if (game.items) game.kind = state.shiny ? 'shiny' : 'food';
   };
 
   const HINTS = {
@@ -232,11 +243,21 @@ async function start() {
     if (goal) { scene.remove(goal); goal = null; }
     if (game.net) { goal = makeGoal(game.goal, game.net); scene.add(goal); }
     racquet.visible = !!rig.racquet;
+    nest.visible = !!game.items;
+    beak.visible = !!rig.beak;
+    poseItems(items, null);
     tennisBall.visible = football.visible = false;
     if (!tools) {
       tools = new Tools({
         canvas, camera, body, soft, groom,
         onLaunch: (e, flick) => aimAndLaunch(e, flick),
+        // the Hand on the crow's things (nobody else leaves things about)
+        items: {
+          pick: (o, d) => game.itemAt?.(o, d) ?? null,
+          grab: (id) => !!game.grabItem?.(id),
+          move: (id, p) => game.moveItem?.(id, p),
+          release: (id) => game.releaseItem?.(id),
+        },
       });
     } else tools.attach({ body, soft });
 
@@ -249,7 +270,7 @@ async function start() {
     canvas.setAttribute('aria-label', info.aria);
     $('#title p').textContent = info.blurb;
     $('#tool-label').textContent = info.tool;
-    $('#b-launch').innerHTML = `${info.verb}<i>S</i>`;
+    setLaunchLabel();
     const [r0, r1] = game.readout();
     $('#l-a').textContent = r0[0]; $('#l-b').textContent = r1[0];
     fur.uniforms.stitch.value.setRGB(...info.stitch, THREE.LinearSRGBColorSpace);
@@ -257,7 +278,7 @@ async function start() {
     // frame the athlete and its court
     const o = tools.orbit, cam = info.camera;
     o.az = cam.az; o.el = cam.el; o.dist = cam.dist;
-    o.target.set(game.home[0], cam.y, game.home[1] - (game.net ? 0.6 : 0));
+    o.target.set(game.home[0] + (cam.x || 0), cam.y, game.home[1] - (game.net ? 0.6 : 0));
     resize();
   };
 
@@ -265,7 +286,7 @@ async function start() {
      aimed through (his hitting plane, or the goal line); a flick adds pace */
   const aimAndLaunch = (e, flick) => {
     const ray = tools.rayAt(e);
-    const zp = game.net ? game.goal.z : game.home[1] + 0.5;
+    const zp = game.net ? game.goal.z : game.aimZ ?? game.home[1] + 0.5;
     const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -zp);
     const P = ray.intersectPlane(plane, new THREE.Vector3());
     if (!P) return;
@@ -301,6 +322,18 @@ async function start() {
   $('#b-reset').onclick = reset;
   $('#b-smooth').onclick = () => groom.smooth(1.1);
   $('#b-launch').onclick = () => launch();
+  // the crow: food or shiny things
+  const kindB = $('#b-kind');
+  const setLaunchLabel = () => {
+    const info = CHARACTER_INFO[state.character];
+    $('#b-launch').innerHTML = game.items ? `${info.verb} ${state.shiny ? 'shiny' : 'food'}<i>S</i>` : `${info.verb}<i>S</i>`;
+  };
+  kindB.onclick = () => {
+    state.shiny = !state.shiny;
+    kindB.setAttribute('aria-pressed', String(state.shiny));
+    if (game.items) game.kind = state.shiny ? 'shiny' : 'food';
+    setLaunchLabel();
+  };
   const autoB = $('#b-auto');
   autoB.onclick = () => { state.auto = !state.auto; game.auto = state.auto; autoB.setAttribute('aria-pressed', String(state.auto)); if (state.auto && !game.ball) launch(); };
   $('#b-shake').onclick = () => {
@@ -332,6 +365,7 @@ async function start() {
     else if (k >= '1' && k <= '4') setTool(['hand', 'finger', 'comb', 'play'][+k - 1]);
     else if (k === 's' || k === 'enter') launch();
     else if (k === 'a') autoB.onclick();
+    else if (k === 't' && game.items) kindB.onclick();
     else if (k === 'c') togglePanel(!document.body.classList.contains('panel-open'));
     else if (k === 'r') reset();
     else if (k === ' ') { e.preventDefault(); pause.onclick(); }
@@ -419,7 +453,7 @@ async function start() {
     if (!tools.ptrs.size) {
       const k = Math.min(1, real * 1.2), cam = CHARACTER_INFO[state.character].camera;
       const zOff = game.net ? -0.6 : 0;
-      ft.x += (game.home[0] + (c[0] - game.home[0]) * 0.35 - ft.x) * k;
+      ft.x += (game.home[0] + (cam.x || 0) + (c[0] - game.home[0]) * 0.35 - ft.x) * k;
       ft.z += (game.home[1] + zOff + (c[2] - game.home[1]) * 0.25 - ft.z) * k;
       ft.y += (cam.y - ft.y) * k;
       tools.applyOrbit();
@@ -434,6 +468,11 @@ async function start() {
     game.headCentre(hc);
     poseStars(stars, hc, game.daze, soft.time);
     const shadows = b && !b.dead ? [[b.x[0], b.x[1], b.x[2], b.r]] : [];
+    if (game.items) {
+      poseItems(items, game.items);
+      for (const it of game.items) if (it.state !== 'gone') shadows.push([it.ball.x[0], it.ball.x[1], it.ball.x[2], it.r * 0.8]);
+    }
+    if (rig.beak) poseBeak(beak, game.beakFrame(), [state.beakScale, 0.92 + 0.12 * state.beakScale]);
     if (rig.racquet) shadows.push([game.rq.C[0], game.rq.C[1], game.rq.C[2], 0.3]);
     floor.paint(soft, null, shadows);
 

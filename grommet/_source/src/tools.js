@@ -14,8 +14,8 @@ import * as THREE from 'three/webgpu';
 const BRUSH = 0.24;
 
 export class Tools {
-  constructor({ canvas, camera, body, soft, groom, onLaunch }) {
-    Object.assign(this, { canvas, camera, body, soft, groom, onLaunch });
+  constructor({ canvas, camera, body, soft, groom, onLaunch, items = null }) {
+    Object.assign(this, { canvas, camera, body, soft, groom, onLaunch, items });
     this.mode = 'hand';
     this.ptrs = new Map();
     this.pins = new Map();
@@ -130,6 +130,20 @@ export class Tools {
     }
 
     const hit = this._cast(e);
+    // the Hand can pick up things lying about (the crow's treasures), when
+    // one is nearer than the plush under the pointer
+    if (this.mode === 'hand' && this.items) {
+      const r = this.rayAt(e);
+      const got = this.items.pick([r.origin.x, r.origin.y, r.origin.z], [r.direction.x, r.direction.y, r.direction.z]);
+      const at = got && new THREE.Vector3(...got.point);
+      if (got && (!hit || at.distanceTo(r.origin) < hit.distance) && this.items.grab(got.id)) {
+        p.kind = 'item';
+        p.id = got.id;
+        p.plane = this._camPlane(at);
+        this.canvas.dataset.grabbing = '1';
+        return;
+      }
+    }
     if (!hit) { p.kind = 'orbit'; return; }
     const v = this._nearestVertex(hit);
     const i = this.body.part[v];
@@ -183,6 +197,9 @@ export class Tools {
       this.soft.moveGrab(e.pointerId, [at.x, at.y, at.z]);
     } else if (p.kind === 'finger') {
       this._fingerTo(p, e);
+    } else if (p.kind === 'item') {
+      const at = this._onPlane(e, p.plane);
+      if (at) this.items.move(p.id, [at.x, at.y, at.z]);
     } else if (p.kind === 'play') {
       p.trail.push([e.clientX, e.clientY, performance.now()]);
       if (p.trail.length > 12) p.trail.shift();
@@ -217,7 +234,12 @@ export class Tools {
 
   _hover(e) {
     if (this.mode === 'play') { this.canvas.dataset.hover = ''; return; }
-    this.canvas.dataset.hover = this._cast(e) ? 'body' : '';
+    let over = !!this._cast(e);
+    if (!over && this.mode === 'hand' && this.items) {
+      const r = this.rayAt(e);
+      over = !!this.items.pick([r.origin.x, r.origin.y, r.origin.z], [r.direction.x, r.direction.y, r.direction.z]);
+    }
+    this.canvas.dataset.hover = over ? 'body' : '';
   }
 
   /* the ray under a pointer (for aiming a serve) */
@@ -230,6 +252,9 @@ export class Tools {
     if (p.kind === 'hand') {
       if (e.shiftKey) this.pins.set(e.pointerId, p.i);
       else this.soft.release(e.pointerId);
+      this.canvas.dataset.grabbing = this.soft.grabs.size ? '1' : '';
+    } else if (p.kind === 'item') {
+      this.items.release(p.id);
       this.canvas.dataset.grabbing = this.soft.grabs.size ? '1' : '';
     } else if (p.kind === 'finger') {
       this.soft.spheres = this.soft.spheres.filter((s) => s !== p.sphere);

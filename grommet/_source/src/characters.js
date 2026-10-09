@@ -45,6 +45,25 @@ export const CHARACTER_INFO = {
     camera: { az: 0.28, el: 0.3, dist: 17, y: 1.6 },
     face: bearFace, pattern: () => {}, court: pitch, tint: '#8fb27a',
   },
+  crow: {
+    label: 'Crow', sport: 'Catch & hoard', tool: 'Toss', verb: 'Toss',
+    // nose: the beak and legs (felt); cloth: the feet; sheen: the gloss on
+    // the pile; beak: its heft (a raven's is bigger)
+    colors: {
+      crow: { fur: '#1c1b21', under: '#24232b', accent: '#1c1b21', spot: '#1c1b21', nose: '#3d3c43', cloth: '#3d3c43', trim: '#3d3c43', sheen: '#2c2a70', beak: 1 },
+      hooded: { fur: '#8e8b89', under: '#9d9a97', accent: '#1d1c22', spot: '#1d1c22', nose: '#323137', cloth: '#323137', trim: '#323137', sheen: '#26264e', beak: 1 },
+      white: { fur: '#f0ede7', under: '#f7f5f0', accent: '#ebe7e0', spot: '#ebe7e0', nose: '#e6b6ad', cloth: '#e2b2a8', trim: '#e2b2a8', sheen: '#000000', beak: 1 },
+      raven: { fur: '#131217', under: '#1a1920', accent: '#131217', spot: '#131217', nose: '#29282e', cloth: '#29282e', trim: '#29282e', sheen: '#382878', beak: 1.25 },
+    },
+    eyes: { part: 'head', u: 0.118, v: 0.43, lift: 0.028, scale: [0.085, 0.092, 0.06] },
+    pile: 4, stitch: [0.02, 0.02, 0.025],
+    aria: 'A round plush crow with a felt beak who catches what you toss him and hoards shiny things in a twig nest',
+    blurb: 'A round plush crow, glossy black. Toss him a crumb: he hops across and snaps it out of the air — wide ones get a flap and a lunge. Toss him something shiny and it goes in his nest. Then try taking it back.',
+    hand: 'Grab his head, a wing or the tail and pull. Or pick a treasure out of his nest and carry it off — he’ll come and take it back.',
+    play: 'Click where he should catch it; flick to toss it harder. Shiny things (T) go to his nest. Or use Toss (S).',
+    camera: { az: 0.3, el: 0.3, dist: 12.5, y: 1.25, x: 0.8 },
+    face: crowFace, pattern: crowPattern, court: crowMat, tint: '#9c9aa8',
+  },
 };
 
 /* the painting helpers for one rig and one canvas */
@@ -96,7 +115,7 @@ function painter(g, size, rig) {
     const R = rig.regions[P.region];
     return [(R.x0 + a * (R.x1 - R.x0)) * size, (R.y0 + Math.min(1, s * 0.985) * (R.y1 - R.y0)) * size];
   };
-  return { parts, reg, at, px, blob, eyeRing, stitch, tubeAt };
+  return { parts, reg, at, px, blob, eyeRing, stitch, tubeAt, rig };
 }
 
 /* paint an athlete's mask (pile, blush, stitch) and pattern (spots, nose) */
@@ -137,7 +156,7 @@ export function paintAthlete(maskTex, patTex, name, rig) {
   }
 }
 
-const noseOf = (name) => (name === 'leopard' ? leopardNose : bearNose);
+const noseOf = (name) => (name === 'leopard' ? leopardNose : name === 'crow' ? () => {} : bearNose);
 
 /* ── the leopard ─────────────────────────────────────────────────────────── */
 
@@ -285,6 +304,83 @@ function bearFace(g, size, P) {
 
 function bearNose(g, size, P) {
   nosePad(g, P, 'muzzle', 0.5, 0.33, 0.175, 0.2, 'rgb(0,255,0)');
+}
+
+/* ── the crow ────────────────────────────────────────────────────────────── */
+
+function crowFace(g, size, P) {
+  const { eyeRing, blob, stitch, tubeAt } = P;
+  eyeRing('head', 0.118, 0.43, 0.2);
+  // a short-cropped patch where the beak is sewn on, so it isn't buried
+  g.globalCompositeOperation = 'source-over';
+  blob('head', 0.5, 0.56, 0.3, 0.2, 'rgb(70,0,0)');
+  // the second foot (painter's lookups find the first): no fur under felt
+  for (const part of P.rig.parts) {
+    if (part.kind !== 'grid' || part.name !== 'foot') continue;
+    const R = P.rig.regions[part.region];
+    g.fillStyle = 'rgb(0,0,0)';
+    g.fillRect(R.x0 * size, R.y0 * size, (R.x1 - R.x0) * size, (R.y1 - R.y0) * size);
+  }
+  // feathers: rows of stitched scallops down each folded wing, and the
+  // tail's feathers stitched along their length
+  g.globalCompositeOperation = 'lighter';
+  for (const part of P.rig.parts) {
+    if (part.kind !== 'tube') continue;
+    const ch = P.rig.arms[part.chain];
+    if (ch.kind === 'arm') {
+      for (const s0 of [0.38, 0.55, 0.7, 0.84]) {
+        for (let k = 0; k < 6; k++) {
+          const a0 = k / 6, a1 = (k + 1) / 6;
+          const pts = [];
+          for (let q = 0; q <= 6; q++) {
+            const a = a0 + (a1 - a0) * q / 6;
+            pts.push(tubeAt(part, a, s0 + 0.05 * Math.sin(Math.PI * q / 6)));
+          }
+          g.strokeStyle = 'rgb(0,0,150)';
+          g.lineWidth = Math.max(1.2, size / 512 * 1.4);
+          g.beginPath();
+          pts.forEach(([x, y], q) => (q ? g.lineTo(x, y) : g.moveTo(x, y)));
+          g.stroke();
+        }
+      }
+    } else if (ch.kind === 'tail') {
+      for (const a of [0.125, 0.375, 0.625, 0.875]) {
+        const [x0, y0] = tubeAt(part, a, 0.2), [x1, y1] = tubeAt(part, a, 0.97);
+        g.strokeStyle = 'rgb(0,0,150)';
+        g.lineWidth = Math.max(1.2, size / 512 * 1.4);
+        g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+      }
+    }
+  }
+  void stitch;
+}
+
+/* the legs are felt (the beak's colour); a hooded crow's black bib */
+function crowPattern(g, size, P, rig) {
+  for (const part of rig.parts) {
+    if (part.kind !== 'tube' || rig.arms[part.chain].kind !== 'leg') continue;
+    const R = rig.regions[part.region];
+    g.fillStyle = 'rgb(0,255,0)';
+    g.fillRect(R.x0 * size, R.y0 * size, (R.x1 - R.x0) * size, (R.y1 - R.y0) * size);
+  }
+  // the bib: under the beak, down the throat to the top of the chest
+  P.blob('torso', 0.5, 0.2, 0.75, 0.42, 'rgb(255,0,0)');
+  P.blob('head', 0.5, 0.78, 0.6, 0.42, 'rgb(255,0,0)');
+}
+
+/* a soft play mat with a chalk ring where he stands, and his corner */
+function crowMat(g, toPx, k) {
+  const [a, b] = toPx(-4.6, -3.1), [c, d] = toPx(4.6, 4.2);
+  g.fillStyle = 'rgb(0,255,0)';
+  g.beginPath();
+  g.roundRect ? g.roundRect(a, b, c - a, d - b, 0.6 * k) : g.rect(a, b, c - a, d - b);
+  g.fill();
+  const [sx, sy] = toPx(0, 0.05);
+  g.strokeStyle = 'rgb(200,0,0)';
+  g.lineWidth = 0.06 * k;
+  g.setLineDash([0.18 * k, 0.14 * k]);
+  g.beginPath(); g.arc(sx, sy, 1.15 * k, 0, Math.PI * 2); g.stroke();
+  g.setLineDash([]);
 }
 
 /* ── courts, painted into the floor ──────────────────────────────────────── */

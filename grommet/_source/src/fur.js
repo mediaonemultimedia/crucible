@@ -47,6 +47,8 @@ export function makeFurMaterial(groomTex, maskTex, patTex) {
     key: uniform(KEY.clone()),
     fill: uniform(FILL.clone()),
     meshView: uniform(0),
+    // a glossy sheen on the pile (a crow's blue-violet); black: none at all
+    sheen: uniform(new THREE.Color(0, 0, 0)),
   };
 
   const n = normalLocal;
@@ -170,7 +172,8 @@ export function makeFurMaterial(groomTex, maskTex, patTex) {
 
     const lit = base.mul(diff.mul(vec3(1.0, 0.96, 0.9)).mul(1.05).add(vec3(fillL).mul(vec3(0.85, 0.9, 1.0))).add(sky)).mul(ao).mul(napShade)
       .add(vec3(spec).mul(vec3(1.0, 0.97, 0.92)))
-      .add(base.mul(1.3).add(0.15).mul(rim));
+      .add(base.mul(1.3).add(0.15).mul(rim))
+      .add(vec3(U.sheen).mul(s2.mul(0.5).add(s1.mul(0.5)).mul(specMask).add(rim.mul(0.5))));
     const meshCol = mix(base, vec3(0.2), 0.2).mul(wrap.mul(0.6).add(0.4));
     return vec4(mix(lit, meshCol, U.meshView), 1);
   });

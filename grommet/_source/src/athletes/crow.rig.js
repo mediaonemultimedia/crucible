@@ -17,7 +17,7 @@ export const CROW = {
   HEAD: { c: [0, 2.0, 0.16], r: [0.5, 0.47, 0.5], B: null, bulge: (phi) => 1 + 0.04 * Math.sin(phi) },
   // the beak, in the head's rest frame (relative to the head bulk's centre):
   // where it is sewn on, which way it points, how long
-  BEAK: { base: [0, -0.07, 0.4], dir: [0, -0.12, 1], len: 0.5, w: 0.15, h: 0.12 },
+  BEAK: { base: [0, -0.06, 0.4], dir: [0, -0.14, 1], len: 0.64, w: 0.2, h: 0.16 },
   PIVOT: [0, 1.66, 0.08],
 };
 
@@ -26,8 +26,8 @@ export function buildCrow() {
   const { TORSO, HEAD } = CROW;
   const { h0, h1 } = standingBody(b, {
     TORSO, HEAD,
-    hip: [0.25, 0.6, 0.06], foot: [0.27, 0.2, 0.12], legR: 0.1,
-    FOOT: { c: [0.28, 0.11, 0.22], r: [0.19, 0.11, 0.3] },
+    hip: [0.25, 0.6, 0.06], foot: [0.27, 0.18, 0.12], legR: 0.08,
+    FOOT: { c: [0.27, 0.09, 0.2], r: [0.16, 0.09, 0.28] },
     torsoLook: { under: (u, v, l) => smooth(0.3, 0.8, l[2]) * smooth(0.5, -0.4, l[1]) * 0.35, pile: () => 0.95 },
     footLook: { pile: () => 0 },
     legLook: { pile: () => 0 },
@@ -65,10 +65,10 @@ export function buildCrow() {
   });
 
   // little felt feet: cloth over the sole grids (no fur under them)
-  const FOOT = { c: [0.28, 0.11, 0.22], r: [0.19, 0.11, 0.3] };
+  const FOOT = { c: [0.27, 0.09, 0.2], r: [0.16, 0.09, 0.28] };
   for (const s of [-1, 1]) {
     b.clothGrid({
-      name: s < 0 ? 'right foot' : 'left foot', cloud: 0, c: [s * FOOT.c[0], FOOT.c[1], FOOT.c[2]], r: FOOT.r.map((v) => v + 0.03),
+      name: s < 0 ? 'right foot' : 'left foot', cloud: 0, c: [s * FOOT.c[0], FOOT.c[1], FOOT.c[2]], r: FOOT.r.map((v) => v + 0.02),
       vr: [0, 1], U: 24, V: 12, style: 0,
     });
   }

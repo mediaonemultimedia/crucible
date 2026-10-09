@@ -75,6 +75,80 @@ const SCENES = {
   },
   'leopard-mobile': { character: 'leopard', mobile: true, run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
   'bear-mobile': { character: 'bear', mobile: true, run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
+  'crow-rest': { character: 'crow', run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
+  'crow-close': {
+    character: 'crow',
+    run: async (G) => { await G(`(() => { const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 6.5; o.az = 0.35; o.el = 0.18; o.target.set(0, 1.4, 0); __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
+  },
+  'crow-catch': {
+    character: 'crow',
+    run: async (G) => {
+      await G(`__grommet.step(2)`);
+      const r = await G(`(() => { const g = __grommet.game; const it = g.launch({ aim: [0.5, 1.9], kind: 'food', speed: 15 }); for (let k = 0; k < 240; k++) { __grommet.step(1/120); const b = it.ball.x, m = g.mouth; if (Math.hypot(b[0]-m[0], b[1]-m[1], b[2]-m[2]) < 0.75 && g.beak.x > 0.8) break; } __grommet.step(0, true); return [g.state, g.beak.x, it.state]; })()`);
+      console.log('  catch', r);
+    },
+  },
+  'crow-lunge': {
+    character: 'crow',
+    run: async (G) => {
+      await G(`__grommet.step(2)`);
+      const r = await G(`(() => { const g = __grommet.game; g.launch({ aim: [2.9, 2.1], kind: 'food', speed: 15 }); for (let k = 0; k < 400; k++) { __grommet.step(1/120); if (g.state === 'lunge' && g.t > 0.16) break; } __grommet.step(0, true); return [g.state, g.flap.x]; })()`);
+      console.log('  lunge', r);
+    },
+  },
+  'crow-peck': {
+    character: 'crow',
+    run: async (G) => {
+      await G(`__grommet.step(2)`);
+      const r = await G(`(() => { const g = __grommet.game; g.launch({ aim: [-4, 1], kind: 'food', speed: 26 }); for (let k = 0; k < 1200; k++) { __grommet.step(1/120); if (g.state === 'peck' && g.t > 0.32) break; } __grommet.step(0, true); return [g.state, g.mouth[1]]; })()`);
+      console.log('  peck', r);
+    },
+  },
+  'crow-nest': {
+    character: 'crow',
+    run: async (G) => {
+      await G(`__grommet.step(1.5)`);
+      const r = await G(`(() => { const g = __grommet.game; for (const a of [[0.2, 1.9], [-0.5, 2.0], [0.6, 1.8], [0, 2.1], [0.4, 2.0]]) { g.launch({ aim: a, kind: 'shiny', speed: 15 }); __grommet.step(5.5); } const o = __grommet.tools.orbit; o.dist = 8; o.az = 0.55; o.el = 0.42; o.target.set(1.4, 0.6, -0.6); __grommet.tools.applyOrbit(); __grommet.step(0.05, true); return [g.hoard(), g.items.map((it) => it.sub)]; })()`);
+      console.log('  nest', JSON.stringify(r));
+    },
+  },
+  'crow-steal': {
+    character: 'crow',
+    run: async (G) => {
+      await G(`__grommet.step(1.5)`);
+      const r = await G(`(() => { const g = __grommet.game; for (const a of [[0.2, 1.9], [-0.5, 2.0], [0.6, 1.8]]) { g.launch({ aim: a, kind: 'shiny', speed: 15 }); __grommet.step(5.5); } const it = g.items.find((q) => q.inNest); g.grabItem(it.id); for (let k = 0; k <= 40; k++) { const u = k / 40; g.moveItem(it.id, [2.3 - 3.0 * u, 0.5 + Math.sin(u * Math.PI) * 0.9, -1.05 + 2.4 * u]); __grommet.step(1/60); } g.releaseItem(it.id); for (let k = 0; k < 1200; k++) { __grommet.step(1/120); if (g.state === 'carry' && g.t > 0.5) break; } __grommet.step(0, true); return [g.state, it.state, g.msg]; })()`);
+      console.log('  steal', r);
+    },
+  },
+  'crow-indignant': {
+    character: 'crow',
+    run: async (G) => {
+      await G(`__grommet.step(1.5)`);
+      const r = await G(`(() => { const g = __grommet.game; for (const a of [[0.2, 1.9], [-0.5, 2.0]]) { g.launch({ aim: a, kind: 'shiny', speed: 15 }); __grommet.step(5.5); } const it = g.items.find((q) => q.inNest); g.grabItem(it.id); for (let k = 0; k <= 60; k++) { const u = Math.min(1, k / 40); g.moveItem(it.id, [2.3 - 2.2 * u, 0.5 + Math.sin(Math.min(1, u) * Math.PI / 2) * 1.6, -1.05 + 1.6 * u]); __grommet.step(1/60); if (g.state === 'indignant' && g.t > 0.3) break; } __grommet.step(0, true); return [g.state, g.flap.x]; })()`);
+      console.log('  indignant', r);
+    },
+  },
+  'crow-catch-close': {
+    character: 'crow',
+    run: async (G) => {
+      await G(`__grommet.step(2)`);
+      const r = await G(`(() => { const g = __grommet.game; const it = g.launch({ aim: [0.3, 1.95], kind: 'food', speed: 15 }); for (let k = 0; k < 240; k++) { __grommet.step(1/120); const b = it.ball.x, m = g.mouth; if (Math.hypot(b[0]-m[0], b[1]-m[1], b[2]-m[2]) < 0.6 && g.beak.x > 0.85) break; } const o = __grommet.tools.orbit, c = __grommet.soft.cloudC[0]; o.dist = 6.4; o.az = 0.95; o.el = 0.12; o.target.set(c[0] + 0.3, 1.75, c[2] + 0.5); __grommet.tools.applyOrbit(); __grommet.hold = true; __grommet.step(0, true); return [g.state, g.beak.x, it.state]; })()`);
+      console.log('  catch-close', r);
+    },
+  },
+  'crow-hooded': {
+    character: 'crow',
+    run: async (G) => { await G(`(() => { document.querySelectorAll('#p-fur button')[1].click(); __grommet.step(2.5, true); })()`); },
+  },
+  'crow-white': {
+    character: 'crow',
+    run: async (G) => { await G(`(() => { document.querySelectorAll('#p-fur button')[2].click(); __grommet.step(2.5, true); })()`); },
+  },
+  'crow-raven': {
+    character: 'crow',
+    run: async (G) => { await G(`(() => { document.querySelectorAll('#p-fur button')[3].click(); const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 6.5; o.az = -0.5; o.el = 0.15; o.target.set(0, 1.4, 0); __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
+  },
+  'crow-mobile': { character: 'crow', mobile: true, run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
   'leopard-close': {
     character: 'leopard',
     run: async (G) => { await G(`(() => { const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 7.5; o.az = 0.25; o.el = 0.2; __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
@@ -108,7 +182,7 @@ for (const name of names) {
   const t0 = Date.now();
   await S.run(G);
   await page.waitForTimeout(300);
-  await page.screenshot({ path: path.join(out, name + '.png') });
+  await page.screenshot({ path: path.join(out, name + '.png'), timeout: 120000 });
   console.log(`${name}: ${((Date.now() - t0) / 1000).toFixed(1)} s${errs.length ? '  ERRORS:\n    ' + errs.join('\n    ') : ''}`);
   errors += errs.length;
   await page.close();

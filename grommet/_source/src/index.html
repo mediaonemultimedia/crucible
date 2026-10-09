@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#e6e0d7">
 <title>Grommet — plush athletes</title>
-<meta name="description" content="Plush athletes as position-based soft bodies under shell-rendered fur: a leopard in tennis whites who returns your serve with a wooden racquet, and a polar bear goalkeeper who dives for your shots. Serve, shoot, pull, poke and comb them.">
+<meta name="description" content="Plush athletes as position-based soft bodies under shell-rendered fur: a leopard in tennis whites who returns your serve with a wooden racquet, and a polar bear goalkeeper who dives for your shots, and a crow who catches what you toss him and hoards shiny things in his nest. Serve, shoot, toss, pull, poke and comb them.">
 <style>
 :root{
   --stage:#e6e0d7;
@@ -156,6 +156,7 @@ body.panel-open #panel{transform:translateX(0)}
 .sub-h{margin:0 0 9px;font-family:var(--mono);font-size:8px;letter-spacing:.22em;text-transform:uppercase;color:var(--faint);opacity:.8}
 /* the rally button is the leopard's alone */
 body:not([data-char="leopard"]) [data-leopard-only]{display:none}
+body:not([data-char="crow"]) [data-crow-only]{display:none}
 #game-state{font-style:italic;color:var(--ink-s)}
 #read output.big{font-size:17px}
 #p-fur{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
@@ -253,6 +254,7 @@ body:not([data-char="leopard"]) [data-leopard-only]{display:none}
         <div class="acts">
           <button id="b-launch">Serve<i>S</i></button>
           <button id="b-auto" aria-pressed="false" data-leopard-only>Auto rally<i>A</i></button>
+          <button id="b-kind" aria-pressed="false" data-crow-only>Shiny things<i>T</i></button>
         </div>
         <label class="sld"><span class="row">Pace<output id="o-pace"></output></span><input id="s-pace" type="range" min="8" max="26" step="0.5" value="15"><span class="ends"><span>gentle</span><span>hard</span></span></label>
         <p class="note">Tool <b>4</b> aims: click where the ball should go, flick to hit it harder.</p>
@@ -287,6 +289,7 @@ body:not([data-char="leopard"]) [data-leopard-only]{display:none}
         <p class="note">The racquet is a rigid body held in the paw, its handle along the forearm the physics gives. Every substep the ball is tested against the <b>string plane</b> and its own velocity at the contact: strings are lively, the wooden frame is dead and skews the shot. A clean contact is steered back toward you. A ball to the head is an impulse into the head's stuffing: it squashes, the headband dents with it, and he's dazed.</p>
         <p class="note">The fur is the body drawn <b>64 times</b> as shells cut into strands, groomable with the comb, lit along each strand (<b>Kajiya-Kay</b>); the rosettes are printed under the pile. The kit is a second skin of <b>cotton</b> skinned to the same body — no fur under it — that swings on the fur-lag springs and creases where it bunches.</p>
         <p class="note">The goal's net is a verlet mesh pinned to its frame: the ball shoves the knots, the knots slow the ball. A save is the ball and the bear pushing each other apart by mass.</p>
+        <p class="note">The crow's beak isn't stuffing: two rigid felt mandibles ride the head's frame, <b>shape-matched</b> from its stuffing every substep, and the lower one hinges open. His wings are flat chains re-posed to beat, their cross-section turned with them; through a lunge the beats hold up part of his weight and steer him to where the toss comes down. What he hoards are small rigid bodies resting against the nest's bowl, its rim and each other.</p>
       </section>
     </div>
   </aside>

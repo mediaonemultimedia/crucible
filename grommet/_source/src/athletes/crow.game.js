@@ -347,8 +347,8 @@ export class CrowGame extends Athlete {
           this.drive = { x: sx, z: sz, speed: 0.6 };
           this.faceT = face;
         }
-        this.peckT = Math.min(1.15, this.t * 4);
-        this.leanT = [0.65, 0];
+        this.peckT = Math.min(1.05, this.t * 4);
+        this.leanT = [0.6, 0];
         this.beakT = this.t > 0.12 ? 1 : 0;
         // moved off (a hand took it, it rolled): go after it again
         if (this._standoffDist(T) > 0.45 || this.t > 1.1) {
@@ -741,7 +741,7 @@ export class CrowGame extends Athlete {
     if (!this.held && this.beak.x > 0.35) {
       for (const it of free) {
         const b = it.ball, m = this.mouth;
-        const reach = it.r + (this.state === 'peck' ? 0.36 : this.state === 'lunge' || this.state === 'land' ? 0.38 : 0.3);
+        const reach = it.r + (this.state === 'peck' ? 0.25 : this.state === 'lunge' || this.state === 'land' ? 0.38 : 0.3);
         if (Math.hypot(b.x[0] - m[0], b.x[1] - m[1], b.x[2] - m[2]) > reach) continue;
         if ((it.inNest && !it.stolen) || this.time < (it.noCatch || 0)) continue;
         this._caught(it);

@@ -16,7 +16,7 @@ const K = () => vec3(KEY.x, KEY.y, KEY.z);
 const F = () => vec3(FILL.x, FILL.y, FILL.z);
 
 /* the shared hand lighting: wrapped key, fill, sky, a little floor AO */
-function shade(base, N, { spec = 0, power = 40, wrap = 0.55 } = {}) {
+export function shade(base, N, { spec = 0, power = 40, wrap = 0.55 } = {}) {
   const V = normalize(cameraPosition.sub(positionWorld));
   const ndl = clamp(dot(N, K()).mul(1 - wrap).add(wrap), 0, 1);
   const fill = clamp(dot(N, F()).mul(0.5).add(0.35), 0, 1).mul(0.25);
@@ -107,7 +107,7 @@ export function poseRacquet(g, F) {
    two-lobed seam, a football's black pentagons and white hexagons with
    their stitched seams. The felt itself is in the shader: a fuzzy halo at
    the silhouette, a soft sheen, fibres.                                  */
-function feltMaterial() {
+export function feltMaterial() {
   const mat = new THREE.MeshBasicNodeMaterial();
   const col = attribute('color', 'vec3');
   const vCol = varying(col);
