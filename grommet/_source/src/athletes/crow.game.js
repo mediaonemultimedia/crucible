@@ -74,6 +74,9 @@ export class CrowGame extends Athlete {
     this.peck = spring();            // the head bowed forward, radians
     this.flap = spring();            // 0 folded … 1 beating
     this.lunge = spring();           // how far he leans into a lunge
+    this.bow = spring(); this.roll = spring();
+    this.leanT = [0, 0];
+    this.faceT = 0;
     this.beakT = 0;
     this.peckT = 0;
     this.flapT = 0;
@@ -108,10 +111,11 @@ export class CrowGame extends Athlete {
       return { k, side: Math.sign(rest[i0 * 3]), d0: d.map((v) => v / Math.hypot(...d)), ref0: [...ch.ref] };
     });
     this._headFrame();
+    this.restMouthY = this.mouth[1];
     this._go('ready');
   }
 
-  _springs() { return [...super._springs(), this.beak, this.peck, this.flap, this.lunge]; }
+  _springs() { return [...super._springs(), this.beak, this.peck, this.flap, this.lunge, this.bow, this.roll]; }
 
   reset() {
     super.reset();
@@ -121,7 +125,7 @@ export class CrowGame extends Athlete {
     this.beakT = this.peckT = this.flapT = 0;
     this.balanceK = 0.007;
     this.lean = null;
-    this.face = 0;
+    this.face = this.faceT = 0;
     this.msg = 'ready';
     for (const w of this.wings) this.rig.arms[w.k].ref = [...w.ref0];
   }
@@ -267,12 +271,13 @@ export class CrowGame extends Athlete {
     const T = this.target && this.target.state !== 'gone' ? this.target : (this.target = null);
     let look = null;
     this.flapT = 0;
-    this.lean = null;
+    this.peckT = 0;
+    this.leanT = [0, 0];
     if (this.state !== 'lunge') this.balanceK = 0.007;
 
     switch (this.state) {
       case 'ready': {
-        this.beakT = 0; this.peckT = 0; this.drive = null; this.face = 0;
+        this.beakT = 0; this.peckT = 0; this.drive = null; this.faceT = 0;
         const next = this._choose();
         if (next) this._aimAt(next);
         else look = this.items.find((it) => it.state === 'hand')?.ball.x || null;
@@ -290,7 +295,7 @@ export class CrowGame extends Athlete {
         look = T?.ball.x || null;
         this.flapT = 1;
         this.balanceK = 0.0035;
-        this.lean = [0.15, 0, -this.lungeSide * 0.32 * this.lunge.x];
+        this.leanT = [0.15, -this.lungeSide * 0.32 * this.lunge.x];
         ease(this.lunge, 1, 120, dt);
         // the beats steer: the body's velocity is servoed (per substep) to
         // put his mouth where the thing will be when it gets down to it
@@ -300,7 +305,9 @@ export class CrowGame extends Athlete {
           const tr = downTime(b, Math.min(m[1], b.x[1])) ?? 0;
           if (tr > 0.02 && b.x[2] > m[2] - 0.3) {
             const P = b.at(tr), k = 1 / Math.max(tr, 0.08);
-            this.flyV = [clamp((P[0] - m[0]) * k, -6, 6), clamp((P[1] - m[1]) * k, -3, 3.5), clamp((P[2] - m[2]) * k, -4, 4)];
+            // up and over: a ballistic arc under what the beats don't hold up
+            const g = this.soft.params.gravity * (1 - LIFT);
+            this.flyV = [clamp((P[0] - m[0]) * k, -6, 6), clamp((P[1] - m[1]) * k + 0.5 * g * tr, -3, 4.5), clamp((P[2] - m[2]) * k, -4, 4)];
           }
         }
         if (!this.flyV && this.t > 0.15) this._go('land');
@@ -338,10 +345,10 @@ export class CrowGame extends Athlete {
         {
           const [sx, sz, face] = this._standoff(T);
           this.drive = { x: sx, z: sz, speed: 0.6 };
-          this.face = face;
+          this.faceT = face;
         }
         this.peckT = Math.min(1.15, this.t * 4);
-        this.lean = [0.65 * Math.min(1, this.t * 3), 0, 0];
+        this.leanT = [0.65, 0];
         this.beakT = this.t > 0.12 ? 1 : 0;
         // moved off (a hand took it, it rolled): go after it again
         if (this._standoffDist(T) > 0.45 || this.t > 1.1) {
@@ -354,7 +361,7 @@ export class CrowGame extends Athlete {
         const it = this.held;
         if (!it) { this._afterward(); break; }
         const [sx, sz, face] = this._nestStand();
-        this.face = face;
+        this.faceT = face;
         this.beakT = 0;
         look = [NEST.c[0], 0.3, NEST.c[1]];
         // a strut: walking steps, not hops
@@ -367,7 +374,7 @@ export class CrowGame extends Athlete {
       case 'drop': {
         look = [NEST.c[0], 0.1, NEST.c[1]];
         this.peckT = Math.min(0.75, this.t * 3);
-        this.lean = [0.25 * Math.min(1, this.t * 3), 0, 0];
+        this.leanT = [0.25, 0];
         if (this.t > 0.32 && this.held) {
           this.beakT = 1;
           this._dropInNest(this.held);
@@ -386,7 +393,7 @@ export class CrowGame extends Athlete {
         break;
       }
       case 'return': {
-        this.face = 0;
+        this.faceT = 0;
         const next = this._choose();
         if (next) { this._aimAt(next); break; }
         this.drive = { x: this.home[0], z: this.home[1], speed: 2.2 };
@@ -396,6 +403,14 @@ export class CrowGame extends Athlete {
       }
     }
     this.lookAt = look;
+    // he turns to face things at a walking pace (a whole-body turn pulled
+    // in fast is a spin)
+    const df = Math.atan2(Math.sin(this.faceT - this.face), Math.cos(this.faceT - this.face));
+    this.face += clamp(df, -2.2 * dt, 2.2 * dt);
+    // the body bows and rolls on springs: never a snap (that's a kick)
+    ease(this.bow, this.leanT[0], 70, dt);
+    ease(this.roll, this.leanT[1], 70, dt);
+    this.lean = Math.abs(this.bow.x) + Math.abs(this.roll.x) > 1e-3 ? [this.bow.x, 0, this.roll.x] : null;
 
     ease(this.beak, this.beakT, this.beakT > this.beak.x ? 900 : 2600, dt);
     this.beak.x = clamp(this.beak.x, -0.05, 1.1);
@@ -433,7 +448,6 @@ export class CrowGame extends Athlete {
   }
 
   _afterward() {
-    this.lean = null;
     if (this.held) {
       if (this.held.kind === 'food') { this.msg = 'gulp'; this._go('gulp'); }
       else { this.msg = 'mine'; this._go('carry'); }
@@ -456,7 +470,7 @@ export class CrowGame extends Athlete {
     const apex = b.x[1] + (b.v[1] > 0 ? b.v[1] * b.v[1] / (2 * g) : 0);
     // catch it at mouth height; a lob that never gets that high, as high
     // as it does get, with a bow of the head
-    const restY = this.restMouthY ?? (this.restMouthY = m[1]);
+    const restY = this.restMouthY;
     const y = Math.min(restY, Math.max(0.7, apex - 0.05));
     const t = down(y);
     if (t === null || b.v[2] > 0.5 && b.x[2] > c[2] + 1.5) { this.drive = null; this.beakT = 0; return; }
@@ -474,7 +488,7 @@ export class CrowGame extends Athlete {
       return;
     }
     const feet = 2.6 * Math.max(0, t - 0.1);
-    if (dist < 0.2 + feet * 0.85) {
+    if (dist < 0.2 + feet * 0.85 || (dist < 0.5 && t < LUNGE_T)) {
       this.drive = dist > 0.05 ? { x: c[0] + dx, z: c[2] + dz, speed: 3.4 } : null;
       this.hopping = dist > 0.3;
       this.msg = this.target.kind === 'food' ? 'got it…' : 'ooh, shiny…';
@@ -524,7 +538,7 @@ export class CrowGame extends Athlete {
      the head puts the beak on it */
   _pursue(T) {
     const [sx, sz, face] = this._standoff(T);
-    this.face = face;
+    this.faceT = face;
     this.beakT = 0;
     const c = this.soft.cloudC[0];
     const far = Math.hypot(sx - c[0], sz - c[2]);
@@ -711,7 +725,7 @@ export class CrowGame extends Athlete {
       if (it.sleep > 30 && it.inNest) continue;
       b.finish(h);
       // the edge of the mat: a thing that rolls off it is stopped there
-      for (const [d, lo, hi] of STAGE) {
+      if (b.x[1] < b.r + 0.3) for (const [d, lo, hi] of STAGE) {
         if (b.x[d] < lo) { b.x[d] = lo; b.v[d] = Math.abs(b.v[d]) * 0.2; }
         else if (b.x[d] > hi) { b.x[d] = hi; b.v[d] = -Math.abs(b.v[d]) * 0.2; }
       }

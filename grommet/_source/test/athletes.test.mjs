@@ -285,3 +285,245 @@ test('every rig has the structure SoftBody and Body consume', () => {
     assert.ok(rig.cloth?.parts.length, `${name} has no kit`);
   }
 });
+
+/* ── the crow's catch and hoard ─────────────────────────────────────────── */
+
+/* run the crow for `sec`, keeping a log: every state he passed through,
+   peak kinetic energy, the biggest frame-to-frame jump of his middle    */
+const watchCrow = (A, sec, log = { states: new Set(), peak: 0, jump: 0 }) => {
+  let prev = [...A.soft.cloudC[0]];
+  tick(A, sec, () => {
+    log.states.add(A.game.state);
+    log.peak = Math.max(log.peak, A.soft.kinetic());
+    const c = A.soft.cloudC[0];
+    log.jump = Math.max(log.jump, Math.hypot(c[0] - prev[0], c[1] - prev[1], c[2] - prev[2]));
+    prev = [...c];
+  });
+  return log;
+};
+const settledHome = (A) => {
+  const { soft, game } = A;
+  assert.ok(soft.cloudR[0][4] > 0.97, `not upright (up·y ${soft.cloudR[0][4].toFixed(3)})`);
+  assert.ok(soft.kinetic() < 1, `still moving ${soft.kinetic()}`);
+  const home = Math.hypot(soft.cloudC[0][0] - game.home[0], soft.cloudC[0][2] - game.home[1]);
+  assert.ok(home < 0.3, `${home.toFixed(2)} from home`);
+  assert.ok(!soft.nanResets);
+};
+
+for (const aim of [[0, 1.9], [0.8, 1.8], [-1.2, 2.1]]) {
+  test(`crow: a well-aimed food toss ${JSON.stringify(aim)} is snapped out of the air in his beak`, () => seeded(31, () => {
+    const A = make('crow');
+    tick(A, 1.5);
+    const it = A.game.launch({ aim, kind: 'food', speed: 15 });
+    let lowest = Infinity;
+    const log = { states: new Set(), peak: 0, jump: 0 };
+    tick(A, 1.6, () => { log.states.add(A.game.state); if (it.state === 'free') lowest = Math.min(lowest, it.ball.x[1]); });
+    // caught: in the beak (or already going down), and never near the floor
+    assert.ok(lowest > 1, `it fell to ${lowest.toFixed(2)}`);
+    assert.ok(['beak', 'gone'].includes(it.state), `food is ${it.state} (${A.game.msg})`);
+    assert.equal(A.game.row, 1);
+    assert.equal(A.game.catches, 1);
+    assert.ok(!log.states.has('lunge'), 'lunged at a toss he could step to');
+    // then the gulp: gone, and he's back where he stands
+    watchCrow(A, 4, log);
+    assert.equal(it.state, 'gone', 'not swallowed');
+    assert.ok(log.states.has('gulp'));
+    assert.ok(log.peak < 6000, `peak kinetic ${log.peak}`);
+    settledHome(A);
+  }));
+}
+
+test('crow: the beak opens on the way in and is shut on the food when it lands in it', () => seeded(37, () => {
+  const A = make('crow');
+  tick(A, 1.5);
+  const it = A.game.launch({ aim: [0.2, 1.9], kind: 'food', speed: 15 });
+  let maxOpen = 0, openAtCatch = null;
+  tick(A, 1.6, () => {
+    maxOpen = Math.max(maxOpen, A.game.beak.x);
+    if (it.state === 'beak' && openAtCatch === null) openAtCatch = A.game.beak.x;
+  });
+  assert.ok(maxOpen > 0.8, `never opened (max ${maxOpen.toFixed(2)})`);
+  assert.ok(openAtCatch !== null, 'never caught');
+  tick(A, 0.15);
+  assert.ok(A.game.beak.x < 0.2, `still open after the catch (${A.game.beak.x.toFixed(2)})`);
+  // the food rides in the beak, at the mouth
+  if (it.state === 'beak') {
+    const m = A.game.mouth, b = it.ball.x;
+    assert.ok(Math.hypot(b[0] - m[0], b[1] - m[1], b[2] - m[2]) < 1e-6);
+  }
+}));
+
+for (const aim of [[2.5, 1.9], [-3, 2.0], [3, 2.4]]) {
+  test(`crow: a wide toss ${JSON.stringify(aim)} gets a flap-and-lunge — no runaway energy, back on his feet`, () => seeded(41, () => {
+    const A = make('crow');
+    tick(A, 1.5);
+    const it = A.game.launch({ aim, kind: 'food', speed: 15 });
+    let flapped = 0, airborne = false;
+    const foot0 = Math.min(...[...A.game.feet[0]].map((i) => A.soft.x[i * 3 + 1]));
+    const log = { states: new Set(), peak: 0, jump: 0 };
+    tick(A, 1.5, () => {
+      log.states.add(A.game.state);
+      log.peak = Math.max(log.peak, A.soft.kinetic());
+      flapped = Math.max(flapped, A.game.flap.x);
+      const fy = Math.min(...[...A.game.feet[0]].map((i) => A.soft.x[i * 3 + 1]));
+      if (A.game.state === "lunge" && fy > foot0 + 0.12) airborne = true;
+    });
+    assert.ok(log.states.has('lunge'), `no lunge: ${[...log.states]}`);
+    assert.ok(flapped > 0.8, `wings never beat (${flapped.toFixed(2)})`);
+    assert.ok(airborne, 'never left the floor');
+    assert.ok(['beak', 'gone'].includes(it.state) || it.ball.x[1] < 0.5, 'lost track of it');
+    watchCrow(A, 6, log);
+    assert.ok(log.peak < 12000, `peak kinetic ${log.peak}`);
+    assert.ok(log.jump < 0.25, `centre jumped ${log.jump.toFixed(3)} in a frame`);
+    settledHome(A);
+  }));
+}
+
+test('crow: the beating wings turn out from his sides and fold back after', () => seeded(43, () => {
+  const A = make('crow');
+  tick(A, 1.5);
+  const { soft, rig, game } = A;
+  const tipOut = () => {
+    const w = rig.arms[game.cfg.armL], i = w.idx[w.idx.length - 1];
+    return soft.x[i * 3] - soft.cloudC[0][0];
+  };
+  const rest = tipOut();
+  A.game.launch({ aim: [3, 2.2], kind: 'food', speed: 15 });
+  let most = rest;
+  tick(A, 1.2, () => { most = Math.max(most, tipOut()); });
+  assert.ok(most > rest + 0.35, `wing tip only got ${(most - rest).toFixed(2)} out from its fold`);
+  tick(A, 5);
+  assert.ok(Math.abs(tipOut() - rest) < 0.12, `wing not folded back (${(tipOut() - rest).toFixed(2)})`);
+}));
+
+test('crow: a food he misses he pecks up off the floor', () => seeded(47, () => {
+  const A = make('crow');
+  tick(A, 1.5);
+  // far out wide and fast: past him, onto the floor
+  const it = A.game.launch({ aim: [-4, 1], kind: 'food', speed: 26 });
+  let landed = false, mouthLow = Infinity;
+  const log = { states: new Set(), peak: 0, jump: 0 };
+  tick(A, 7, () => {
+    log.states.add(A.game.state);
+    log.peak = Math.max(log.peak, A.soft.kinetic());
+    if (it.state === 'free' && it.ball.x[1] < it.r + 0.02) landed = true;
+    if (A.game.state === 'peck') mouthLow = Math.min(mouthLow, A.game.mouth[1]);
+  });
+  assert.ok(landed, 'it never reached the floor');
+  assert.equal(A.game.row, 0, 'a miss still counted as a catch');
+  assert.ok(log.states.has('peck'), `never pecked: ${[...log.states]}`);
+  assert.ok(mouthLow < 0.45, `the peck didn't reach down (mouth at ${mouthLow.toFixed(2)})`);
+  assert.equal(it.state, 'gone', `food left ${it.state} at ${it.ball.x.map((v) => v.toFixed(2))}`);
+  watchCrow(A, 5, log);
+  assert.ok(log.peak < 12000, `peak kinetic ${log.peak}`);
+  settledHome(A);
+}));
+
+test('crow: a shiny thing he catches ends up resting in his nest', () => seeded(53, () => {
+  const A = make('crow');
+  tick(A, 1.5);
+  const it = A.game.launch({ aim: [0.3, 1.9], kind: 'shiny', speed: 15 });
+  const log = watchCrow(A, 8);
+  assert.ok(log.states.has('carry') && log.states.has('drop'), `${[...log.states]}`);
+  assert.equal(A.game.catches, 1, 'not caught in the air');
+  assert.ok(it.inNest, `not in the nest: ${it.ball.x.map((v) => v.toFixed(2))}`);
+  assert.equal(it.state, 'free', 'still in his beak');
+  const N = A.game.nest, b = it.ball;
+  const d = Math.hypot(b.x[0] - N.c[0], b.x[2] - N.c[1]);
+  assert.ok(d < N.R, `outside the bowl (${d.toFixed(2)})`);
+  // resting: on the bowl, not floating, not moving
+  const bowl = N.y0 + N.dip * (d / N.R) ** 2 + b.r;
+  assert.ok(Math.abs(b.x[1] - bowl) < 0.03, `not on the bowl: y ${b.x[1].toFixed(3)} vs ${bowl.toFixed(3)}`);
+  assert.ok(b.speed() < 0.05, `still moving ${b.speed()}`);
+  assert.equal(A.game.hoard(), 1);
+  settledHome(A);
+}));
+
+test('crow: several treasures pile up in the nest, each resting, none inside another', () => seeded(59, () => {
+  const A = make('crow');
+  tick(A, 1.5);
+  for (const aim of [[0.2, 1.9], [-0.5, 2.0], [0.6, 1.8], [0, 2.1]]) {
+    A.game.launch({ aim, kind: 'shiny', speed: 15 });
+    tick(A, 5.5);
+  }
+  tick(A, 2);
+  const inNest = A.game.items.filter((it) => it.inNest);
+  assert.equal(A.game.hoard(), 4, `hoard ${A.game.hoard()}`);
+  for (const it of inNest) assert.ok(it.ball.speed() < 0.05, `${it.sub} still moving`);
+  for (let a = 0; a < inNest.length; a++)
+    for (let k = a + 1; k < inNest.length; k++) {
+      const P = inNest[a].ball, Q = inNest[k].ball;
+      const d = Math.hypot(P.x[0] - Q.x[0], P.x[1] - Q.x[1], P.x[2] - Q.x[2]);
+      assert.ok(d > (P.r + Q.r) * 0.9, `${inNest[a].sub} and ${inNest[k].sub} overlap`);
+    }
+  settledHome(A);
+}));
+
+test('crow: drag a treasure out of the nest and he flaps, comes over and steals it back', () => seeded(61, () => {
+  const A = make('crow');
+  tick(A, 1.5);
+  A.game.launch({ aim: [0.2, 1.9], kind: 'shiny', speed: 15 });
+  tick(A, 6);
+  const it = A.game.items.find((q) => q.inNest);
+  assert.ok(it, 'nothing in the nest to take');
+  // the Hand: pick it up out of the nest and carry it across the stage
+  assert.ok(A.game.grabItem(it.id));
+  const log = { states: new Set(), peak: 0, jump: 0 };
+  let flapped = 0;
+  for (let k = 0; k <= 40; k++) {
+    const u = k / 40;
+    A.game.moveItem(it.id, [2.3 - 3.2 * u, 0.5 + Math.sin(u * Math.PI) * 0.9, -1.05 + 2.6 * u]);
+    tick(A, 1 / 60, () => { log.states.add(A.game.state); flapped = Math.max(flapped, A.game.flap.x); });
+  }
+  A.game.releaseItem(it.id);
+  assert.ok(it.stolen, 'he didn’t notice');
+  tick(A, 10, () => {
+    log.states.add(A.game.state);
+    log.peak = Math.max(log.peak, A.soft.kinetic());
+    flapped = Math.max(flapped, A.game.flap.x);
+  });
+  assert.ok(log.states.has('indignant'), `no indignant flap: ${[...log.states]}`);
+  assert.ok(flapped > 0.8, 'wings never beat');
+  assert.ok(log.states.has('peck') && log.states.has('carry'), `${[...log.states]}`);
+  assert.ok(it.inNest, `not back in the nest: ${it.ball.x.map((v) => v.toFixed(2))}`);
+  assert.ok(!it.stolen);
+  assert.equal(A.game.hoard(), 1);
+  assert.ok(log.peak < 12000, `peak kinetic ${log.peak}`);
+  settledHome(A);
+}));
+
+test('crow: he snatches it back out of your hand if you hold it low', () => seeded(67, () => {
+  const A = make('crow');
+  tick(A, 1.5);
+  A.game.launch({ aim: [0.2, 1.9], kind: 'shiny', speed: 15 });
+  tick(A, 6);
+  const it = A.game.items.find((q) => q.inNest);
+  A.game.grabItem(it.id);
+  // hold it out of the nest, low, in front of him, and keep holding it
+  let snatched = false;
+  for (let k = 0; k < 600 && !snatched; k++) {
+    if (it.state === 'hand') A.game.moveItem(it.id, [0.9, 0.35, 0.9]);
+    tick(A, 1 / 60);
+    for (const ev of A.game.events) if (ev.kind === 'snatch' && ev.id === it.id) snatched = true;
+    A.game.events.length = 0;
+  }
+  assert.ok(snatched, `never took it (${A.game.state}, ${A.game.msg})`);
+  tick(A, 8);
+  assert.ok(it.inNest, 'not returned to the nest');
+}));
+
+test('crow: a long run of tosses — food and shiny, near and wide — never runs away', () => seeded(71, () => {
+  const A = make('crow');
+  tick(A, 1);
+  let peak = 0;
+  for (let k = 0; k < 10; k++) {
+    A.game.launch({ kind: k % 3 === 2 ? 'shiny' : 'food', speed: 12 + k * 1.5 });
+    tick(A, 4, () => { peak = Math.max(peak, A.soft.kinetic()); });
+  }
+  tick(A, 8);
+  console.log(`  catches ${A.game.catches}, best ${A.game.best}, hoard ${A.game.hoard()}, peak kinetic ${peak.toFixed(0)}`);
+  assert.ok(A.game.catches >= 5, `only ${A.game.catches} catches`);
+  assert.ok(peak < 12000, `peak kinetic ${peak}`);
+  assert.ok(A.game.items.every((it) => it.ball.x.every(Number.isFinite)));
+  settledHome(A);
+}));
