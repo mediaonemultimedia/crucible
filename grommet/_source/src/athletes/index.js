@@ -11,12 +11,15 @@ import { LeopardGame } from './leopard.game.js';
 import { BearGame } from './bear.game.js';
 import { buildCrow } from './crow.rig.js';
 import { CrowGame } from './crow.game.js';
+import { buildGiraffe } from './giraffe.rig.js';
+import { GiraffeGame } from './giraffe.game.js';
 
 export const ATHLETES = {
   leopard: { build: buildLeopard, Game: LeopardGame },
   bear: { build: buildBear, Game: BearGame },
   crow: { build: buildCrow, Game: CrowGame },
+  giraffe: { build: buildGiraffe, Game: GiraffeGame },
 };
-export const ORDER = ['leopard', 'bear', 'crow'];
+export const ORDER = ['leopard', 'bear', 'crow', 'giraffe'];
 
 export function buildRig(name) { return ATHLETES[name].build(); }
