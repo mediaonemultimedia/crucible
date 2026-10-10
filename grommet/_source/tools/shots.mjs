@@ -158,16 +158,16 @@ const SCENES = {
     character: 'giraffe',
     run: async (G) => {
       await G(`__grommet.step(2)`);
-      // a wide one: mid-stretch with the ring coming down onto him
-      const r = await G(`(() => { const g = __grommet.game; const ring = g.launch({ aim: [0.85, 4.25], speed: 15 }); for (let k = 0; k < 400; k++) { __grommet.step(1/120); const t = g.hornTip(); if (ring.state !== 'free' || (ring.v[1] < 0 && Math.hypot(ring.x[0]-t[0], ring.x[1]-t[1], ring.x[2]-t[2]) < 0.75)) break; } __grommet.step(0, true); return [g.state, ring.state, g.msg]; })()`);
-      console.log('  stretch', r);
+      // a wide one: mid-stretch, the ring coming down onto his ossicones
+      const r = await G(`(() => { const g = __grommet.game; const ring = g.launch({ aim: [0.75, 4.75], speed: 13 }); for (let k = 0; k < 400; k++) { __grommet.step(1/120); const t = g.hornTip(); if (ring.state !== 'free' || (ring.v[1] < 0 && Math.hypot(ring.x[0]-t[0], ring.x[1]-t[1], ring.x[2]-t[2]) < 0.6)) break; } const o = __grommet.tools.orbit; o.dist = 11.5; o.az = 0.8; o.el = 0.12; o.target.set(0.3, 3.2, 0.6); __grommet.tools.applyOrbit(); __grommet.step(0, true); return [g.state, ring.state, g.msg, g.hornTip().map((v) => +v.toFixed(2))]; })()`);
+      console.log('  stretch', JSON.stringify(r));
     },
   },
   'giraffe-dip': {
     character: 'giraffe',
     run: async (G) => {
       await G(`__grommet.step(2)`);
-      const r = await G(`(() => { const g = __grommet.game; const ring = g.launch({ aim: [-0.2, 3.85], speed: 12 }); for (let k = 0; k < 400; k++) { __grommet.step(1/120); const t = g.hornTip(); if (ring.state !== 'free' || (ring.v[1] < 0 && Math.hypot(ring.x[0]-t[0], ring.x[1]-t[1], ring.x[2]-t[2]) < 0.9)) break; } __grommet.step(0, true); return [g.state, ring.state, g.msg]; })()`);
+      const r = await G(`(() => { const g = __grommet.game; const ring = g.launch({ aim: [-0.2, 3.85], speed: 12 }); for (let k = 0; k < 400; k++) { __grommet.step(1/120); const t = g.hornTip(); if (ring.state !== 'free' || (ring.v[1] < 0 && Math.hypot(ring.x[0]-t[0], ring.x[1]-t[1], ring.x[2]-t[2]) < 0.6)) break; } const o = __grommet.tools.orbit; o.dist = 11.5; o.az = 1.0; o.el = 0.12; o.target.set(0.2, 3.0, 0.8); __grommet.tools.applyOrbit(); __grommet.step(0, true); return [g.state, ring.state, g.msg, g.hornTip().map((v) => +v.toFixed(2))]; })()`);
       console.log('  dip', r);
     },
   },
@@ -175,7 +175,7 @@ const SCENES = {
     character: 'giraffe',
     run: async (G) => {
       await G(`__grommet.step(1.5)`);
-      const r = await G(`(() => { const g = __grommet.game; for (const a of [[0, 4.6], [0.3, 4.5], [-0.3, 4.6], [0.1, 4.4], [-0.1, 4.7]]) { g.launch({ aim: a, speed: 15 }); __grommet.step(2.6); } const o = __grommet.tools.orbit; o.dist = 10.5; o.az = 0.85; o.el = 0.14; o.target.set(0, 2.6, 0.4); __grommet.tools.applyOrbit(); __grommet.step(0.05, true); return [g.onNeck().length, g.best, g.sag.x]; })()`);
+      const r = await G(`(() => { const g = __grommet.game; for (const a of [[0, 4.6], [0.3, 4.5], [-0.3, 4.6], [0.1, 4.4], [-0.1, 4.7]]) { g.launch({ aim: a, speed: 15 }); __grommet.step(2.6); } const o = __grommet.tools.orbit; o.dist = 10; o.az = 1.05; o.el = 0.12; o.target.set(0, 2.9, 0.4); __grommet.tools.applyOrbit(); __grommet.step(0.05, true); return [g.onNeck().length, g.best, g.sag.x]; })()`);
       console.log('  stack', JSON.stringify(r));
     },
   },
@@ -205,7 +205,7 @@ const SCENES = {
   },
   'giraffe-masai': {
     character: 'giraffe',
-    run: async (G) => { await G(`(() => { document.querySelectorAll('#p-fur button')[2].click(); const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 9; o.az = -0.6; o.el = 0.15; o.target.set(0, 2.6, 0.3); __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
+    run: async (G) => { await G(`(() => { document.querySelectorAll('#p-fur button')[2].click(); const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 11; o.az = -0.6; o.el = 0.15; o.target.set(0, 2.9, 0.3); __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
   },
   'giraffe-mint': {
     character: 'giraffe',

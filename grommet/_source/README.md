@@ -3,7 +3,7 @@
 Readable source for **Grommet** (Crucible No. 22): plush athletes, each a soft
 body under shell fur, each playing one little sport against you. Stage 1 is the
 **leopard** (tennis) and the **polar bear** (goalkeeping); then the **crow**
-(catch & hoard).
+(catch & hoard) and the **giraffe** (ring toss).
 
 This tree lives on the `grommet-source` branch only. What ships to `main` is
 the single built file, `grommet/index.html`.
@@ -15,7 +15,7 @@ npm run build            # → final.html (self-contained; the build fails on an
 node tools/shots.mjs     # headless Chromium screenshots → shots/ (WebGL 2 on SwiftShader)
 ```
 
-Open `final.html?character=leopard|bear|crow` (add `&webgl` to force the WebGL 2
+Open `final.html?character=leopard|bear|crow|giraffe` (add `&webgl` to force the WebGL 2
 path). Copy it to `grommet/index.html` on the release branch to publish.
 
 ## What came from Flock
@@ -65,9 +65,13 @@ src/athletes/
   bear.game.js      goalkeeping
   crow.rig.js       round body, head, flat wing chains, tail fan, felt feet
   crow.game.js      catch & hoard: tosses, the beak, the lunge, the nest
+  giraffe.rig.js    four legs, a long neck chain, the head a second cloud on it
+  giraffe.game.js   ring toss: tracking, the neck's reach, the stack, the shake
+ring.js             a felt ring: a rigid torus (impulse contacts; no three.js)
 characters.js       per-athlete colours, eyes, face, pattern, court, words
 props.js            what they play with (three.js)
 crowprops.js        the crow's beak, nest and treasures (three.js)
+giraffeprops.js     the giraffe's felt rings (three.js)
 ```
 
 ### The crow (how he differs)
@@ -91,6 +95,47 @@ crowprops.js        the crow's beak, nest and treasures (three.js)
   rim, each other, and the edge of the mat (`STAGE`). The Hand picks them up
   through `Tools`' optional `items` hook (null for everyone else).
 - `fur.js` has a `sheen` uniform (black = none, so the others are unchanged).
+
+### The giraffe (how he differs)
+
+- **Four legs, a neck, a head on it.** Cloud 0 is the body and four inCloud
+  legs on flat soles (`standingBody` is for bipeds; his is in his rig). The
+  neck is a chain off the front of it, and the head is a *second cloud* that
+  shares the neck's top point and remembers how it sat on the body, like
+  Flock's llama — but only the top point: sharing two made the neck's bending
+  windows steer the head, and it wouldn't hold level.
+- **Pose bones go to the head cloud's own points only** (`cfg.skull`: its
+  shell, core, and the roots of the ears and ossicones). The chain points of
+  the ears and ossicones remember their places in the head's measured frame;
+  posing them as well turned them twice, and pinning their roots to an
+  unturned pose tore the head off the neck (it walked him across the mat).
+- **Aiming the neck**: `_plan()` finds the first point of the ring's fall
+  where his ossicone tips can be (the neck top that far from its root), and
+  the neck bone turns toward it. What the neck's weight and lag leave him
+  short by is integrated (`corr`) and the head is pulled toward the spot
+  (`_reachForce`, the body taking the reaction). He catches a ring when both
+  tips are inside it as it comes down.
+- **On the neck** a ring is a particle held round a path (ossicone tips →
+  between their roots → down the neck chain) with a little clearance,
+  friction along it against the neck's motion, a share of every push given
+  to the neck (capped: a ring weighs little), and lateral knocks damped (felt
+  is dead). Rings stack **in the order they came on** (one can't pass another
+  on a neck); a settled ring is held down on the one below. A ring caught off
+  centre gets `slack`, shrinking: snapping it onto the line was a kick.
+- **Sag and sway** are pose-space springs: the stack's weight sets the sag's
+  target, its natural frequency drops and its damping falls as rings are
+  added, and catches and landings kick it.
+- **The shake** turns the whole neck down at its root (the root bending
+  windows are eased off while it does, or they fight the pose and haul him
+  forward), nose down, and swings it; friction drops to almost nothing, the
+  rings slide down to his head and off over his ossicones. They don't touch
+  his head for 0.3 s after leaving (they'd be threaded round his horns).
+- **Free rings** (`ring.js`) are rigid tori: contacts are impulses at the
+  contact point against the floor (16 points round the centreline), the
+  plush (exact point-to-circle distance) and each other; they only go to
+  sleep lying flat.
+- `react: true` (memory pushes the body back): with it off, swinging the neck
+  over shoved him across the floor.
 
 ### Adding one (stage 2: penguin batter, otter juggler, panda drummer)
 
@@ -138,6 +183,14 @@ tosses get a flap-and-lunge with the wings out, bounded energy, back on his
 feet; a miss is pecked off the floor; shiny things end up resting in the nest
 (several, none overlapping); a treasure dragged out is stolen back (and
 snatched from your hand if you hold it low); a long mixed run never runs away.
+Giraffe: he stands square on all four soles; well-aimed rings (centre and
+either side) drop over his ossicones and slide to rest at the base of his
+neck; five rings stack without overlapping and his head drops measurably
+further than under one (the sag spring more than doubles); past the limit he
+shakes and every ring comes off and ends at rest on the floor (bounded
+energy, ring speeds, no frame jumps, back home upright); a ring dropped hard on
+his head is a clonk that sets the shake off; misses bounce, roll and lie
+flat at rest, and Collect clears them; a 30 s auto run never runs away.
 
 There is no GPU in the build sandbox: screenshots are SwiftShader, and frame
 rate / WebGPU behaviour have to be checked on real hardware.
