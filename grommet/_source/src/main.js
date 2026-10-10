@@ -14,6 +14,8 @@ import { FOOTBALL_R } from './athletes/bear.game.js';
 import { CROW } from './athletes/crow.rig.js';
 import { makeBeak, poseBeak, makeNest, makeItems, poseItems } from './crowprops.js';
 import { makeRings, poseRings } from './giraffeprops.js';
+import { makeBat, poseBat, makeBaseball } from './props.js';
+import { BAT, batR, BASEBALL_R } from './athletes/penguin.game.js';
 
 const $ = (s) => document.querySelector(s);
 
@@ -93,6 +95,10 @@ async function start() {
   // the giraffe's felt rings
   const rings = makeRings();
   scene.add(rings);
+  // the penguin's bat and baseball
+  const bat = makeBat(BAT, batR);
+  const baseball = makeBaseball(BASEBALL_R);
+  scene.add(bat, baseball);
 
   // rig view: points + links, rebuilt per athlete
   const rigLineMat = new THREE.LineBasicMaterial({ color: 0x1d1a17, depthTest: false, transparent: true, opacity: 0.9 });
@@ -247,11 +253,12 @@ async function start() {
     if (goal) { scene.remove(goal); goal = null; }
     if (game.net) { goal = makeGoal(game.goal, game.net); scene.add(goal); }
     racquet.visible = !!rig.racquet;
+    bat.visible = !!rig.bat;
     nest.visible = !!game.items;
     beak.visible = !!rig.beak;
     poseItems(items, null);
     poseRings(rings, null);
-    tennisBall.visible = football.visible = false;
+    tennisBall.visible = football.visible = baseball.visible = false;
     if (!tools) {
       tools = new Tools({
         canvas, camera, body, soft, groom,
@@ -276,8 +283,12 @@ async function start() {
     $('#title p').textContent = info.blurb;
     $('#tool-label').textContent = info.tool;
     setLaunchLabel();
-    const [r0, r1] = game.readout();
+    const [r0, r1, r2] = game.readout();
     $('#l-a').textContent = r0[0]; $('#l-b').textContent = r1[0];
+    // a third readout, for the games that keep three numbers
+    $('#read-c').hidden = !r2;
+    $('#read').classList.toggle('three', !!r2);
+    if (r2) $('#l-c').textContent = r2[0];
     fur.uniforms.stitch.value.setRGB(...info.stitch, THREE.LinearSRGBColorSpace);
     setTool(tools.mode);
     // frame the athlete and its court
@@ -473,6 +484,8 @@ async function start() {
     const b = game.ball;
     poseBall(tennisBall, b?.kind === 'tennis' ? b : null);
     poseBall(football, b?.kind === 'football' ? b : null);
+    poseBall(baseball, b?.kind === 'baseball' ? b : null);
+    if (rig.bat) poseBat(bat, game.bat);
     goal?.userData.update();
     game.headCentre(hc);
     poseStars(stars, hc, game.daze, soft.time);
@@ -487,6 +500,7 @@ async function start() {
     }
     if (rig.beak) poseBeak(beak, game.beakFrame(), [state.beakScale, 0.92 + 0.12 * state.beakScale]);
     if (rig.racquet) shadows.push([game.rq.C[0], game.rq.C[1], game.rq.C[2], 0.3]);
+    if (rig.bat) for (const s of [0.5, 1.0, 1.35]) shadows.push([game.bat.p[0] + game.bat.h[0] * s, game.bat.p[1] + game.bat.h[1] * s, game.bat.p[2] + game.bat.h[2] * s, 0.12]);
     floor.paint(soft, null, shadows);
 
     // eyes ride the head surface, and roll toward the ball
@@ -529,9 +543,10 @@ async function start() {
     if (fpsT > 0.5) { $('#fps').textContent = Math.round(frames / fpsT); frames = 0; fpsT = 0; }
     if (readT > 0.12 || real === 0) {
       readT = 0;
-      const [r0, r1] = game.readout();
+      const [r0, r1, r2] = game.readout();
       $('#r-a').textContent = r0[1];
       $('#r-b').textContent = r1[1];
+      if (r2) $('#r-c').textContent = r2[1];
       $('#r-vol').innerHTML = `${(soft.volumeRatio() * 100).toFixed(1)}<small>%</small>`;
       // particles share the mass; 1 unit = 9 cm
       const mass = Math.round(90 + 60 * soft.params.stuffing) * (rig.name === 'bear' ? 1.6 : rig.name === 'giraffe' ? 1.4 : 1);

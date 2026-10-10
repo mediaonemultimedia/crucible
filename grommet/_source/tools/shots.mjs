@@ -212,6 +212,41 @@ const SCENES = {
     run: async (G) => { await G(`(() => { document.querySelectorAll('#p-fur button')[3].click(); __grommet.step(2.5, true); })()`); },
   },
   'giraffe-mobile': { character: 'giraffe', mobile: true, run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
+  'penguin-rest': { character: 'penguin', run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
+  'penguin-close': {
+    character: 'penguin',
+    run: async (G) => { await G(`(() => { const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 6.5; o.az = -0.3; o.el = 0.15; o.target.set(-0.4, 1.5, 0); __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
+  },
+  'penguin-swing': {
+    character: 'penguin',
+    run: async (G) => {
+      await G(`__grommet.step(2)`);
+      // the bat meeting the ball: stop on contact
+      const r = await G(`(() => { const g = __grommet.game; g.launch({ aim: [-2.4, 1.5], speed: 14 }); g.timingErr = -0.01; g.heightErr = 0; for (let k = 0; k < 400; k++) { __grommet.step(1/120); if (g.contact) { __grommet.step(1/60); break; } } __grommet.step(0, true); return [g.state, g.call, g.msg]; })()`);
+      console.log('  swing', r);
+    },
+  },
+  'penguin-hit': {
+    character: 'penguin',
+    run: async (G) => {
+      await G(`__grommet.step(2)`);
+      const r = await G(`(() => { const g = __grommet.game; g.launch({ aim: [-2.4, 1.5], speed: 14 }); g.timingErr = -0.01; g.heightErr = 0; for (let k = 0; k < 400; k++) { __grommet.step(1/120); if (g.contact) break; } __grommet.step(0.12, true); return [g.state, g.call, g.msg, g.carry]; })()`);
+      console.log('  hit', r);
+    },
+  },
+  'penguin-whiff': {
+    character: 'penguin',
+    run: async (G) => {
+      await G(`__grommet.step(2)`);
+      const r = await G(`(() => { const g = __grommet.game; g.launch({ aim: [-2.4, 1.5], speed: 14 }); g.timingErr = 0.08; for (let k = 0; k < 600; k++) { __grommet.step(1/120); if (g.state === 'spin' && g.t > 0.42) break; } __grommet.step(0, true); return [g.state, g.call, g.msg]; })()`);
+      console.log('  whiff', r);
+    },
+  },
+  'penguin-emperor': {
+    character: 'penguin',
+    run: async (G) => { await G(`(() => { document.querySelectorAll('#p-fur button')[1].click(); __grommet.step(2.5, true); })()`); },
+  },
+  'penguin-mobile': { character: 'penguin', mobile: true, run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
   'leopard-close': {
     character: 'leopard',
     run: async (G) => { await G(`(() => { const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 7.5; o.az = 0.25; o.el = 0.2; __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },

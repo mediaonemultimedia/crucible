@@ -160,6 +160,8 @@ body:not([data-char="crow"]) [data-crow-only]{display:none}
 body:not([data-char="giraffe"]) [data-giraffe-only]{display:none}
 #game-state{font-style:italic;color:var(--ink-s)}
 #read output.big{font-size:17px}
+#read.three{grid-template-columns:repeat(5,auto)}
+#read [hidden]{display:none}
 #p-fur{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 #p-fur button{background:rgba(232,227,216,.028);border:1px solid var(--rule-2);color:var(--dim);cursor:pointer;padding:7px 5px 6px;text-align:left;transition:border-color .25s ease,color .25s ease}
 #p-fur button .sw{display:block;height:16px;margin-bottom:6px}
@@ -187,6 +189,7 @@ body:not([data-char="giraffe"]) [data-giraffe-only]{display:none}
   #foot{left:16px;right:16px;bottom:86px;max-width:none}
   #hint{display:none}
   #read{grid-template-columns:repeat(4,1fr)}
+  #read.three{grid-template-columns:repeat(5,1fr)}
   #mark{left:16px;top:18px}
   #title{left:16px}
   #panel-toggle{right:16px;top:16px}
@@ -219,6 +222,7 @@ body:not([data-char="giraffe"]) [data-giraffe-only]{display:none}
     <div id="read">
       <div><span id="l-a">Rally</span><output id="r-a" class="big">0</output></div>
       <div><span id="l-b">Best</span><output id="r-b" class="big">0</output></div>
+      <div id="read-c" hidden><span id="l-c"></span><output id="r-c" class="big">0</output></div>
       <div><span>Volume</span><output id="r-vol">100<small>%</small></output></div>
       <div><span>Kinetic</span><output id="r-ke">0.00<small>mJ</small></output></div>
     </div>

@@ -284,3 +284,88 @@ export function makeGoal(G, net) {
   g.userData.update();
   return g;
 }
+
+/* ── the penguin's bat ─────────────────────────────────────────────────────
+   Turned wood along +y from the grip point at the origin: a knob, a taped
+   handle, swelling to the barrel — the same profile batR() collides with. */
+export function makeBat(BAT, batR) {
+  const g = new THREE.Group();
+  const wood = new THREE.MeshBasicNodeMaterial();
+  wood.colorNode = Fn(() => {
+    const N = normalize(normalWorld);
+    const p = positionLocal;
+    const grain = sin(p.y.mul(9).add(mx_noise_float(vec3(p.mul(vec3(14, 2, 14)))).mul(3))).mul(0.5).add(0.5);
+    const base = mix(vec3(0.72, 0.52, 0.3), vec3(0.84, 0.66, 0.42), grain);
+    // a dark maker's band round the barrel
+    const band = smoothstep(0.012, 0.0, abs(p.y.sub(1.0))).mul(0.6);
+    return vec4(shade(mix(base, vec3(0.2, 0.12, 0.07), band), N, { spec: 0.4, power: 50 }), 1);
+  })();
+  const tape = new THREE.MeshBasicNodeMaterial();
+  tape.colorNode = Fn(() => {
+    const N = normalize(normalWorld);
+    const p = positionLocal;
+    const a = atan(p.x, p.z).div(Math.PI * 2);
+    const wrapT = fract(p.y.mul(16).add(a));
+    const ridge = smoothstep(0.0, 0.12, wrapT).mul(smoothstep(1.0, 0.85, wrapT));
+    return vec4(shade(mix(vec3(0.1, 0.1, 0.12), vec3(0.2, 0.2, 0.23), ridge), N, { spec: 0.1, power: 16 }), 1);
+  })();
+  const prof = [];
+  const M = 40;
+  for (let k = 0; k <= M; k++) {
+    const s = BAT.knob + (BAT.len - BAT.knob) * (k / M);
+    let r = batR(Math.max(0, s));
+    if (s < 0.02) r = s < BAT.knob + 0.05 ? 0.075 : BAT.rH * 0.95;
+    prof.push(new THREE.Vector2(r, s));
+  }
+  // round the end of the barrel off
+  const top = prof[prof.length - 1];
+  for (let k = 1; k <= 6; k++) { const a = (k / 6) * Math.PI / 2; prof.push(new THREE.Vector2(top.x * Math.cos(a), top.y + top.x * 0.4 * Math.sin(a))); }
+  prof.unshift(new THREE.Vector2(0, BAT.knob));
+  g.add(new THREE.Mesh(new THREE.LatheGeometry(prof, 24), wood));
+  const grip = new THREE.Mesh(new THREE.CylinderGeometry(BAT.rH * 1.12, BAT.rH * 1.12, 0.4, 16, 4), tape);
+  grip.position.y = 0.12;
+  g.add(grip);
+  g.traverse((o) => { o.frustumCulled = false; });
+  g.matrixAutoUpdate = false;
+  return g;
+}
+
+const _bx = new THREE.Vector3(), _by = new THREE.Vector3(), _bz = new THREE.Vector3();
+export function poseBat(g, F) {
+  _by.fromArray(F.h); _bz.fromArray(F.n);
+  _bx.crossVectors(_by, _bz).normalize();
+  _bz.crossVectors(_bx, _by);
+  _m.makeBasis(_bx, _by, _bz).setPosition(F.p[0], F.p[1], F.p[2]);
+  g.matrix.copy(_m);
+  g.matrixWorldNeedsUpdate = true;
+}
+
+/* a felt baseball: off-white, with the two-lobed seam in red cross-stitch */
+export function makeBaseball(r) {
+  const geo = new THREE.SphereGeometry(1, 56, 40);
+  const P = geo.attributes.position, n = P.count;
+  const col = new Float32Array(n * 3);
+  const seam = [];
+  const k = 0.3, c = 2 * Math.sqrt(k * (1 - k));
+  for (let s = 0; s < 400; s++) {
+    const t = (s / 400) * Math.PI * 2;
+    seam.push([new THREE.Vector3((1 - k) * Math.cos(t) + k * Math.cos(3 * t), (1 - k) * Math.sin(t) - k * Math.sin(3 * t), c * Math.sin(2 * t)).normalize(), t]);
+  }
+  const felt = new THREE.Color('#f3efe4'), red = new THREE.Color('#c23a32'), line = new THREE.Color('#ddd6c6');
+  const v = new THREE.Vector3();
+  for (let i = 0; i < n; i++) {
+    v.fromBufferAttribute(P, i).normalize();
+    let d = 9, tt = 0;
+    for (const [q, t] of seam) { const e = v.distanceTo(q); if (e < d) { d = e; tt = t; } }
+    const cc = felt.clone().lerp(line, THREE.MathUtils.smoothstep(0.03, 0.012, d) * 0.8);
+    // the stitches: little red dashes either side of the seam
+    const dash = Math.sin(tt * 60) > 0.1 ? 1 : 0;
+    cc.lerp(red, THREE.MathUtils.smoothstep(0.075, 0.05, d) * THREE.MathUtils.smoothstep(0.018, 0.035, d) * dash);
+    col[i * 3] = cc.r; col[i * 3 + 1] = cc.g; col[i * 3 + 2] = cc.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const m = new THREE.Mesh(geo, feltMaterial());
+  m.scale.setScalar(r);
+  m.visible = false;
+  return m;
+}

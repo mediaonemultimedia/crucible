@@ -83,6 +83,25 @@ export const CHARACTER_INFO = {
     camera: { az: 0.72, el: 0.2, dist: 18.5, y: 2.35, x: 0.2 },
     face: giraffeFace, pattern: giraffePattern, court: giraffeMat, tint: '#c8a76a',
   },
+  penguin: {
+    label: 'Penguin', sport: 'Batting', tool: 'Pitch', verb: 'Pitch',
+    // fur: the black back; under: the white front; nose: the beak; cloth:
+    // the felt feet; trim: his cap
+    colors: {
+      classic: { fur: '#1f1e24', under: '#f5f2ea', accent: '#1f1e24', spot: '#1f1e24', nose: '#f7a03a', cloth: '#f09232', trim: '#c0392f' },
+      emperor: { fur: '#2c3340', under: '#f7f2e2', accent: '#2c3340', spot: '#2c3340', nose: '#e9a43a', cloth: '#3a3a40', trim: '#1f3f78' },
+      fairy: { fur: '#5b7fa6', under: '#f4f4f0', accent: '#5b7fa6', spot: '#5b7fa6', nose: '#3a3a40', cloth: '#e8a3a0', trim: '#e2b23a' },
+      rockhopper: { fur: '#26262c', under: '#f6f3ec', accent: '#26262c', spot: '#26262c', nose: '#d4523a', cloth: '#e58fa0', trim: '#2f7a4f' },
+    },
+    eyes: { part: 'head', u: 0.092, v: 0.44, lift: 0.028, scale: [0.09, 0.1, 0.065] },
+    pile: 5, stitch: [0.06, 0.05, 0.05],
+    aria: 'A round plush penguin in a felt ball cap who bats the pitches you throw him with a wooden bat',
+    blurb: 'A round plush penguin in a felt cap, bat on his shoulder. Pitch to him: he watches it in, loads and swings — the soft body behind it. Square it up on the sweet spot and it’s gone; mistime it and it’s foul — or he whiffs and spins himself round.',
+    hand: 'Grab his head, a flipper or the tail and pull — it gives, then springs back. Shift as you let go to pin that point.',
+    play: 'Click by the plate to pitch it there; flick to throw it harder. Or use Pitch (S). He takes the ones off the plate.',
+    camera: { az: -0.42, el: 0.22, dist: 13, y: 1.45, x: -1.0 },
+    face: penguinFace, pattern: () => {}, court: diamond, tint: '#b88057',
+  },
 };
 
 /* the painting helpers for one rig and one canvas */
@@ -175,7 +194,7 @@ export function paintAthlete(maskTex, patTex, name, rig) {
   }
 }
 
-const noseOf = (name) => (name === 'leopard' ? leopardNose : name === 'crow' ? () => {} : name === 'giraffe' ? giraffeNose : bearNose);
+const noseOf = (name) => (name === 'leopard' ? leopardNose : name === 'crow' ? () => {} : name === 'giraffe' ? giraffeNose : name === 'penguin' ? penguinNose : bearNose);
 
 /* ── the leopard ─────────────────────────────────────────────────────────── */
 
@@ -566,4 +585,66 @@ function giraffeMat(g, toPx, k) {
   const [a, b] = toPx(-1.6, 4.9), [c] = toPx(1.6, 4.9);
   g.fillStyle = 'rgb(220,0,0)';
   g.fillRect(a, b - 0.05 * k, c - a, 0.1 * k);
+}
+
+/* ── the penguin ─────────────────────────────────────────────────────────── */
+
+function penguinFace(g, size, P) {
+  const { eyeRing, blob, stitch } = P;
+  eyeRing('head', 0.092, 0.44, 0.2);
+  g.globalCompositeOperation = 'lighter';
+  blob('head', 0.5 - 0.17, 0.56, 0.13, 0.08, 'rgba(0,120,0,0.5)');
+  blob('head', 0.5 + 0.17, 0.56, 0.13, 0.08, 'rgba(0,120,0,0.5)');
+  // a seam down the beak, and the felt feet carry no fur (both of them)
+  stitch('beak', [[0.5, 0.25], [0.5, 0.62]], 0.012);
+  g.globalCompositeOperation = 'source-over';
+  for (const part of P.rig.parts) {
+    if (part.kind !== 'grid' || part.name !== 'foot') continue;
+    const R = P.rig.regions[part.region];
+    g.fillStyle = 'rgb(0,0,0)';
+    g.fillRect(R.x0 * size, R.y0 * size, (R.x1 - R.x0) * size, (R.y1 - R.y0) * size);
+  }
+}
+
+/* the beak is felt in the nose colour, all of it */
+function penguinNose(g, size, P) {
+  const R = P.reg('beak');
+  g.fillStyle = 'rgb(0,255,0)';
+  g.fillRect(R.x0 * size, R.y0 * size, (R.x1 - R.x0) * size, (R.y1 - R.y0) * size);
+}
+
+/* a little felt diamond: the dirt round the plate, the plate, the
+   batter's boxes, foul lines out toward you, and the pitcher's mound */
+function diamond(g, toPx, k) {
+  const px = -2.5, pz = 0.32;
+  const [cx, cy] = toPx(px, pz);
+  g.fillStyle = 'rgb(0,255,0)';
+  g.beginPath(); g.ellipse(cx, cy, 3.6 * k, 3.6 * k, 0, 0, Math.PI * 2); g.fill();
+  const [mx, my] = toPx(0.4, 11);
+  g.beginPath(); g.ellipse(mx, my, 1.6 * k, 1.6 * k, 0, 0, Math.PI * 2); g.fill();
+  // the plate: a pentagon, its point toward the catcher (−z)
+  g.fillStyle = 'rgb(255,0,0)';
+  g.beginPath();
+  for (const [x, z] of [[-0.28, 0.2], [0.28, 0.2], [0.28, -0.05], [0, -0.3], [-0.28, -0.05]]) {
+    const [a, b] = toPx(px + x, pz + z);
+    g.lineTo(a, b);
+  }
+  g.closePath(); g.fill();
+  // the batter's boxes, either side
+  g.strokeStyle = 'rgb(220,0,0)';
+  g.lineWidth = 0.06 * k;
+  for (const s of [-1, 1]) {
+    const [a, b] = toPx(px + s * 0.55 - (s < 0 ? 1.0 : 0), pz - 1.0);
+    g.strokeRect(a, b, 1.0 * k, 2.0 * k);
+  }
+  // foul lines from the plate out toward the pitcher's side
+  g.lineWidth = 0.08 * k;
+  for (const s of [-1, 1]) {
+    const [a, b] = toPx(px, pz), [c, d] = toPx(px + s * 20 * Math.sin(0.6), pz + 20 * Math.cos(0.6));
+    g.beginPath(); g.moveTo(a, b); g.lineTo(c, d); g.stroke();
+  }
+  // the rubber on the mound
+  const [ra, rb] = toPx(0.1, 10.95), [rc, rd] = toPx(0.7, 11.05);
+  g.fillStyle = 'rgb(255,0,0)';
+  g.fillRect(ra, rb, rc - ra, rd - rb);
 }

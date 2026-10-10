@@ -694,3 +694,104 @@ test('giraffe: a long auto run of tosses never runs away', () => seeded(101, () 
   settledHome(A);
   console.log(`  giraffe: ${A.game.catches} caught, ${A.game.shakes} shakes, peak kinetic ${log.peak.toFixed(0)}`);
 }));
+
+/* ── the penguin's batting ───────────────────────────────────────────────── */
+
+test('penguin: a well-timed pitch is hit forward, fair, off the barrel', () => seeded(21, () => {
+  for (const [y, err] of [[1.5, -0.01], [1.25, 0], [1.9, -0.005]]) {
+    const A = make('penguin');
+    tick(A, 1.5);
+    const { game, soft } = A;
+    const b = game.launch({ aim: [game.plate[0] + 0.1, y], speed: 14 });
+    game.timingErr = err; game.heightErr = 0;
+    let off = null, peak = 0;
+    tick(A, 1.5, () => { peak = Math.max(peak, soft.kinetic()); if (game.contact && !off) off = [...b.v]; });
+    assert.ok(off, `pitch at ${y}: no contact (${game.call})`);
+    assert.ok(['hit', 'homer'].includes(game.call), `pitch at ${y}: called ${game.call}`);
+    assert.ok(off[2] > 8, `pitch at ${y}: not going forward, vz ${off[2].toFixed(1)}`);
+    assert.ok(Math.abs(Math.atan2(off[0], off[2])) < 0.6, 'sprayed foul');
+    assert.equal(game.hits, 1);
+    assert.ok(peak < 8000, `swing energy ${peak}`);
+    assert.ok(!soft.nanResets);
+  }
+}));
+
+test('penguin: early, late and way off — pulled or topped foul, or whiffed; never a clean hit', () => seeded(23, () => {
+  for (const err of [-0.08, 0.08]) {
+    const A = make('penguin');
+    tick(A, 1.5);
+    A.game.launch({ aim: [A.game.plate[0] + 0.1, 1.5], speed: 14 });
+    A.game.timingErr = err;
+    tick(A, 1.5);
+    assert.ok(!['hit', 'homer'].includes(A.game.call), `timing ${err}: ${A.game.call}`);
+  }
+}));
+
+test('penguin: a whiff spins him right round on his follow-through, and he wobbles back to face you', () => seeded(25, () => {
+  const A = make('penguin');
+  tick(A, 1.5);
+  const { game, soft } = A;
+  game.launch({ aim: [game.plate[0] + 0.1, 1.5], speed: 14 });
+  game.timingErr = 0.08;
+  let yaw = 0, last = 0, turned = 0, peak = 0, jump = 0;
+  const prev = Float64Array.from(soft.x);
+  tick(A, 5, () => {
+    const R = soft.cloudR[0];
+    const a = Math.atan2(R[2], R[8]);
+    let d = a - last; d = Math.atan2(Math.sin(d), Math.cos(d));
+    yaw += d; last = a;
+    turned = Math.max(turned, Math.abs(yaw));
+    peak = Math.max(peak, soft.kinetic());
+    for (let i = 0; i < soft.n * 3; i++) jump = Math.max(jump, Math.abs(soft.x[i] - prev[i]));
+    prev.set(soft.x);
+  });
+  assert.equal(game.call, 'whiff');
+  assert.equal(game.strikes, 1);
+  assert.ok(turned > 5.3, `only turned ${turned.toFixed(2)} rad`);
+  assert.ok(jump < 0.5, `frame-to-frame jump ${jump.toFixed(2)}`);
+  assert.ok(peak < 8000, `spin energy ${peak}`);
+  tick(A, 3);
+  assert.ok(soft.cloudR[0][8] > 0.95, `not facing the pitcher again (fwd·z ${soft.cloudR[0][8].toFixed(2)})`);
+  assert.ok(soft.cloudR[0][4] > 0.97, 'left leaning');
+  assert.ok(soft.kinetic() < 1, `still moving ${soft.kinetic()}`);
+  const off = Math.hypot(soft.cloudC[0][0] - game.home[0], soft.cloudC[0][2] - game.home[1]);
+  assert.ok(off < 0.2, `wandered ${off.toFixed(2)} off his mark`);
+  assert.ok(game.daze < 0.05);
+  assert.ok(!soft.nanResets);
+}));
+
+test('penguin: takes one well off the plate (ball), and the count adds up', () => seeded(27, () => {
+  const A = make('penguin');
+  tick(A, 1.5);
+  const { game } = A;
+  game.launch({ aim: [game.plate[0] - 2.5, 1.5], speed: 14 });
+  tick(A, 2.5);
+  assert.equal(game.call, 'ball');
+  assert.equal(game.balls, 1);
+  assert.equal(game.state === 'ready' || game.state === 'take', true);
+  // three swinging strikes: a new count
+  for (let k = 0; k < 3; k++) {
+    game.launch({ aim: [game.plate[0] + 0.1, 1.5], speed: 14 });
+    game.timingErr = 0.1;
+    tick(A, 3.2);
+  }
+  assert.equal(game.strikes, 0, 'strike three resets the count');
+  assert.equal(game.balls, 0);
+  assert.deepEqual(game.readout().map((r) => r[0]), ['Count', 'Hits', 'Homers']);
+}));
+
+test('penguin: an inning of random pitches never runs away', () => seeded(29, () => {
+  const A = make('penguin');
+  tick(A, 1);
+  let peak = 0;
+  for (let k = 0; k < 10; k++) {
+    A.game.launch({ speed: 10 + (k % 4) * 4 });
+    tick(A, 2.6, () => { peak = Math.max(peak, A.soft.kinetic()); });
+  }
+  tick(A, 4);
+  console.log(`  pitches ${A.game.pitches}, hits ${A.game.hits}, home runs ${A.game.homers}, peak kinetic ${peak.toFixed(0)}`);
+  assert.ok(peak < 12000, `peak kinetic ${peak}`);
+  assert.ok(A.soft.kinetic() < 1);
+  assert.ok(A.soft.cloudR[0][4] > 0.97);
+  assert.ok(!A.soft.nanResets);
+}));
