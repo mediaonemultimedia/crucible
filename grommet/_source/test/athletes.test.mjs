@@ -4,6 +4,7 @@ import { ATHLETES, ORDER, buildRig } from '../src/athletes/index.js';
 import { SoftBody } from '../src/softbody.js';
 import { Idle } from '../src/idle.js';
 import { det3, mulMat3, mulberry32 } from '../src/math.js';
+import { STACK_MAX } from '../src/athletes/giraffe.game.js';
 
 /* a fresh athlete: soft body, idle life and its game, as the page builds it */
 function make(name, { stuffing = 0.42, idle = 0.5 } = {}) {
@@ -526,4 +527,170 @@ test('crow: a long run of tosses — food and shiny, near and wide — never run
   assert.ok(peak < 12000, `peak kinetic ${peak}`);
   assert.ok(A.game.items.every((it) => it.ball.x.every(Number.isFinite)));
   settledHome(A);
+}));
+
+/* ── the giraffe's ring toss ─────────────────────────────────────────────── */
+
+const watchGiraffe = (A, sec, log = { states: new Set(), peak: 0, jump: 0, ringV: 0 }) => {
+  let prev = [...A.soft.cloudC[0]];
+  tick(A, sec, () => {
+    log.states.add(A.game.state);
+    log.peak = Math.max(log.peak, A.soft.kinetic());
+    for (const r of A.game.rings) log.ringV = Math.max(log.ringV, r.speed());
+    const c = A.soft.cloudC[0];
+    log.jump = Math.max(log.jump, Math.hypot(c[0] - prev[0], c[1] - prev[1], c[2] - prev[2]));
+    prev = [...c];
+    assert.ok(A.game.rings.every((r) => [...r.x, ...r.v, ...r.q].every(Number.isFinite)), 'a ring went NaN');
+  });
+  return log;
+};
+const tipHeight = (A, sec) => { let y = 0, n = 0; tick(A, sec, () => { y += A.game.hornTip()[1]; n++; }); return y / n; };
+
+test('giraffe: stands square on all four feet', () => {
+  const A = make('giraffe', { idle: 0 });
+  tick(A, 3);
+  const { soft, rig } = A;
+  // the soles: cloud points on the floor, one group under each leg
+  const quad = [0, 0, 0, 0];
+  for (const i of rig.clouds[0].ix) {
+    if (rig.rest[i * 3 + 1] > 0.1 || !soft.contact[i]) continue;
+    quad[(rig.rest[i * 3] < 0 ? 0 : 1) + (rig.rest[i * 3 + 2] < 0 ? 2 : 0)]++;
+  }
+  assert.ok(quad.every((q) => q >= 6), `feet on the floor per leg: ${quad}`);
+  // and his head up where it's sewn, at the top of his neck
+  assert.ok(A.game.hornTip()[1] > 4.5, `ossicones at ${A.game.hornTip()[1].toFixed(2)}`);
+});
+
+for (const aim of [[0, 4.6], [0.5, 4.4], [-0.7, 4.7]]) {
+  test(`giraffe: a well-aimed ring ${JSON.stringify(aim)} drops over his ossicones and slides down to the base`, () => seeded(73, () => {
+    const A = make('giraffe');
+    tick(A, 1.5);
+    const r = A.game.launch({ aim, speed: 15 });
+    const s = [];
+    const log = watchGiraffe(A, 1.5);
+    assert.equal(r.state, 'neck', `ring is ${r.state} (${A.game.msg})`);
+    assert.ok(log.states.has('caught'));
+    // it slides: down the path, all the way to the bottom of the neck
+    tick(A, 2, () => s.push(r.s));
+    assert.ok(s[s.length - 1] > s[0] - 1e-6, 'went back up the neck');
+    assert.ok(Math.abs(r.s - A.game.path.base) < 0.06, `resting at s ${r.s.toFixed(2)}, base ${A.game.path.base.toFixed(2)}`);
+    assert.ok(r.rest, 'not resting on the base');
+    assert.ok(r.x[1] < 2.7 && r.x[1] > 1.9, `resting at height ${r.x[1].toFixed(2)}`);
+    assert.ok(r.speed() < 0.3, `still sliding ${r.speed().toFixed(2)}`);
+    assert.equal(A.game.readout()[0][1], 1);
+    assert.ok(log.peak < 6000, `peak kinetic ${log.peak}`);
+    assert.ok(A.soft.cloudR[0][4] > 0.97 && !A.soft.nanResets);
+    assert.ok(Math.hypot(A.soft.cloudC[0][0] - A.game.home[0], A.soft.cloudC[0][2] - A.game.home[1]) < 0.3, 'walked off');
+  }));
+}
+
+test('giraffe: rings stack on the neck, and the neck sags measurably more under five than under one', () => seeded(79, () => {
+  const A = make('giraffe', { idle: 0 });
+  tick(A, 1.5);
+  const y0 = tipHeight(A, 0.5);
+  A.game.launch({ aim: [0, 4.6], speed: 15 });
+  tick(A, 3);
+  const y1 = tipHeight(A, 1);
+  const sag1 = A.game.sag.x;
+  for (const aim of [[0.3, 4.5], [-0.3, 4.6], [0.1, 4.4], [-0.1, 4.7]]) { A.game.launch({ aim, speed: 15 }); tick(A, 3); }
+  const on = A.game.onNeck();
+  assert.equal(on.length, 5, `${on.length} on the neck`);
+  assert.equal(A.game.best, 5);
+  // a stack: each resting on the one below, none inside another
+  const s = on.map((r) => r.s).sort((a, b) => b - a);
+  for (let k = 1; k < s.length; k++) assert.ok(s[k - 1] - s[k] > 0.13, `rings ${k - 1} and ${k} overlap: ${s.map((v) => v.toFixed(2))}`);
+  assert.ok(on.every((r) => r.rest), 'not all resting');
+  const y5 = tipHeight(A, 1);
+  const drop1 = y0 - y1, drop5 = y0 - y5;
+  assert.ok(drop5 > drop1 + 0.1, `head dropped ${drop1.toFixed(3)} under one, ${drop5.toFixed(3)} under five`);
+  assert.ok(A.game.sag.x > sag1 * 2.5, `sag ${sag1.toFixed(3)} → ${A.game.sag.x.toFixed(3)}`);
+  // …and it sways wider and slower: the same knock, a bigger swing
+  const swing = (n) => { A.game.sway.v = 0.6; let peak = 0, t0 = null; tick(A, 1.5, () => { peak = Math.max(peak, Math.abs(A.game.sway.x)); if (t0 === null && A.game.sway.v < 0) t0 = A.game.time; }); return { peak, n }; };
+  const big = swing(5);
+  assert.ok(big.peak > 0.035, `sway ${big.peak}`);
+  assert.ok(A.soft.cloudR[0][4] > 0.97 && !A.soft.nanResets);
+}));
+
+test('giraffe: past the limit he shakes the whole stack off — rings fly, nothing runs away', () => seeded(83, () => {
+  const A = make('giraffe');
+  tick(A, 1.5);
+  const log = { states: new Set(), peak: 0, jump: 0, ringV: 0 };
+  let k = 0;
+  while (A.game.shakes === 0 && k < 12) {
+    A.game.launch({ aim: [(k % 3 - 1) * 0.25, 4.55], speed: 15 });
+    watchGiraffe(A, 2.8, log);
+    k++;
+  }
+  assert.equal(A.game.shakes, 1, 'never shook');
+  assert.ok(A.game.best > STACK_MAX, `best stack ${A.game.best}`);
+  watchGiraffe(A, 6, log);
+  assert.ok(log.states.has('shake'));
+  assert.equal(A.game.onNeck().length, 0, `${A.game.onNeck().length} still on the neck`);
+  // they flew: off his head and away, and came down at rest on the floor
+  const free = A.game.rings.filter((r) => r.state === 'free');
+  assert.ok(free.length > STACK_MAX);
+  for (const r of free) {
+    assert.ok(r.x[1] < r.R + r.r + 0.05, `a ring at height ${r.x[1].toFixed(2)}`);
+    assert.ok(r.speed() < 0.2, `a ring still moving ${r.speed().toFixed(2)}`);
+  }
+  assert.ok(log.peak < 12000, `peak kinetic ${log.peak}`);
+  assert.ok(log.ringV < 25, `a ring at ${log.ringV.toFixed(1)} u/s`);
+  assert.ok(log.jump < 0.2, `body jumped ${log.jump.toFixed(3)} in a frame`);
+  settledHome(A);
+}));
+
+test('giraffe: a ring that clonks him on the head sets off the shake, and the stack comes off', () => seeded(89, () => {
+  const A = make('giraffe');
+  tick(A, 1.5);
+  for (const aim of [[0, 4.6], [0.2, 4.5]]) { A.game.launch({ aim, speed: 15 }); tick(A, 3); }
+  assert.equal(A.game.onNeck().length, 2);
+  // dropped hard onto his head, off to one side of the ossicones
+  const r = A.game.launch();
+  const hc = A.game.headCentre();
+  r.x = [hc[0] + 0.32, hc[1] + 1.4, hc[2] + 0.1]; r.p = [...r.x];
+  r.v = [0, -9, 0];
+  const log = watchGiraffe(A, 6);
+  assert.ok(log.states.has('clonk'), `states ${[...log.states]}`);
+  assert.ok(log.states.has('shake'));
+  assert.equal(A.game.onNeck().length, 0);
+  assert.ok(A.game.rings.every((q) => q.state === 'free'));
+  assert.ok(log.peak < 12000, `peak kinetic ${log.peak}`);
+  watchGiraffe(A, 2);
+  settledHome(A);
+}));
+
+for (const aim of [[3.2, 3], [-3.4, 2.6], [2.6, 1.0]]) {
+  test(`giraffe: a missed ring ${JSON.stringify(aim)} bounces and rolls, and ends on the floor at rest`, () => seeded(97, () => {
+    const A = make('giraffe');
+    tick(A, 1.5);
+    const r = A.game.launch({ aim, speed: 15 });
+    const log = watchGiraffe(A, 8);
+    assert.equal(r.state, 'free', `ring ${r.state}`);
+    assert.ok(r.floor, 'not on the floor');
+    assert.ok(r.x[1] < r.R + r.r + 0.02, `lying at height ${r.x[1].toFixed(2)}`);
+    // flat: lying on its side, axis up
+    assert.ok(Math.abs(r.axis()[1]) > 0.95, `standing on its edge (axis·y ${r.axis()[1].toFixed(2)})`);
+    assert.ok(r.speed() < 0.05 && Math.hypot(...r.w) < 0.3, 'still rolling');
+    assert.equal(A.game.onNeck().length, 0);
+    assert.ok(log.peak < 6000, `peak kinetic ${log.peak}`);
+    settledHome(A);
+    // Collect clears the floor
+    assert.equal(A.game.collect(), 1);
+    assert.equal(A.game.rings.length, 0);
+  }));
+}
+
+test('giraffe: a long auto run of tosses never runs away', () => seeded(101, () => {
+  const A = make('giraffe');
+  tick(A, 1);
+  A.game.auto = true;
+  const log = watchGiraffe(A, 30);
+  A.game.auto = false;
+  assert.ok(A.game.catches >= 6, `caught ${A.game.catches}`);
+  assert.ok(log.peak < 12000, `peak kinetic ${log.peak}`);
+  assert.ok(log.jump < 0.2, `body jumped ${log.jump.toFixed(3)}`);
+  assert.ok(!A.soft.nanResets);
+  watchGiraffe(A, 6);
+  settledHome(A);
+  console.log(`  giraffe: ${A.game.catches} caught, ${A.game.shakes} shakes, peak kinetic ${log.peak.toFixed(0)}`);
 }));

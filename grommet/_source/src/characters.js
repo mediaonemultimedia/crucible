@@ -64,6 +64,25 @@ export const CHARACTER_INFO = {
     camera: { az: 0.3, el: 0.3, dist: 12.5, y: 1.25, x: 0.8 },
     face: crowFace, pattern: crowPattern, court: crowMat, tint: '#9c9aa8',
   },
+  giraffe: {
+    label: 'Giraffe', sport: 'Ring toss', tool: 'Toss', verb: 'Toss a ring',
+    // spot: the patches; accent: the mane and the tufts; nose: nostrils;
+    // cloth: the felt hooves
+    colors: {
+      savanna: { fur: '#e3b467', under: '#f6e8cb', accent: '#5e3a22', spot: '#9b5b2b', nose: '#3f2a1e', cloth: '#4a3324', trim: '#4a3324' },
+      reticulated: { fur: '#efdcb4', under: '#fbf3e2', accent: '#55301c', spot: '#8a3b1a', nose: '#3a2418', cloth: '#3d2a20', trim: '#3d2a20' },
+      masai: { fur: '#e6cb95', under: '#f7ecd4', accent: '#46301f', spot: '#6e4429', nose: '#33241b', cloth: '#3a2a20', trim: '#3a2a20' },
+      mint: { fur: '#cfe4c4', under: '#f1f7ea', accent: '#5a8766', spot: '#86b18a', nose: '#3e5a47', cloth: '#e3a19b', trim: '#e3a19b' },
+    },
+    eyes: { part: 'head', u: 0.15, v: 0.4, lift: 0.026, scale: [0.075, 0.085, 0.055] },
+    pile: 7, stitch: [0.08, 0.05, 0.03],
+    aria: 'A tall plush giraffe with felt ossicones who plays ring toss, catching felt rings over his head and stacking them on his neck',
+    blurb: 'A tall plush giraffe. Toss him a felt ring: he watches it come, stretches or dips his long neck to get his ossicones under it, and down it slides onto the stack. The more he carries the more his neck sags and sways — until he shakes the lot off.',
+    hand: 'Grab his head, an ear or the tail and pull. Pick a ring up off the floor and drop it over his ossicones yourself.',
+    play: 'Click where the ring should come down; flick to toss it harder. Or use Toss (S). Collect (G) picks up the rings on the floor.',
+    camera: { az: 0.72, el: 0.2, dist: 18.5, y: 2.35, x: 0.2 },
+    face: giraffeFace, pattern: giraffePattern, court: giraffeMat, tint: '#c8a76a',
+  },
 };
 
 /* the painting helpers for one rig and one canvas */
@@ -156,7 +175,7 @@ export function paintAthlete(maskTex, patTex, name, rig) {
   }
 }
 
-const noseOf = (name) => (name === 'leopard' ? leopardNose : name === 'crow' ? () => {} : bearNose);
+const noseOf = (name) => (name === 'leopard' ? leopardNose : name === 'crow' ? () => {} : name === 'giraffe' ? giraffeNose : bearNose);
 
 /* ── the leopard ─────────────────────────────────────────────────────────── */
 
@@ -424,4 +443,127 @@ function pitch(g, toPx, k) {
   g.strokeStyle = 'rgb(255,0,0)';
   g.lineWidth = 0.1 * k;
   g.beginPath(); g.arc(sx, sy, 3.4 * k, Math.PI * 0.29, Math.PI * 0.71); g.stroke();
+}
+
+/* ── the giraffe ─────────────────────────────────────────────────────────── */
+
+function giraffeFace(g, size, P) {
+  const { eyeRing, stitch, blob } = P;
+  eyeRing('head', 0.15, 0.4, 0.17);
+  g.globalCompositeOperation = 'lighter';
+  // a little lash stitched over each eye, and a smile under the muzzle
+  for (const s of [-1, 1]) {
+    const u = 0.5 + s * 0.15;
+    stitch('head', [[u - s * 0.03, 0.33], [u, 0.315], [u + s * 0.035, 0.325], [u + s * 0.05, 0.305]], 0.014);
+  }
+  stitch('muzzle', [[0.43, 0.66], [0.465, 0.69], [0.5, 0.675], [0.535, 0.69], [0.57, 0.66]], 0.02);
+  // cheeks
+  blob('head', 0.5 - 0.2, 0.55, 0.12, 0.08, 'rgba(0,110,0,0.5)');
+  blob('head', 0.5 + 0.2, 0.55, 0.12, 0.08, 'rgba(0,110,0,0.5)');
+  // the hooves are felt: no fur under them (every foot, not just the first)
+  g.globalCompositeOperation = 'source-over';
+  for (const part of P.rig.parts) {
+    if (part.kind !== 'grid' || !/foot$/.test(part.name)) continue;
+    const R = P.rig.regions[part.region];
+    const y0 = R.y0 + 0.5 * (R.y1 - R.y0);
+    g.fillStyle = 'rgb(0,0,0)';
+    g.fillRect(R.x0 * size, y0 * size, (R.x1 - R.x0) * size, (R.y1 - y0) * size);
+  }
+}
+
+function giraffeNose(g, size, P) {
+  // two soft nostrils, high on the front of the muzzle
+  for (const s of [-1, 1]) P.blob('muzzle', 0.5 + s * 0.07, 0.42, 0.06, 0.035, 'rgb(0,255,0)', s * 0.5);
+}
+
+/* patches: rounded, many-sided, a cream net of fur between them — on the
+   body, the neck, the legs (smaller toward the hooves), the head (small),
+   none on the belly, the muzzle or the inside of the legs               */
+function giraffePattern(g, size, P, rig) {
+  const rnd = mulberry32(4411);
+  const patch = (cx, cy, sx, sy, R, W) => {
+    const n = 6 + Math.floor(rnd() * 3), rot = rnd() * 6.28;
+    const pts = [];
+    for (let k = 0; k < n; k++) {
+      const a = rot + (k / n) * Math.PI * 2 + (rnd() - 0.5) * 0.5;
+      const rr = R * (0.78 + rnd() * 0.3);
+      pts.push([Math.cos(a) * rr, Math.sin(a) * rr]);
+    }
+    g.fillStyle = 'rgba(255,0,0,0.95)';
+    for (const shift of [0, -W, W]) {
+      g.beginPath();
+      // rounded corners: through the midpoints, curving at each vertex
+      const m = (k) => { const a = pts[k % n], b = pts[(k + 1) % n]; return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; };
+      const p0 = m(n - 1);
+      g.moveTo(cx + p0[0] * sx + shift, cy + p0[1] * sy);
+      for (let k = 0; k < n; k++) { const q = m(k); g.quadraticCurveTo(cx + pts[k][0] * sx + shift, cy + pts[k][1] * sy, cx + q[0] * sx + shift, cy + q[1] * sy); }
+      g.fill();
+    }
+  };
+  for (const part of rig.parts) {
+    if (part.kind === 'grid') {
+      if (part.name === 'muzzle' || /foot$/.test(part.name)) continue;
+      const R = rig.regions[part.region];
+      const rx = Math.max(part.r[0], part.r[2]), ry = part.r[1];
+      const W = (R.x1 - R.x0) * size;
+      const head = part.name === 'head';
+      const spacing = head ? 0.15 : 0.34;
+      const rows = Math.floor(Math.PI * ry / spacing);
+      for (let j = 0; j < rows; j++) {
+        const v = (j + 0.5 + (rnd() - 0.5) * 0.4) / rows;
+        const phi = v * Math.PI, sp = Math.sin(phi);
+        if (sp < 0.2) continue;
+        const ring = 2 * Math.PI * rx * sp;
+        const cols = Math.max(1, Math.round(ring / spacing));
+        const off = rnd();
+        for (let i = 0; i < cols; i++) {
+          const u = (i + off + (rnd() - 0.5) * 0.3) / cols;
+          const th = (u - 0.5) * 2 * Math.PI;
+          const l = [sp * Math.sin(th), Math.cos(phi), sp * Math.cos(th)];
+          if (part.under(u, v, l) > 0.2) continue;
+          if (head && (l[2] > 0.35 || l[1] > 0.6)) continue;
+          const sx = W / ring, sy = (R.y1 - R.y0) * size / (Math.PI * ry);
+          patch((R.x0 + (((u % 1) + 1) % 1) * (R.x1 - R.x0)) * size, (R.y0 + v * (R.y1 - R.y0)) * size, sx, sy, spacing * 0.44, W);
+        }
+      }
+    } else {
+      const ch = rig.arms[part.chain];
+      if (ch.kind === 'ear' || ch.kind === 'horn') continue;
+      const R = rig.regions[part.region];
+      const W = (R.x1 - R.x0) * size, len = ch.len;
+      const spacing = ch.kind === 'neck' ? 0.27 : ch.kind === 'tail' ? 0.16 : 0.2;
+      const rows = Math.max(1, Math.floor(len / spacing));
+      for (let j = 0; j < rows; j++) {
+        const s = (j + 0.5 + (rnd() - 0.5) * 0.3) / rows;
+        if (ch.kind === 'leg' && s > 0.72) continue;
+        if (ch.kind === 'tail' && s > 0.6) continue;
+        const ring = 2 * Math.PI * ch.radius(s);
+        const cols = Math.max(2, Math.round(ring / spacing));
+        const off = rnd();
+        for (let i = 0; i < cols; i++) {
+          const a = (i + off + (rnd() - 0.5) * 0.3) / cols;
+          const c = Math.cos(a * 2 * Math.PI);
+          if (ch.under(s, c) > 0.2 || ch.accent(s, c) > 0.3) continue;
+          const sx = W / ring, sy = (R.y1 - R.y0) * 0.985 * size / len;
+          const shrink = ch.kind === 'leg' ? 1 - 0.45 * s : 1;
+          patch((R.x0 + (((a % 1) + 1) % 1) * (R.x1 - R.x0)) * size, (R.y0 + s * 0.985 * (R.y1 - R.y0)) * size, sx, sy, spacing * 0.42 * shrink, W);
+        }
+      }
+    }
+  }
+}
+
+/* a round sandy mat, and a chalk line to toss from */
+function giraffeMat(g, toPx, k) {
+  const [cx, cy] = toPx(0, 0.3);
+  g.fillStyle = 'rgb(0,255,0)';
+  g.beginPath(); g.ellipse(cx, cy, 4.2 * k, 4.2 * k, 0, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = 'rgb(200,0,0)';
+  g.lineWidth = 0.07 * k;
+  g.setLineDash([0.2 * k, 0.14 * k]);
+  g.beginPath(); g.arc(cx, cy, 1.55 * k, 0, Math.PI * 2); g.stroke();
+  g.setLineDash([]);
+  const [a, b] = toPx(-1.6, 4.9), [c] = toPx(1.6, 4.9);
+  g.fillStyle = 'rgb(220,0,0)';
+  g.fillRect(a, b - 0.05 * k, c - a, 0.1 * k);
 }

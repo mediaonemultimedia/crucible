@@ -226,6 +226,7 @@ export class GiraffeGame extends Athlete {
         const mv = this.rings.find((r) => r.state === 'free' && !r.floor && r.speed() > 0.5) || this.rings.find((r) => r.state === 'hand');
         look = mv ? mv.x : null;
         if (on.length > STACK_MAX && this._settled(on)) { this._startShake('that’s enough!'); break; }
+        this._goHome();
         break;
       }
       case 'track': {
@@ -253,6 +254,7 @@ export class GiraffeGame extends Athlete {
       case 'miss': {
         const T = this.target;
         look = T && T.state === 'free' ? T.x : null;
+        this._goHome();
         if (this.t > 0.9) this._go('ready');
         break;
       }
@@ -299,6 +301,12 @@ export class GiraffeGame extends Athlete {
   }
 
   _settled(on) { return on.every((r) => r.rest); }
+
+  /* back to his spot on the mat, a few paces */
+  _goHome() {
+    const c = this.soft.cloudC[0];
+    if (Math.hypot(c[0] - this.home[0], c[2] - this.home[1]) > 0.06) this.drive = { x: this.home[0], z: this.home[1], speed: 1.2 };
+  }
 
   _startShake(msg) {
     this.msg = msg;
@@ -525,7 +533,8 @@ export class GiraffeGame extends Athlete {
   _softCollide(r, ghost = false) {
     const s = this.soft, X = s.x, V = s.v, Rr = s.r, n = s.n, reach = r.R + r.r + 0.2;
     let clonk = 0, at = null;
-    const inHead = this._inHead || (this._inHead = (() => { const m = new Uint8Array(n); for (const i of this.cfg.core) m[i] = 1; return m; })());
+    // (his head: its stuffing, his ears, his ossicones)
+    const inHead = this._inHead || (this._inHead = (() => { const m = new Uint8Array(n); for (const i of this.cfg.head) m[i] = 1; return m; })());
     for (let i = 0; i < n; i++) {
       const dx = X[i * 3] - r.x[0], dy = X[i * 3 + 1] - r.x[1], dz = X[i * 3 + 2] - r.x[2];
       if (dx > reach || dx < -reach || dy > reach || dy < -reach || dz > reach || dz < -reach) continue;
@@ -555,7 +564,7 @@ export class GiraffeGame extends Athlete {
 
   /* over the ossicones: both tips inside the ring as it comes down */
   _tryCatch(r) {
-    if (r.v[1] > 0.5 || r.floor) return;
+    if (r.v[1] > 0.5 || r.floor || this.state === 'clonk' || this.state === 'shake') return;
     const x = this.soft.x;
     const ax = r.axis(), up = sub(this.hornTip(), this.headCentre());
     const ul = len(up);
@@ -577,6 +586,7 @@ export class GiraffeGame extends Athlete {
     const o = sub(sub(r.x, pr.c), pr.tan.map((v) => v * dot(sub(r.x, pr.c), pr.tan)));
     r.slack = Math.max(0, len(o) - Math.max(0.03, r.R - r.r - pr.rn));
     r.state = 'neck';
+    r.seq = this.seqN = (this.seqN || 0) + 1;
     r.rest = false;
     r.threaded = false;
     r.spinA = 0;
@@ -649,20 +659,27 @@ export class GiraffeGame extends Athlete {
      above on the one below; all ride the neck as it moves               */
   _stack(neck, h) {
     if (!neck.length) return;
-    neck.sort((a, b) => b.s - a.s);
+    // in the order they came on: a ring can't pass the ones below it
+    neck.sort((a, b) => a.seq - b.seq);
     const base = this.path.base, gap = 2 * RING.r * 1.06;
     let limit = base;
     for (const r of neck) {
       const pr = this._project(r.x, r.seg ?? -1);
       r.s = pr.s; r.tan = pr.tan; r.seg = pr.k;
       if (r.s > limit) {
-        const ds = Math.min(r.s - limit, 0.03);
+        const ds = Math.min(r.s - limit, 0.12);
         for (let d = 0; d < 3; d++) r.x[d] -= pr.tan[d] * ds;
         // a landing: the stack takes the knock, and he feels it
         const vin = dot(r.v, pr.tan);
         if (!r.rest && vin > 1.2) { this.sag.v += vin * 0.012 * (1 + 0.25 * neck.length); this.sway.v += (Math.random() - 0.5) * vin * 0.03; }
         r.s = limit;
         r.rest = true;
+      } else if (r.rest && this.state !== 'shake') {
+        // settled on the stack, its weight holds it down on the one below
+        // (felt on felt doesn't slide up a neck that sways under it)
+        const ds = Math.max(r.s - limit, -0.02);
+        for (let d = 0; d < 3; d++) r.x[d] -= pr.tan[d] * ds;
+        r.s -= ds;
       } else if (r.s < limit - 0.08) r.rest = false;
       limit = r.s - gap;
       // the ring tips with its slide round the neck; it turns slowly

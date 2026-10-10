@@ -65,7 +65,7 @@ export function buildGiraffe() {
     name: 'neck', kind: 'neck', cloud: body, n: NECK.n, anchor: [0, 1.98, 0.3],
     path: (u) => { const p = lerp3(NECK.root, NECK.top, u); p[2] += 0.1 * Math.sin(u * Math.PI); return p; },
     radius: (u) => NECK.r0 + (NECK.r1 - NECK.r0) * u + 0.02 * smooth(0.15, 0, u),
-    ref: [0, 0, 1], bend: 2.6, mem: 10, stretch: 1.16, skip: 3, AS: 34, AA: 24, CAP: 0,
+    ref: [0, 0, 1], bend: 2.6, mem: 10, stretch: 1.16, skip: 3, AS: 34, AA: 24, CAP: 6,
     // a short dark mane down the back of the neck; a paler throat
     pile: (s, c) => 1 + 1.3 * smooth(-0.72, -0.95, c) * smooth(0.02, 0.1, s),
     accent: (s, c) => smooth(-0.7, -0.9, c) * smooth(0.02, 0.1, s),
@@ -97,7 +97,7 @@ export function buildGiraffe() {
       path: (u) => lerp3(base, tip, u),
       radius: (u) => HORN.r + HORN.knob * smooth(0.55, 1, u),
       ref: [0, 0, 1], bend: 4, mem: 10, stretch: 1.2, skip: 2, AS: 12, AA: 14, CAP: 7,
-      accent: (u) => smooth(0.6, 0.8, u), pile: (u) => 0.35 + 1.5 * smooth(0.6, 0.85, u),
+      accent: (u) => smooth(0.55, 0.75, u), pile: (u) => 0.3 + 0.55 * smooth(0.6, 0.85, u),
     }));
   }
 

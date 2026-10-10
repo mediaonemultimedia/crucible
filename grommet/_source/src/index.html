@@ -157,6 +157,7 @@ body.panel-open #panel{transform:translateX(0)}
 /* the rally button is the leopard's alone */
 body:not([data-char="leopard"]) [data-leopard-only]{display:none}
 body:not([data-char="crow"]) [data-crow-only]{display:none}
+body:not([data-char="giraffe"]) [data-giraffe-only]{display:none}
 #game-state{font-style:italic;color:var(--ink-s)}
 #read output.big{font-size:17px}
 #p-fur{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
@@ -255,6 +256,7 @@ body:not([data-char="crow"]) [data-crow-only]{display:none}
           <button id="b-launch">Serve<i>S</i></button>
           <button id="b-auto" aria-pressed="false" data-leopard-only>Auto rally<i>A</i></button>
           <button id="b-kind" aria-pressed="false" data-crow-only>Shiny things<i>T</i></button>
+          <button id="b-collect" data-giraffe-only>Collect rings<i>G</i></button>
         </div>
         <label class="sld"><span class="row">Pace<output id="o-pace"></output></span><input id="s-pace" type="range" min="8" max="26" step="0.5" value="15"><span class="ends"><span>gentle</span><span>hard</span></span></label>
         <p class="note">Tool <b>4</b> aims: click where the ball should go, flick to hit it harder.</p>
@@ -290,6 +292,7 @@ body:not([data-char="crow"]) [data-crow-only]{display:none}
         <p class="note">The fur is the body drawn <b>64 times</b> as shells cut into strands, groomable with the comb, lit along each strand (<b>Kajiya-Kay</b>); the rosettes are printed under the pile. The kit is a second skin of <b>cotton</b> skinned to the same body — no fur under it — that swings on the fur-lag springs and creases where it bunches.</p>
         <p class="note">The goal's net is a verlet mesh pinned to its frame: the ball shoves the knots, the knots slow the ball. A save is the ball and the bear pushing each other apart by mass.</p>
         <p class="note">The crow's beak isn't stuffing: two rigid felt mandibles ride the head's frame, <b>shape-matched</b> from its stuffing every substep, and the lower one hinges open. His wings are flat chains re-posed to beat, their cross-section turned with them; through a lunge the beats hold up part of his weight and steer him to where the toss comes down. What he hoards are small rigid bodies resting against the nest's bowl, its rim and each other.</p>
+        <p class="note">The giraffe's head is a second cloud riding on a long neck chain. To catch a ring he <b>re-poses the neck</b> about its root and pulls his head toward where the ring will come down. The rings are <b>rigid felt tori</b> that bounce and roll on impulses at their contact points. A ring that drops over his ossicones is threaded onto the neck and held round it, sliding with friction down to the stack. The stack's weight bends the neck forward and sets the pace of its sway, until he dips and shakes them all off.</p>
       </section>
     </div>
   </aside>

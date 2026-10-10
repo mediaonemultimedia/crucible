@@ -182,7 +182,8 @@ export class Ring {
     const sp = Math.hypot(...this.v), ws = Math.hypot(...this.w);
     if (sp > 30) for (let d = 0; d < 3; d++) this.v[d] *= 30 / sp;
     if (ws > 40) for (let d = 0; d < 3; d++) this.w[d] *= 40 / ws;
-    if (this.floor && sp < 0.12 && ws < 0.5) this.sleep++;
+    // (only lying down: a ring rolled slow on its edge is about to topple)
+    if (this.floor && sp < 0.12 && ws < 0.5 && Math.abs(this.M[8]) > 0.9) this.sleep++;
     else this.sleep = 0;
     if (this.sleep > 40) { this.v = [0, 0, 0]; this.w = [0, 0, 0]; }
     if (![...this.x, ...this.v, ...this.w, ...this.q].every(Number.isFinite)) this.dead = true;

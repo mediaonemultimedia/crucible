@@ -13,6 +13,7 @@ import { TENNIS_R } from './athletes/leopard.game.js';
 import { FOOTBALL_R } from './athletes/bear.game.js';
 import { CROW } from './athletes/crow.rig.js';
 import { makeBeak, poseBeak, makeNest, makeItems, poseItems } from './crowprops.js';
+import { makeRings, poseRings } from './giraffeprops.js';
 
 const $ = (s) => document.querySelector(s);
 
@@ -89,6 +90,9 @@ async function start() {
   const nest = makeNest();
   const items = makeItems();
   scene.add(beak, nest, items);
+  // the giraffe's felt rings
+  const rings = makeRings();
+  scene.add(rings);
 
   // rig view: points + links, rebuilt per athlete
   const rigLineMat = new THREE.LineBasicMaterial({ color: 0x1d1a17, depthTest: false, transparent: true, opacity: 0.9 });
@@ -246,6 +250,7 @@ async function start() {
     nest.visible = !!game.items;
     beak.visible = !!rig.beak;
     poseItems(items, null);
+    poseRings(rings, null);
     tennisBall.visible = football.visible = false;
     if (!tools) {
       tools = new Tools({
@@ -322,6 +327,9 @@ async function start() {
   $('#b-reset').onclick = reset;
   $('#b-smooth').onclick = () => groom.smooth(1.1);
   $('#b-launch').onclick = () => launch();
+  // the giraffe: pick up the rings off the floor
+  const collectB = $('#b-collect');
+  collectB.onclick = () => game.collect?.();
   // the crow: food or shiny things
   const kindB = $('#b-kind');
   const setLaunchLabel = () => {
@@ -366,6 +374,7 @@ async function start() {
     else if (k === 's' || k === 'enter') launch();
     else if (k === 'a') autoB.onclick();
     else if (k === 't' && game.items) kindB.onclick();
+    else if (k === 'g' && game.rings) collectB.onclick();
     else if (k === 'c') togglePanel(!document.body.classList.contains('panel-open'));
     else if (k === 'r') reset();
     else if (k === ' ') { e.preventDefault(); pause.onclick(); }
@@ -472,6 +481,10 @@ async function start() {
       poseItems(items, game.items);
       for (const it of game.items) if (it.state !== 'gone') shadows.push([it.ball.x[0], it.ball.x[1], it.ball.x[2], it.r * 0.8]);
     }
+    if (game.rings) {
+      poseRings(rings, game.rings);
+      for (const r of game.rings) if (r.state !== 'gone') shadows.push([r.x[0], r.x[1], r.x[2], r.R * 0.9]);
+    }
     if (rig.beak) poseBeak(beak, game.beakFrame(), [state.beakScale, 0.92 + 0.12 * state.beakScale]);
     if (rig.racquet) shadows.push([game.rq.C[0], game.rq.C[1], game.rq.C[2], 0.3]);
     floor.paint(soft, null, shadows);
@@ -521,7 +534,7 @@ async function start() {
       $('#r-b').textContent = r1[1];
       $('#r-vol').innerHTML = `${(soft.volumeRatio() * 100).toFixed(1)}<small>%</small>`;
       // particles share the mass; 1 unit = 9 cm
-      const mass = Math.round(90 + 60 * soft.params.stuffing) * (rig.name === 'bear' ? 1.6 : 1);
+      const mass = Math.round(90 + 60 * soft.params.stuffing) * (rig.name === 'bear' ? 1.6 : rig.name === 'giraffe' ? 1.4 : 1);
       const ke = soft.kinetic() * (mass / 1000 / soft.n) * 0.0081 * 1000;
       $('#r-ke').innerHTML = `${ke.toFixed(2)}<small>mJ</small>`;
       const gs = $('#game-state');

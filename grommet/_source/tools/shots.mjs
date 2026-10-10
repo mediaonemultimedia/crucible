@@ -149,6 +149,69 @@ const SCENES = {
     run: async (G) => { await G(`(() => { document.querySelectorAll('#p-fur button')[3].click(); const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 6.5; o.az = -0.5; o.el = 0.15; o.target.set(0, 1.4, 0); __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
   },
   'crow-mobile': { character: 'crow', mobile: true, run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
+  'giraffe-rest': { character: 'giraffe', run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
+  'giraffe-close': {
+    character: 'giraffe',
+    run: async (G) => { await G(`(() => { const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 7; o.az = 0.55; o.el = 0.12; o.target.set(0, 3.9, 0.9); __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
+  },
+  'giraffe-stretch': {
+    character: 'giraffe',
+    run: async (G) => {
+      await G(`__grommet.step(2)`);
+      // a wide one: mid-stretch with the ring coming down onto him
+      const r = await G(`(() => { const g = __grommet.game; const ring = g.launch({ aim: [0.85, 4.25], speed: 15 }); for (let k = 0; k < 400; k++) { __grommet.step(1/120); const t = g.hornTip(); if (ring.state !== 'free' || (ring.v[1] < 0 && Math.hypot(ring.x[0]-t[0], ring.x[1]-t[1], ring.x[2]-t[2]) < 0.75)) break; } __grommet.step(0, true); return [g.state, ring.state, g.msg]; })()`);
+      console.log('  stretch', r);
+    },
+  },
+  'giraffe-dip': {
+    character: 'giraffe',
+    run: async (G) => {
+      await G(`__grommet.step(2)`);
+      const r = await G(`(() => { const g = __grommet.game; const ring = g.launch({ aim: [-0.2, 3.85], speed: 12 }); for (let k = 0; k < 400; k++) { __grommet.step(1/120); const t = g.hornTip(); if (ring.state !== 'free' || (ring.v[1] < 0 && Math.hypot(ring.x[0]-t[0], ring.x[1]-t[1], ring.x[2]-t[2]) < 0.9)) break; } __grommet.step(0, true); return [g.state, ring.state, g.msg]; })()`);
+      console.log('  dip', r);
+    },
+  },
+  'giraffe-stack': {
+    character: 'giraffe',
+    run: async (G) => {
+      await G(`__grommet.step(1.5)`);
+      const r = await G(`(() => { const g = __grommet.game; for (const a of [[0, 4.6], [0.3, 4.5], [-0.3, 4.6], [0.1, 4.4], [-0.1, 4.7]]) { g.launch({ aim: a, speed: 15 }); __grommet.step(2.6); } const o = __grommet.tools.orbit; o.dist = 10.5; o.az = 0.85; o.el = 0.14; o.target.set(0, 2.6, 0.4); __grommet.tools.applyOrbit(); __grommet.step(0.05, true); return [g.onNeck().length, g.best, g.sag.x]; })()`);
+      console.log('  stack', JSON.stringify(r));
+    },
+  },
+  'giraffe-shake': {
+    character: 'giraffe',
+    run: async (G) => {
+      await G(`__grommet.step(1.5)`);
+      const r = await G(`(() => { const g = __grommet.game; for (const a of [[0, 4.6], [0.3, 4.5], [-0.3, 4.6], [0.1, 4.4], [-0.1, 4.7], [0.2, 4.6], [0, 4.5]]) { g.launch({ aim: a, speed: 15 }); __grommet.step(2.6); if (g.state === 'shake') break; } for (let k = 0; k < 600; k++) { if (g.state === 'shake' && g.t > 0.75 && g.rings.some((q) => q.state === 'free' && q.x[1] > 0.5)) break; __grommet.step(1/120); } __grommet.step(0, true); return [g.state, g.onNeck().length, g.msg, g.shakes]; })()`);
+      console.log('  shake', JSON.stringify(r));
+    },
+  },
+  'giraffe-floor': {
+    character: 'giraffe',
+    run: async (G) => {
+      await G(`__grommet.step(1.5)`);
+      const r = await G(`(() => { const g = __grommet.game; for (const a of [[2.4, 3.4], [-2.6, 3.0], [1.8, 1.6]]) { g.launch({ aim: a, speed: 15 }); __grommet.step(2.4); } __grommet.step(1.5, true); return g.rings.map((q) => [q.state, q.x.map((v) => +v.toFixed(2))]); })()`);
+      console.log('  floor', JSON.stringify(r));
+    },
+  },
+  'giraffe-side': {
+    character: 'giraffe',
+    run: async (G) => { await G(`(() => { const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 11; o.az = 1.45; o.el = 0.1; o.target.set(0, 2.3, 0.2); __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
+  },
+  'giraffe-reticulated': {
+    character: 'giraffe',
+    run: async (G) => { await G(`(() => { document.querySelectorAll('#p-fur button')[1].click(); __grommet.step(2.5, true); })()`); },
+  },
+  'giraffe-masai': {
+    character: 'giraffe',
+    run: async (G) => { await G(`(() => { document.querySelectorAll('#p-fur button')[2].click(); const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 9; o.az = -0.6; o.el = 0.15; o.target.set(0, 2.6, 0.3); __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
+  },
+  'giraffe-mint': {
+    character: 'giraffe',
+    run: async (G) => { await G(`(() => { document.querySelectorAll('#p-fur button')[3].click(); __grommet.step(2.5, true); })()`); },
+  },
+  'giraffe-mobile': { character: 'giraffe', mobile: true, run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
   'leopard-close': {
     character: 'leopard',
     run: async (G) => { await G(`(() => { const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 7.5; o.az = 0.25; o.el = 0.2; __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
