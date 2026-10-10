@@ -59,7 +59,11 @@ export class Pose {
     s.poseRot = new Float64Array(n * 9);
     for (let i = 0; i < n; i++) s.poseRot[i * 9] = s.poseRot[i * 9 + 4] = s.poseRot[i * 9 + 8] = 1;
     this.touched = new Uint8Array(n);
-    if (this.posed >= 0) {
+    if (Array.isArray(this.posed)) {
+      // several clouds follow the pose (two toys in one rig)
+      this._saves = this.posed.map((k) => { const g = s.clouds[k]; return { q: Float64Array.from(g.q), c0: [...g.c0], Aqq: Float64Array.from(g.AqqInv) }; });
+      s.posedCloud = this.posed[0];
+    } else if (this.posed >= 0) {
       const g = s.clouds[this.posed];
       this._save = { q: Float64Array.from(g.q), c0: [...g.c0], Aqq: Float64Array.from(g.AqqInv) };
       s.posedCloud = this.posed;
@@ -70,6 +74,13 @@ export class Pose {
   release() {
     if (!this.active) return;
     const s = this.soft;
+    if (this._saves) {
+      this.posed.forEach((k, j) => {
+        const g = s.clouds[k], sv = this._saves[j];
+        g.q.set(sv.q); for (let d = 0; d < 3; d++) g.c0[d] = sv.c0[d]; g.AqqInv.set(sv.Aqq);
+      });
+      this._saves = null;
+    }
     if (this._save) {
       const g = s.clouds[this.posed];
       g.q.set(this._save.q);
@@ -114,12 +125,13 @@ export class Pose {
         mark[i] = 1;
       }
     }
-    if (this.posed >= 0) this._reshape();
+    if (Array.isArray(this.posed)) for (const k of this.posed) this._reshape(k);
+    else if (this.posed >= 0) this._reshape();
   }
 
   /* the posed cloud's shape-matching rest offsets follow the pose */
-  _reshape() {
-    const s = this.soft, g = s.clouds[this.posed], P = s.pose, ix = g.ix, m = ix.length, q = g.q;
+  _reshape(k = this.posed) {
+    const s = this.soft, g = s.clouds[k], P = s.pose, ix = g.ix, m = ix.length, q = g.q;
     let cx = 0, cy = 0, cz = 0;
     for (const i of ix) { cx += P[i * 3]; cy += P[i * 3 + 1]; cz += P[i * 3 + 2]; }
     cx /= m; cy /= m; cz /= m;

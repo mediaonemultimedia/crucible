@@ -795,3 +795,224 @@ test('penguin: an inning of random pitches never runs away', () => seeded(29, ()
   assert.ok(A.soft.cloudR[0][4] > 0.97);
   assert.ok(!A.soft.nanResets);
 }));
+
+/* ── the otter's juggling ────────────────────────────────────────────────── */
+
+test('otter: two things tossed in stay juggled paw to paw for 5 s', () => seeded(31, () => {
+  const A = make('otter');
+  tick(A, 1.5);
+  const { game, soft } = A;
+  game.launch({});
+  tick(A, 1.0);
+  game.launch({});
+  tick(A, 1.0);
+  assert.equal(game.juggling(), 2, `only ${game.juggling()} going (${game.msg})`);
+  let lowest = 9, peak = 0, throws = 0, minUp = 1;
+  tick(A, 5, () => {
+    assert.equal(game.juggling(), 2, `dropped one (${game.msg})`);
+    for (const it of game.stones) lowest = Math.min(lowest, it.ball.x[1]);
+    throws += game.events.filter((e) => e.kind === 'throw').length;
+    game.events.length = 0;
+    peak = Math.max(peak, soft.kinetic());
+    minUp = Math.min(minUp, soft.cloudR[0][4]);
+  });
+  assert.equal(game.state, 'juggle');
+  assert.ok(throws >= 8, `only ${throws} throws in 5 s`);
+  assert.ok(lowest > 0.8, 'something came down to the floor');
+  assert.ok(peak < 1500, `juggling energy ${peak}`);
+  assert.ok(minUp > 0.95, 'he wobbled over');
+  assert.equal(game.best, 2);
+  assert.ok(!soft.nanResets);
+}));
+
+test('otter: three go round too (a cascade)', () => seeded(33, () => {
+  const A = make('otter');
+  tick(A, 1.5);
+  for (let k = 0; k < 3; k++) { A.game.launch({}); tick(A, 1.0); }
+  tick(A, 4);
+  assert.equal(A.game.juggling(), 3, A.game.msg);
+}));
+
+test('otter: too many and it all comes tumbling down — bouncing off him, no runaway energy, a bit sheepish', () => seeded(35, () => {
+  const A = make('otter');
+  tick(A, 1.5);
+  const { game, soft } = A;
+  let peak = 0, sp = 0, hitHim = 0;
+  for (let k = 0; k < 5; k++) {
+    game.launch({});
+    tick(A, 1.0, () => { peak = Math.max(peak, soft.kinetic()); });
+  }
+  assert.equal(game.state, 'tumble', `state ${game.state}`);
+  assert.equal(game.juggling(), 0);
+  assert.ok(game.lookAt && game.lookAt[1] === 0, 'not looking at the floor');
+  tick(A, 3, () => {
+    peak = Math.max(peak, soft.kinetic());
+    for (const it of game.stones) sp = Math.max(sp, Math.hypot(...it.ball.v));
+  });
+  for (const it of game.stones) hitHim += it.bumps || 0;
+  assert.ok(hitHim > 0, 'nothing bounced off him');
+  assert.ok(sp < 12, `a stone flew off at ${sp.toFixed(1)}`);
+  assert.ok(peak < 2500, `tumble energy ${peak}`);
+  for (const it of game.stones) assert.ok(it.ball.x[1] < it.r + 0.05 && Math.hypot(...it.ball.v) < 0.2, 'a stone still moving or in the air');
+  tick(A, 4);
+  assert.equal(game.state, 'ready');
+  assert.ok(soft.kinetic() < 1, `still moving ${soft.kinetic()}`);
+  assert.ok(soft.cloudR[0][4] > 0.97);
+  assert.equal(game.drops, 1);
+  assert.equal(game.best, 4);
+  assert.ok(!soft.nanResets);
+}));
+
+test('otter: a toss out of his reach drops everything he has going', () => seeded(37, () => {
+  const A = make('otter');
+  tick(A, 1.5);
+  A.game.launch({});
+  tick(A, 1.2);
+  assert.equal(A.game.juggling(), 1);
+  A.game.launch({ aim: [3.2, 0.9], speed: 15 });
+  tick(A, 1.5);
+  assert.equal(A.game.state, 'tumble');
+  assert.equal(A.game.juggling(), 0);
+}));
+
+/* ── the pandas' sumo ────────────────────────────────────────────────────── */
+
+/* the deepest the two pandas' stuffing points sink into each other, as a
+   fraction of their touching distance (0: just touching, 1: coincident)  */
+const pandaOverlap = (soft) => {
+  const { x, r } = soft, [A, B] = soft.rig.bodies.map((b) => b.ix);
+  let worst = 0;
+  for (const i of A) for (const j of B) {
+    const m = r[i] + r[j], d = Math.hypot(x[i * 3] - x[j * 3], x[i * 3 + 1] - x[j * 3 + 1], x[i * 3 + 2] - x[j * 3 + 2]);
+    if (d < m) worst = Math.max(worst, (m - d) / m);
+  }
+  return worst;
+};
+
+/* a bout from the ready crouch (ritual done) to its end; returns the log */
+const bout = (A, opts, plan = null, sec = 20) => {
+  const { game, soft } = A;
+  game.ritual = true;
+  game.launch(opts);
+  if (plan) game.plan = plan;
+  const log = { peak: 0, overlap: 0, minGap: 9, t: 0, ended: null };
+  let k = 0;
+  tick(A, sec, () => {
+    log.t += 1 / 60;
+    log.peak = Math.max(log.peak, soft.kinetic());
+    if (k++ % 3 === 0) log.overlap = Math.max(log.overlap, pandaOverlap(soft));
+    const a = soft.cloudC[0], b = soft.cloudC[1];
+    log.minGap = Math.min(log.minGap, Math.hypot(a[0] - b[0], a[2] - b[2]));
+    if (game.state === 'end' && log.ended === null) log.ended = log.t;
+  });
+  return log;
+};
+
+test('pandas: the shiko comes first — each lifts a leg and stomps, twice, and the dust puffs', () => seeded(41, () => {
+  const A = make('panda');
+  tick(A, 1.5);
+  const { game } = A;
+  game.launch({ power: 0.9 });
+  assert.equal(game.state, 'shiko');
+  let dust = 0, lifted = 0;
+  const footY = () => { const f = game.champ.feet[0]; return f.reduce((s, i) => s + A.soft.x[i * 3 + 1], 0) / f.length; };
+  const y0 = footY();
+  tick(A, 1.0, () => { lifted = Math.max(lifted, footY() - y0); dust += game.events.filter((e) => e.kind === 'dust').length; game.events.length = 0; });
+  tick(A, 1.4, () => { dust += game.events.filter((e) => e.kind === 'dust').length; game.events.length = 0; });
+  assert.ok(lifted > 0.12, `the foot only came up ${lifted.toFixed(2)}`);
+  assert.equal(dust, 4, 'two stomps each');
+  assert.ok(['tachiai', 'clinch'].includes(game.state), `then the charge (state ${game.state})`);
+}));
+
+test('pandas: a strong, well-aimed charge drives the champion out of the ring', () => seeded(43, () => {
+  for (const D of [0.2, 0.5]) {
+    const A = make('panda');
+    A.game.difficulty = D;
+    tick(A, 1.5);
+    const log = bout(A, { power: 1 }, 'meet', 8);
+    const { game, soft } = A;
+    assert.equal(game.won, 1, `D ${D}: ${game.msg}`);
+    assert.equal(game.lost, 0);
+    assert.equal(game.loser, game.champ);
+    assert.ok(/out of the ring/.test(game.why), game.why);
+    assert.ok(log.ended < 4, `took ${log.ended}s`);
+    assert.ok(log.peak < 20000, `bout energy ${log.peak}`);
+    assert.ok(!soft.nanResets);
+  }
+}));
+
+test('pandas: a weak charge is met and repelled — the challenger goes out', () => seeded(45, () => {
+  const A = make('panda');
+  tick(A, 1.5);
+  const log = bout(A, { power: 0.25 }, null, 9);
+  const { game } = A;
+  assert.equal(game.lost, 1, game.msg);
+  assert.equal(game.loser, game.chal);
+  assert.ok(log.ended < 8, `took ${log.ended}s`);
+  // and the champion stayed in: his centre well inside the rope
+  assert.ok(game.streak === -1);
+}));
+
+test('pandas: a reckless charge gets side-stepped, and carries the challenger out', () => seeded(47, () => {
+  const A = make('panda');
+  tick(A, 1.5);
+  bout(A, { power: 1, aim: [A.game.champ.c()[0], A.game.champ.c()[2] + 0.8] }, 'henka', 8);
+  assert.equal(A.game.lost, 1, A.game.msg);
+  assert.equal(A.game.loser, A.game.chal);
+}));
+
+test('pandas: every bout ends with one clear winner, in bounded time; no deep overlap, no runaway energy', () => seeded(49, () => {
+  const A = make('panda');
+  tick(A, 1.5);
+  const { game, soft } = A;
+  let worst = 0, peak = 0, longest = 0;
+  for (let k = 0; k < 6; k++) {
+    const won = game.won, lost = game.lost;
+    const c = game.champ.c();
+    const log = bout(A, { power: 0.2 + 0.16 * k, aim: [c[0], c[2] + (k % 3 - 1) * 0.6] }, null, 18);
+    assert.ok(log.ended !== null, `bout ${k} never ended (${game.state}: ${game.msg})`);
+    assert.equal((game.won - won) + (game.lost - lost), 1, `bout ${k}: not one winner`);
+    longest = Math.max(longest, log.ended);
+    worst = Math.max(worst, log.overlap);
+    peak = Math.max(peak, log.peak);
+    assert.ok(log.minGap > 1.0, `bout ${k}: their middles came within ${log.minGap.toFixed(2)}`);
+    // back to the marks and the ready crouch before the next
+    for (let w = 0; w < 30 && game.state !== 'ready'; w++) tick(A, 0.5);
+    assert.equal(game.state, 'ready', `bout ${k}: stuck in ${game.state}`);
+  }
+  console.log(`  6 bouts: won ${game.won}, lost ${game.lost}, longest ${longest.toFixed(1)} s, deepest overlap ${(worst * 100).toFixed(0)}%, peak kinetic ${peak.toFixed(0)}`);
+  assert.ok(longest < 16, `a bout took ${longest.toFixed(1)} s`);
+  assert.ok(worst < 0.6, `stuffing sank ${(worst * 100).toFixed(0)}% into the other panda`);
+  assert.ok(peak < 20000, `peak kinetic ${peak}`);
+  assert.ok(!soft.nanResets);
+}));
+
+test('pandas: after a bout the winner wobbles, the loser sits, and both reset cleanly to their marks', () => seeded(51, () => {
+  const A = make('panda');
+  tick(A, 1.5);
+  const { game, soft } = A;
+  game.ritual = true;
+  game.launch({ power: 1 });
+  game.plan = 'meet';
+  for (let k = 0; k < 600 && game.state !== 'end'; k++) tick(A, 1 / 60);
+  assert.equal(game.state, 'end');
+  // mid-celebration: the winner's arms up, the loser leaning back, dazed
+  tick(A, 1.2);
+  assert.ok(game.winner.up.x > 0.6, 'the winner has his arms up');
+  assert.ok(game.loser.leanS[0] < -0.3 && game.loser.daze > 0.4, 'the loser sat down, dazed');
+  let peak = 0;
+  for (let w = 0; w < 40 && game.state !== 'ready'; w++) tick(A, 0.5, () => { peak = Math.max(peak, soft.kinetic()); });
+  assert.equal(game.state, 'ready');
+  tick(A, 2);
+  for (const r of game.both) {
+    const c = r.c();
+    assert.ok(Math.hypot(c[0] - r.mark[0], c[2] - r.mark[1]) < 0.2, `${r === game.champ ? 'champion' : 'challenger'} not on his mark`);
+    assert.ok(r.upright() > 0.97, 'not upright');
+    const f = r.fwd();
+    assert.ok(f[0] * -r.side > 0.95, 'not facing the other');
+  }
+  assert.ok(soft.kinetic() < 2, `still moving ${soft.kinetic()}`);
+  assert.ok(peak < 20000, `reset energy ${peak}`);
+  assert.deepEqual(game.readout().map((r) => r[0]), ['Won', 'Lost', 'Streak']);
+  assert.ok(!soft.nanResets);
+}));

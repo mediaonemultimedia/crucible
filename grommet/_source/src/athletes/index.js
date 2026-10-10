@@ -15,6 +15,10 @@ import { buildGiraffe } from './giraffe.rig.js';
 import { GiraffeGame } from './giraffe.game.js';
 import { buildPenguin } from './penguin.rig.js';
 import { PenguinGame } from './penguin.game.js';
+import { buildOtter } from './otter.rig.js';
+import { OtterGame } from './otter.game.js';
+import { buildPanda } from './panda.rig.js';
+import { PandaGame } from './panda.game.js';
 
 export const ATHLETES = {
   leopard: { build: buildLeopard, Game: LeopardGame },
@@ -22,7 +26,9 @@ export const ATHLETES = {
   crow: { build: buildCrow, Game: CrowGame },
   giraffe: { build: buildGiraffe, Game: GiraffeGame },
   penguin: { build: buildPenguin, Game: PenguinGame },
+  otter: { build: buildOtter, Game: OtterGame },
+  panda: { build: buildPanda, Game: PandaGame },
 };
-export const ORDER = ['leopard', 'bear', 'crow', 'giraffe', 'penguin'];
+export const ORDER = ['leopard', 'bear', 'crow', 'giraffe', 'penguin', 'otter', 'panda'];
 
 export function buildRig(name) { return ATHLETES[name].build(); }

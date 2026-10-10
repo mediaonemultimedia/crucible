@@ -54,6 +54,14 @@ export class SoftBody {
     this.cloudC = [this.headC, ...this.clouds.slice(1).map(() => new Float64Array(3))];
     this.cloudR = [this.headR, ...this.clouds.slice(1).map(() => Float64Array.of(1, 0, 0, 0, 1, 0, 0, 0, 1))];
 
+    // a rig of several separate toys (two pandas in one ring): which toy
+    // each point belongs to. Their contacts with each other go through a
+    // broadphase (_collideBodies) instead of the all-pairs list
+    this.bodyOf = null;
+    if (rig.bodies) {
+      this.bodyOf = new Int8Array(n);
+      rig.bodies.forEach((B, k) => { for (const i of B.ix) this.bodyOf[i] = k; });
+    }
     this._pairs = this._collisionPairs();
     this._tethers = this._buildTethers();
     this.time = 0;
@@ -80,6 +88,7 @@ export class SoftBody {
     for (let i = 0; i < this.n; i++)
       for (let j = i + 1; j < this.n; j++) {
         if (M[i] & M[j]) continue;
+        if (this.bodyOf && this.bodyOf[i] !== this.bodyOf[j]) continue;
         if (armOf[i] >= 0 && armOf[i] === armOf[j] && Math.abs(armJ[i] - armJ[j]) < 3) continue;
         // an arm's first two points live inside the head by design
         if ((M[i] && armJ[j] >= 0 && armJ[j] < arms[armOf[j]].skip) || (M[j] && armJ[i] >= 0 && armJ[i] < arms[armOf[i]].skip)) continue;
@@ -192,6 +201,7 @@ export class SoftBody {
     // a head remembers how it sat on its torso
     for (let k = 1; k < this.clouds.length; k++) {
       const spec = this.rig.clouds[k];
+      if (spec.parent < 0) continue;
       const p = this.clouds[spec.parent];
       const Rp = quatToMat(p.q4, _R), cp = p.c, c0p = p.c0;
       const a = alpha * spec.mem;
@@ -364,6 +374,7 @@ export class SoftBody {
     this._tether();
 
     this._collide();
+    if (this.bodyOf) this._collideBodies();
 
     for (const sp of this.spheres) {
       for (let i = 0; i < n; i++) {
@@ -408,6 +419,7 @@ export class SoftBody {
       mx += v[i * 3]; my += v[i * 3 + 1]; mz += v[i * 3 + 2];
     }
     mx /= n; my /= n; mz /= n;
+    if (this.bodyOf) return this._finishBodies(h);
     const VMAX = 60;
     for (let i = 0; i < n; i++) {
       const sp = Math.hypot(v[i * 3], v[i * 3 + 1], v[i * 3 + 2]);
@@ -429,6 +441,85 @@ export class SoftBody {
       v[i * 3 + 1] = (my + (v[i * 3 + 1] - my) * kd) * ka;
       v[i * 3 + 2] = (mz + (v[i * 3 + 2] - mz) * kd) * ka;
     }
+  }
+
+  /* several toys: velocities capped and damped about each toy's own mean
+     (one plush's charge isn't the other's jiggle) */
+  _finishBodies(h) {
+    const { v, n } = this, P = this.params;
+    const VMAX = 60;
+    for (let i = 0; i < n; i++) {
+      const sp = Math.hypot(v[i * 3], v[i * 3 + 1], v[i * 3 + 2]);
+      if (sp > VMAX) { const f = VMAX / sp; v[i * 3] *= f; v[i * 3 + 1] *= f; v[i * 3 + 2] *= f; }
+    }
+    if (this.rig.restV) {
+      const vs = this.rig.restV;
+      for (let i = 0; i < n; i++) if (this.contact[i] && Math.hypot(v[i * 3], v[i * 3 + 2]) < vs) { v[i * 3] = 0; v[i * 3 + 2] = 0; }
+    }
+    const kd = Math.exp(-(0.4 + 14 * P.damping * P.damping) * h);
+    const ka = Math.exp(-0.25 * h);
+    for (const B of this.rig.bodies) {
+      let mx = 0, my = 0, mz = 0;
+      const ix = B.ix;
+      for (const i of ix) { mx += v[i * 3]; my += v[i * 3 + 1]; mz += v[i * 3 + 2]; }
+      mx /= ix.length; my /= ix.length; mz /= ix.length;
+      for (const i of ix) {
+        v[i * 3] = (mx + (v[i * 3] - mx) * kd) * ka;
+        v[i * 3 + 1] = (my + (v[i * 3 + 1] - my) * kd) * ka;
+        v[i * 3 + 2] = (mz + (v[i * 3 + 2] - mz) * kd) * ka;
+      }
+    }
+  }
+
+  /* contact between toys: only where their boxes overlap, each point of
+     one against the other's points inside that overlap. Equal masses: the
+     push is shared, so a charge shoves and a brace holds               */
+  _collideBodies() {
+    const { x, r } = this, B = this.rig.bodies;
+    const box = this._boxes || (this._boxes = B.map(() => new Float64Array(6)));
+    const pad = 0.32;
+    for (let k = 0; k < B.length; k++) {
+      const b = box[k];
+      b[0] = b[1] = b[2] = Infinity; b[3] = b[4] = b[5] = -Infinity;
+      for (const i of B[k].ix) for (let d = 0; d < 3; d++) {
+        const v = x[i * 3 + d];
+        if (v < b[d]) b[d] = v;
+        if (v > b[d + 3]) b[d + 3] = v;
+      }
+    }
+    const L = this._near || (this._near = B.map((Q) => new Int32Array(Q.ix.length)));
+    let touching = 0;
+    for (let a = 0; a < B.length; a++)
+      for (let c = a + 1; c < B.length; c++) {
+        const A = box[a], C = box[c];
+        // the overlap of the two boxes (padded by the largest radius)
+        const lo = [Math.max(A[0], C[0]) - pad, Math.max(A[1], C[1]) - pad, Math.max(A[2], C[2]) - pad];
+        const hi = [Math.min(A[3], C[3]) + pad, Math.min(A[4], C[4]) + pad, Math.min(A[5], C[5]) + pad];
+        if (lo[0] > hi[0] || lo[1] > hi[1] || lo[2] > hi[2]) continue;
+        let na = 0, nc = 0;
+        const inside = (i) => x[i * 3] >= lo[0] && x[i * 3] <= hi[0] && x[i * 3 + 1] >= lo[1] && x[i * 3 + 1] <= hi[1] && x[i * 3 + 2] >= lo[2] && x[i * 3 + 2] <= hi[2];
+        for (const i of B[a].ix) if (inside(i)) L[a][na++] = i;
+        for (const i of B[c].ix) if (inside(i)) L[c][nc++] = i;
+        for (let p = 0; p < na; p++) {
+          const i = L[a][p];
+          for (let q = 0; q < nc; q++) {
+            const j = L[c][q];
+            const dx = x[j * 3] - x[i * 3], m = r[i] + r[j];
+            if (dx > m || dx < -m) continue;
+            const dy = x[j * 3 + 1] - x[i * 3 + 1];
+            if (dy > m || dy < -m) continue;
+            const dz = x[j * 3 + 2] - x[i * 3 + 2];
+            if (dz > m || dz < -m) continue;
+            const d2 = dx * dx + dy * dy + dz * dz;
+            if (d2 >= m * m || d2 < 1e-12) continue;
+            const d = Math.sqrt(d2), f = (m - d) / d * 0.5;
+            x[i * 3] -= dx * f; x[i * 3 + 1] -= dy * f; x[i * 3 + 2] -= dz * f;
+            x[j * 3] += dx * f; x[j * 3 + 1] += dy * f; x[j * 3 + 2] += dz * f;
+            touching++;
+          }
+        }
+      }
+    this.touching = touching;          // how many point pairs are in contact
   }
 
   _collide() {

@@ -158,6 +158,7 @@ body.panel-open #panel{transform:translateX(0)}
 body:not([data-char="leopard"]) [data-leopard-only]{display:none}
 body:not([data-char="crow"]) [data-crow-only]{display:none}
 body:not([data-char="giraffe"]) [data-giraffe-only]{display:none}
+body:not([data-char="panda"]) [data-panda-only]{display:none}
 #game-state{font-style:italic;color:var(--ink-s)}
 #read output.big{font-size:17px}
 #read.three{grid-template-columns:repeat(5,auto)}
@@ -263,6 +264,7 @@ body:not([data-char="giraffe"]) [data-giraffe-only]{display:none}
           <button id="b-collect" data-giraffe-only>Collect rings<i>G</i></button>
         </div>
         <label class="sld"><span class="row">Pace<output id="o-pace"></output></span><input id="s-pace" type="range" min="8" max="26" step="0.5" value="15"><span class="ends"><span>gentle</span><span>hard</span></span></label>
+        <label class="sld" data-panda-only><span class="row">Champion<output id="o-strength"></output></span><input id="s-strength" type="range" min="0" max="0.99" step="0.01" value="0.4"><span class="ends"><span>novice</span><span>grand champion</span></span></label>
         <p class="note">Tool <b>4</b> aims: click where the ball should go, flick to hit it harder.</p>
       </section>
       <section>

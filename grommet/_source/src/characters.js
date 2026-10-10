@@ -102,6 +102,45 @@ export const CHARACTER_INFO = {
     camera: { az: -0.42, el: 0.22, dist: 13, y: 1.45, x: -1.0 },
     face: penguinFace, pattern: () => {}, court: diamond, tint: '#b88057',
   },
+  otter: {
+    label: 'Otter', sport: 'Juggling', tool: 'Toss', verb: 'Toss',
+    // fur: the brown; under: the cream face and bib; accent: the darker
+    // paws and feet; nose: the nose pad
+    colors: {
+      river: { fur: '#7a5236', under: '#ecdcc0', accent: '#4e3322', spot: '#4e3322', nose: '#2a1d17', cloth: '#3aa6a0', trim: '#3aa6a0' },
+      sea: { fur: '#5e4a3d', under: '#d9cdbd', accent: '#3b2e26', spot: '#3b2e26', nose: '#1f1714', cloth: '#e8b13a', trim: '#e8b13a' },
+      honey: { fur: '#a8774b', under: '#f3e6cc', accent: '#6b4a2e', spot: '#6b4a2e', nose: '#3b2a20', cloth: '#d4574a', trim: '#d4574a' },
+      silver: { fur: '#8e8a86', under: '#efebe4', accent: '#5f5b58', spot: '#5f5b58', nose: '#2b2a2c', cloth: '#5a7cc4', trim: '#5a7cc4' },
+    },
+    eyes: { part: 'head', u: 0.105, v: 0.46, lift: 0.026, scale: [0.08, 0.088, 0.06] },
+    pile: 5, stitch: [0.05, 0.035, 0.03],
+    aria: 'A sleek plush otter sitting up who juggles the shells and pebbles you toss him',
+    blurb: 'A sleek plush otter, sitting up. Toss him a shell: he catches it and keeps it going, paw to paw. Toss another, and another — he’ll keep them all up for as long as he can. Too many, or a wild toss, and the lot comes tumbling down.',
+    hand: 'Grab his head, an ear, an arm or the tail and pull — it gives, then springs back. Shift as you let go to pin that point.',
+    play: 'Click by his paws to toss a shell there; flick to toss it harder. Or use Toss (S), one at a time. Five at once is too many.',
+    camera: { az: 0.35, el: 0.22, dist: 11.5, y: 1.45 },
+    face: otterFace, pattern: () => {}, court: otterMat, tint: '#86a9b4',
+  },
+  panda: {
+    label: 'Pandas', sport: 'Sumo', tool: 'Charge', verb: 'Charge',
+    // fur / under: the white; accent and spot: the black (ears, arms, legs,
+    // saddle, eye patches); cloth: the challenger's mawashi; trim: the
+    // champion's
+    colors: {
+      classic: { fur: '#f3f0e9', under: '#f6f3ec', accent: '#1f1d20', spot: '#1f1d20', nose: '#1a181a', cloth: '#c8352e', trim: '#4a2a6e' },
+      qinling: { fur: '#efe6d8', under: '#f3ebdf', accent: '#5b3e2e', spot: '#5b3e2e', nose: '#3a2820', cloth: '#2f6fa8', trim: '#c9952f' },
+      ink: { fur: '#ebe6dc', under: '#efebe2', accent: '#2c2f38', spot: '#2c2f38', nose: '#202228', cloth: '#d97b2b', trim: '#2b5b45' },
+      sakura: { fur: '#f6f0ee', under: '#f9f4f2', accent: '#3a2c33', spot: '#3a2c33', nose: '#2c2226', cloth: '#e06f8c', trim: '#3c3a8a' },
+    },
+    eyes: { part: 'head', parts: ['head', 'head b'], u: 0.088, v: 0.47, lift: 0.03, scale: [0.085, 0.095, 0.065] },
+    pile: 12, stitch: [0.05, 0.045, 0.05], shells: 40,
+    aria: 'Two chubby plush pandas in felt mawashi, a champion and a challenger, wrestling sumo in a round felt ring',
+    blurb: 'Two chubby plush pandas in a felt ring. You’re the challenger, in red: charge him. The champion reads it, braces and shoves back — belly to belly, all soft body — and side-steps a wild one. Out of the ring or down, and the bout’s over.',
+    hand: 'Grab either panda — a head, an ear, an arm — and pull; it gives, then springs back. Best between bouts.',
+    play: 'Click the ring to charge that way; flick to charge harder. Click again in a clinch to shove. Or use Charge (S). Champion (panel) sets his strength.',
+    camera: { az: 0.3, el: 0.36, dist: 19.5, y: 1.3 },
+    face: pandaFace, pattern: pandaPattern, court: dohyo, tint: '#c7a47a',
+  },
 };
 
 /* the painting helpers for one rig and one canvas */
@@ -194,7 +233,7 @@ export function paintAthlete(maskTex, patTex, name, rig) {
   }
 }
 
-const noseOf = (name) => (name === 'leopard' ? leopardNose : name === 'crow' ? () => {} : name === 'giraffe' ? giraffeNose : name === 'penguin' ? penguinNose : bearNose);
+const noseOf = (name) => (name === 'leopard' ? leopardNose : name === 'crow' ? () => {} : name === 'giraffe' ? giraffeNose : name === 'penguin' ? penguinNose : name === 'otter' ? otterNose : name === 'panda' ? pandaNose : bearNose);
 
 /* ── the leopard ─────────────────────────────────────────────────────────── */
 
@@ -647,4 +686,87 @@ function diamond(g, toPx, k) {
   const [ra, rb] = toPx(0.1, 10.95), [rc, rd] = toPx(0.7, 11.05);
   g.fillStyle = 'rgb(255,0,0)';
   g.fillRect(ra, rb, rc - ra, rd - rb);
+}
+
+/* ── the otter ───────────────────────────────────────────────────────────── */
+
+function otterFace(g, size, P) {
+  const { eyeRing, blob, stitch } = P;
+  eyeRing('head', 0.105, 0.46, 0.18);
+  g.globalCompositeOperation = 'source-over';
+  nosePad(g, P, 'muzzle', 0.5, 0.3, 0.15, 0.13, 'rgb(0,0,0)');
+  g.globalCompositeOperation = 'lighter';
+  stitch('muzzle', [[0.5, 0.36], [0.5, 0.5]], 0.022);
+  stitch('muzzle', [[0.42, 0.56], [0.46, 0.57], [0.5, 0.5], [0.54, 0.57], [0.58, 0.56]], 0.022);
+  // whisker dots on the pads
+  for (const s of [-1, 1])
+    for (const [du, dv] of [[0.1, 0.38], [0.13, 0.45], [0.09, 0.47], [0.12, 0.53]]) blob('muzzle', 0.5 + s * du, dv, 0.026, 0.026, 'rgb(0,0,190)');
+  blob('head', 0.5 - 0.17, 0.6, 0.11, 0.07, 'rgba(0,110,0,0.45)');
+  blob('head', 0.5 + 0.17, 0.6, 0.11, 0.07, 'rgba(0,110,0,0.45)');
+}
+
+function otterNose(g, size, P) {
+  nosePad(g, P, 'muzzle', 0.5, 0.3, 0.145, 0.125, 'rgb(0,255,0)');
+}
+
+/* a round blue felt pond-mat, and a ripple stitched round where he sits */
+function otterMat(g, toPx, k) {
+  const [cx, cy] = toPx(0, 0.4);
+  g.fillStyle = 'rgb(0,255,0)';
+  g.beginPath(); g.ellipse(cx, cy, 3.9 * k, 3.4 * k, 0, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = 'rgb(200,0,0)';
+  g.lineWidth = 0.06 * k;
+  g.setLineDash([0.2 * k, 0.14 * k]);
+  for (const r of [1.3, 2.1]) { g.beginPath(); g.ellipse(cx, cy - 0.3 * k, r * k, r * 0.88 * k, 0, 0, Math.PI * 2); g.stroke(); }
+  g.setLineDash([]);
+}
+
+/* ── the pandas ──────────────────────────────────────────────────────────── */
+
+function pandaFace(g, size, P) {
+  const { eyeRing, blob, stitch } = P;
+  for (const [head, muzzle] of [['head', 'muzzle'], ['head b', 'muzzle b']]) {
+    eyeRing(head, 0.088, 0.47, 0.22);
+    g.globalCompositeOperation = 'source-over';
+    nosePad(g, P, muzzle, 0.5, 0.31, 0.16, 0.17, 'rgb(0,0,0)');
+    g.globalCompositeOperation = 'lighter';
+    stitch(muzzle, [[0.5, 0.4], [0.5, 0.53]], 0.03);
+    stitch(muzzle, [[0.42, 0.58], [0.46, 0.585], [0.5, 0.53], [0.54, 0.585], [0.58, 0.58]], 0.03);
+    blob(head, 0.5 - 0.2, 0.6, 0.13, 0.08, 'rgba(0,120,0,0.5)');
+    blob(head, 0.5 + 0.2, 0.6, 0.13, 0.08, 'rgba(0,120,0,0.5)');
+  }
+}
+
+/* the eye patches: a black teardrop tilted down and out round each eye,
+   with a ring of white felt left round the bead */
+function pandaPattern(g, size, P) {
+  for (const head of ['head', 'head b']) {
+    for (const s of [-1, 1]) {
+      P.blob(head, 0.5 + s * 0.095, 0.5, 0.36, 0.26, 'rgb(255,0,0)', -s * 0.5);
+      g.globalCompositeOperation = 'destination-out';
+      P.blob(head, 0.5 + s * 0.088, 0.47, 0.16, 0.16, 'rgb(255,0,0)');
+      g.globalCompositeOperation = 'lighter';
+    }
+  }
+}
+
+function pandaNose(g, size, P) {
+  for (const m of ['muzzle', 'muzzle b']) nosePad(g, P, m, 0.5, 0.31, 0.155, 0.165, 'rgb(0,255,0)');
+}
+
+/* the dohyo: a round platform of clay, the starting lines, and the rope
+   (a prop: it stands up off the floor) */
+function dohyo(g, toPx, k) {
+  const [cx, cy] = toPx(0, 0);
+  g.fillStyle = 'rgb(0,255,0)';
+  g.beginPath(); g.ellipse(cx, cy, 4.4 * k, 4.4 * k, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgb(255,0,0)';
+  for (const s of [-1, 1]) {
+    const [a, b] = toPx(s * 0.55 - 0.05, -0.45), [c, d] = toPx(s * 0.55 + 0.05, 0.45);
+    g.fillRect(a, b, c - a, d - b);
+  }
+  // a faint brushed ring of sand just outside the rope
+  g.strokeStyle = 'rgb(90,0,0)';
+  g.lineWidth = 0.25 * k;
+  g.beginPath(); g.ellipse(cx, cy, 3.75 * k, 3.75 * k, 0, 0, Math.PI * 2); g.stroke();
 }

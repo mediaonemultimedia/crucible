@@ -247,6 +247,82 @@ const SCENES = {
     run: async (G) => { await G(`(() => { document.querySelectorAll('#p-fur button')[1].click(); __grommet.step(2.5, true); })()`); },
   },
   'penguin-mobile': { character: 'penguin', mobile: true, run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
+  'otter-rest': { character: 'otter', run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
+  'otter-close': {
+    character: 'otter',
+    run: async (G) => { await G(`(() => { const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 6; o.az = 0.3; o.el = 0.12; o.target.set(0, 1.55, 0.2); __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
+  },
+  'otter-juggle': {
+    character: 'otter',
+    run: async (G) => {
+      await G(`__grommet.step(2)`);
+      const r = await G(`(() => { const g = __grommet.game; for (let k = 0; k < 3; k++) { g.launch({}); __grommet.step(1.0); } for (let k = 0; k < 200; k++) { __grommet.step(1/120); if (g.stones.filter((s) => s.state === 'fly').length >= 2 && g.stones.some((s) => s.state === 'held')) break; } __grommet.step(0, true); return [g.state, g.juggling(), g.stones.map((s) => s.state)]; })()`);
+      console.log('  juggle', JSON.stringify(r));
+    },
+  },
+  'otter-juggle-close': {
+    character: 'otter',
+    run: async (G) => {
+      await G(`__grommet.step(2)`);
+      const r = await G(`(() => { const g = __grommet.game; for (let k = 0; k < 2; k++) { g.launch({}); __grommet.step(1.0); } __grommet.step(2.2); for (let k = 0; k < 200; k++) { __grommet.step(1/120); if (g.stones.some((s) => s.state === 'fly' && s.ball.x[1] > 1.9)) break; } const o = __grommet.tools.orbit; o.dist = 7; o.az = 0.2; o.el = 0.1; o.target.set(0, 1.7, 0.3); __grommet.tools.applyOrbit(); __grommet.step(0, true); return [g.state, g.juggling()]; })()`);
+      console.log('  juggle-close', JSON.stringify(r));
+    },
+  },
+  'otter-tumble': {
+    character: 'otter',
+    run: async (G) => {
+      await G(`__grommet.step(2)`);
+      const r = await G(`(() => { const g = __grommet.game; for (let k = 0; k < 5; k++) { g.launch({}); for (let j = 0; j < 120 && g.state !== 'tumble'; j++) __grommet.step(1/120); if (g.state === 'tumble') break; __grommet.step(0.6); } __grommet.step(0.9, true); return [g.state, g.msg, g.stones.map((s) => s.state)]; })()`);
+      console.log('  tumble', JSON.stringify(r));
+    },
+  },
+  'otter-sea': {
+    character: 'otter',
+    run: async (G) => { await G(`(() => { document.querySelectorAll('#p-fur button')[1].click(); __grommet.step(2.5, true); })()`); },
+  },
+  'otter-mobile': { character: 'otter', mobile: true, run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
+  'panda-rest': { character: 'panda', run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
+  'panda-close': {
+    character: 'panda',
+    run: async (G) => { await G(`(() => { const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 8; o.az = 0.9; o.el = 0.15; o.target.set(-1.4, 1.9, 0.4); __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
+  },
+  'panda-shiko': {
+    character: 'panda',
+    run: async (G) => {
+      await G(`__grommet.step(1.5)`);
+      const r = await G(`(() => { const g = __grommet.game; g.launch({ power: 0.9 }); for (let k = 0; k < 400; k++) { __grommet.step(1/60); if (g.state === 'shiko' && g.t > 0.5) break; } __grommet.step(0, true); return [g.state, g.t]; })()`);
+      console.log('  shiko', JSON.stringify(r));
+    },
+  },
+  'panda-shove': {
+    character: 'panda',
+    run: async (G) => {
+      await G(`__grommet.step(1.5)`);
+      const r = await G(`(() => { const g = __grommet.game; g.ritual = true; g.launch({ power: 0.85 }); g.plan = 'meet'; for (let k = 0; k < 600; k++) { __grommet.step(1/60); if (g.state === 'clinch' && g.t > 0.6) break; } const o = __grommet.tools.orbit; o.dist = 11; o.az = 0.25; o.el = 0.18; const f = g.focus(); o.target.set(f[0], 1.6, f[2]); __grommet.tools.applyOrbit(); __grommet.step(0, true); return [g.state, g.msg]; })()`);
+      console.log('  shove', JSON.stringify(r));
+    },
+  },
+  'panda-out': {
+    character: 'panda',
+    run: async (G) => {
+      await G(`__grommet.step(1.5)`);
+      const r = await G(`(() => { const g = __grommet.game; g.ritual = true; g.launch({ power: 1 }); g.plan = 'meet'; for (let k = 0; k < 900; k++) { __grommet.step(1/60); if (g.state === 'end' && g.t > 0.7) break; } __grommet.step(0, true); return [g.state, g.msg, g.won, g.lost]; })()`);
+      console.log('  out', JSON.stringify(r));
+    },
+  },
+  'panda-lose': {
+    character: 'panda',
+    run: async (G) => {
+      await G(`__grommet.step(1.5)`);
+      const r = await G(`(() => { const g = __grommet.game; g.ritual = true; g.launch({ power: 0.3 }); for (let k = 0; k < 900; k++) { __grommet.step(1/60); if (g.state === 'end' && g.t > 1.6) break; } __grommet.step(0, true); return [g.state, g.msg, g.won, g.lost]; })()`);
+      console.log('  lose', JSON.stringify(r));
+    },
+  },
+  'panda-qinling': {
+    character: 'panda',
+    run: async (G) => { await G(`(() => { document.querySelectorAll('#p-fur button')[1].click(); __grommet.step(2.5, true); })()`); },
+  },
+  'panda-mobile': { character: 'panda', mobile: true, run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
   'leopard-close': {
     character: 'leopard',
     run: async (G) => { await G(`(() => { const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 7.5; o.az = 0.25; o.el = 0.2; __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },

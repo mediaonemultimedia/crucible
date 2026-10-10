@@ -23,9 +23,9 @@ import { rodrigues } from './pose.js';
 
 const _R = new Float64Array(9), _L = new Float64Array(9), _U = new Float64Array(9), _c = new Float64Array(3);
 
-export function balance(soft, alpha, lean = null, face = null, standY = null) {
+export function balance(soft, alpha, lean = null, face = null, standY = null, k = 0) {
   if (alpha <= 0) return;
-  const g = soft.clouds[0], x = soft.x, w = soft.w;
+  const g = soft.clouds[k], x = soft.x, w = soft.w;
   const R = quatToMat(g.q4, _R);
   // facing: the cloud's forward, flattened onto the floor — or, for an
   // athlete who keeps squaring up to the play, turned a little toward `face`
@@ -75,8 +75,8 @@ export function uprightness(soft) { return soft.cloudR[0][4]; }
    velocity is eased toward a slow, capped turn up about the centre
    (ω = axis × min(2·angle, maxTurn)) plus a capped lift to standing
    height — a heave, damped by construction.                              */
-export function rightUp(soft, h, { k = 7, maxTurn = 2, standY = null, maxLift = 1.4 } = {}) {
-  const g = soft.clouds[0], x = soft.x, v = soft.v;
+export function rightUp(soft, h, { k = 7, maxTurn = 2, standY = null, maxLift = 1.4, cloud = 0 } = {}) {
+  const g = soft.clouds[cloud], x = soft.x, v = soft.v;
   const R = quatToMat(g.q4, _R);
   const ux = R[1], uy = R[4], uz = R[7];
   // axis: up × world up, angle between them
@@ -104,8 +104,8 @@ export function rightUp(soft, h, { k = 7, maxTurn = 2, standY = null, maxLift = 
 /* A landing: the stuffing soaks up the tumble. Each point's velocity is
    eased toward the body's mean velocity (so spin and jiggle die, the slide
    doesn't) — a damper, adding nothing.                                   */
-export function settle(soft, h, k = 8) {
-  const ix = soft.rig.clouds[0].ix, v = soft.v, x = soft.x;
+export function settle(soft, h, k = 8, cloud = 0) {
+  const ix = soft.rig.clouds[cloud].ix, v = soft.v, x = soft.x;
   let mx = 0, my = 0, mz = 0;
   for (const i of ix) { mx += v[i * 3]; my += v[i * 3 + 1]; mz += v[i * 3 + 2]; }
   mx /= ix.length; my /= ix.length; mz /= ix.length;

@@ -15,6 +15,9 @@ import { CROW } from './athletes/crow.rig.js';
 import { makeBeak, poseBeak, makeNest, makeItems, poseItems } from './crowprops.js';
 import { makeRings, poseRings } from './giraffeprops.js';
 import { makeBat, poseBat, makeBaseball } from './props.js';
+import { makeStones, poseStones } from './otterprops.js';
+import { makeRope, makeDust, puffDust, poseDust } from './pandaprops.js';
+import { RING_R } from './athletes/panda.game.js';
 import { BAT, batR, BASEBALL_R } from './athletes/penguin.game.js';
 
 const $ = (s) => document.querySelector(s);
@@ -52,7 +55,7 @@ async function start() {
   const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.1, 140);
 
   // the current athlete: rebuilt whole by setCharacter()
-  let rig, soft, idle, body, cloth = null, game;
+  let rig, soft, idle, body, cloth = null, game, shellN = SHELLS;
   const groom = new Groom();
   const groomTex = makeGroomTexture(groom);
   const maskTex = makeMaskTexture();
@@ -72,9 +75,11 @@ async function start() {
 
   const eyeMat = makeEyeMaterial();
   const eyeGeo = new THREE.SphereGeometry(1, 40, 28);
-  const eyes = [-1, 1].map((s) => {
+  // two per head; the pandas have two heads between them
+  const eyes = [-1, 1, -1, 1].map((s, k) => {
     const m = new THREE.Mesh(eyeGeo, eyeMat);
     m.userData.side = s;
+    m.userData.head = k >> 1;
     scene.add(m);
     return m;
   });
@@ -99,6 +104,13 @@ async function start() {
   const bat = makeBat(BAT, batR);
   const baseball = makeBaseball(BASEBALL_R);
   scene.add(bat, baseball);
+  // the otter's shells and pebbles
+  const stones = makeStones();
+  scene.add(stones);
+  // the pandas' dohyo rope, and the dust a stomp puffs up
+  const rope = makeRope(RING_R);
+  const dust = makeDust();
+  scene.add(rope, dust);
 
   // rig view: points + links, rebuilt per athlete
   const rigLineMat = new THREE.LineBasicMaterial({ color: 0x1d1a17, depthTest: false, transparent: true, opacity: 0.9 });
@@ -178,6 +190,9 @@ async function start() {
   slider('idle', (v) => (v === 0 ? 'still' : v.toFixed(2)), (v) => { state.idle = v; if (idle) idle.amount = v; });
   // 1 unit = 9 cm: a 15 u/s serve is 1.35 m/s at plush scale
   slider('pace', (v) => `${(v * 0.09).toFixed(1)} m/s`, (v) => { state.pace = v; if (game) game.speed = v; });
+  // the pandas: how strong the champion is
+  const RANKS = ['jonidan', 'makushita', 'jūryō', 'maegashira', 'komusubi', 'sekiwake', 'ōzeki', 'yokozuna'];
+  slider('strength', (v) => RANKS[Math.min(RANKS.length - 1, Math.floor(v * RANKS.length))], (v) => { state.strength = v; if (game && game.both) game.difficulty = v; });
   const applyBody = () => {
     soft.params.stuffing = state.stuffing;
     soft.params.damping = state.damping;
@@ -185,6 +200,7 @@ async function start() {
     game.speed = state.pace;
     game.auto = state.auto;
     if (game.items) game.kind = state.shiny ? 'shiny' : 'food';
+    if (game.both) game.difficulty = state.strength;
   };
 
   const HINTS = {
@@ -238,7 +254,11 @@ async function start() {
     game = new ATHLETES[name].Game(soft);
     applyBody();
     body = new Body(rig, soft);
-    body.geometry.instanceCount = state.mesh ? 1 : SHELLS;
+    // two furred pandas in one mesh: fewer shells each, the same pile
+    shellN = info.shells || SHELLS;
+    fur.uniforms.shells.value = shellN;
+    $('#o-shells').textContent = shellN;
+    body.geometry.instanceCount = state.mesh ? 1 : shellN;
     shells.geometry = body.geometry;
     cloth = rig.cloth ? new Body(rig, soft, { cloth: true }) : null;
     clothMesh.visible = !!cloth;
@@ -254,10 +274,12 @@ async function start() {
     if (game.net) { goal = makeGoal(game.goal, game.net); scene.add(goal); }
     racquet.visible = !!rig.racquet;
     bat.visible = !!rig.bat;
+    rope.visible = !!rig.bodies;
     nest.visible = !!game.items;
     beak.visible = !!rig.beak;
     poseItems(items, null);
     poseRings(rings, null);
+    poseStones(stones, null);
     tennisBall.visible = football.visible = baseball.visible = false;
     if (!tools) {
       tools = new Tools({
@@ -302,6 +324,14 @@ async function start() {
      aimed through (his hitting plane, or the goal line); a flick adds pace */
   const aimAndLaunch = (e, flick) => {
     const ray = tools.rayAt(e);
+    if (game.focus) {
+      // the challenger charges toward where you point on the floor
+      const F = ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3());
+      if (!F) return;
+      const k = flick > 250 ? THREE.MathUtils.clamp(0.75 + flick / 2400, 0.8, 1.6) : 1;
+      launch({ aim: [F.x, F.z], speed: state.pace * k });
+      return;
+    }
     const zp = game.net ? game.goal.z : game.aimZ ?? game.home[1] + 0.5;
     const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -zp);
     const P = ray.intersectPlane(plane, new THREE.Vector3());
@@ -372,7 +402,7 @@ async function start() {
     mesh.setAttribute('aria-pressed', String(state.mesh));
     fur.uniforms.meshView.value = state.mesh ? 1 : 0;
     clothMat.uniforms.meshView.value = state.mesh ? 1 : 0;
-    body.geometry.instanceCount = state.mesh ? 1 : SHELLS;
+    body.geometry.instanceCount = state.mesh ? 1 : shellN;
     rigLines.visible = rigPts.visible = state.mesh;
   };
 
@@ -465,11 +495,12 @@ async function start() {
     });
     groom.relax(real);
     if (groom.dirty) { groomTex.needsUpdate = true; groom.dirty = false; }
-    for (const ev of game.events) if (ev.kind === 'bonk') dent(ev);
+    for (const ev of game.events) { if (ev.kind === 'bonk') dent(ev); if (ev.kind === 'dust') puffDust(dust, ev.at, ev.strength); }
+    poseDust(dust, real * (state.paused ? 0 : state.speed));
     game.events.length = 0;
 
     // the camera drifts a little after the athlete, anchored to its court
-    const ft = tools.orbit.target, c = soft.cloudC[0];
+    const ft = tools.orbit.target, c = game.focus ? game.focus() : soft.cloudC[0];
     if (!tools.ptrs.size) {
       const k = Math.min(1, real * 1.2), cam = CHARACTER_INFO[state.character].camera;
       const zOff = game.net ? -0.6 : 0;
@@ -494,22 +525,31 @@ async function start() {
       poseItems(items, game.items);
       for (const it of game.items) if (it.state !== 'gone') shadows.push([it.ball.x[0], it.ball.x[1], it.ball.x[2], it.r * 0.8]);
     }
+    if (game.stones) {
+      poseStones(stones, game.stones);
+      for (const it of game.stones) shadows.push([it.ball.x[0], it.ball.x[1], it.ball.x[2], it.r * 0.9]);
+    }
     if (game.rings) {
       poseRings(rings, game.rings);
       for (const r of game.rings) if (r.state !== 'gone') shadows.push([r.x[0], r.x[1], r.x[2], r.R * 0.9]);
     }
     if (rig.beak) poseBeak(beak, game.beakFrame(), [state.beakScale, 0.92 + 0.12 * state.beakScale]);
     if (rig.racquet) shadows.push([game.rq.C[0], game.rq.C[1], game.rq.C[2], 0.3]);
+    // the second panda's own soft shadow under him
+    for (let k = 1; rig.bodies && k < rig.bodies.length; k++) { const q = soft.cloudC[rig.bodies[k].cloud]; shadows.push([q[0], q[1] * 0.6, q[2], 1.4]); }
     if (rig.bat) for (const s of [0.5, 1.0, 1.35]) shadows.push([game.bat.p[0] + game.bat.h[0] * s, game.bat.p[1] + game.bat.h[1] * s, game.bat.p[2] + game.bat.h[2] * s, 0.12]);
     floor.paint(soft, null, shadows);
 
     // eyes ride the head surface, and roll toward the ball
     const ey = CHARACTER_INFO[rig.name].eyes;
-    const eyePart = body.parts.find((q) => q.name === ey.part);
-    const R = soft.cloudR[eyePart.cloud];
-    up.set(R[1], R[4], R[7]);
-    const gaze = game.gaze;
+    const heads = ey.parts || [ey.part];
     for (const e of eyes) {
+      e.visible = e.userData.head < heads.length;
+      if (!e.visible) continue;
+      const eyePart = body.parts.find((q) => q.name === heads[e.userData.head]);
+      const R = soft.cloudR[eyePart.cloud];
+      up.set(R[1], R[4], R[7]);
+      const gaze = game.gazeOf ? game.gazeOf(e.userData.head) : game.gaze;
       body.surfacePoint(eyePart.name, 0.5 + e.userData.side * ey.u, ey.v, P, N);
       e.position.copy(P).addScaledVector(N, ey.lift);
       if (gaze) {
@@ -549,7 +589,7 @@ async function start() {
       if (r2) $('#r-c').textContent = r2[1];
       $('#r-vol').innerHTML = `${(soft.volumeRatio() * 100).toFixed(1)}<small>%</small>`;
       // particles share the mass; 1 unit = 9 cm
-      const mass = Math.round(90 + 60 * soft.params.stuffing) * (rig.name === 'bear' ? 1.6 : rig.name === 'giraffe' ? 1.4 : 1);
+      const mass = Math.round(90 + 60 * soft.params.stuffing) * (rig.name === 'bear' ? 1.6 : rig.name === 'giraffe' ? 1.4 : rig.name === 'panda' ? 3.2 : 1);
       const ke = soft.kinetic() * (mass / 1000 / soft.n) * 0.0081 * 1000;
       $('#r-ke').innerHTML = `${ke.toFixed(2)}<small>mJ</small>`;
       const gs = $('#game-state');
