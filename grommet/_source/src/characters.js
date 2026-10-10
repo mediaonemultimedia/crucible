@@ -138,7 +138,7 @@ export const CHARACTER_INFO = {
     blurb: 'Two chubby plush pandas in a felt ring. You’re the challenger, in red: charge him. The champion reads it, braces and shoves back — belly to belly, all soft body — and side-steps a wild one. Out of the ring or down, and the bout’s over.',
     hand: 'Grab either panda — a head, an ear, an arm — and pull; it gives, then springs back. Best between bouts.',
     play: 'Click the ring to charge that way; flick to charge harder. Click again in a clinch to shove. Or use Charge (S). Champion (panel) sets his strength.',
-    camera: { az: 0.3, el: 0.36, dist: 19.5, y: 1.3 },
+    camera: { az: -0.55, el: 0.34, dist: 17.5, y: 1.4 },
     face: pandaFace, pattern: pandaPattern, court: dohyo, tint: '#c7a47a',
   },
 };
@@ -726,7 +726,7 @@ function otterMat(g, toPx, k) {
 function pandaFace(g, size, P) {
   const { eyeRing, blob, stitch } = P;
   for (const [head, muzzle] of [['head', 'muzzle'], ['head b', 'muzzle b']]) {
-    eyeRing(head, 0.088, 0.47, 0.22);
+    eyeRing(head, 0.088, 0.47, 0.13);
     g.globalCompositeOperation = 'source-over';
     nosePad(g, P, muzzle, 0.5, 0.31, 0.16, 0.17, 'rgb(0,0,0)');
     g.globalCompositeOperation = 'lighter';
@@ -742,9 +742,11 @@ function pandaFace(g, size, P) {
 function pandaPattern(g, size, P) {
   for (const head of ['head', 'head b']) {
     for (const s of [-1, 1]) {
-      P.blob(head, 0.5 + s * 0.095, 0.5, 0.36, 0.26, 'rgb(255,0,0)', -s * 0.5);
+      // an oval, longer down and out from the eye than above it
+      P.blob(head, 0.5 + s * 0.1, 0.49, 0.38, 0.33, 'rgb(255,0,0)');
+      P.blob(head, 0.5 + s * 0.12, 0.54, 0.3, 0.26, 'rgb(255,0,0)');
       g.globalCompositeOperation = 'destination-out';
-      P.blob(head, 0.5 + s * 0.088, 0.47, 0.16, 0.16, 'rgb(255,0,0)');
+      P.blob(head, 0.5 + s * 0.088, 0.47, 0.135, 0.135, 'rgb(255,0,0)');
       g.globalCompositeOperation = 'lighter';
     }
   }

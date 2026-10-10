@@ -3,7 +3,8 @@
 Readable source for **Grommet** (Crucible No. 22): plush athletes, each a soft
 body under shell fur, each playing one little sport against you. Stage 1 is the
 **leopard** (tennis) and the **polar bear** (goalkeeping); then the **crow**
-(catch & hoard) and the **giraffe** (ring toss).
+(catch & hoard) and the **giraffe** (ring toss). Stage 2 adds the **penguin**
+(batting), the **otter** (juggling) and two **pandas** (sumo).
 
 This tree lives on the `grommet-source` branch only. What ships to `main` is
 the single built file, `grommet/index.html`.
@@ -15,7 +16,7 @@ npm run build            # → final.html (self-contained; the build fails on an
 node tools/shots.mjs     # headless Chromium screenshots → shots/ (WebGL 2 on SwiftShader)
 ```
 
-Open `final.html?character=leopard|bear|crow|giraffe` (add `&webgl` to force the WebGL 2
+Open `final.html?character=leopard|bear|crow|giraffe|penguin|otter|panda` (add `&webgl` to force the WebGL 2
 path). Copy it to `grommet/index.html` on the release branch to publish.
 
 ## What came from Flock
@@ -67,11 +68,19 @@ src/athletes/
   crow.game.js      catch & hoard: tosses, the beak, the lunge, the nest
   giraffe.rig.js    four legs, a long neck chain, the head a second cloud on it
   giraffe.game.js   ring toss: tracking, the neck's reach, the stack, the shake
+  penguin.rig.js    an egg of a body, flat flippers (the right one holds the bat), felt cap and feet
+  penguin.game.js   batting: the count, the swing, the bat's contact, the whiff-spin
+  otter.rig.js      a pear sat on its bottom (a seat ring, no feet), short arms, flat tail
+  otter.game.js     juggling: paws to the catch, the scoop, the throw, the tumble
+  panda.rig.js      two pandas in one rig (cloud 0 the champion, cloud 1 the challenger)
+  panda.game.js     sumo: Rikishi per panda, the charge, the clinch, the call, the reset
 ring.js             a felt ring: a rigid torus (impulse contacts; no three.js)
 characters.js       per-athlete colours, eyes, face, pattern, court, words
 props.js            what they play with (three.js)
 crowprops.js        the crow's beak, nest and treasures (three.js)
 giraffeprops.js     the giraffe's felt rings (three.js)
+otterprops.js       the otter's shells and pebbles (three.js)
+pandaprops.js       the dohyo rope and the stomp dust (three.js)
 ```
 
 ### The crow (how he differs)
@@ -137,7 +146,94 @@ giraffeprops.js     the giraffe's felt rings (three.js)
 - `react: true` (memory pushes the body back): with it off, swinging the neck
   over shoved him across the floor.
 
-### Adding one (stage 2: penguin batter, otter juggler, panda drummer)
+### The penguin (how he differs)
+
+- **The bat** is the racquet idea again: a rigid body gripped in the right
+  flipper (`batFrame`: the flipper's last points give the handle axis, an
+  eased wrist cocks it), and every swing is that straight-sewn flipper
+  turned about the shoulder. Contact is the ball against the bat's capsule
+  (it thins from barrel to handle, `batR`) with the bat's own velocity at
+  the contact point, swept over the substep. Nothing is steered: the call
+  comes from the ball's flight off the bat — outside the foul lines, back
+  over him or topped into the floor by the plate is foul; fair and carrying
+  past `FENCE` a home run; fair and short a hit.
+- **Aiming low**: the stuffed flipper rides high through a fast swing (more
+  so low down), so his plan aims under it by a learned line (`AIM_FIX`),
+  measured with the bat swinging through without the ball.
+- **The count**: pitches well off the plate he takes (ball); the rest he
+  swings at, and chases a few near ones. Three strikes or four balls, a new
+  count; fouls count as strikes up to two.
+- **The whiff-spin** is a capped velocity servo on his yaw that makes one
+  full turn. Two things had to give for it: the felt soles' static grip
+  (`restV`) is off while he turns, and the stuffing's rotation estimate is
+  turned on by each substep's spin — shape matching toward a frame refined
+  from the last substep's lags a fast turn, and that lag is a brake (it held
+  him to a sixth of the speed asked).
+
+### The otter (how he differs)
+
+- **Sitting up**: no legs to stand on. Cloud 0 is a long pear sat on a flat
+  ring of points (`seat`), a wider footprint than any biped's; his hind legs
+  are short inCloud chains along the floor, his flat tail lies behind.
+- **Paws** are arm chains re-posed toward eased aims (three critically
+  damped springs per paw, so a new aim is a reach, not a snap) and pulled
+  there by a capped, damped spring on their last two points.
+- **The cascade** is event-driven: a paw meets the next thing coming down to
+  it (where the arc crosses paw height, clamped to his reach), closes on it
+  inside `CATCH_R`, carries it through a scoop, and throws it to come down
+  where the other paw waits, `TF` later; a paw still holding when the next
+  is about to land throws early. Juggled things are little `Ball`s with no
+  plush collision while they're his; loose ones (tumbling, missed) collide
+  both ways with him, the mat and each other, and a pebble squeezed out from
+  between his paws is soaked up (capped at 5 u/s) rather than shot off.
+- **The tumble**: five at once, or one he can't reach, and everything lets
+  go — the ones in his paws pop up and drop back onto his belly and legs.
+  His lean is eased: the balance pull is stiff, so a jump in what it pulls
+  toward was a kick (KE 1200 out of nowhere).
+- `stones`, not `items`: `main.js` reads `game.items` as the crow's.
+
+### The pandas (how they differ)
+
+- **Two toys, one rig**: each panda is built facing +z at the origin by the
+  same code, then turned and moved to its mark (`place()`: points, grid
+  centres and bases, chain frames). One soft body, one fur mesh, one draw;
+  `rig.bodies` lists which points are whose. `SoftBody` then (only for such
+  a rig): leaves cross-toy pairs out of the all-pairs list and collides the
+  two through a box-overlap broadphase (`_collideBodies`, which also counts
+  `touching`); damps each toy about its own mean velocity (`_finishBodies`
+  — one panda's charge isn't the other's jiggle); and skips the head-on-
+  torso memory for a cloud with no parent. `Pose` takes several posed
+  clouds; `balance`, `rightUp` and `settle` take a cloud index. With no
+  `bodies` every line of that is skipped: the other athletes run exactly
+  the code they did.
+- **Rikishi**: each panda's frame (`cfg.R`, its rest turn), attention,
+  arms (hang / reach / up / out), lean, balance strength, drive. Pose bones
+  and leans are written in his own frame and turned into the rest frame.
+- **Strength** is a velocity servo on his stuffing with a capped
+  acceleration (`_drive`). Contact is the soft body's own collisions: who
+  pushes harder moves the other. Locked together, each grips the other's
+  mawashi (`_grip`: their motion across the line between them is shared,
+  equal and opposite) — without it the pair orbited each other and the
+  bout became a dance. A clinch needs real contact (`touching`) and both
+  facing each other: a charge brushing past a side-step isn't one, and a
+  charging challenger faces where he runs.
+- **The champion** meets a charge, or side-steps a reckless one (all-out,
+  or well off the line), circles a little at the rope, and belly-bumps
+  when your push sags. Difficulty scales his push; his form varies a little
+  bout to bout. Your push tires (`stamina`), so a bout always ends; the
+  judges decide at `DECIDE_T` regardless.
+- **The call**: a panda loses when any of his points touches the floor
+  outside the rope, anything but a sole touches inside it, or he tips over.
+- **After**: the winner bounces with his arms up; the loser sits back,
+  dazed (gently: a stiff lean back fought the floor and thrashed). Getting
+  up is `rightUp` with the soles' static grip off (it snagged him half-way,
+  and switching the balance pull on at 45° then blew him apart — balance
+  only comes back once he's upright). Then both walk to their marks and the
+  shiko plays (a roll onto one leg, a lift, a stomp, dust; then the other).
+- Two pandas carry twice the vertices, so they get 40 shells (`shells` in
+  their character info) instead of 64.
+
+### Adding one
 
 1. **Rig** — `src/athletes/NAME.rig.js` exporting `buildNAME()`:
    - `standingBody(b, {...})` for a biped (or your own clouds for anything
@@ -191,6 +287,23 @@ shakes and every ring comes off and ends at rest on the floor (bounded
 energy, ring speeds, no frame jumps, back home upright); a ring dropped hard on
 his head is a clonk that sets the shake off; misses bounce, roll and lie
 flat at rest, and Collect clears them; a 30 s auto run never runs away.
+Penguin: well-timed pitches (low, middle, high) are hit fair and forward off
+the barrel; early, late or way off is never a clean hit; a whiff spins him a
+full turn (no frame jumps, bounded energy) and he wobbles back to face the
+pitcher on his mark; one well off the plate is taken for a ball, and the
+count adds up (strike three resets it); an inning of random pitches never
+runs away. Otter: two tossed in stay juggled paw to paw for 5 s (at least 8
+throws, nothing below his paws, bounded energy); three go round; five is too
+many and everything tumbles, bouncing off him, coming to rest on the mat
+without flying off, and he looks at the floor; a toss out of reach drops
+everything. Pandas: the shiko comes first (a foot lifted, four stomps, dust);
+a strong well-aimed charge drives the champion out at two difficulties; a
+weak one is met and repelled; a reckless one is side-stepped and carries the
+challenger out; six mixed bouts each end with exactly one winner inside
+16 s, the two never closer than a body apart, stuffing never sinking more
+than 60% of a touching distance into the other, bounded energy; after a bout
+the winner's arms go up and the loser sits back dazed, and both end on their
+marks, upright, facing each other, at rest.
 
 There is no GPU in the build sandbox: screenshots are SwiftShader, and frame
 rate / WebGPU behaviour have to be checked on real hardware.

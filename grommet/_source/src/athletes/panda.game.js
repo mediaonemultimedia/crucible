@@ -249,12 +249,21 @@ export class PandaGame extends Athlete {
     const watch = this.state !== 'end' || this.t < 0.6;
     A.attend(watch ? B.headCentre() : null, dt);
     B.attend(watch ? A.headCentre() : null, dt);
+    this.daze = Math.max(A.daze, B.daze);
     this.gaze = A.att > 0.02 ? { at: B.headCentre(), amount: A.att } : null;
     this.gaze2 = B.att > 0.02 ? { at: A.headCentre(), amount: B.att } : null;
     this.pose.apply([...A.bones((k, d) => this.armBone(k, d)), ...B.bones((k, d) => this.armBone(k, d))]);
   }
 
   gazeOf(j) { return j === 0 ? this.gaze : this.gaze2; }
+
+  /* the page puts the stars of a daze over whichever panda is dazed */
+  headCentre(out = [0, 0, 0]) {
+    const r = this.chal.daze > this.champ.daze ? this.chal : this.champ;
+    const h = r.headCentre();
+    out[0] = h[0]; out[1] = h[1]; out[2] = h[2];
+    return out;
+  }
 
   _think(dt) {
     const A = this.champ, B = this.chal, st = this.state;

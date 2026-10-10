@@ -76,7 +76,7 @@ function buildOne(b, k, champion) {
   b.grid({ name: name('muzzle'), cloud: k, c: [0, 2.32, 0.66], r: [0.31, 0.22, 0.24], B: rotX(0.12), U: 32, V: 22, pile: () => 0.55 });
   if (champion) {
     // the topknot: a little black bun on the crown, tipped forward
-    b.grid({ name: 'topknot', cloud: k, c: [0, 3.12, 0.02], r: [0.13, 0.1, 0.22], B: rotX(-0.25), U: 18, V: 12, accent: () => 1, pile: () => 0.6 });
+    b.grid({ name: 'topknot', cloud: k, c: [0, 3.22, 0.0], r: [0.16, 0.12, 0.27], B: rotX(-0.25), U: 18, V: 12, accent: () => 1, pile: () => 0.35 });
   }
 
   // round black ears

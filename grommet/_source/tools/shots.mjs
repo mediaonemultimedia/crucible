@@ -284,7 +284,7 @@ const SCENES = {
   'panda-rest': { character: 'panda', run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
   'panda-close': {
     character: 'panda',
-    run: async (G) => { await G(`(() => { const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 8; o.az = 0.9; o.el = 0.15; o.target.set(-1.4, 1.9, 0.4); __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
+    run: async (G) => { await G(`(() => { const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 8; o.az = -0.85; o.el = 0.15; o.target.set(1.4, 1.9, 0.5); __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
   },
   'panda-shiko': {
     character: 'panda',
@@ -298,7 +298,7 @@ const SCENES = {
     character: 'panda',
     run: async (G) => {
       await G(`__grommet.step(1.5)`);
-      const r = await G(`(() => { const g = __grommet.game; g.ritual = true; g.launch({ power: 0.85 }); g.plan = 'meet'; for (let k = 0; k < 600; k++) { __grommet.step(1/60); if (g.state === 'clinch' && g.t > 0.6) break; } const o = __grommet.tools.orbit; o.dist = 11; o.az = 0.25; o.el = 0.18; const f = g.focus(); o.target.set(f[0], 1.6, f[2]); __grommet.tools.applyOrbit(); __grommet.step(0, true); return [g.state, g.msg]; })()`);
+      const r = await G(`(() => { const g = __grommet.game; g.ritual = true; g.launch({ power: 0.85 }); g.plan = 'meet'; for (let k = 0; k < 600; k++) { __grommet.step(1/60); if (g.state === 'clinch' && g.t > 0.6) break; } const o = __grommet.tools.orbit; o.dist = 10; o.az = -0.15; o.el = 0.14; const f = g.focus(); o.target.set(f[0], 1.6, f[2]); __grommet.tools.applyOrbit(); __grommet.step(0, true); return [g.state, g.msg]; })()`);
       console.log('  shove', JSON.stringify(r));
     },
   },
@@ -323,6 +323,15 @@ const SCENES = {
     run: async (G) => { await G(`(() => { document.querySelectorAll('#p-fur button')[1].click(); __grommet.step(2.5, true); })()`); },
   },
   'panda-mobile': { character: 'panda', mobile: true, run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
+  'switch-all': {
+    character: 'leopard',
+    run: async (G) => {
+      // every athlete in turn, by the selector and by Shift+number, each
+      // played a little: the console must stay clean throughout
+      const r = await G(`(async () => { const names = ['leopard', 'bear', 'crow', 'giraffe', 'penguin', 'otter', 'panda']; const seen = []; for (const n of names) { __grommet.setCharacter(n); __grommet.step(0.5); __grommet.game.launch({}); __grommet.step(1.0, true); seen.push(__grommet.character); } for (let k = 1; k <= 7; k++) { dispatchEvent(new KeyboardEvent('keydown', { key: '!', code: 'Digit' + k, shiftKey: true })); __grommet.step(0.3, true); seen.push(__grommet.character); } for (const t of ['hand', 'finger', 'comb', 'play']) __grommet.setTool(t); __grommet.step(0.2, true); return seen; })()`);
+      console.log('  switch', JSON.stringify(r));
+    },
+  },
   'leopard-close': {
     character: 'leopard',
     run: async (G) => { await G(`(() => { const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 7.5; o.az = 0.25; o.el = 0.2; __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
