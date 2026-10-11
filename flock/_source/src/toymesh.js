@@ -316,31 +316,31 @@ function makeSheep() {
   // the face and legs in dark felt
   const felt = feltMaterial('#2c2522');
   const head = new THREE.Group();
-  head.position.set(0, 0.13, 0.4);
-  head.rotation.x = 0.38;
+  head.position.set(0, 0.16, 0.5);
+  head.rotation.x = 0.32;
   body.add(head);
   const face = new THREE.Mesh(lumps([
-    { at: [0, 0, 0.08], r: [0.15, 0.165, 0.2] },
-    { at: [0, -0.04, 0.2], r: [0.11, 0.115, 0.12] },
+    { at: [0, 0, 0.09], r: [0.17, 0.185, 0.22] },
+    { at: [0, -0.04, 0.22], r: [0.12, 0.125, 0.13] },
   ]), felt);
   head.add(face);
   // little ears, sticking out sideways and drooping a touch, pink inside
   const inner = feltMaterial('#b98a83');
   for (const s of [-1, 1]) {
     const ear = new THREE.Group();
-    ear.position.set(s * 0.15, 0.08, 0.02);
+    ear.position.set(s * 0.16, 0.08, 0.04);
     ear.rotation.set(0.2, -s * 0.3, -s * 0.45);
-    ear.add(new THREE.Mesh(lumps([{ at: [s * 0.09, 0, 0], r: [0.1, 0.035, 0.055] }], 16, 10), felt));
-    ear.add(new THREE.Mesh(lumps([{ at: [s * 0.095, 0.012, 0.012], r: [0.07, 0.02, 0.035] }], 16, 10), inner));
+    ear.add(new THREE.Mesh(lumps([{ at: [s * 0.1, 0, 0], r: [0.12, 0.04, 0.065] }], 16, 10), felt));
+    ear.add(new THREE.Mesh(lumps([{ at: [s * 0.11, 0.014, 0.014], r: [0.085, 0.024, 0.042] }], 16, 10), inner));
     head.add(ear);
   }
   // bead eyes in a white felt surround, and a small stitched nose
   const white = feltMaterial('#f2ece2'), bead = feltMaterial('#100d0c');
   for (const s of [-1, 1]) {
-    head.add(new THREE.Mesh(lumps([{ at: [s * 0.075, 0.06, 0.24], r: [0.042, 0.045, 0.025] }], 16, 10), white));
-    head.add(new THREE.Mesh(lumps([{ at: [s * 0.077, 0.058, 0.262], r: [0.024, 0.026, 0.014] }], 12, 8), bead));
+    head.add(new THREE.Mesh(lumps([{ at: [s * 0.078, 0.065, 0.268], r: [0.046, 0.05, 0.026] }], 16, 10), white));
+    head.add(new THREE.Mesh(lumps([{ at: [s * 0.08, 0.063, 0.29], r: [0.026, 0.028, 0.014] }], 12, 8), bead));
   }
-  head.add(new THREE.Mesh(lumps([{ at: [0, -0.02, 0.32], r: [0.04, 0.022, 0.015] }], 12, 8), feltMaterial('#4a3b38')));
+  head.add(new THREE.Mesh(lumps([{ at: [0, -0.02, 0.348], r: [0.045, 0.025, 0.016] }], 12, 8), feltMaterial('#4a3b38')));
   // four short legs, dark felt, sitting under the wool
   const leg = new THREE.CylinderGeometry(0.052, 0.058, 0.36, 12, 1);
   for (const [x, z] of [[-0.15, 0.2], [0.15, 0.2], [-0.15, -0.24], [0.15, -0.24]]) {

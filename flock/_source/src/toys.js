@@ -325,11 +325,16 @@ export class Play {
         handle() { return [this.top[0] + this.wand[0], this.top[1] + this.wand[1], this.top[2] + this.wand[2]]; },
       };
     } else if (kind === 'sheep') {
-      // set down facing the wolf
+      // set down side-on to you, turned a little toward the wolf
       const c = this.soft.cloudC[0];
+      let wx = c[0] - at[0], wz = c[2] - at[2];
+      const wl = Math.hypot(wx, wz) || 1;
+      wx /= wl; wz /= wl;
+      let sx = -wz, sz = wx;
+      if (sx * toCam[0] + sz * toCam[2] < 0) { sx = -sx; sz = -sz; }
       this.toy = {
         kind, x: [at[0], SHEEP_Y, at[2]], v: [0, 0, 0], p: [0, 0, 0], r: SHEEP_R, held: false, hand: null,
-        yaw: Math.atan2(c[0] - at[0], c[2] - at[2]), lean: [0, 0], leanV: [0, 0], vLast: [0, 0], travel: 0,
+        yaw: Math.atan2(sx + wx * 0.6, sz + wz * 0.6), lean: [0, 0], leanV: [0, 0], vLast: [0, 0], travel: 0,
       };
       this.far = 0; this.crept = 0; this.creepV = null;
       this.creepHome = [c[0], c[2]];
@@ -736,14 +741,15 @@ export class Play {
         const away = toy.travel > 0.5 && d > 2.7 && d < 6.5 && this.att > 0.25 && !grabbed && this.crept < CREEP_LEASH - 0.1;
         this.far = away ? this.far + dt : 0;
         if (this.hold > 1) { this.hold = 0; this.hit = false; this._go('boop'); }
-        else if (this.far > 0.5) { this.far = 0; toy.travel = 0; this._go('creep'); }
+        else if (this.far > 0.5) { this.far = 0; toy.travel = 0; this.hit = false; this._go('creep'); }
       } else this.hold = this.far = 0;
     }
     if (this.state === 'creep') {
       // low, with a slow rolling gait: a step every 0.7 s
       const ph = this.t / 0.7;
       const pulse = Math.sin(Math.PI * (ph % 1)) ** 2;
-      crouchT = 0.13 + 0.04 * pulse;
+      crouchT = 0.2 + 0.05 * pulse;
+      this.bob = -0.12;
       const c = this.soft.cloudC[0];
       const h0 = this.creepHome;
       const fromHome = Math.hypot(c[0] - h0[0], c[2] - h0[1]);
