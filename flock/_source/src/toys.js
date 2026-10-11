@@ -1,4 +1,5 @@
-/* Toys for the fox, the lion and the llama — and the attention they draw.
+/* Toys for the fox, the lion, the llama and the wolf — and the attention
+   they draw.
 
    Nothing here is keyframed. Each animal's behaviour is three layers of
    gentle input into the same soft body everything else drives:
@@ -13,13 +14,14 @@
    2. A signature move, a small state machine like the octopus's grasp:
       watch → move → cooldown. The fox pounces on a feather on a string,
       the lion bats a ball of yarn back to you, the llama nibbles a carrot
-      on a stick. Each move is more of the same: a pose (a crouch, a paw
+      on a stick, the wolf creeps after a plush sheep and boops it. Each move is more of the same: a pose (a crouch, a paw
       raised, a neck stretched), a force (the neck reaching), an impulse
       (the hop, the swipe).
    3. A line in the hint area saying what to do, and what the animal's up to.
 
    The toys' own physics (a feather on a short rope, a rolling ball that
-   collides with the plush, a carrot held on a stick) lives here too. This
+   collides with the plush, a carrot held on a stick, a sheep that slides on
+   the floor) lives here too. This
    file draws nothing; toymesh.js dresses it.                              */
 
 import { smooth } from './rigs.js';
@@ -31,6 +33,7 @@ export const TOYS = {
   fox: { kind: 'feather', label: 'Feather' },
   lion: { kind: 'yarn', label: 'Yarn' },
   llama: { kind: 'carrot', label: 'Carrot' },
+  wolf: { kind: 'sheep', label: 'Sheep' },
 };
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -167,6 +170,16 @@ const BALL_R = 0.3, BALL_M = 4;
 export const ROPE = 6;
 const ROPE_LEN = 1.55;
 const HOP = 5.4;   // the fox's take-off speed, straight up
+// the sheep: a body sphere for collisions, the height it stands at, its mass
+// against one plush point's, how hard the floor drags it to a stop
+export const SHEEP_R = 0.45, SHEEP_Y = 0.5;
+const SHEEP_M = 0.7, SHEEP_SLIDE = 7;
+// the wolf's creep: how far from the sheep he stops, and the furthest he'll
+// ever go from where he sat when it came out, and his pace (the floor's
+// friction takes a good part of it)
+const CREEP_NEAR = 1.9, CREEP_LEASH = 2.2, CREEP_V = 2.2;
+// the boop: how far he leans forward from the hips, and the nod of the head
+const BOOP_LEAN = 0.6, BOOP_NOD = 0.08;
 
 export class Play {
   constructor(soft) {
@@ -202,7 +215,7 @@ export class Play {
     for (const i of ix0) for (let d = 0; d < 3; d++) this.c0[d] += rest[i * 3 + d] / ix0.length;
     this.headMask = new Uint8Array(rig.n);
     for (const i of cfg.core) this.headMask[i] = 1;
-    if (this.name === 'fox') {
+    if (this.name === 'fox' || this.name === 'wolf') {
       // the crouch leans everything above the hips forward, more the higher it is
       const tail = new Set(cfg.tailIx);
       const ix = [], w = [];
@@ -212,6 +225,14 @@ export class Play {
         if (wy > 0) { ix.push(i); w.push(wy); }
       }
       this.crouchBone = { ix: Int32Array.from(ix), w: Float64Array.from(w) };
+    }
+    if (this.name === 'wolf') {
+      // the end of the muzzle: the head's foremost point at snout height
+      let best = -1e9;
+      for (const i of cfg.core) {
+        const sc = rest[i * 3 + 2] - 0.5 * Math.abs(rest[i * 3 + 1] - 2.03);
+        if (sc > best) { best = sc; this.noseIx = i; }
+      }
     }
     if (this.name === 'lion') {
       this.pawBones = cfg.legs.map((k) => {
@@ -271,8 +292,20 @@ export class Play {
     if (!t) return null;
     if (t.kind === 'feather') return t.feather();
     if (t.kind === 'yarn') return t.x;
+    if (t.kind === 'sheep') return [t.x[0], t.x[1] + 0.12, t.x[2]];
     return t.tip();
   }
+
+  /* the wolf's nose: just past the head's foremost point */
+  nose() {
+    const x = this.soft.x, i = this.noseIx, hc = this.headCentre();
+    const dx = x[i * 3] - hc[0], dy = x[i * 3 + 1] - hc[1], dz = x[i * 3 + 2] - hc[2];
+    const d = Math.hypot(dx, dy, dz) || 1;
+    return [x[i * 3] + dx / d * 0.24, x[i * 3 + 1] + dy / d * 0.24, x[i * 3 + 2] + dz / d * 0.24];
+  }
+
+  /* a sheep is dragged across the floor, not through the air */
+  get floorDrag() { return this.kind === 'sheep'; }
 
   /* ── the toy in hand ──────────────────────────────────────────────────── */
 
@@ -291,6 +324,15 @@ export class Play {
         feather() { const n = ROPE * 3; return [this.pts[n], this.pts[n + 1], this.pts[n + 2]]; },
         handle() { return [this.top[0] + this.wand[0], this.top[1] + this.wand[1], this.top[2] + this.wand[2]]; },
       };
+    } else if (kind === 'sheep') {
+      // set down facing the wolf
+      const c = this.soft.cloudC[0];
+      this.toy = {
+        kind, x: [at[0], SHEEP_Y, at[2]], v: [0, 0, 0], p: [0, 0, 0], r: SHEEP_R, held: false, hand: null,
+        yaw: Math.atan2(c[0] - at[0], c[2] - at[2]), lean: [0, 0], leanV: [0, 0], vLast: [0, 0], travel: 0,
+      };
+      this.far = 0; this.crept = 0; this.creepV = null;
+      this.creepHome = [c[0], c[2]];
     } else if (kind === 'yarn') {
       this.toy = { kind, x: [at[0], BALL_R + 0.5, at[2]], v: [0, 0, 0], p: [0, 0, 0], r: BALL_R, held: false, q: [0, 0, 0, 1], vel: [0, 0, 0], last: null };
     } else {
@@ -314,6 +356,7 @@ export class Play {
   remove() {
     this.toy = null;
     this.drag = null;
+    this.creepV = null;
     if (this.state !== 'idle' && this.state !== 'leap') { this.state = 'idle'; this.t = 0; }
   }
 
@@ -329,6 +372,7 @@ export class Play {
       return s;
     }
     if (t.kind === 'yarn') return [{ a: t.x, b: t.x, r: t.r * 1.2 }];
+    if (t.kind === 'sheep') return [{ a: t.x, b: t.x, r: t.r }];
     return [{ a: t.handle(), b: t.base, r: 0.09 }, { a: t.base, b: t.tip(), r: 0.18 }];
   }
 
@@ -339,6 +383,14 @@ export class Play {
 
   dragStart(p) {
     if (!this.toy) return;
+    if (this.toy.kind === 'sheep') {
+      // the hand leads the sheep on a short soft lead along the floor
+      const t = this.toy;
+      this.drag = { off: [t.x[0] - p[0], 0, t.x[2] - p[2]] };
+      t.held = true;
+      t.hand = [t.x[0], t.x[2]];
+      return;
+    }
     const a = this._anchor();
     this.drag = { off: [a[0] - p[0], a[1] - p[1], a[2] - p[2]] };
     this.toy.held = true;
@@ -348,6 +400,16 @@ export class Play {
   dragTo(p) {
     const t = this.toy;
     if (!t || !this.drag) return;
+    if (t.kind === 'sheep') {
+      const o = this.drag.off, c = this.soft.cloudC[0];
+      let hx = p[0] + o[0], hz = p[2] + o[2];
+      // a playpen round the wolf, like the yarn's
+      const ox = hx - c[0], oz = hz - c[2], od = Math.hypot(ox, oz);
+      if (od > 7) { hx = c[0] + ox / od * 7; hz = c[2] + oz / od * 7; }
+      if (t.hand) t.travel += Math.hypot(hx - t.hand[0], hz - t.hand[1]);
+      t.hand = [hx, hz];
+      return;
+    }
     const a = this._anchor(), o = this.drag.off;
     a[0] = p[0] + o[0]; a[1] = p[1] + o[1]; a[2] = p[2] + o[2];
     const low = t.kind === 'feather' ? 0.45 : t.kind === 'yarn' ? t.r : 0.35;
@@ -360,6 +422,7 @@ export class Play {
     this.drag = null;
     if (!t) return;
     t.held = false;
+    t.hand = null;
     if (t.kind === 'yarn') {
       // a flick: the ball leaves at the hand's speed
       const v = t.vel, s = Math.hypot(...v), cap = 13;
@@ -372,8 +435,10 @@ export class Play {
     this.t = 0; this.hold = 0; this.att = 0; this.bob = 0;
     for (const s of [this.yaw, this.pitch, this.roll, this.earTurn, this.perk, this.crouch, this.reach, this.paw, this.swing, ...(this._rv || [])]) s.x = s.v = 0;
     this._reachRv = null;
+    this.creepV = null;
     this.pose.release();
     const t = this.toy;
+    if (t?.kind === 'sheep') { t.v = [0, 0, 0]; t.x[1] = SHEEP_Y; t.lean = [0, 0]; t.leanV = [0, 0]; }
     if (t?.kind === 'yarn') { t.v = [0, 0, 0]; t.x[1] = Math.max(t.x[1], t.r); }
     if (t?.kind === 'feather') { t.pinned = null; this._hang(t); }
     if (t?.kind === 'carrot') t.len = Math.max(t.len, STUB);
@@ -464,6 +529,7 @@ export class Play {
   _signature(dt, T) {
     if (this.name === 'fox') this._fox(dt, T);
     else if (this.name === 'lion') this._lion(dt, T);
+    else if (this.name === 'wolf') this._wolf(dt, T);
     else this._llama(dt, T);
   }
 
@@ -642,6 +708,92 @@ export class Play {
     ease(this.roll, 0.2 * this.att * Math.tanh(this.yaw.x * 4), 30, dt);
   }
 
+  /* the wolf: watches the sheep. Pulled away, he creeps after it a little —
+     low, slow steps, never far; left still within reach for a second, he
+     dips his head and gives it a gentle boop with his nose               */
+  _wolf(dt, S) {
+    const toy = this.toy;
+    let crouchT = 0, reachT = 0;
+    this.bob = 0;
+    this.creepV = null;
+    let d = 1e9, ang = 0, front = 0, near = 0;
+    if (toy && S) {
+      const ch = this.chest(), c = this.soft.cloudC[0];
+      d = Math.hypot(S[0] - ch[0], S[2] - ch[2]);
+      const l = this.toLocal([S[0] - c[0], S[1] - c[1], S[2] - c[2]]);
+      ang = Math.atan2(l[0], l[2]);
+      front = l[2];
+      near = smooth(4.5, 1.2, d);
+    }
+    const grabbed = this.soft.grabs.size > 0;
+    if (this.state === 'watch' || this.state === 'idle') {
+      if (toy && S) {
+        const still = !toy.held && Math.hypot(toy.v[0], toy.v[2]) < 0.15;
+        const zone = d > 1.0 && d < 2.0 && Math.abs(ang) < 0.75 && front > 0.4;
+        if (zone && still && this.att > 0.5) this.hold += dt;
+        else this.hold = Math.max(0, this.hold - dt * 2);
+        // led away by hand, out of reach: after a moment, he follows
+        const away = toy.travel > 0.5 && d > 2.7 && d < 6.5 && this.att > 0.25 && !grabbed && this.crept < CREEP_LEASH - 0.1;
+        this.far = away ? this.far + dt : 0;
+        if (this.hold > 1) { this.hold = 0; this.hit = false; this._go('boop'); }
+        else if (this.far > 0.5) { this.far = 0; toy.travel = 0; this._go('creep'); }
+      } else this.hold = this.far = 0;
+    }
+    if (this.state === 'creep') {
+      // low, with a slow rolling gait: a step every 0.7 s
+      const ph = this.t / 0.7;
+      const pulse = Math.sin(Math.PI * (ph % 1)) ** 2;
+      crouchT = 0.13 + 0.04 * pulse;
+      const c = this.soft.cloudC[0];
+      const h0 = this.creepHome;
+      const fromHome = Math.hypot(c[0] - h0[0], c[2] - h0[1]);
+      this.crept = Math.max(this.crept, fromHome);
+      if (!toy || grabbed || d < CREEP_NEAR || fromHome >= CREEP_LEASH || this.t > 6) this._go('cool');
+      else {
+        const ch = this.chest();
+        let dx = S[0] - ch[0], dz = S[2] - ch[2];
+        const dl = Math.hypot(dx, dz) || 1;
+        dx /= dl; dz /= dl;
+        const sp = CREEP_V * pulse * smooth(0, 0.6, this.t);
+        this.creepV = [dx * sp, dz * sp];
+        // and turns, slowly, to face where it went
+        this.creepW = clamp(ang * 0.8, -0.35, 0.35) * pulse;
+      }
+    }
+    if (this.state === 'boop') {
+      const t = this.t;
+      // down (0.8 s), the nudge, then back up
+      const dip = t < 0.8 ? smooth(0, 0.8, t) : t < 1.3 ? 1 : 1 - smooth(1.3, 2.0, t);
+      crouchT = BOOP_LEAN * dip;
+      this.bob = BOOP_NOD * dip;
+      reachT = t > 0.4 && t < 1.3 ? 1 : 0;
+      if (toy && !this.hit && t > 0.6 && t < 1.4) {
+        const n = this.nose();
+        const gap = Math.hypot(n[0] - toy.x[0], n[1] - toy.x[1], n[2] - toy.x[2]) - toy.r;
+        if (gap < 0.22 || t > 1.3) {
+          if (gap < 0.35) {
+            // a nudge: off away from him, a little hop, a wobble
+            const ch = this.chest();
+            let ax = toy.x[0] - ch[0], az = toy.x[2] - ch[2];
+            const al = Math.hypot(ax, az) || 1;
+            ax /= al; az /= al;
+            toy.v[0] += ax * 2.1; toy.v[1] += 1.1; toy.v[2] += az * 2.1;
+            toy.leanV[0] += ax * 2.4; toy.leanV[1] += az * 2.4;
+            this.count++;
+          }
+          this.hit = true;
+        }
+      }
+      if (!toy || t > 2.0) this._go('cool');
+    }
+    if (this.state === 'cool' && this.t > 1.5) this._go(toy ? 'watch' : 'idle');
+    ease(this.crouch, crouchT, this.state === 'boop' ? 60 : 30, dt);
+    ease(this.reach, reachT, 30, dt);
+    ease(this.perk, this.att * (0.5 + 0.5 * near), 50, dt);
+    // a curious tilt of the head as the sheep comes close
+    ease(this.roll, 0.12 * this.att * near * Math.tanh(this.yaw.x * 4), 30, dt);
+  }
+
   /* ── the toys' own physics, per fixed step ───────────────────────────── */
 
   _toyStep(dt) {
@@ -669,6 +821,8 @@ export class Play {
         t.q = t.q.map((v) => v / ql);
       }
       if (![...t.x, ...t.v].every(Number.isFinite)) { t.x = [this.soft.cloudC[0][0], 2, this.soft.cloudC[0][2] + 2]; t.v = [0, 0, 0]; }
+    } else if (t.kind === 'sheep') {
+      this._sheepWobble(t, dt);
     } else {
       this._aimCarrot(t, Math.min(1, dt * 3));
     }
@@ -762,6 +916,13 @@ export class Play {
         const near = F ? smooth(3.8, 1.2, Math.hypot(F[0] - ch[0], F[2] - ch[2])) : 0;
         amp = 160 + 420 * near + (this.state === 'crouch' ? 350 : 0);
         freq = 0.55 + 1.7 * near + (this.state === 'crouch' ? 1.6 : 0);
+      } else if (this.name === 'wolf') {
+        // the nearer the sheep, the faster the wag
+        const S = this.target();
+        const ch = this.chest();
+        const near = S ? smooth(4.5, 1.2, Math.hypot(S[0] - ch[0], S[2] - ch[2])) : 0;
+        amp = 200 + 380 * near + (this.state === 'boop' ? 200 : 0);
+        freq = 0.7 + 2.3 * near;
       } else if (this.name === 'lion') { amp = 260; freq = 1.3; } else { amp = 240; freq = 2.4; }
       this._phase = (this._phase || 0) + freq * h;
       sweep(this.soft, this.rig.arms[this.cfg.tail], a * amp * Math.sin(TAU * this._phase), hh);
@@ -770,6 +931,11 @@ export class Play {
     if (toy?.kind === 'yarn' && !toy.held) this._ball(toy, h);
     else if (toy?.kind === 'yarn') this._ballPush(toy);
     if (this.name === 'llama' && toy && this.reach.x > 0.02) this._reachForce(hh);
+    if (toy?.kind === 'sheep') this._sheep(toy, h);
+    if (this.name === 'wolf') {
+      if (this.state === 'creep' && this.creepV) this._creep(h);
+      if (toy && this.reach.x > 0.02) this._noseForce(hh);
+    }
   }
 
   /* feet planted. Reaching, batting and nibbling are all the animal's own
@@ -782,7 +948,7 @@ export class Play {
     const s = this.soft, c = s.cloudC[0];
     let touching = 0;
     for (const i of this.rig.clouds[0].ix) touching += s.contact[i];
-    const free = !s.grabs.size && touching >= 3 && !['crouch', 'leap', 'land'].includes(this.state);
+    const free = !s.grabs.size && touching >= 3 && !['crouch', 'leap', 'land', 'creep'].includes(this.state);
     if (!free || !this._home) { this._home = free ? [c[0], c[2]] : null; return; }
     const dx = c[0] - this._home[0], dz = c[2] - this._home[1];
     const d = Math.hypot(dx, dz);
@@ -872,6 +1038,112 @@ export class Play {
     if (sp > 20) for (let d = 0; d < 3; d++) b.v[d] *= 20 / sp;
   }
 
+  /* the creep: the whole wolf's horizontal velocity and turn are eased
+     toward a slow walk (a nudge to the velocity each substep, never a
+     shove of the positions, so it can't build up). The floor's friction
+     drags the paws, so they lag and catch up: steps                      */
+  _creep(h) {
+    const s = this.soft, x = s.x, v = s.v, n = s.n, c = s.cloudC[0];
+    let mx = 0, mz = 0, L = 0, I = 0;
+    for (let i = 0; i < n; i++) {
+      const rx = x[i * 3] - c[0], rz = x[i * 3 + 2] - c[2];
+      mx += v[i * 3]; mz += v[i * 3 + 2];
+      L += rz * v[i * 3] - rx * v[i * 3 + 2];
+      I += rx * rx + rz * rz;
+    }
+    mx /= n; mz /= n;
+    const k = Math.min(1, 10 * h);
+    const dvx = (this.creepV[0] - mx) * k, dvz = (this.creepV[1] - mz) * k;
+    const dw = (this.creepW - L / (I || 1)) * k;
+    for (let i = 0; i < n; i++) {
+      const rx = x[i * 3] - c[0], rz = x[i * 3 + 2] - c[2];
+      x[i * 3] += (dvx + dw * rz) * h;
+      x[i * 3 + 2] += (dvz - dw * rx) * h;
+    }
+  }
+
+  /* the boop: the head's points drawn gently toward the sheep, the body
+     pushed back the same amount so he doesn't pull himself over         */
+  _noseForce(hh) {
+    const t = this.toy, n = this.nose();
+    let gx = t.x[0] - n[0], gy = t.x[1] + 0.1 - n[1], gz = t.x[2] - n[2];
+    const d = Math.hypot(gx, gy, gz);
+    if (d > 1) { gx /= d; gy /= d; gz /= d; }
+    const k = 18 * this.reach.x * hh;
+    const x = this.soft.x, ix = this.cfg.core;
+    for (const i of ix) { x[i * 3] += gx * k; x[i * 3 + 1] += gy * k; x[i * 3 + 2] += gz * k; }
+    this.soft._shift(this.rig.clouds[0].ix, -gx * k * ix.length, -gy * k * ix.length, -gz * k * ix.length);
+  }
+
+  /* a plush sheep: a light body that stands on the floor and slides to a
+     stop. Held, it is led on a short soft lead toward the hand; it bumps
+     the plush (and the plush it) by mass                                 */
+  _sheep(t, h) {
+    const { x, r, n } = this.soft;
+    const g = this.soft.params.gravity;
+    const p = t.p;
+    p[0] = t.x[0]; p[1] = t.x[1]; p[2] = t.x[2];
+    if (t.held && t.hand) {
+      const K = 140, C = 2 * Math.sqrt(K);
+      t.v[0] += (K * (t.hand[0] - t.x[0]) - C * t.v[0]) * h;
+      t.v[2] += (K * (t.hand[1] - t.x[2]) - C * t.v[2]) * h;
+    }
+    t.v[1] -= g * h;
+    for (let d = 0; d < 3; d++) t.x[d] += t.v[d] * h;
+    // held, it gives way to the plush; loose, the two share it by mass
+    const share = t.held ? 0.15 : SHEEP_M / (SHEEP_M + 1);
+    for (let i = 0; i < n; i++) {
+      const dx = x[i * 3] - t.x[0], dy = x[i * 3 + 1] - t.x[1], dz = x[i * 3 + 2] - t.x[2];
+      const m = t.r + r[i] * 0.85;
+      if (dx > m || dx < -m || dy > m || dy < -m || dz > m || dz < -m) continue;
+      const d = Math.hypot(dx, dy, dz);
+      if (d >= m || d < 1e-9) continue;
+      const pen = m - d, nx = dx / d, ny = dy / d, nz = dz / d;
+      x[i * 3] += nx * pen * share; x[i * 3 + 1] += ny * pen * share; x[i * 3 + 2] += nz * pen * share;
+      // pushed down into the floor by a nose, it stays standing on it
+      t.x[0] -= nx * pen * (1 - share); t.x[1] -= Math.max(0, ny) * pen * (1 - share); t.x[2] -= nz * pen * (1 - share);
+    }
+    let floor = false;
+    if (t.x[1] < SHEEP_Y) { t.x[1] = SHEEP_Y; floor = true; }
+    const c = this.soft.cloudC[0];
+    const ox = t.x[0] - c[0], oz = t.x[2] - c[2], od = Math.hypot(ox, oz), wall = 7;
+    if (od > wall) { t.x[0] = c[0] + ox / od * wall; t.x[2] = c[2] + oz / od * wall; }
+    const ih = 1 / h;
+    for (let d = 0; d < 3; d++) t.v[d] = (t.x[d] - p[d]) * ih;
+    if (floor) {
+      t.v[1] = Math.max(0, t.v[1]);
+      if (!t.held) {
+        // felt on the floor: a steady drag to a stop
+        const sp = Math.hypot(t.v[0], t.v[2]), dv = SHEEP_SLIDE * h;
+        const k = sp > dv ? (sp - dv) / sp : 0;
+        t.v[0] *= k; t.v[2] *= k;
+      }
+    }
+    const sp = Math.hypot(...t.v);
+    if (sp > 9) for (let d = 0; d < 3; d++) t.v[d] *= 9 / sp;
+    if (![...t.x, ...t.v].every(Number.isFinite)) { t.x = [c[0], SHEEP_Y, c[2] + 2.5]; t.v = [0, 0, 0]; }
+  }
+
+  /* how the sheep looks as it goes: its top lags behind a change of pace
+     on an underdamped spring (a wobble), and it turns to face its way   */
+  _sheepWobble(t, dt) {
+    const ax = (t.v[0] - t.vLast[0]) / dt, az = (t.v[2] - t.vLast[1]) / dt;
+    t.vLast = [t.v[0], t.v[2]];
+    const want = [clamp(-ax * 0.012, -0.3, 0.3), clamp(-az * 0.012, -0.3, 0.3)];
+    for (let d = 0; d < 2; d++) {
+      t.leanV[d] += (110 * (want[d] - t.lean[d]) - 5 * t.leanV[d]) * dt;
+      t.lean[d] = clamp(t.lean[d] + t.leanV[d] * dt, -0.45, 0.45);
+    }
+    const sp = Math.hypot(t.v[0], t.v[2]);
+    if (sp > 0.5) {
+      let d = Math.atan2(t.v[0], t.v[2]) - t.yaw;
+      while (d > Math.PI) d -= TAU;
+      while (d < -Math.PI) d += TAU;
+      t.yaw += d * Math.min(1, dt * 2.5 * Math.min(1, sp / 2));
+    }
+    if (![...t.lean, ...t.leanV, t.yaw].every(Number.isFinite)) { t.lean = [0, 0]; t.leanV = [0, 0]; t.yaw = 0; }
+  }
+
   /* what to show in the hint line */
   status() {
     const t = this.toy;
@@ -879,6 +1151,11 @@ export class Play {
       if (!t) return '';
       const s = { idle: 'watching', watch: this.hold > 0.2 ? 'fixed on it…' : 'watching', crouch: 'crouching…', leap: 'pounce!', land: 'got it', cool: 'got it' }[this.state] || '';
       return `${s} · pounces ${this.count}`;
+    }
+    if (this.name === 'wolf') {
+      if (!t) return '';
+      const s = { watch: this.hold > 0.25 ? 'sniffing…' : 'watching the sheep', idle: 'watching the sheep', creep: 'creeping after it…', boop: 'boop!', cool: this.hit ? 'boop!' : 'settling' }[this.state] || '';
+      return `${s} · boops ${this.count}`;
     }
     if (this.name === 'lion') {
       if (!t) return '';

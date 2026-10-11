@@ -1,5 +1,6 @@
 /* The toys, dressed: a feather on a string tied to a little wooden wand, a
-   ball of wound yarn trailing a loose end, a felt carrot on a stick. Same
+   ball of wound yarn trailing a loose end, a felt carrot on a stick, a plush
+   sheep in a curly fleece. Same
    material language as the plush and the stick — soft wrap-lit felt with a
    fine fuzz, wood with a grain — and no textures: every pattern is a few
    lines of shader. toys.js does the physics; this only follows it.        */
@@ -8,6 +9,7 @@ import * as THREE from 'three/webgpu';
 import {
   Fn, uniform, float, vec2, vec3, vec4, positionLocal, positionWorld, normalWorld, cameraPosition, uv,
   mix, smoothstep, clamp, normalize, dot, pow, abs, fract, sin, Discard, mx_noise_float,
+  mx_worley_noise_float, normalLocal,
 } from 'three/tsl';
 import { KEY } from './fur.js';
 
@@ -241,6 +243,125 @@ function makeCarrot() {
   };
 }
 
+/* ── plush sheep ───────────────────────────────────────────────────────────── */
+
+/* many spheres, each scaled, rotated and placed, as one geometry (so the
+   fleece's pattern runs on in the sheep's own space across all of them)  */
+function lumps(list, w = 24, h = 16) {
+  const unit = new THREE.SphereGeometry(1, w, h);
+  const P = unit.attributes.position.array, N = unit.attributes.normal.array, I = unit.index.array;
+  const pos = [], nrm = [], idx = [];
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), nm = new THREE.Matrix3();
+  const v = new THREE.Vector3();
+  for (const L of list) {
+    q.setFromEuler(e.set(...(L.rot || [0, 0, 0])));
+    m.compose(v.set(...L.at), q, new THREE.Vector3(...L.r));
+    nm.getNormalMatrix(m);
+    const base = pos.length / 3;
+    for (let k = 0; k < P.length; k += 3) {
+      v.set(P[k], P[k + 1], P[k + 2]).applyMatrix4(m); pos.push(v.x, v.y, v.z);
+      v.set(N[k], N[k + 1], N[k + 2]).applyMatrix3(nm).normalize(); nrm.push(v.x, v.y, v.z);
+    }
+    for (const i of I) idx.push(base + i);
+  }
+  unit.dispose();
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+  g.setIndex(idx);
+  return g;
+}
+
+/* the fleece: long curly white pile — every lump bubbled with tight curls
+   (a cellular pattern pushes the surface out into ringlets), cream in the
+   creases, the tips catching the light                                    */
+function fleeceMaterial() {
+  const mat = new THREE.MeshBasicNodeMaterial();
+  const curl = Fn(() => {
+    const p = positionLocal.mul(17);
+    const w = mx_worley_noise_float(p.add(mx_noise_float(p.mul(0.35)).mul(0.6)));
+    // each cell a little ringlet: a raised loop round a dip
+    return smoothstep(0.05, 0.42, w).mul(smoothstep(0.95, 0.5, w));
+  });
+  mat.positionNode = positionLocal.add(normalLocal.mul(curl().mul(0.035).add(mx_noise_float(positionLocal.mul(6)).mul(0.012))));
+  mat.colorNode = Fn(() => {
+    const N = normalize(normalWorld);
+    const c = curl();
+    const loop = sin(mx_worley_noise_float(positionLocal.mul(17)).mul(26)).mul(0.5).add(0.5);
+    const crease = vec3(0.86, 0.8, 0.7), tip = vec3(0.99, 0.975, 0.95);
+    const base = mix(crease, tip, c.mul(0.75).add(loop.mul(0.25)));
+    return vec4(shade(base, N, 140), 1);
+  })();
+  return mat;
+}
+
+function makeSheep() {
+  const root = new THREE.Group();
+  const body = new THREE.Group();
+  body.position.y = 0.5;
+  root.add(body);
+  // wool lumps over an egg of a body, a woolly cap and a pom of a tail
+  const wool = [{ at: [0, 0.02, -0.04], r: [0.33, 0.28, 0.42] }];
+  const n = 90, ga = Math.PI * (3 - Math.sqrt(5));
+  for (let k = 0; k < n; k++) {
+    const y = 1 - (k + 0.5) / n * 1.7;        // stop short of the belly
+    const rr = Math.sqrt(1 - y * y), a = k * ga;
+    const s = 0.11 + 0.035 * ((k * 7) % 5) / 4;
+    wool.push({ at: [Math.cos(a) * rr * 0.33, 0.02 + y * 0.28, -0.04 + Math.sin(a) * rr * 0.42], r: [s, s * 0.9, s] });
+  }
+  for (const [x, y, z, s] of [[0, 0.33, 0.36, 0.085], [-0.07, 0.3, 0.3, 0.075], [0.07, 0.3, 0.3, 0.075], [0, 0.31, 0.27, 0.08], [0, 0.07, -0.5, 0.09]]) wool.push({ at: [x, y, z], r: [s, s, s] });
+  const fleece = new THREE.Mesh(lumps(wool, 20, 14), fleeceMaterial());
+  body.add(fleece);
+
+  // the face and legs in dark felt
+  const felt = feltMaterial('#2c2522');
+  const head = new THREE.Group();
+  head.position.set(0, 0.13, 0.4);
+  head.rotation.x = 0.38;
+  body.add(head);
+  const face = new THREE.Mesh(lumps([
+    { at: [0, 0, 0.08], r: [0.15, 0.165, 0.2] },
+    { at: [0, -0.04, 0.2], r: [0.11, 0.115, 0.12] },
+  ]), felt);
+  head.add(face);
+  // little ears, sticking out sideways and drooping a touch, pink inside
+  const inner = feltMaterial('#b98a83');
+  for (const s of [-1, 1]) {
+    const ear = new THREE.Group();
+    ear.position.set(s * 0.15, 0.08, 0.02);
+    ear.rotation.set(0.2, -s * 0.3, -s * 0.45);
+    ear.add(new THREE.Mesh(lumps([{ at: [s * 0.09, 0, 0], r: [0.1, 0.035, 0.055] }], 16, 10), felt));
+    ear.add(new THREE.Mesh(lumps([{ at: [s * 0.095, 0.012, 0.012], r: [0.07, 0.02, 0.035] }], 16, 10), inner));
+    head.add(ear);
+  }
+  // bead eyes in a white felt surround, and a small stitched nose
+  const white = feltMaterial('#f2ece2'), bead = feltMaterial('#100d0c');
+  for (const s of [-1, 1]) {
+    head.add(new THREE.Mesh(lumps([{ at: [s * 0.075, 0.06, 0.24], r: [0.042, 0.045, 0.025] }], 16, 10), white));
+    head.add(new THREE.Mesh(lumps([{ at: [s * 0.077, 0.058, 0.262], r: [0.024, 0.026, 0.014] }], 12, 8), bead));
+  }
+  head.add(new THREE.Mesh(lumps([{ at: [0, -0.02, 0.32], r: [0.04, 0.022, 0.015] }], 12, 8), feltMaterial('#4a3b38')));
+  // four short legs, dark felt, sitting under the wool
+  const leg = new THREE.CylinderGeometry(0.052, 0.058, 0.36, 12, 1);
+  for (const [x, z] of [[-0.15, 0.2], [0.15, 0.2], [-0.15, -0.24], [0.15, -0.24]]) {
+    const m = new THREE.Mesh(leg, felt);
+    m.position.set(x, -0.32, z);
+    body.add(m);
+  }
+
+  const _q = new THREE.Quaternion(), _k = new THREE.Vector3();
+  return {
+    group: root,
+    update(t) {
+      // stands on the floor; the wobble rocks it about its feet
+      root.position.set(t.x[0], t.x[1] - 0.5, t.x[2]);
+      root.quaternion.setFromAxisAngle(_up, t.yaw);
+      const l = Math.hypot(t.lean[0], t.lean[1]);
+      if (l > 1e-5) root.quaternion.premultiply(_q.setFromAxisAngle(_k.set(t.lean[1] / l, 0, -t.lean[0] / l), l));
+    },
+  };
+}
+
 /* one view per toy kind, built on first use; only the live one is shown */
 export class ToyView {
   constructor(scene, rope) {
@@ -251,7 +372,7 @@ export class ToyView {
 
   _get(kind) {
     if (!this.views[kind]) {
-      const v = kind === 'feather' ? makeFeather(this.rope) : kind === 'yarn' ? makeYarn(0.3) : makeCarrot();
+      const v = kind === 'feather' ? makeFeather(this.rope) : kind === 'yarn' ? makeYarn(0.3) : kind === 'sheep' ? makeSheep() : makeCarrot();
       v.group.visible = false;
       this.scene.add(v.group);
       this.views[kind] = v;
@@ -273,6 +394,7 @@ export class ToyView {
     const t = play?.toy;
     if (!t) return [];
     if (t.kind === 'yarn') return [[...t.x, t.r]];
+    if (t.kind === 'sheep') return [[t.x[0], t.x[1] - 0.15, t.x[2], 0.5]];
     if (t.kind === 'feather') {
       const out = [];
       for (let k = 0; k < t.pts.length / 3; k++) out.push([t.pts[k * 3], t.pts[k * 3 + 1], t.pts[k * 3 + 2], k === t.pts.length / 3 - 1 ? 0.14 : 0.02]);

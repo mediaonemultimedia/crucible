@@ -239,7 +239,8 @@ export class Tools {
 
   _startToyDrag(p, point) {
     p.kind = 'toy';
-    p.plane = this._camPlane(point);
+    // a toy that lives on the floor (the sheep) is dragged across it
+    p.plane = this.play.floorDrag ? new THREE.Plane(new THREE.Vector3(0, 1, 0), -point.y) : this._camPlane(point);
     this.play.dragStart([point.x, point.y, point.z]);
   }
 

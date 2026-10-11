@@ -42,7 +42,7 @@ function tossKE(b) {
   return 0.5 * e;
 }
 
-for (const name of ['fox', 'lion', 'llama']) {
+for (const name of ['fox', 'lion', 'llama', 'wolf']) {
   test(`${name}: no toy, no change — Play installed but idle is bit-for-bit the plain toy`, () => {
     const a = make(name);
     const b = new SoftBody(buildRig(name));
@@ -226,4 +226,102 @@ test('llama: a carrot pulled out of reach — the neck springs back', () => {
   T.play.dragTo([m[0] + 0.1, 3, m[2] + 6]);
   T.run(3);
   assert.ok(T.play.reach.x < 0.1, `still reaching: ${T.play.reach.x}`);
+});
+
+test('wolf: the sheep is a sheep — it stands on the floor, slides to a stop, and never leaves the playpen', () => {
+  const T = make('wolf');
+  T.run(1.5);
+  const c = [...T.b.cloudC[0]];
+  T.play.place([c[0] + 2.5, 0, c[2] + 2.5], [0, 0, 1]);
+  assert.equal(T.play.toy.kind, 'sheep');
+  assert.equal(T.play.floorDrag, true);
+  // shoved hard, it slides a little way and stops on its feet
+  T.play.toy.v = [4, 0, 0];
+  T.run(2);
+  const t = T.play.toy;
+  assert.ok(t.x[0] - (c[0] + 2.5) > 0.5 && t.x[0] - (c[0] + 2.5) < 2, `slid ${(t.x[0] - c[0] - 2.5).toFixed(2)}`);
+  assert.ok(Math.hypot(...t.v) < 1e-6, 'still sliding');
+  assert.ok(Math.abs(t.x[1] - 0.5) < 1e-6, `not on its feet: y ${t.x[1]}`);
+  // dragged miles away, the playpen keeps it near
+  T.play.dragStart(t.x);
+  T.play.dragTo([c[0] + 40, 0.5, c[2] + 40]);
+  T.run(2);
+  T.play.dragEnd();
+  T.run(2);
+  assert.ok(Math.hypot(t.x[0] - T.b.cloudC[0][0], t.x[2] - T.b.cloudC[0][2]) <= 7 + 1e-6);
+  assert.ok(t.x.every(Number.isFinite) && t.v.every(Number.isFinite));
+});
+
+test('wolf: a sheep led away by hand — he creeps after it a little, low and slow, and stops', () => {
+  const T = make('wolf');
+  T.run(1.5);
+  const c0 = [...T.b.cloudC[0]];
+  T.play.place([c0[0] + 0.2, 0, c0[2] + 2.2], [0, 0, 1]);
+  T.play.dragStart(T.play.toy.x);
+  for (let k = 1; k <= 60; k++) { T.play.dragTo([c0[0] + 0.2 + 0.03 * k, 0.5, c0[2] + 2.2 + 0.04 * k]); T.run(1 / 60); }
+  T.play.dragEnd();
+  const S = [...T.play.toy.x];
+  const seen = new Set();
+  let low = 0;
+  T.run(9, () => { seen.add(T.play.state); if (T.play.state === 'creep') low = Math.max(low, T.play.crouch.x); return false; });
+  assert.ok(seen.has('creep'), `never crept (states ${[...seen]})`);
+  assert.ok(low > 0.08, `not low: crouch ${low.toFixed(3)}`);
+  const c1 = T.b.cloudC[0];
+  const before = Math.hypot(S[0] - c0[0], S[2] - c0[2]), after = Math.hypot(S[0] - c1[0], S[2] - c1[2]);
+  assert.ok(before - after > 0.6, `only closed ${(before - after).toFixed(2)} on the sheep`);
+  const went = Math.hypot(c1[0] - c0[0], c1[2] - c0[2]);
+  assert.ok(went < 2.6, `went ${went.toFixed(2)}: too far`);
+  assert.ok(after > 1.6, `walked into the sheep: ${after.toFixed(2)}`);
+  assert.ok(T.b.cloudR[0][4] > 0.95, `fell over: ${T.b.cloudR[0][4].toFixed(3)}`);
+  assert.ok(T.peak < tossKE(T.b) * 0.5, `peak ${T.peak.toFixed(0)}`);
+  // stopped: sitting, watching (the tail still going), not walking on
+  const cs = [...c1];
+  T.run(2);
+  assert.ok(Math.hypot(T.b.cloudC[0][0] - cs[0], T.b.cloudC[0][2] - cs[2]) < 0.05, 'still walking');
+  assert.ok(T.b.x.every(Number.isFinite) && !T.b.nanResets);
+  // led further and further off: the leash holds
+  for (let r = 0; r < 4; r++) {
+    const t = T.play.toy, c = T.b.cloudC[0];
+    T.play.dragStart(t.x);
+    for (let k = 1; k <= 40; k++) { T.play.dragTo([t.x[0] + 0.1, 0.5, c[2] + 6.4]); T.run(1 / 60); }
+    T.play.dragEnd();
+    T.run(8);
+  }
+  const far = Math.hypot(T.b.cloudC[0][0] - c0[0], T.b.cloudC[0][2] - c0[2]);
+  assert.ok(far < 2.8, `crept ${far.toFixed(2)} from where he sat: off the stage`);
+  assert.ok(T.b.cloudR[0][4] > 0.95);
+});
+
+test('wolf: a sheep left still within reach gets a gentle nose-boop — it scoots, nothing runs away', () => {
+  const T = make('wolf');
+  T.run(1.5);
+  const c0 = [...T.b.cloudC[0]];
+  T.play.place([c0[0] + 0.1, 0, c0[2] + 1.6], [0, 0, 1]);
+  const s0 = [...T.play.toy.x];
+  const seen = new Set();
+  let low = 9, sheepPeak = 0;
+  T.run(5, () => {
+    seen.add(T.play.state);
+    if (T.play.state === 'boop') low = Math.min(low, T.play.nose()[1]);
+    sheepPeak = Math.max(sheepPeak, Math.hypot(...T.play.toy.v));
+    return T.play.count > 0 && T.play.state === 'cool';
+  });
+  assert.ok(seen.has('boop'), `never booped (states ${[...seen]})`);
+  assert.equal(T.play.count, 1);
+  assert.ok(low < 1.3, `the head never dipped: nose at ${low.toFixed(2)}`);
+  T.run(2);
+  const s1 = T.play.toy.x;
+  const away = Math.hypot(s1[0] - c0[0], s1[2] - c0[2]) - Math.hypot(s0[0] - c0[0], s0[2] - c0[2]);
+  assert.ok(away > 0.15 && away < 1.2, `the sheep scooted ${away.toFixed(2)}`);
+  assert.ok(sheepPeak < 4, `sheep flew off at ${sheepPeak.toFixed(2)}`);
+  assert.ok(Math.abs(s1[1] - 0.5) < 0.02, 'sheep not back on its feet');
+  assert.ok(T.play.toy.x.every(Number.isFinite) && T.play.toy.v.every(Number.isFinite));
+  assert.ok(T.b.x.every(Number.isFinite) && !T.b.nanResets, 'NaN');
+  assert.ok(T.peak < tossKE(T.b) * 0.5, `peak kinetic ${T.peak.toFixed(0)}`);
+  assert.ok(T.b.cloudR[0][4] > 0.95, `fell over: ${T.b.cloudR[0][4].toFixed(3)}`);
+  assert.ok(Math.hypot(T.b.cloudC[0][0] - c0[0], T.b.cloudC[0][2] - c0[2]) < 0.4, 'the boop walked him off');
+  T.play.remove();
+  T.run(6);
+  assert.ok(T.b.kinetic() < 5);
+  assert.equal(T.b.pose, null);
 });
