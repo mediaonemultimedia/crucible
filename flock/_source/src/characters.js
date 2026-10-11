@@ -71,6 +71,22 @@ export const CHARACTER_INFO = {
     toy: 'Click the floor to hold out a carrot on a stick; drag it about. The llama stretches for it — keep it at its mouth and it nibbles. Take it away and offer a fresh one.',
     face: llamaFace,
   },
+  wolf: {
+    label: 'Wolf',
+    colors: {
+      grey: { fur: '#9a9ca3', under: '#f1e9da', accent: '#5f626b' },
+      timber: { fur: '#a08670', under: '#efe2cc', accent: '#6b5544' },
+      arctic: { fur: '#e8e6e1', under: '#fbf8f1', accent: '#b9bcc4' },
+      dusk: { fur: '#6d6f7c', under: '#d9d3cb', accent: '#3d3f4a' },
+    },
+    eyes: { part: 'head', u: 0.074, v: 0.45, lift: 0.03, scale: [0.12, 0.135, 0.08] },
+    unit: ['part', 'parts'], readout: 'Held', stitch: [0.045, 0.04, 0.045],
+    aria: 'A plush wolf you can pull, poke and comb',
+    blurb: 'A sitting wolf in a grey coat, ears up. Tug an ear and it springs back; comb the tail against the nap and it stays rough.',
+    hand: 'Grab the head, an ear or the tail and pull — it gives, then springs back. Shift as you let go to pin that point, then grab another.',
+    toy: 'Click the floor to set down a woolly sheep; drag it about the floor. The wolf watches it. Pull it away and he creeps after it; leave it still within reach for a second and he gives it a gentle nose-boop.',
+    face: wolfFace,
+  },
 };
 
 /* paint a character's mask into the shared canvas texture */
@@ -168,6 +184,17 @@ function foxFace(g, size, { at, blob, eyeRing, stitch }) {
   // mouth: a short stitch down from the nose under the chin, then a smile
   stitch('snout', [[0.5, 0.18], [0.5, 0.3]], 0.03);
   stitch('snout', [[0.38, 0.36], [0.44, 0.34], [0.5, 0.3], [0.56, 0.34], [0.62, 0.36]], 0.03);
+}
+
+function wolfFace(g, size, { blob, eyeRing, stitch }) {
+  eyeRing('head', 0.074, 0.45, 0.32);
+  g.globalCompositeOperation = 'lighter';
+  // nose: a big soft satin-stitched pad on the end of the snout
+  blob('snout', 0.5, 0.36, 0.25, 0.15, 'rgb(0,0,255)');
+  blob('snout', 0.5, 0.29, 0.17, 0.08, 'rgb(0,0,255)');
+  // mouth: down from the nose, then a small smile each way
+  stitch('snout', [[0.5, 0.42], [0.5, 0.6]], 0.05);
+  stitch('snout', [[0.42, 0.67], [0.46, 0.66], [0.5, 0.6], [0.54, 0.66], [0.58, 0.67]], 0.05);
 }
 
 function lionFace(g, size, { blob, eyeRing, stitch }) {

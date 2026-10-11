@@ -308,7 +308,7 @@ async function start() {
   addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT') return;
     const k = e.key.toLowerCase();
-    const digit = /^Digit([1-4])$/.exec(e.code);
+    const digit = /^Digit([1-5])$/.exec(e.code);
     if (e.shiftKey && digit) setCharacter(CHARACTERS[+digit[1] - 1]);
     else if (k >= '1' && k <= '4') setTool(['hand', 'finger', 'comb', 'toy'][+k - 1]);
     else if (k === 'c') togglePanel(!document.body.classList.contains('panel-open'));

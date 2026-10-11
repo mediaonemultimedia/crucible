@@ -2,7 +2,7 @@
 
    Each character is one or two shape-matched clouds plus appendage chains,
    written the same way the octopus is so the one SoftBody and one Body drive
-   them all. The fox and lion are a single firmly stuffed cloud, torso and
+   them all. The fox, wolf and lion are a single firmly stuffed cloud, torso and
    head together; the llama's small head is a second cloud riding on its neck
    chain. Proportions are a chunky, friendly toy's: big round heads, short
    muzzles, stubby legs.
@@ -235,7 +235,7 @@ export class RigBuilder {
   }
 }
 
-/* ── shared anatomy for the two sitting cats-and-dogs (the fox and the lion) ──────────────────────── */
+/* ── shared anatomy for the sitting cats-and-dogs (the fox, the wolf and the lion) ───────────── */
 
 /* sitting torso: pear-shaped, leaning back a touch, bottom on the floor */
 function sittingTorso(b, { w = 0.8, h = 0.98, d = 0.74 } = {}) {
@@ -358,6 +358,60 @@ export function buildFox() {
   });
 
   return b.finish({ camY: 0.2, toy: sittingToy(b, h0, h1, { pivot: [0, 1.86, 0.02], chest: [0, 1.25, 0.62] }) });
+}
+
+/* ── wolf ───────────────────────────────────────────────────────────────────── */
+
+export function buildWolf() {
+  const b = new RigBuilder('wolf');
+  const torso = sittingTorso(b);
+  const HEAD = { c: [0, 2.22, 0.1], r: [0.8, 0.7, 0.72], B: null, bulge: (phi) => 1 + 0.06 * Math.sin(phi * 1.3) };
+  // one stuffed cloud, head and torso together: a firmly sewn plush head
+  const h0 = b.rad.length;
+  const head = headBulk(b, HEAD);
+  const h1 = b.rad.length;
+
+  // grey with a cream chest and belly, a darker saddle up the back
+  const belly = (l) => smooth(0.15, 0.55, l[2]) * smooth(0.75, 0.2, l[1]);
+  const saddle = (l) => smooth(0.0, -0.6, l[2]) * smooth(-0.2, 0.6, l[1]) * 0.55;
+  b.grid({ name: 'torso', cloud: 0, ...torso, U: 56, V: 36, under: (u, v, l) => belly(l), accent: (u, v, l) => saddle(l) });
+  // cheeks and lower face cream, crown and back of the head darker
+  b.grid({
+    name: 'head', cloud: head, ...HEAD, U: 64, V: 40, eye: true,
+    under: (u, v, l) => smooth(0.25, 0.7, l[2]) * smooth(0.05, -0.45, l[1]),
+    accent: (u, v, l) => Math.max(smooth(0.3, 0.95, l[1]) * smooth(0.6, -0.1, l[2]) * 0.6,
+      smooth(0.15, 0.45, l[1]) * smooth(0.3, 0.05, Math.abs(l[0])) * smooth(0.5, 0.85, l[2]) * 0.55),
+    pile: (u, v, l) => 1 + 0.35 * smooth(0.2, -0.5, l[1]) * smooth(0.6, 0.95, Math.abs(l[0])),   // cheek ruffs
+  });
+  b.grid({ name: 'snout', cloud: head, c: [0, 2.03, 0.7], r: [0.31, 0.24, 0.34], B: rotX(0.1), U: 32, V: 22, under: () => 1, pile: () => 0.7 });
+  haunches(b, { under: (u, v, l) => smooth(0.4, 0.9, l[2]) * 0.4, accent: (u, v, l) => smooth(0.0, -0.8, l[2]) * 0.4 });
+  frontLegs(b, { under: (s, c) => 0.25 + 0.6 * smooth(0.75, 1, s) });
+
+  // pointed upright ears: stiff, flattened front-to-back, cream inside
+  for (const s of [-1, 1]) {
+    b.chain({
+      name: s < 0 ? 'left ear' : 'right ear', kind: 'ear', cloud: head, n: 5,
+      anchor: [s * 0.24, 2.4, 0.04],
+      path: (u) => [s * (0.34 + 0.2 * u), 2.62 + 0.78 * u, 0.06 - 0.06 * u],
+      radius: (u) => 0.035 + 0.22 * Math.pow(1 - u, 0.85),
+      ref: [0, 0, 1], flat: 0.42, bend: 3.2, mem: 7, stretch: 1.12, skip: 2, AS: 20, AA: 18, CAP: 5,
+      under: (u, c) => smooth(0.25, 0.75, c) * smooth(0.12, 0.3, u) * (1 - smooth(0.7, 0.92, u)),
+      accent: (u) => smooth(0.72, 0.95, u),
+      pile: () => 0.8,
+    });
+  }
+
+  // bushy tail curled round the right haunch onto the floor
+  b.chain({
+    name: 'tail', kind: 'tail', cloud: 0, n: 9, anchor: [0.1, 0.5, -0.35],
+    path: spline([[0.15, 0.45, -0.6], [0.6, 0.31, -0.8], [1.1, 0.3, -0.6], [1.5, 0.32, -0.28], [1.72, 0.42, 0.02]]),
+    radius: (u) => 0.13 + 0.15 * Math.pow(Math.sin(Math.PI * Math.min(1, 0.15 + u * 0.95)), 0.8),
+    ref: [0, -1, 0], bend: 1.6, mem: 0.6, stretch: 1.25, AS: 36, AA: 20, CAP: 7,
+    pile: () => 1.45, accent: (u) => smooth(0.86, 0.98, u) * 0.85, under: (u, c) => smooth(0.2, 0.8, c) * 0.5 * (1 - smooth(0.75, 0.9, u)),
+    groom: { ruf: 0.12 },
+  });
+
+  return b.finish({ camY: 0.15, toy: sittingToy(b, h0, h1, { pivot: [0, 1.86, 0.02], chest: [0, 1.25, 0.62] }) });
 }
 
 /* ── lion ───────────────────────────────────────────────────────────────────── */
