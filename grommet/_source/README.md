@@ -63,7 +63,8 @@ src/athletes/
   leopard.game.js   tennis
   bear.rig.js       rest shape, gloves, furMask
   bear.game.js      goalkeeping
-  crow.rig.js       round body, head, flat wing chains, tail fan, felt feet
+  crow.rig.js       round body running back into a rump and tail fan, head,
+                    flat wing chains sewn in at the shoulder, felt feet
   crow.game.js      catch & hoard: tosses, the beak, the lunge, the nest
 characters.js       per-athlete colours, eyes, face, pattern, court, words
 props.js            what they play with (three.js)
@@ -76,6 +77,9 @@ crowprops.js        the crow's beak, nest and treasures (three.js)
   head's frame, which `CrowGame._headFrame()` measures every substep by
   shape-matching the head's stuffing to its sewn shape. `beak` (0…1) is the
   gape; `mouth` (between the mandibles) is what catches.
+- **Shape**: one stuffed cloud — torso, head, and a rump and flat tail fan
+  (bulk points + grids), so the body runs out behind like a bird's. The wings
+  are laid along the torso's surface (`torsoX`), their roots inside it.
 - **Wings** are flat `arm` chains. A beat re-poses them (out, up, round) and
   turns the chain's `ref` with the same rotation, so the flat cross-section
   turns with the wing (`_posture()`); the tips are also driven toward the pose.
