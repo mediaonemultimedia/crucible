@@ -136,6 +136,14 @@ const SCENES = {
       console.log('  catch-close', r);
     },
   },
+  'crow-side': {
+    character: 'crow',
+    run: async (G) => { await G(`(() => { const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 7.5; o.az = 1.35; o.el = 0.2; o.target.set(0, 1.1, -0.2); __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
+  },
+  'crow-back': {
+    character: 'crow',
+    run: async (G) => { await G(`(() => { const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 7.5; o.az = 2.5; o.el = 0.3; o.target.set(0, 1.1, -0.2); __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
+  },
   'crow-hooded': {
     character: 'crow',
     run: async (G) => { await G(`(() => { document.querySelectorAll('#p-fur button')[1].click(); __grommet.step(2.5, true); })()`); },

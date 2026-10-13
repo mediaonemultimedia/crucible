@@ -14,34 +14,44 @@ import { NEST, ITEMS } from './athletes/crow.game.js';
 import { mulberry32 } from './math.js';
 
 /* ── the beak ──────────────────────────────────────────────────────────────
-   Each mandible is lofted along its length (z, from the hinge at the
-   origin) through half-ellipse sections — the upper one arched over and
-   hooked down a little at the tip, the lower one a shallower scoop —
-   closed flat across where the two meet.                                */
+   Closed, the two mandibles make one solid, rounded cone: the upper is the
+   top of it — full and arched, a ridge (culmen) running down its middle,
+   curving over into a slight hook at the tip — and the lower is the
+   shallower bottom of the same cone. They meet along the gape line, and
+   each is closed by its own inside face along it, so an open beak shows
+   a mouth, not a hollow shell. Lofted along z from the hinge at the
+   origin; the root sits inside the head's fur.                          */
 function mandible(L, W, H, upper) {
-  const S = 22, K = 18;
+  const S = 28, K = 24;
   const pos = [], idx = [];
+  const hook = 0.5 * H;
+  // the gape line: straight, dropping into the hook near the tip
+  const gapeY = (s) => -hook * Math.pow(s, 3.2);
   for (let j = 0; j <= S; j++) {
     const s = j / S;
-    const w = W * Math.pow(Math.max(0, 1 - Math.pow(s, 1.6)), 0.75) * (1 + 0.15 * (1 - s));
-    const h = H * Math.pow(Math.max(0, 1 - s), 0.85);
-    // the upper bill's ridge curves down over the tip; the lower follows
-    const y0 = -0.42 * H * Math.pow(s, 2.4) - (upper ? 0 : 0.04 * H * s);
+    // full at the root, tapering in a gentle ogive to a fine point
+    const taper = Math.pow(Math.max(0, 1 - Math.pow(s, 1.35)), 0.62);
+    const w = W * taper;
+    const h = (upper ? H : H * 0.62) * taper * (upper ? 1 + 0.12 * (1 - s) : 1);
+    const y0 = gapeY(s);
     for (let k = 0; k <= K; k++) {
       const a = (k / K) * Math.PI;
-      const sx = Math.cos(a), sy = Math.sin(a);
-      pos.push(sx * w, y0 + (upper ? sy * h : -sy * h * 0.55), s * L);
+      const cx = Math.cos(a), sy = Math.sin(a);
+      // rounded, with a soft ridge along the top of the upper bill
+      const ridge = upper ? 1 + 0.16 * Math.pow(sy, 8) : 1;
+      const r = Math.pow(sy, 0.75) * ridge;
+      pos.push(cx * w, y0 + (upper ? r * h : -r * h), s * L);
     }
   }
   const tip = pos.length / 3;
-  pos.push(0, -0.42 * H - (upper ? 0 : 0.04 * H), L * 1.02);
+  pos.push(0, gapeY(1) - (upper ? 0 : 0.02 * H), L * 1.01);
   const R = K + 1;
   for (let j = 0; j < S; j++) {
     for (let k = 0; k < K; k++) {
       const a = j * R + k, b = a + 1, c = a + R, d = c + 1;
       if (upper) idx.push(a, c, b, b, c, d); else idx.push(a, b, c, b, d, c);
     }
-    // the flat underside (or top), across the section's chord
+    // the inside face across the gape
     const a = j * R, b = j * R + K, c = a + R, d = b + R;
     if (upper) idx.push(a, b, c, b, d, c); else idx.push(a, c, b, b, c, d);
   }
@@ -58,19 +68,28 @@ function mandible(L, W, H, upper) {
 
 export function makeBeak(B) {
   const color = uniform(new THREE.Color('#3d3c42'));
-  const mat = new THREE.MeshBasicNodeMaterial();
-  mat.colorNode = Fn(() => {
-    const N = normalize(normalWorld);
-    const V = normalize(cameraPosition.sub(positionWorld));
-    // felt: fibres, a fuzzy halo at the silhouette, a dull sheen
-    const fib = mx_noise_float(vec3(positionLocal.mul(90))).mul(0.07).add(0.96);
-    const base = vec3(color).mul(fib);
-    const fuzz = pow(float(1).sub(abs(dot(N, V))), float(2.4)).mul(0.35);
-    return vec4(shade(base, N, { spec: 0.08, power: 10, wrap: 0.5 }).add(base.mul(fuzz)).add(vec3(0.02, 0.02, 0.025).mul(fuzz)), 1);
-  })();
+  // felt: fibres, a fuzzy halo at the silhouette, a satin sheen. The upper
+  // bill catches the light along its ridge; the lower one sits in its shade
+  const felt = (upper) => {
+    const mat = new THREE.MeshBasicNodeMaterial();
+    mat.colorNode = Fn(() => {
+      const N = normalize(normalWorld);
+      const V = normalize(cameraPosition.sub(positionWorld));
+      const p = positionLocal;
+      const fib = mx_noise_float(vec3(p.mul(90))).mul(0.07).add(0.96);
+      let base = vec3(color).mul(fib);
+      if (upper) {
+        const ridge = float(1).sub(smoothstep(0.0, 0.06, abs(p.x))).mul(smoothstep(0.02, 0.09, p.y));
+        base = base.mul(ridge.mul(1.1).add(1.05));
+      } else base = base.mul(0.62);
+      const fuzz = pow(float(1).sub(abs(dot(N, V))), float(2.4)).mul(0.35);
+      return vec4(shade(base, N, { spec: upper ? 0.3 : 0.12, power: 16, wrap: 0.3 }).add(base.mul(fuzz)).add(vec3(0.03, 0.03, 0.035).mul(fuzz)), 1);
+    })();
+    return mat;
+  };
   const g = new THREE.Group();
-  const up = new THREE.Mesh(mandible(B.len, B.w, B.h, true), mat);
-  const lo = new THREE.Mesh(mandible(B.len * 0.93, B.w * 0.92, B.h * 0.9, false), mat);
+  const up = new THREE.Mesh(mandible(B.len, B.w, B.h, true), felt(true));
+  const lo = new THREE.Mesh(mandible(B.len * 0.96, B.w * 0.97, B.h, false), felt(false));
   const upG = new THREE.Group(), loG = new THREE.Group();
   upG.add(up); loG.add(lo);
   g.add(upG, loG);

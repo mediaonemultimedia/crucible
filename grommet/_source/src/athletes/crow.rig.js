@@ -9,7 +9,7 @@
    riding the head's frame, and the lower one hinges open and snaps shut.
    He faces +z; his right is −x. Units: 1 = 9 cm; about 22 cm tall.       */
 
-import { RigBuilder, smooth, lerp3, spline } from '../rigbuilder.js';
+import { RigBuilder, smooth, spline, rotX } from '../rigbuilder.js';
 import { standingBody, athleteCfg } from './standing.js';
 
 export const CROW = {
@@ -17,9 +17,17 @@ export const CROW = {
   HEAD: { c: [0, 2.0, 0.16], r: [0.5, 0.47, 0.5], B: null, bulge: (phi) => 1 + 0.04 * Math.sin(phi) },
   // the beak, in the head's rest frame (relative to the head bulk's centre):
   // where it is sewn on, which way it points, how long
-  BEAK: { base: [0, -0.06, 0.4], dir: [0, -0.14, 1], len: 0.64, w: 0.2, h: 0.16 },
+  BEAK: { base: [0, -0.02, 0.34], dir: [0, -0.3, 1], len: 0.66, w: 0.2, h: 0.23 },
   PIVOT: [0, 1.66, 0.08],
 };
+
+/* how far out the torso's surface is (|x|) at height y, depth z */
+function torsoX(T, y, z) {
+  const dy = (y - T.c[1]) / T.r[1];
+  const b = T.bulge(Math.acos(Math.max(-1, Math.min(1, dy))));
+  const dz = (z - T.c[2]) / (T.r[2] * b);
+  return T.r[0] * b * Math.sqrt(Math.max(0, 1 - dy * dy - dz * dz));
+}
 
 export function buildCrow() {
   const b = new RigBuilder('crow');
@@ -40,28 +48,34 @@ export function buildCrow() {
     pile: (u, v, l) => 0.8 + 0.25 * smooth(0.4, 0.9, l[1]) - 0.25 * smooth(0.55, 0.9, l[2]) * smooth(0.4, -0.2, l[1]),
   });
 
-  // folded wings along his sides: flat chains from the shoulder back and
-  // down, thin across (their flat axis is the side normal)
+  // folded wings along his sides, sewn on at the shoulder: each is a flat
+  // chain whose root sits inside the body (so the fur closes over the seam)
+  // and whose length lies along the body's surface, back and down, the tip
+  // tucked in over the rump
   const wings = [];
   for (const s of [-1, 1]) {
-    const P = [[s * 0.6, 1.5, 0.1], [s * 0.68, 1.15, -0.14], [s * 0.6, 0.82, -0.42], [s * 0.44, 0.6, -0.68]];
+    const on = (y, z, d) => [s * (torsoX(TORSO, y, z) + d), y, z];
+    const P = [on(1.58, 0.1, -0.12), on(1.3, -0.08, 0.02), on(1.0, -0.32, 0.05), on(0.78, -0.56, 0.0), on(0.66, -0.76, -0.08)];
     wings.push(b.chain({
       name: s < 0 ? 'right wing' : 'left wing', kind: 'arm', cloud: 0, n: 6,
-      anchor: [s * 0.36, 1.42, 0.05],
+      anchor: [s * 0.3, 1.45, 0.02],
       path: spline(P),
-      radius: (u) => 0.27 - 0.1 * u - 0.06 * smooth(0.75, 1, u),
-      ref: [s, 0, 0], flat: 0.32, bend: 3.2, mem: 6, stretch: 1.08, skip: 3, AS: 22, AA: 20, CAP: 7,
-      accent: () => 1, pile: (u) => 0.75 - 0.25 * u,
+      radius: (u) => 0.2 + 0.08 * Math.sin(Math.PI * Math.min(1, u * 1.6)) - 0.08 * smooth(0.7, 1, u),
+      ref: [s, 0, 0], flat: 0.3, bend: 3.2, mem: 6, stretch: 1.08, skip: 3, AS: 24, AA: 20, CAP: 7,
+      accent: () => 1, pile: (u) => 0.95 - 0.35 * u,
     }));
   }
 
-  // the tail: a fan of feathers out behind, flat (thin vertically)
-  b.chain({
-    name: 'tail', kind: 'tail', cloud: 0, n: 4, anchor: [0, 0.78, -0.42],
-    path: (u) => [0, 0.66 - 0.2 * u, -0.66 - 0.5 * u],
-    radius: (u) => 0.16 + 0.1 * u,
-    ref: [0, 1, 0], flat: 0.28, bend: 3, mem: 5, stretch: 1.06, skip: 2, AS: 14, AA: 18, CAP: 6,
-    accent: () => 1, pile: () => 0.6,
+  // no separate tail: the body itself runs out behind into a tapering rump
+  // and a flat fan of tail feathers, all one stuffed cloud
+  const RUMP = { c: [0, 0.86, -0.6], r: [0.42, 0.34, 0.56], B: rotX(-0.42) };
+  const TAIL = { c: [0, 0.6, -1.1], r: [0.21, 0.07, 0.42], B: rotX(-0.36), bulge: (phi) => 0.8 + 0.4 * Math.sin(phi) };
+  b.bulk(0, RUMP, 22, (d) => d[2] > 0.3);
+  b.bulk(0, TAIL, 14);
+  b.grid({ name: 'rump', cloud: 0, ...RUMP, U: 40, V: 24, accent: () => 1, pile: () => 0.9 });
+  b.grid({
+    name: 'tail', cloud: 0, ...TAIL, U: 36, V: 16, accent: () => 1,
+    pile: (u, v, l) => 0.55 + 0.25 * smooth(-0.2, -0.9, l[2]),
   });
 
   // little felt feet: cloth over the sole grids (no fur under them)
