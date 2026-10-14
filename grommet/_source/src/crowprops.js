@@ -71,12 +71,22 @@ function mandible(L, W, H, upper) {
     }
   }
   // the inside face across the gape, on its own vertices (a sharp lip, and
-  // the flanks' normals not bent down into it)
+  // the flanks' normals not bent down into it), hollowed down the middle
+  // into a trough: open, it reads as the inside of a mouth, not a blade
   const lip = pos.length / 3;
-  for (let j = 0; j <= S; j++) for (const k of [0, K]) { const i = j * R + k; pos.push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]); }
+  for (let j = 0; j <= S; j++) {
+    const s = j / S, t = taper(s), y0 = gapeY(s);
+    const h = (upper ? H : H * lower) * t * 0.45 * (1 - s * s);
+    const e0 = j * R, eK = j * R + K;
+    pos.push(pos[e0 * 3], pos[e0 * 3 + 1], pos[e0 * 3 + 2]);
+    pos.push(0, y0 + (upper ? h : -h), s * L);
+    pos.push(pos[eK * 3], pos[eK * 3 + 1], pos[eK * 3 + 2]);
+  }
   for (let j = 0; j < S; j++) {
-    const a = lip + j * 2, b = a + 1, c = a + 2, d = a + 3;
-    if (upper) idx.push(a, c, b, b, c, d); else idx.push(a, b, c, b, d, c);
+    for (const q of [0, 1]) {
+      const a = lip + j * 3 + q, b = a + 1, c = a + 3, d = a + 4;
+      if (upper) idx.push(a, c, b, b, c, d); else idx.push(a, b, c, b, d, c);
+    }
   }
   for (let k = 0; k < K; k++) {
     const a = S * R + k;
@@ -119,6 +129,9 @@ export function makeBeak(B) {
         const ridge = float(1).sub(smoothstep(0.0, 0.035, abs(p.x))).mul(smoothstep(0.04, 0.12, p.y));
         base = base.mul(ridge.mul(0.4).add(1.0)).mul(float(1).sub(side.mul(0.55)));
       } else base = base.mul(0.58).mul(float(1).sub(side.mul(0.35)));
+      // the inside of the mouth (the trough faces the other mandible): dark
+      const inside = smoothstep(0.3, 0.7, upper ? normalize(normalLocal).y.negate() : normalize(normalLocal).y);
+      base = mix(base, vec3(0.13, 0.08, 0.085), inside.mul(0.85));
       const rim = pow(float(1).sub(abs(dot(N, V))), float(2.4));
       const lit = shade(base, N, { spec: upper ? 0.32 : 0.12, power: 18, wrap: 0.2 });
       // the silhouette turns away into shadow, with a faint felt halo
