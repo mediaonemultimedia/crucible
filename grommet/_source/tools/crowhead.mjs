@@ -13,7 +13,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = path.join(root, 'shots');
 fs.mkdirSync(out, { recursive: true });
 const prefix = process.argv[2] || 'crowhead';
-const url = 'file://' + path.join(root, 'final.html');
+const url = 'file://' + (process.env.FINAL || path.join(root, 'final.html'));
 
 // cameras about the head's centre: az from the front (+z), el up
 const VIEWS = {
@@ -61,9 +61,10 @@ for (const [name, [az, el]] of Object.entries(VIEWS)) {
   const s = 560;
   await page.screenshot({ path: path.join(out, `${prefix}-${name}.png`), clip: { x: cx - s / 2, y: cy - s / 2, width: s, height: s }, timeout: 400000 });
 }
-// the head turned: he looks off to his right (camera-left from the front), the camera stays put
-for (const [name, look] of Object.entries({ 'turn-front': [-2.2, 2.0, 2.6] })) {
-  await G(`(() => { const g = __grommet.game; g.lookAt = ${JSON.stringify(look)}; __grommet.step(1.2); const o = __grommet.tools.orbit, c = g.hC; o.dist = 3.2; o.az = 0; o.el = 0.08; o.target.set(c[0], c[1] - 0.1, c[2] + 0.3); __grommet.tools.applyOrbit(); __grommet.step(0, true); })()`);
+// mid-catch: a berry tossed to his beak, caught open, from the front and three-quarter
+await G(`(() => { const g = __grommet.game; g.reset(); __grommet.step(2); const it = g.launch({ aim: [0.15, 1.95], kind: 'food', sub: 'berry', speed: 15 }); for (let k = 0; k < 240; k++) { __grommet.step(1/120); const b = it.ball.x, m = g.mouth; if (Math.hypot(b[0]-m[0], b[1]-m[1], b[2]-m[2]) < 0.5 && g.beak.x > 0.85) break; } return [g.state, g.beak.x]; })()`);
+for (const [name, [az, el]] of Object.entries({ 'catch-front': [0.12, 0.08], 'catch-q': [0.75, 0.1] })) {
+  await G(`(() => { const o = __grommet.tools.orbit, c = __grommet.game.hC; o.dist = ${process.env.DIST || 3.6}; o.az = ${az}; o.el = ${el}; o.target.set(c[0], c[1] - 0.1, c[2] + 0.3); __grommet.tools.applyOrbit(); __grommet.step(0, true); })()`);
   await page.waitForTimeout(200);
   const [cx, cy] = await centre();
   const s = 560;

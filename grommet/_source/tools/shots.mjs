@@ -156,6 +156,22 @@ const SCENES = {
     character: 'crow',
     run: async (G) => { await G(`(() => { document.querySelectorAll('#p-fur button')[3].click(); const o = __grommet.tools.orbit; __grommet.step(2); o.dist = 6.5; o.az = -0.5; o.el = 0.15; o.target.set(0, 1.4, 0); __grommet.tools.applyOrbit(); __grommet.step(0.1, true); })()`); },
   },
+  'crow-toss-random': {
+    character: 'crow',
+    // the panel open on the toss control (Random, the default), the play tool's hint naming what's coming
+    run: async (G) => {
+      const r = await G(`(() => { dispatchEvent(new KeyboardEvent('keydown', { key: 'c' })); __grommet.setTool('play'); __grommet.step(1.5); const seen = []; for (let k = 0; k < 6; k++) { dispatchEvent(new KeyboardEvent('keydown', { key: 's' })); seen.push(__grommet.game.items[__grommet.game.items.length - 1].sub); __grommet.step(k < 5 ? 3 : 0.35); } __grommet.step(0, true); return [document.querySelector('#b-kind [aria-pressed="true"]').dataset.kind, document.querySelector('#b-launch').textContent, document.querySelector('#hint').textContent, seen]; })()`);
+      console.log('  toss', JSON.stringify(r));
+    },
+  },
+  'crow-toss-cycle': {
+    character: 'crow',
+    // T steps the mode: random → food → shiny; S tosses in it
+    run: async (G) => {
+      const r = await G(`(() => { dispatchEvent(new KeyboardEvent('keydown', { key: 'c' })); __grommet.setTool('play'); __grommet.step(1); const modes = []; for (let k = 0; k < 3; k++) { dispatchEvent(new KeyboardEvent('keydown', { key: 't' })); modes.push(__grommet.game.kind); } dispatchEvent(new KeyboardEvent('keydown', { key: 's' })); __grommet.step(0.4, true); return [modes, __grommet.game.items.map((it) => it.kind), document.querySelector('#hint').textContent]; })()`);
+      console.log('  cycle', JSON.stringify(r));
+    },
+  },
   'crow-mobile': { character: 'crow', mobile: true, run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
   'giraffe-rest': { character: 'giraffe', run: async (G) => { await G(`__grommet.step(2.5, true)`); } },
   'giraffe-close': {

@@ -89,7 +89,20 @@ pandaprops.js       the dohyo rope and the stomp dust (three.js)
 - **Beak**: not stuffing. Two rigid felt mandibles (`crowprops.js`) ride the
   head's frame, which `CrowGame._headFrame()` measures every substep by
   shape-matching the head's stuffing to its sewn shape. `beak` (0…1) is the
-  gape; `mouth` (between the mandibles) is what catches.
+  gape; `mouth` (between the mandibles) is what catches. The mandibles are
+  lofted meshes and **must be wound counter-clockwise from outside**
+  (positive signed volume; a test checks it): wound the other way, the outer
+  skin is culled and you see the inside of the far wall — a flat wedge
+  head-on that, three-quarter, seems to grow out of one cheek. The bill is
+  deeper than wide and hinged well inside the head, so it leaves the fur at
+  its full section; the eyes sit round on the sides of the head.
+  `node tools/crowhead.mjs [prefix]` renders the head from fixed cameras
+  (front, ¾ either side, side, top, below, mid-catch) and prints where the
+  beak and eyes sit in the head's frame (`FINAL=… ` renders another build).
+- **Toss mode** (`kind`): food, shiny, or **random** (the page's default):
+  each random toss is food 60% of the time (`FOOD_SHARE`), and which food
+  or shiny thing is random too (`pickToss`). T cycles the mode; S and tool 4
+  toss in it. `tossing` names the last toss for the hint line.
 - **Shape**: one stuffed cloud — torso, head, and a rump and flat tail fan
   (bulk points + grids), so the body runs out behind like a bird's. The wings
   are laid along the torso's surface (`torsoX`), their roots inside it.
