@@ -5,7 +5,7 @@
 
 import * as THREE from 'three/webgpu';
 import {
-  Fn, uniform, attribute, float, vec3, vec4, positionLocal, normalWorld, cameraPosition, positionWorld,
+  Fn, uniform, attribute, float, vec3, vec4, positionLocal, normalWorld, normalLocal, cameraPosition, positionWorld,
   mix, smoothstep, clamp, normalize, dot, pow, abs, varying, mx_noise_float, reflect,
 } from 'three/tsl';
 import { KEY } from './fur.js';
@@ -14,33 +14,51 @@ import { NEST, ITEMS } from './athletes/crow.game.js';
 import { mulberry32 } from './math.js';
 
 /* ── the beak ──────────────────────────────────────────────────────────────
-   Closed, the two mandibles make one solid, rounded cone: the upper is the
-   top of it — full and arched, a ridge (culmen) running down its middle,
-   curving over into a slight hook at the tip — and the lower is the
-   shallower bottom of the same cone. They meet along the gape line, and
-   each is closed by its own inside face along it, so an open beak shows
-   a mouth, not a hollow shell. Lofted along z from the hinge at the
-   origin; the root sits inside the head's fur.                          */
+   Closed, the two mandibles make one solid, rounded cone, deeper than it is
+   wide (a crow's bill is pinched in from the sides): the upper is the top
+   of it — an arched, rounded section rising to a ridge (culmen) down its
+   middle, curving over into a slight hook at the tip — and the lower is
+   the shallower bottom of the same cone. They meet along the gape line,
+   and each is closed by its own inside face along it, so an open beak
+   shows a mouth, not a hollow shell. Lofted along z from the hinge at the
+   origin. The first quarter or so is buried in the head (the hinge sits
+   well inside the stuffing), so the bill comes out of the fur at its full
+   section and the pile closes round it: no seam, no cut edge.          */
+export const BEAK_SECTION = {
+  // the half-width and the heights (upper above, lower below the gape) of
+  // the section at s along the bill, as fractions of w and h
+  taper: (s) => Math.pow(Math.max(0, 1 - Math.pow(s, 1.5)), 0.7),
+  lower: 0.62,
+  // the section round from one gape edge (a = 0) over the top (a = π/2)
+  // to the other: a rounded arch with a soft ridge, never a flat top
+  arch: (a, upper) => {
+    const sy = Math.sin(a);
+    return Math.pow(sy, 0.95) * (upper ? 1 + 0.12 * Math.pow(sy, 12) : 1);
+  },
+};
+
 function mandible(L, W, H, upper) {
-  const S = 28, K = 24;
+  const S = 32, K = 28;
   const pos = [], idx = [];
-  const hook = 0.5 * H;
+  const hook = 0.42 * H;
+  const { taper, lower, arch } = BEAK_SECTION;
   // the gape line: straight, dropping into the hook near the tip
   const gapeY = (s) => -hook * Math.pow(s, 3.2);
   for (let j = 0; j <= S; j++) {
     const s = j / S;
-    // full at the root, tapering in a gentle ogive to a fine point
-    const taper = Math.pow(Math.max(0, 1 - Math.pow(s, 1.35)), 0.62);
-    const w = W * taper;
-    const h = (upper ? H : H * 0.62) * taper * (upper ? 1 + 0.12 * (1 - s) : 1);
+    const t = taper(s);
+    // the sides bow out a little below the ridge at the base, so it reads
+    // as a cone with shoulders, not a wedge
+    const w = W * t;
+    const h = (upper ? H : H * lower) * t * (upper ? 1 + 0.1 * (1 - s) : 1);
     const y0 = gapeY(s);
     for (let k = 0; k <= K; k++) {
       const a = (k / K) * Math.PI;
-      const cx = Math.cos(a), sy = Math.sin(a);
-      // rounded, with a soft ridge along the top of the upper bill
-      const ridge = upper ? 1 + 0.16 * Math.pow(sy, 8) : 1;
-      const r = Math.pow(sy, 0.75) * ridge;
-      pos.push(cx * w, y0 + (upper ? r * h : -r * h), s * L);
+      const cx = Math.cos(a);
+      const r = arch(a, upper);
+      // a little fuller across the shoulders than an ellipse
+      const xw = cx * w * (1 + 0.08 * Math.sin(a) * (1 - s));
+      pos.push(xw, y0 + (upper ? r * h : -r * h), s * L);
     }
   }
   const tip = pos.length / 3;
@@ -49,16 +67,28 @@ function mandible(L, W, H, upper) {
   for (let j = 0; j < S; j++) {
     for (let k = 0; k < K; k++) {
       const a = j * R + k, b = a + 1, c = a + R, d = c + 1;
-      if (upper) idx.push(a, c, b, b, c, d); else idx.push(a, b, c, b, d, c);
+      if (upper) idx.push(a, b, c, b, d, c); else idx.push(a, c, b, b, c, d);
     }
-    // the inside face across the gape
-    const a = j * R, b = j * R + K, c = a + R, d = b + R;
-    if (upper) idx.push(a, b, c, b, d, c); else idx.push(a, c, b, b, c, d);
+  }
+  // the inside face across the gape, on its own vertices (a sharp lip, and
+  // the flanks' normals not bent down into it)
+  const lip = pos.length / 3;
+  for (let j = 0; j <= S; j++) for (const k of [0, K]) { const i = j * R + k; pos.push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]); }
+  for (let j = 0; j < S; j++) {
+    const a = lip + j * 2, b = a + 1, c = a + 2, d = a + 3;
+    if (upper) idx.push(a, c, b, b, c, d); else idx.push(a, b, c, b, d, c);
   }
   for (let k = 0; k < K; k++) {
     const a = S * R + k;
-    if (upper) idx.push(a, tip, a + 1); else idx.push(a, a + 1, tip);
+    if (upper) idx.push(a, a + 1, tip); else idx.push(a, tip, a + 1);
   }
+  // the root, capped (it is buried, but an open beak can show it)
+  const rc = pos.length / 3;
+  pos.push(0, upper ? H * 0.4 : -H * lower * 0.4, 0);
+  for (let k = 0; k < K; k++) { if (upper) idx.push(k, rc, k + 1); else idx.push(k, k + 1, rc); }
+  // every face wound counter-clockwise seen from outside, so the normals
+  // point out: wound the other way (as it was) the outer skin was culled
+  // and you saw the inside of the far wall — a flat, lopsided wedge
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.setIndex(idx);
@@ -68,8 +98,9 @@ function mandible(L, W, H, upper) {
 
 export function makeBeak(B) {
   const color = uniform(new THREE.Color('#3d3c42'));
-  // felt: fibres, a fuzzy halo at the silhouette, a satin sheen. The upper
-  // bill catches the light along its ridge; the lower one sits in its shade
+  // felt: fibres, a soft sheen, the ridge catching the light; darker where
+  // it comes out of the fur and along the gape, so its roundness shows
+  // even head-on (an evenly lit cone pointing at you is a flat triangle)
   const felt = (upper) => {
     const mat = new THREE.MeshBasicNodeMaterial();
     mat.colorNode = Fn(() => {
@@ -78,18 +109,26 @@ export function makeBeak(B) {
       const p = positionLocal;
       const fib = mx_noise_float(vec3(p.mul(90))).mul(0.07).add(0.96);
       let base = vec3(color).mul(fib);
+      // in the fur's shade at the root
+      base = base.mul(smoothstep(0.05, 0.3, p.z).mul(0.45).add(0.55));
+      // the bill's own roundness, whatever the light: its flanks (normals
+      // turned out to the side) fall off toward the gape, the ridge stays
+      // lit — so it reads as a solid cone even end-on
+      const side = pow(abs(normalize(normalLocal).x), float(1.4));
       if (upper) {
-        const ridge = float(1).sub(smoothstep(0.0, 0.06, abs(p.x))).mul(smoothstep(0.02, 0.09, p.y));
-        base = base.mul(ridge.mul(1.1).add(1.05));
-      } else base = base.mul(0.62);
-      const fuzz = pow(float(1).sub(abs(dot(N, V))), float(2.4)).mul(0.35);
-      return vec4(shade(base, N, { spec: upper ? 0.3 : 0.12, power: 16, wrap: 0.3 }).add(base.mul(fuzz)).add(vec3(0.03, 0.03, 0.035).mul(fuzz)), 1);
+        const ridge = float(1).sub(smoothstep(0.0, 0.035, abs(p.x))).mul(smoothstep(0.04, 0.12, p.y));
+        base = base.mul(ridge.mul(0.4).add(1.0)).mul(float(1).sub(side.mul(0.55)));
+      } else base = base.mul(0.58).mul(float(1).sub(side.mul(0.35)));
+      const rim = pow(float(1).sub(abs(dot(N, V))), float(2.4));
+      const lit = shade(base, N, { spec: upper ? 0.32 : 0.12, power: 18, wrap: 0.2 });
+      // the silhouette turns away into shadow, with a faint felt halo
+      return vec4(lit.mul(float(1).sub(rim.mul(0.35))).add(vec3(0.03, 0.03, 0.035).mul(rim)), 1);
     })();
     return mat;
   };
   const g = new THREE.Group();
   const up = new THREE.Mesh(mandible(B.len, B.w, B.h, true), felt(true));
-  const lo = new THREE.Mesh(mandible(B.len * 0.96, B.w * 0.97, B.h, false), felt(false));
+  const lo = new THREE.Mesh(mandible(B.len * 0.96, B.w * 0.96, B.h, false), felt(false));
   const upG = new THREE.Group(), loG = new THREE.Group();
   upG.add(up); loG.add(lo);
   g.add(upG, loG);

@@ -16,8 +16,12 @@ export const CROW = {
   TORSO: { c: [0, 1.12, -0.04], r: [0.66, 0.68, 0.7], B: null, bulge: (phi) => 0.9 + 0.16 * (phi / Math.PI) },
   HEAD: { c: [0, 2.0, 0.16], r: [0.5, 0.47, 0.5], B: null, bulge: (phi) => 1 + 0.04 * Math.sin(phi) },
   // the beak, in the head's rest frame (relative to the head bulk's centre):
-  // where it is sewn on, which way it points, how long
-  BEAK: { base: [0, -0.02, 0.34], dir: [0, -0.3, 1], len: 0.66, w: 0.2, h: 0.23 },
+  // where it is hinged (on the face's midline, below the eyes, well inside
+  // the head so the bill leaves the fur at its full section), which way it
+  // points, how long, its half-width and the upper bill's depth. Deeper
+  // than wide, and narrow beside the head: a wide one swallowed the face
+  // between the eyes and, seen three-quarter, seemed to grow from a cheek
+  BEAK: { base: [0, -0.04, 0.32], dir: [0, -0.26, 1], len: 0.72, w: 0.125, h: 0.17 },
   PIVOT: [0, 1.66, 0.08],
 };
 

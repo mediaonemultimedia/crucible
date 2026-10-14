@@ -55,7 +55,7 @@ export const CHARACTER_INFO = {
       white: { fur: '#f0ede7', under: '#f7f5f0', accent: '#ebe7e0', spot: '#ebe7e0', nose: '#e6b6ad', cloth: '#e2b2a8', trim: '#e2b2a8', sheen: '#000000', beak: 1 },
       raven: { fur: '#131217', under: '#1a1920', accent: '#131217', spot: '#131217', nose: '#29282e', cloth: '#29282e', trim: '#29282e', sheen: '#382878', beak: 1.25 },
     },
-    eyes: { part: 'head', u: 0.118, v: 0.43, lift: 0.028, scale: [0.085, 0.092, 0.06] },
+    eyes: { part: 'head', u: 0.15, v: 0.43, lift: 0.028, scale: [0.085, 0.092, 0.06] },
     pile: 4, stitch: [0.02, 0.02, 0.025],
     aria: 'A round plush crow with a felt beak who catches what you toss him and hoards shiny things in a twig nest',
     blurb: 'A round plush crow, glossy black. Toss him a crumb: he hops across and snaps it out of the air — wide ones get a flap and a lunge. Toss him something shiny and it goes in his nest. Then try taking it back.',
@@ -387,10 +387,13 @@ function bearNose(g, size, P) {
 
 function crowFace(g, size, P) {
   const { eyeRing, blob, stitch, tubeAt } = P;
-  eyeRing('head', 0.118, 0.43, 0.2);
-  // a short-cropped patch where the beak is sewn on, so it isn't buried
+  // the eyes well round on the sides of his head, the beak between them
+  eyeRing('head', 0.15, 0.43, 0.2);
+  // the pile shorter round where the beak comes out (so it isn't buried),
+  // but not cropped to a patch: the fur still closes round its root
   g.globalCompositeOperation = 'source-over';
-  blob('head', 0.5, 0.56, 0.3, 0.2, 'rgb(70,0,0)');
+  blob('head', 0.5, 0.56, 0.2, 0.15, 'rgb(150,0,0)');
+  blob('head', 0.5, 0.565, 0.13, 0.1, 'rgb(105,0,0)');
   // the second foot (painter's lookups find the first): no fur under felt
   for (const part of P.rig.parts) {
     if (part.kind !== 'grid' || part.name !== 'foot') continue;
