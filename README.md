@@ -19,7 +19,7 @@ the same either way.
 | 03 | **Mercury** | — | _pending rebuild_ |
 | 04 | **Torsion** | — | _pending rebuild_ |
 | 05 | **Torsion 2.0** | — | _pending rebuild_ |
-| 06 | **Weft** | Real-time cloth study — four scenes, four woven fabrics, drop-in image printing | [`/weft/`](./weft/) |
+| 06 | **Weft** | Real-time cloth study — four scenes, three woven fabrics, drop-in image printing | [`/weft/`](./weft/) |
 | 07 | **Cast** | Kinetic typography as a cast, lit, physical object | [`/cast/`](./cast/) |
 | 08 | **Solve** | GPU compute fluid — pressure solve in WebGPU | [`/solve/`](./solve/) |
 | 09 | **Torsion Pineapple** | Imported mesh driven through a torsion field | [`/torsion-pineapple/`](./torsion-pineapple/) |
