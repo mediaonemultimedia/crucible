@@ -131,7 +131,7 @@ export function makeBeak(B) {
       } else base = base.mul(0.58).mul(float(1).sub(side.mul(0.35)));
       // the inside of the mouth (the trough faces the other mandible): dark
       const inside = smoothstep(0.3, 0.7, upper ? normalize(normalLocal).y.negate() : normalize(normalLocal).y);
-      base = mix(base, vec3(0.13, 0.08, 0.085), inside.mul(0.85));
+      base = mix(base, vec3(0.075, 0.045, 0.05), inside.mul(0.9));
       const rim = pow(float(1).sub(abs(dot(N, V))), float(2.4));
       const lit = shade(base, N, { spec: upper ? 0.32 : 0.12, power: 18, wrap: 0.2 });
       // the silhouette turns away into shadow, with a faint felt halo
