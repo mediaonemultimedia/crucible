@@ -180,6 +180,10 @@ body:not([data-char="panda"]) [data-panda-only]{display:none}
 .acts button[aria-pressed="true"]{border-color:rgba(200,168,119,.62);background:rgba(200,168,119,.09);color:var(--ink)}
 .acts button:disabled{opacity:.35;cursor:default}
 .acts .span{grid-column:1/-1}
+.acts .seg{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr 1fr 1fr;gap:6px;align-items:center}
+.acts .seg>span{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim-s);padding-right:2px}
+.acts .seg>span i{font-style:normal;color:var(--accent);margin-left:6px}
+.acts .seg button{text-align:center}
 .acts button i{float:right;font-style:normal;font-family:var(--mono);font-size:8px;color:var(--faint);letter-spacing:.1em;margin-top:2px}
 
 #fps{color:var(--dim)}
@@ -260,7 +264,7 @@ body:not([data-char="panda"]) [data-panda-only]{display:none}
         <div class="acts">
           <button id="b-launch">Serve<i>S</i></button>
           <button id="b-auto" aria-pressed="false" data-leopard-only>Auto rally<i>A</i></button>
-          <button id="b-kind" aria-pressed="false" data-crow-only>Shiny things<i>T</i></button>
+          <div id="b-kind" class="seg" role="group" aria-label="What to toss (T cycles)" data-crow-only><span>Toss<i>T</i></span><button data-kind="food" aria-pressed="false">Food</button><button data-kind="shiny" aria-pressed="false">Shiny</button><button data-kind="random" aria-pressed="true">Random</button></div>
           <button id="b-collect" data-giraffe-only>Collect rings<i>G</i></button>
         </div>
         <label class="sld"><span class="row">Pace<output id="o-pace"></output></span><input id="s-pace" type="range" min="8" max="26" step="0.5" value="15"><span class="ends"><span>gentle</span><span>hard</span></span></label>

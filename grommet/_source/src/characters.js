@@ -60,7 +60,7 @@ export const CHARACTER_INFO = {
     aria: 'A round plush crow with a felt beak who catches what you toss him and hoards shiny things in a twig nest',
     blurb: 'A round plush crow, glossy black. Toss him a crumb: he hops across and snaps it out of the air — wide ones get a flap and a lunge. Toss him something shiny and it goes in his nest. Then try taking it back.',
     hand: 'Grab his head, a wing or the tail and pull. Or pick a treasure out of his nest and carry it off — he’ll come and take it back.',
-    play: 'Click where he should catch it; flick to toss it harder. Shiny things (T) go to his nest. Or use Toss (S).',
+    play: 'Click where he should catch it; flick to toss it harder. T picks what: food, shiny (it goes to his nest) or random. Or use Toss (S).',
     camera: { az: 0.3, el: 0.3, dist: 12.5, y: 1.25, x: 0.8 },
     face: crowFace, pattern: crowPattern, court: crowMat, tint: '#9c9aa8',
   },

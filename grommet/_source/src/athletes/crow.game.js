@@ -18,6 +18,10 @@
    then over he comes to take it back (from your hand, if you hold it low
    enough) and return it to the nest.
 
+   What you toss is `kind`: 'food', 'shiny', or 'random' — each toss then
+   picks food or a shiny thing (FOOD_SHARE of them food) and which one, so
+   a run of tosses mixes both. `tossing` names the last one for the hint.
+
    The beak is two rigid felt mandibles riding the head's frame (measured
    every substep by shape-matching the head's stuffing to its sewn shape):
    `beak` (0…1) is how far the lower mandible hangs open. Catches are the
@@ -34,13 +38,22 @@ export const THROWER = [0, 1.5, 8.5];
 export const NEST = { c: [2.3, -1.05], R: 0.6, rimR: 0.68, rimr: 0.17, rimY: 0.22, y0: 0.05, dip: 0.2 };
 export const STAGE = [[0, -4.5, 4.5], [2, -3, 4]];   // where things can roll to: [axis, min, max]
 export const ITEMS = {
-  crumb: { kind: 'food', r: 0.1, mass: 0.2 },
-  berry: { kind: 'food', r: 0.085, mass: 0.2 },
-  button: { kind: 'shiny', r: 0.115, mass: 0.3 },
-  cap: { kind: 'shiny', r: 0.115, mass: 0.3 },
-  key: { kind: 'shiny', r: 0.125, mass: 0.35 },
+  crumb: { kind: 'food', r: 0.1, mass: 0.2, name: 'crumb' },
+  berry: { kind: 'food', r: 0.085, mass: 0.2, name: 'berry' },
+  button: { kind: 'shiny', r: 0.115, mass: 0.3, name: 'button' },
+  cap: { kind: 'shiny', r: 0.115, mass: 0.3, name: 'bottle cap' },
+  key: { kind: 'shiny', r: 0.125, mass: 0.35, name: 'key' },
 };
 const FOODS = ['crumb', 'berry'], SHINIES = ['button', 'cap', 'key'];
+export const TOSS_KINDS = ['food', 'shiny', 'random'];
+export const FOOD_SHARE = 0.6;        // of random tosses, this many are food
+
+/* what a toss of `kind` throws: [kind, sub] (random picks both) */
+export function pickToss(kind, rnd = Math.random) {
+  if (kind === 'random') kind = rnd() < FOOD_SHARE ? 'food' : 'shiny';
+  const list = kind === 'shiny' ? SHINIES : FOODS;
+  return [kind, list[Math.floor(rnd() * list.length)]];
+}
 export const BEAK_OPEN = 0.62;        // radians, the lower mandible at full gape
 const MOUTH = 0.62;                   // the mouth: this far along the beak
 const LUNGE_T = 0.42;                 // the flight of a lunge, about
@@ -86,6 +99,7 @@ export class CrowGame extends Athlete {
     this.nest = NEST;
     this.aimZ = this.home[1] + 0.85; // tool 4 aims across this plane (his mouth's)
     this.msg = 'ready';
+    this.tossing = null;             // { name, at }: the last thing tossed, for the hint
     // the head's own frame: its stuffing shape-matched to its sewn shape
     const rest = this.rig.rest, core = this.cfg.core;
     this._hc0 = [0, 0, 0];
@@ -127,6 +141,7 @@ export class CrowGame extends Athlete {
     this.lean = null;
     this.face = this.faceT = 0;
     this.msg = 'ready';
+    this.tossing = null;
     for (const w of this.wings) this.rig.arms[w.k].ref = [...w.ref0];
   }
 
@@ -184,9 +199,9 @@ export class CrowGame extends Athlete {
     if (!aim) aim = [(Math.random() - 0.5) * 1.6, 1.8 + Math.random() * 0.5];
     const zc = this.aimZ;
     aim = [clamp(aim[0], -5, 5), clamp(aim[1], 0.3, 4)];
-    const list = kind === 'shiny' ? SHINIES : FOODS;
-    sub = sub || list[Math.floor(Math.random() * list.length)];
+    if (!sub) [, sub] = pickToss(kind);
     const spec = ITEMS[sub];
+    this.tossing = { name: spec.name, at: this.time };
     const S = [THROWER[0] + aim[0] * 0.2, THROWER[1], THROWER[2]];
     const T = [aim[0], aim[1], zc];
     const d = Math.hypot(T[0] - S[0], T[1] - S[1], T[2] - S[2]);
@@ -835,5 +850,9 @@ export class CrowGame extends Athlete {
 
   hoard() { return this.items.filter((it) => it.inNest && it.kind === 'shiny').length; }
   readout() { return [['Row / best', `${this.row} / ${this.best}`], ['Hoard', this.hoard()]]; }
-  status() { return this.msg; }
+  /* the hint: what's coming (for a few seconds after a toss), then how he is */
+  status() {
+    const T = this.tossing;
+    return T && this.time - T.at < 3 ? `tossing: ${T.name} · ${this.msg}` : this.msg;
+  }
 }

@@ -12,6 +12,7 @@ import { makeRacquet, poseRacquet, makeTennisBall, makeFootball, poseBall, makeS
 import { TENNIS_R } from './athletes/leopard.game.js';
 import { FOOTBALL_R } from './athletes/bear.game.js';
 import { CROW } from './athletes/crow.rig.js';
+import { TOSS_KINDS } from './athletes/crow.game.js';
 import { makeBeak, poseBeak, makeNest, makeItems, poseItems } from './crowprops.js';
 import { makeRings, poseRings } from './giraffeprops.js';
 import { makeBat, poseBat, makeBaseball } from './props.js';
@@ -142,7 +143,7 @@ async function start() {
   let tools = null;
 
   /* ── panel ──────────────────────────────────────────────────────────────── */
-  const state = { speed: 1, paused: false, mesh: false, character: null, color: {}, stuffing: 0.42, damping: 0.45, idle: 0.5, pace: 15, auto: false, pile: {}, shiny: false, beakScale: 1 };
+  const state = { speed: 1, paused: false, mesh: false, character: null, color: {}, stuffing: 0.42, damping: 0.45, idle: 0.5, pace: 15, auto: false, pile: {}, toss: 'random', beakScale: 1 };
   const furBox = $('#p-fur');
   const cap = (s) => s[0].toUpperCase() + s.slice(1);
   const applyColor = (c) => {
@@ -199,7 +200,7 @@ async function start() {
     idle.amount = state.idle;
     game.speed = state.pace;
     game.auto = state.auto;
-    if (game.items) game.kind = state.shiny ? 'shiny' : 'food';
+    if (game.items) game.kind = state.toss;
     if (game.both) game.difficulty = state.strength;
   };
 
@@ -371,18 +372,22 @@ async function start() {
   // the giraffe: pick up the rings off the floor
   const collectB = $('#b-collect');
   collectB.onclick = () => game.collect?.();
-  // the crow: food or shiny things
+  // the crow: food, shiny things, or either at random (the default)
   const kindB = $('#b-kind');
+  const TOSS_LABEL = { food: 'food', shiny: 'shiny', random: 'random' };
   const setLaunchLabel = () => {
     const info = CHARACTER_INFO[state.character];
-    $('#b-launch').innerHTML = game.items ? `${info.verb} ${state.shiny ? 'shiny' : 'food'}<i>S</i>` : `${info.verb}<i>S</i>`;
+    $('#b-launch').innerHTML = game.items ? `${info.verb} ${TOSS_LABEL[state.toss]}<i>S</i>` : `${info.verb}<i>S</i>`;
   };
-  kindB.onclick = () => {
-    state.shiny = !state.shiny;
-    kindB.setAttribute('aria-pressed', String(state.shiny));
-    if (game.items) game.kind = state.shiny ? 'shiny' : 'food';
+  const setToss = (k) => {
+    state.toss = k;
+    for (const b of kindB.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.kind === k));
+    if (game.items) game.kind = k;
     setLaunchLabel();
   };
+  for (const b of kindB.querySelectorAll('button')) b.onclick = () => setToss(b.dataset.kind);
+  // T steps through them: food → shiny → random → food
+  const cycleToss = () => setToss(TOSS_KINDS[(TOSS_KINDS.indexOf(state.toss) + 1) % TOSS_KINDS.length]);
   const autoB = $('#b-auto');
   autoB.onclick = () => { state.auto = !state.auto; game.auto = state.auto; autoB.setAttribute('aria-pressed', String(state.auto)); if (state.auto && !game.ball) launch(); };
   $('#b-shake').onclick = () => {
@@ -414,7 +419,7 @@ async function start() {
     else if (k >= '1' && k <= '4') setTool(['hand', 'finger', 'comb', 'play'][+k - 1]);
     else if (k === 's' || k === 'enter') launch();
     else if (k === 'a') autoB.onclick();
-    else if (k === 't' && game.items) kindB.onclick();
+    else if (k === 't' && game.items) cycleToss();
     else if (k === 'g' && game.rings) collectB.onclick();
     else if (k === 'c') togglePanel(!document.body.classList.contains('panel-open'));
     else if (k === 'r') reset();
