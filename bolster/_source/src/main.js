@@ -374,13 +374,14 @@ class App {
       const right = dir > 0;
       const bx = k ? hx + (right ? 70 : -70) : hx, by = k ? hy + 40 : hy - 10;
       const b = say($('#bubbles'), line, bx, by, { size, tail: !k ? 'down' : right ? 'left' : 'right', maxWidth: Math.min(300, innerWidth * 0.55) });
-      // keep it on screen
-      const r = b.getBoundingClientRect();
+      // keep it on screen (measured from its own size: it's mid-slap now)
+      const sv = b.querySelector('svg'), bw = +sv.getAttribute('width'), bh = +sv.getAttribute('height');
+      const left = parseFloat(b.style.left), top = parseFloat(b.style.top);
       let dx = 0, dy = 0;
-      if (r.left < 12) dx = 12 - r.left;
-      if (r.right > innerWidth - 12) dx = innerWidth - 12 - r.right;
-      if (r.top < 150) dy = 150 - r.top;
-      if (dx || dy) { b.style.left = `${parseFloat(b.style.left) + dx}px`; b.style.top = `${parseFloat(b.style.top) + dy}px`; }
+      if (left < 12) dx = 12 - left;
+      if (left + bw > innerWidth - 12) dx = innerWidth - 12 - bw - left;
+      if (top + 50 < 135) dy = 135 - top - 50;
+      if (dx || dy) { b.style.left = `${left + dx}px`; b.style.top = `${top + dy}px`; }
       this.winBubble = b;
     });
   }

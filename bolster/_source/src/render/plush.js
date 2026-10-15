@@ -189,8 +189,30 @@ export class Plush {
     this._P = new THREE.Vector3(); this._N = new THREE.Vector3(); this._U = new THREE.Vector3();
     this._M = new THREE.Matrix4(); this._X = new THREE.Vector3(); this._Gz = new THREE.Vector3();
     this.hc = [0, 0, 0];
+    // the plush stays on its mark in its own frame: the group carries it
+    // along the stage, so a blow may rock it but never walk it off its
+    // hitbox (a capped velocity servo on the body's mean, as Grommet moves)
+    const ix0 = rig.clouds[0].ix;
+    this._home = [0, 0];
+    for (const i of ix0) { this._home[0] += rig.rest[i * 3] / ix0.length; this._home[1] += rig.rest[i * 3 + 2] / ix0.length; }
+    soft.hooks.push((h) => this._anchor(h, ix0));
     // let him settle onto his feet before the first frame
     for (let i = 0; i < 90; i++) soft.advance(1 / 120, (h) => this.puppet.update(h), (h) => { this.body.update(h); this.cloth?.update(h); });
+  }
+
+  _anchor(h, ix) {
+    const s = this.soft, x = s.x, v = s.v;
+    let cx = 0, cz = 0, mx = 0, mz = 0;
+    for (const i of ix) { cx += x[i * 3]; cz += x[i * 3 + 2]; mx += v[i * 3]; mz += v[i * 3 + 2]; }
+    const n = ix.length;
+    cx /= n; cz /= n; mx /= n; mz /= n;
+    const cap = 7;
+    let tx = (this._home[0] - cx) * 9, tz = (this._home[1] - cz) * 9;
+    const tl = Math.hypot(tx, tz);
+    if (tl > cap) { tx *= cap / tl; tz *= cap / tl; }
+    const e = Math.min(1, 14 * h);
+    const dx = (tx - mx) * e * h, dz = (tz - mz) * e * h;
+    for (let i = 0; i < s.n; i++) { x[i * 3] += dx; x[i * 3 + 2] += dz; }
   }
 
   setColors(c) {
@@ -205,7 +227,7 @@ export class Plush {
   hit(dmg, kd, fromDir) {
     const P = this.puppet, b = P.aim;
     const s = Math.min(9, 2.5 + dmg / 18) * (kd ? 1.3 : 1);
-    P.shove([-b[0] * s, s * 0.25, -b[2] * s], (i, y) => Math.min(1, Math.max(0.15, (y - 0.5) / 2.2)));
+    P.shove([-b[0] * s, s * 0.25, -b[2] * s], (i, y) => Math.min(1, Math.max(0, (y - 0.7) / 2.2)));
     if (dmg >= 60 || kd) P.daze = Math.min(1, P.daze + (kd ? 0.8 : 0.45));
     this.squash.v -= 4 + dmg / 25;
   }

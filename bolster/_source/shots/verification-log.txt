@@ -1,0 +1,45 @@
+# pass 20
+# fail 0
+final    1101.4 KB  -> /home/user/crucible/bolster/_source/final.html
+fetched refs   none
+dynamic import none
+url literals   none (in script)
+fetch sites    0 (three's loaders, never reached)
+
+self-contained OK
+title: 20.6 s ["title",null]
+bubbles: 25.0 s ["title",null]
+title-mobile: 15.5 s ["title",null]
+select: 28.3 s ["select",null]
+select-cpu: 33.6 s ["select",null]
+nap-time: 47.1 s ["select",null]
+toques: 28.1 s ["select",null]
+fight-kevalanche: 17.2 s ["fight","fight"]
+fight-rubberta: 22.8 s ["fight","fight"]
+fight-johnny: 17.7 s ["fight","fight"]
+fight-sumaura: 19.3 s ["fight","fight"]
+fight-k8e: 17.8 s ["fight","fight"]
+signature-uppercut: 14.6 s ["fight","fight"]
+signature-serve: 13.0 s ["fight","fight"]
+special-avalanche: 14.1 s ["fight","fight"]
+special-abraco: 17.1 s ["fight","fight"]
+special-skyneck: 16.5 s ["fight","fight"]
+special-matchpoint: 14.9 s ["fight","fight"]
+special-squash: 14.8 s ["fight","fight"]
+ko: 15.3 s ["fight","ko"]
+fluffless: 15.6 s ["fight","ko"]
+winner: 24.0 s ["win","end"]
+winner-egg: 22.9 s ["win","end"]
+impatient: 13.3 s ["fight","fight"]
+mirror: 15.7 s ["fight","fight"]
+toques-fight: 18.5 s ["fight","fight"]
+pause: 26.9 s ["pause","fight"]
+fight-mobile: 14.9 s ["fight","fight"]
+zero console errors
+end {"screen":"win","winner":0,"wins":[2,1],"ticks":5649,"seconds":"94.2","name":"Rubberta wins","line":"Eight arms, zero chances."}
+wall 191 s
+CPU vs CPU match completed: zero console errors
+end {"screen":"win","winner":0,"wins":[2,1],"ticks":5649,"seconds":"94.2","name":"Johnny Deuce wins","line":"Game, set, match… sorry 'bout that."}
+wall 162 s
+CPU vs CPU match completed: zero console errors
+DONE
