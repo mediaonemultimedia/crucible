@@ -183,3 +183,15 @@ export function buildPanda() {
     ],
   });
 }
+
+/* Bolster: one panda on its own (the champion — topknot, purple mawashi),
+   at the origin facing +z, as every other athlete is built */
+export function buildPandaSolo() {
+  const b = new RigBuilder('panda');
+  const cfg = buildOne(b, 0, true);
+  return b.finish({
+    camY: 0.1,
+    toy: { ...cfg, posed: 0 },
+    furMask: [{ part: 'torso', v0: 0.58, v1: 0.8, pile: 0 }],
+  });
+}

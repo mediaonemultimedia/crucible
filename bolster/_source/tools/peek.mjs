@@ -1,0 +1,22 @@
+/* quick look: open final.html with a query, hold the loop, run JS, screenshot */
+import { chromium } from 'playwright';
+import path from 'path';
+const [,, query = '', out = 'peek.png', js = '__bolster.step(2)', w = '1280', h = '720'] = process.argv;
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const page = await browser.newPage({ viewport: { width: +w, height: +h }, deviceScaleFactor: 1 });
+const logs = [];
+page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
+page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
+page.on('request', (r) => { if (!r.url().startsWith('file:') && !r.url().startsWith('data:')) logs.push('[network] ' + r.url()); });
+const t0 = Date.now();
+await page.goto('file://' + path.resolve('final.html') + query);
+await page.waitForFunction(() => document.body.classList.contains('is-live') && window.__bolster, null, { timeout: 180000 });
+await page.evaluate(() => { window.__bolster.hold = true; });
+console.log('live after', ((Date.now() - t0) / 1000).toFixed(1), 's');
+const r = await page.evaluate(js);
+console.log('result', JSON.stringify(r));
+await page.waitForTimeout(200);
+await page.screenshot({ path: out, timeout: 180000 });
+console.log('done after', ((Date.now() - t0) / 1000).toFixed(1), 's');
+console.log(logs.join('\n'));
+await browser.close();

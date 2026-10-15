@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#e6e0d7">
+<title>Bolster — plush fighters</title>
+<meta name="description" content="A one-on-one fighting game with plush soft-body fighters: a polar-bear boxer, a capoeira octopus, a tennis leopard, a sumo panda and a long-necked giraffe, knocking the stuffing out of each other.">
+<style>
+/*FONTFACE*/
+:root{
+  --stage:#e6e0d7;
+  --ink-s:#2b2622;
+  --dim-s:#7a7068;
+  --faint-s:#a89e94;
+  --ink:#f4efe4;
+  --accent:#c8a877;
+  --p1:#d8553b;
+  --p2:#3b7fc4;
+  --stuff:#fbf6ea;
+  --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",Arial,sans-serif;
+  --heavy:"Bolster Display","Arial Black","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --hand:"Bolster Hand","Comic Sans MS","Chalkboard SE",cursive;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--stage);color:var(--ink-s);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
+canvas#stage{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#ui{position:fixed;inset:0;z-index:5;pointer-events:none}
+.screen{position:absolute;inset:0;display:none;pointer-events:auto}
+.screen.on{display:block}
+.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim-s)}
+button{font:inherit}
+
+/* the series mark ---------------------------------------------------------- */
+#mark{position:absolute;top:24px;left:28px;display:flex;align-items:flex-start;gap:12px;z-index:9;pointer-events:auto}
+#mark .w{font-size:15px;font-weight:300;letter-spacing:.52em;text-transform:uppercase;line-height:1;padding-top:1px}
+#mark .ix{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:#9a7a48;text-decoration:none;border:1px solid rgba(154,122,72,.38);padding:2px 4px 1px;line-height:1;white-space:nowrap}
+#mark .ix:hover{border-color:#9a7a48}
+#mark .col{display:flex;flex-direction:column}
+#mark .sub{margin-top:9px}
+body.fighting #mark{display:none}
+
+/* title --------------------------------------------------------------------- */
+#title-screen .big{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);text-align:center;width:min(92vw,900px)}
+.wordmark{font-family:var(--heavy);font-weight:400;font-size:clamp(64px,13vw,190px);line-height:.85;letter-spacing:-.02em;margin:0;color:var(--stuff);
+  -webkit-text-stroke:clamp(3px,.6vw,7px) var(--ink-s);paint-order:stroke fill;text-shadow:0 .06em 0 var(--ink-s),0 .1em .2em rgba(43,38,34,.25);transform:skewX(-6deg)}
+.wordmark span{display:inline-block;animation:bob 2.6s ease-in-out infinite}
+.wordmark span:nth-child(2n){animation-delay:-.6s}
+.wordmark span:nth-child(3n){animation-delay:-1.3s}
+@keyframes bob{50%{transform:translateY(-.04em) rotate(-1.5deg)}}
+.tagline{font-family:var(--serif);font-style:italic;font-size:clamp(15px,1.8vw,20px);color:var(--dim-s);margin:22px 0 0}
+.press{margin-top:34px;font-family:var(--mono);font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-s);animation:blink 1.3s steps(2) infinite}
+@keyframes blink{50%{opacity:.25}}
+.keyboard-only{display:none;margin:28px auto 0;max-width:320px;font-family:var(--serif);font-style:italic;font-size:16px;line-height:1.5;color:var(--ink-s);background:rgba(251,246,234,.8);border:1px solid rgba(43,38,34,.15);padding:14px 18px}
+body.touch .keyboard-only{display:block}
+body.touch .press{display:none}
+
+/* menus --------------------------------------------------------------------- */
+.menu{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:14px;align-items:stretch;width:min(86vw,380px)}
+.menu h2,.panel-title{margin:0 0 10px;text-align:center;font-family:var(--heavy);font-size:clamp(26px,3.6vw,40px);text-transform:uppercase;letter-spacing:.02em;color:var(--stuff);-webkit-text-stroke:2.5px var(--ink-s);paint-order:stroke fill;transform:skewX(-6deg)}
+.opt{display:flex;justify-content:space-between;align-items:center;gap:12px;background:rgba(251,246,234,.92);border:2px solid var(--ink-s);color:var(--ink-s);padding:14px 18px;cursor:pointer;
+  font-family:var(--heavy);font-size:18px;text-transform:uppercase;letter-spacing:.04em;box-shadow:4px 4px 0 var(--ink-s);transition:transform .12s,box-shadow .12s,background .12s;text-align:left}
+.opt small{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--dim-s);text-transform:uppercase}
+.opt:hover,.opt.sel{background:#fff;transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--ink-s)}
+.opt.sel{outline:3px solid var(--p1);outline-offset:3px}
+.opt[disabled]{opacity:.5;cursor:not-allowed;box-shadow:2px 2px 0 var(--ink-s);transform:none;background:rgba(251,246,234,.6)}
+.hintline{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim-s);text-align:center;margin-top:6px}
+
+/* controls card ------------------------------------------------------------- */
+.controls{background:rgba(251,246,234,.94);border:2px solid var(--ink-s);box-shadow:4px 4px 0 var(--ink-s);padding:12px 14px;font-size:12px;color:var(--ink-s);display:grid;grid-template-columns:auto 1fr;gap:5px 12px;align-items:center;max-width:300px}
+.controls h4{grid-column:1/-1;margin:0 0 4px;font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim-s);font-weight:400}
+kbd{display:inline-block;min-width:22px;text-align:center;font-family:var(--mono);font-size:11px;padding:2px 5px;border:1.5px solid var(--ink-s);border-bottom-width:3px;border-radius:4px;background:#fff;margin-right:2px;line-height:1.2}
+.controls span{line-height:1.3}
+
+/* character select ---------------------------------------------------------- */
+#select-screen .head{position:absolute;top:24px;left:0;right:0;text-align:center}
+#select-screen .head .panel-title{display:inline-block;margin:0}
+#select-screen .head .eyebrow{display:block;margin-top:6px}
+.plate{position:absolute;top:22%;width:min(30vw,340px);text-align:left}
+.plate.p2{right:3.5vw;text-align:right}
+.plate.p1{left:3.5vw}
+.plate .who{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#fff;background:var(--p1);display:inline-block;padding:3px 7px}
+.plate.p2 .who{background:var(--p2)}
+.plate .nm{font-family:var(--heavy);font-size:clamp(26px,3.6vw,46px);line-height:1;margin:10px 0 6px;color:var(--stuff);-webkit-text-stroke:2.5px var(--ink-s);paint-order:stroke fill;text-transform:uppercase}
+.plate .an{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--ink-s)}
+.plate .moves{margin-top:10px;font-family:var(--mono);font-size:10.5px;line-height:1.75;letter-spacing:.04em;color:var(--ink-s)}
+.plate .moves b{font-weight:600}
+.plate.locked .who::after{content:" ✓"}
+.cards{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);display:flex;gap:12px}
+.card{position:relative;width:clamp(96px,11vw,150px);aspect-ratio:3/4;background:#fbf6ea;border:2.5px solid var(--ink-s);box-shadow:4px 4px 0 var(--ink-s);cursor:pointer;overflow:hidden;transition:transform .12s}
+.card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform-origin:50% 90%}
+.card .lab{position:absolute;left:0;right:0;bottom:0;background:rgba(43,38,34,.86);color:#fbf6ea;font-family:var(--heavy);font-size:clamp(10px,1.05vw,13px);text-transform:uppercase;letter-spacing:.03em;padding:5px 6px 5px 30px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .flag{position:absolute;left:6px;bottom:6px;width:20px;height:13px;border:1px solid rgba(255,255,255,.7)}
+.card:hover{transform:translateY(-4px)}
+.card.c1{outline:4px solid var(--p1);outline-offset:2px}
+.card.c2{box-shadow:4px 4px 0 var(--ink-s),0 0 0 4px var(--p2) inset}
+.card.c1.c2{outline:4px solid var(--p1)}
+.card .tag{position:absolute;top:6px;font-family:var(--mono);font-size:10px;font-weight:700;color:#fff;padding:1px 5px}
+.card .tag.t1{left:6px;background:var(--p1)}
+.card .tag.t2{right:6px;background:var(--p2)}
+.card .zzz{position:absolute;right:10%;top:18%;font-family:var(--hand);font-size:22px;color:var(--ink-s);opacity:0;pointer-events:none}
+.card .zzz i{position:absolute;font-style:normal;opacity:0}
+body.napping .card img{animation:doze 3.2s ease-in-out infinite}
+body.napping .card:nth-child(2) img{animation-delay:-.7s}
+body.napping .card:nth-child(3) img{animation-delay:-1.5s}
+body.napping .card:nth-child(4) img{animation-delay:-2.1s}
+body.napping .card:nth-child(5) img{animation-delay:-2.7s}
+@keyframes doze{0%,100%{transform:rotate(-2deg) translateY(2px)}50%{transform:rotate(-7deg) translateY(7px) scaleY(.97)}}
+body.napping .card .zzz{opacity:1}
+body.napping .card .zzz i{animation:zz 2.4s ease-out infinite}
+body.napping .card .zzz i:nth-child(2){animation-delay:.8s;font-size:.8em}
+body.napping .card .zzz i:nth-child(3){animation-delay:1.6s;font-size:.65em}
+@keyframes zz{0%{opacity:0;transform:translate(0,0) rotate(-10deg)}20%{opacity:1}100%{opacity:0;transform:translate(16px,-34px) rotate(12deg)}}
+.card.startle img{animation:startle .5s cubic-bezier(.3,1.6,.5,1)}
+.card.startle::after{content:"!";position:absolute;right:12%;top:8%;font-family:var(--heavy);font-size:32px;color:var(--p1);-webkit-text-stroke:2px var(--ink-s);paint-order:stroke fill;animation:bang .6s ease-out forwards}
+@keyframes startle{0%{transform:translateY(0)}30%{transform:translateY(-14px) scale(1.06)}60%{transform:translateY(2px) rotate(3deg)}100%{transform:none}}
+@keyframes bang{0%{transform:scale(.2);opacity:0}30%{transform:scale(1.3);opacity:1}100%{transform:scale(1);opacity:0}}
+#select-screen .controls{position:absolute;left:3.5vw;bottom:calc(22px + clamp(96px,11vw,150px) * 4 / 3 + 26px);max-width:260px}
+#select-screen .step{position:absolute;right:3.5vw;bottom:calc(22px + clamp(96px,11vw,150px) * 4 / 3 + 26px);font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-s);background:rgba(251,246,234,.92);border:2px solid var(--ink-s);padding:8px 12px;box-shadow:3px 3px 0 var(--ink-s)}
+
+/* HUD ----------------------------------------------------------------------- */
+#hud{position:absolute;left:0;right:0;top:0;display:none;pointer-events:none;padding:18px 3vw 0}
+body.fighting #hud{display:block}
+#hud .top{display:grid;grid-template-columns:1fr auto 1fr;gap:14px;align-items:start}
+.side{display:flex;flex-direction:column;gap:5px}
+.side.r{align-items:flex-end}
+.nameline{display:flex;align-items:center;gap:8px;font-family:var(--heavy);font-size:clamp(13px,1.5vw,18px);text-transform:uppercase;color:var(--stuff);-webkit-text-stroke:1.6px var(--ink-s);paint-order:stroke fill}
+.nameline svg{width:22px;height:14px;border:1px solid var(--ink-s);flex:0 0 auto}
+.label{font-family:var(--heavy);font-size:13px;letter-spacing:.14em;color:var(--ink-s);line-height:1}
+.bar{position:relative;width:100%;height:clamp(16px,2.2vw,24px);background:#5d4a3d;border:3px solid var(--ink-s);border-radius:3px;overflow:hidden;box-shadow:3px 3px 0 rgba(43,38,34,.35)}
+.bar i{position:absolute;top:0;bottom:0;right:0;width:100%;transition:width .05s linear}
+.side.r .bar i{right:auto;left:0}
+.bar .lag{background:#ffffff;transition:width .6s ease .35s}
+.bar .fill{background:repeating-linear-gradient(-45deg,#fbf6ea 0 10px,#f1e8d4 10px 20px)}
+.bar .fill::after{content:"";position:absolute;inset:3px 4px;border:1.5px dashed rgba(120,96,70,.55);border-radius:2px}
+.bar.low .fill{background:repeating-linear-gradient(-45deg,#ffd8c8 0 10px,#f6c0ae 10px 20px)}
+.pips{display:flex;gap:6px}
+.pips b{width:13px;height:13px;border-radius:50%;border:2.5px solid var(--ink-s);background:#fbf6ea}
+.pips b.on{background:#e9b23c}
+#timer{font-family:var(--heavy);font-size:clamp(34px,4.6vw,58px);line-height:1;min-width:2.2em;text-align:center;color:var(--stuff);-webkit-text-stroke:3px var(--ink-s);paint-order:stroke fill;padding-top:2px}
+#timer.low{color:#ffb3a0}
+#hud .meters{position:fixed;left:3vw;right:3vw;bottom:20px;display:flex;justify-content:space-between;pointer-events:none}
+.meter{width:min(30vw,300px);display:flex;flex-direction:column;gap:4px}
+.meter.r{align-items:flex-end}
+.meter .mbar{position:relative;width:100%;height:13px;border:2.5px solid var(--ink-s);background:#3d3540;border-radius:8px;overflow:hidden}
+.meter .mbar i{position:absolute;top:0;bottom:0;left:0;width:0;background:linear-gradient(90deg,#7a5ad6,#c46fe0);border-radius:6px}
+.meter.r .mbar i{left:auto;right:0}
+.meter.full .mbar i{background:linear-gradient(90deg,#ffcf3f,#ff7b3a,#ffcf3f);background-size:200% 100%;animation:shine .8s linear infinite}
+@keyframes shine{to{background-position:-200% 0}}
+.meter .mlab{font-family:var(--heavy);font-size:13px;letter-spacing:.14em;color:var(--ink-s);line-height:1}
+.meter.full .mlab::after{content:" — READY [SPACE]"}
+.meter.r.full .mlab::after{content:" — READY"}
+
+/* banners ------------------------------------------------------------------- */
+#banner{position:absolute;left:0;right:0;top:38%;text-align:center;pointer-events:none}
+#banner .b{display:inline-block;font-family:var(--heavy);font-size:clamp(48px,9vw,128px);line-height:1;color:var(--stuff);-webkit-text-stroke:clamp(3px,.5vw,6px) var(--ink-s);paint-order:stroke fill;
+  text-shadow:0 .06em 0 var(--ink-s);transform:skewX(-8deg);text-transform:uppercase;letter-spacing:.01em;white-space:nowrap}
+#banner .b.pop{animation:pop .5s cubic-bezier(.2,1.6,.4,1)}
+#banner .b.ko{color:#ff6a4a}
+#banner .b.fluffless{color:#fff3c4;font-size:clamp(34px,6.4vw,92px)}
+#banner .b.fluffatality{color:#ffd1e6;font-size:clamp(34px,6.6vw,96px)}
+#banner .sub{display:block;margin-top:10px;font-family:var(--mono);font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-s)}
+@keyframes pop{0%{transform:skewX(-8deg) scale(2.2);opacity:0}100%{transform:skewX(-8deg) scale(1);opacity:1}}
+
+/* pause --------------------------------------------------------------------- */
+#pause-screen{background:rgba(230,224,215,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+#pause-screen .menu{width:min(90vw,660px);flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:18px}
+#pause-screen .col{display:flex;flex-direction:column;gap:12px;width:min(86vw,300px)}
+
+/* winner -------------------------------------------------------------------- */
+#win-screen .who{position:absolute;left:50%;top:7%;transform:translateX(-50%);text-align:center;width:90vw}
+#win-screen .who .eyebrow{display:block;margin-bottom:8px}
+#win-screen .menu{top:auto;bottom:4%;transform:translateX(-50%);flex-direction:row;width:auto;gap:16px}
+#bubbles{position:absolute;inset:0;pointer-events:none;overflow:visible}
+
+/* speech bubbles (cardboard) ------------------------------------------------- */
+.bubble{position:absolute;pointer-events:none;transform-origin:var(--ox,50%) var(--oy,100%)}
+.bubble svg{display:block;overflow:visible}
+.bubble.slap{animation:slap .42s cubic-bezier(.25,1.5,.45,1) both}
+@keyframes slap{0%{transform:rotate(var(--rot)) scale(.2,.1);opacity:0}45%{transform:rotate(var(--rot)) scale(1.12,.86);opacity:1}70%{transform:rotate(var(--rot)) scale(.95,1.05)}100%{transform:rotate(var(--rot)) scale(1)}}
+.bubble.out{animation:bubout .3s ease-in forwards}
+@keyframes bubout{to{transform:rotate(var(--rot)) scale(.6);opacity:0}}
+
+/* toast (the toque code) ------------------------------------------------------ */
+#toast{position:absolute;left:50%;top:20%;transform:translateX(-50%);pointer-events:none}
+
+/* mobile -------------------------------------------------------------------- */
+@media (max-width:760px){
+  #mark{top:16px;left:16px}
+  .plate{top:16%;width:44vw}
+  .plate .moves,.plate .an{display:none}
+  .cards{gap:6px;bottom:14px}
+  .card{width:17vw}
+  #select-screen .controls,#select-screen .step{display:none}
+  #hud{padding:10px 3vw 0}
+  #pause-screen .menu{flex-direction:column;align-items:center}
+}
+@media (prefers-reduced-motion:reduce){.wordmark span,.press{animation:none}}
+</style>
+</head>
+<body>
+<canvas id="stage" aria-label="Two plush fighters on a felt mat"></canvas>
+<div id="ui">
+  <div id="mark">
+    <div class="col">
+      <span class="w">Bolster</span>
+      <span class="eyebrow sub">plush fighters</span>
+    </div>
+    <a class="ix" href="../" aria-label="Study 23 — open series index">No. 23</a>
+  </div>
+
+  <section id="title-screen" class="screen on">
+    <div class="big">
+      <h1 class="wordmark" aria-label="Bolster"><span>B</span><span>O</span><span>L</span><span>S</span><span>T</span><span>E</span><span>R</span></h1>
+      <p class="tagline">Five plush fighters knock the stuffing out of each other.</p>
+      <div class="press">Press any key</div>
+      <div class="keyboard-only">Bolster is best on a keyboard. Come back on a computer to fight — A D W S to move, O and P to hit, Space for the special.</div>
+    </div>
+  </section>
+
+  <section id="mode-screen" class="screen">
+    <div class="menu">
+      <h2>Mode</h2>
+      <button class="opt sel" data-mode="cpu">Vs Computer <small>1 player</small></button>
+      <button class="opt" data-mode="online" disabled>Online <small>coming soon</small></button>
+      <div class="hintline">W / S choose · O or Enter to go</div>
+    </div>
+  </section>
+
+  <section id="select-screen" class="screen">
+    <div class="head"><h2 class="panel-title">Choose your fighter</h2><span class="eyebrow" id="select-hint">Player 1 — A / D to choose, O to pick</span></div>
+    <div class="plate p1"><span class="who">Player 1</span><div class="nm"></div><div class="an"></div><div class="moves"></div></div>
+    <div class="plate p2"><span class="who">Computer</span><div class="nm"></div><div class="an"></div><div class="moves"></div></div>
+    <div class="controls" id="controls-select"></div>
+    <div class="step" id="select-step">Pick for Player 1</div>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section id="diff-screen" class="screen">
+    <div class="menu">
+      <h2>Difficulty</h2>
+      <button class="opt" data-level="easy">Easy <small>a pillow fight</small></button>
+      <button class="opt sel" data-level="normal">Normal <small>a scrap</small></button>
+      <button class="opt" data-level="hard">Hard <small>no mercy, no stuffing</small></button>
+      <div class="hintline">W / S choose · O to fight · P back</div>
+    </div>
+  </section>
+
+  <div id="hud" aria-live="off">
+    <div class="top">
+      <div class="side l">
+        <div class="nameline" id="n1"></div>
+        <span class="label">STUFFING</span>
+        <div class="bar" id="hp1"><i class="lag"></i><i class="fill"></i></div>
+        <div class="pips" id="pips1"><b></b><b></b></div>
+      </div>
+      <div id="timer">99</div>
+      <div class="side r">
+        <div class="nameline" id="n2"></div>
+        <span class="label">STUFFING</span>
+        <div class="bar" id="hp2"><i class="lag"></i><i class="fill"></i></div>
+        <div class="pips" id="pips2"><b></b><b></b></div>
+      </div>
+    </div>
+    <div class="meters">
+      <div class="meter" id="m1"><span class="mlab">SPECIAL</span><div class="mbar"><i></i></div></div>
+      <div class="meter r" id="m2"><span class="mlab">SPECIAL</span><div class="mbar"><i></i></div></div>
+    </div>
+  </div>
+
+  <div id="banner"></div>
+  <div id="bubbles"></div>
+  <div id="toast"></div>
+
+  <section id="pause-screen" class="screen">
+    <div class="menu">
+      <div class="col">
+        <h2>Paused</h2>
+        <button class="opt sel" data-act="resume">Resume <small>Esc</small></button>
+        <button class="opt" data-act="select">Character select</button>
+        <button class="opt" data-act="title">Title</button>
+      </div>
+      <div class="controls" id="controls-pause"></div>
+    </div>
+  </section>
+
+  <section id="win-screen" class="screen">
+    <div class="who"><span class="eyebrow" id="win-eyebrow">Winner</span><h2 class="panel-title" id="win-name"></h2></div>
+    <div class="menu">
+      <button class="opt sel" data-act="rematch">Rematch</button>
+      <button class="opt" data-act="select">Character select</button>
+    </div>
+  </section>
+</div>
+<!--BUNDLE-->
+</body>
+</html>

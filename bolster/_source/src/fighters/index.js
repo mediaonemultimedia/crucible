@@ -57,8 +57,8 @@ export const FIGHTERS = {
   rubberta: {
     id: 'rubberta', name: 'Rubberta', animal: 'Octopus', flag: '🇧🇷', nation: 'br', style: 'Capoeira; tentacles strike like long rubbery punches',
     health: 980, walkF: 52, walkB: 46, jumpV: 270, jumpX: 52, grav: 12,
-    push: { w: 1500, h: 2300 },
-    hurt: { stand: { x: -800, y: 0, w: 1600, h: 2500 }, crouch: { x: -800, y: 0, w: 1600, h: 1700 }, air: { x: -750, y: 200, w: 1500, h: 2200 } },
+    push: { w: 2100, h: 2300 },
+    hurt: { stand: { x: -950, y: 0, w: 1900, h: 2500 }, crouch: { x: -950, y: 0, w: 1900, h: 1700 }, air: { x: -850, y: 200, w: 1700, h: 2200 } },
     moves: {
       ...normals({ lReach: 2500, hReach: 3050, cReach: 2500, lDmg: 36, hDmg: 80, lY: 1300, hY: 1200, hStart: 10, hTotal: 37, lW: 1500, hW: 1900 }),
       signature: move({

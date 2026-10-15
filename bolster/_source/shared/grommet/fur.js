@@ -16,7 +16,7 @@
 import * as THREE from 'three/webgpu';
 import {
   Fn, uniform, attribute, float, vec2, vec3, vec4, texture, positionLocal, normalLocal,
-  instanceIndex, cameraPosition, positionWorld, normalWorld, mix, smoothstep, clamp, normalize,
+  instanceIndex, cameraPosition, positionWorld, normalWorld, modelWorldMatrix, mix, smoothstep, clamp, normalize,
   dot, max, pow, sqrt, abs, fract, floor, sin, length, varying, Discard, mx_noise_float, reflect,
 } from 'three/tsl';
 
@@ -84,10 +84,13 @@ export function makeFurMaterial(groomTex, maskTex, patTex) {
   const strandV = normalize(n.mul(lift).add(bowV.mul(pow(h.add(0.02), float(0.55)).mul(1.55))));
 
   const vH = varying(h);
-  const vN = varying(n);
-  const vS = varying(strandV);
-  const vTu = varying(tu);
-  const vTv = varying(tv);
+  // Bolster: shading directions go to world space (the mesh may be turned
+  // and moved); for Grommet's untransformed mesh this is the identity
+  const toWorld = (d) => modelWorldMatrix.mul(vec4(d, 0)).xyz;
+  const vN = varying(normalize(toWorld(n)));
+  const vS = varying(normalize(toWorld(strandV)));
+  const vTu = varying(toWorld(tu));
+  const vTv = varying(toWorld(tv));
   const vUnder = varying(underA);
   const vAccent = varying(accentA);
   const vFp = varying(fpA);

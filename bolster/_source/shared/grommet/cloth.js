@@ -20,7 +20,7 @@
 
 import * as THREE from 'three/webgpu';
 import {
-  Fn, uniform, attribute, float, vec2, vec3, vec4, positionLocal, normalLocal, cameraPosition, positionWorld,
+  Fn, uniform, attribute, float, vec2, vec3, vec4, positionLocal, normalLocal, cameraPosition, positionWorld, modelWorldMatrix,
   mix, smoothstep, clamp, normalize, dot, max, pow, abs, sin, length, varying, mx_noise_float, frontFacing, select,
 } from 'three/tsl';
 import { KEY, FILL } from './fur.js';
@@ -45,7 +45,9 @@ export function makeClothMaterial() {
   const vFp = varying(uvfp.zw);
   const vTrim = varying(look.x);
   const vStyle = varying(look.w);
-  const vN = varying(n);
+  // Bolster: the normal goes to world space (the mesh may be turned and
+  // moved); for Grommet's untransformed mesh this is the identity
+  const vN = varying(normalize(modelWorldMatrix.mul(vec4(n, 0)).xyz));
 
   const colorNode = Fn(() => {
     const fp = vFp;
