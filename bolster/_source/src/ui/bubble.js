@@ -123,16 +123,21 @@ export function makeBubble(text, { size = 26, maxWidth = 300, tail = 'down-left'
   const lh = size * 1.12;
   const tw = Math.max(...lines.map((l) => measure(l, size))) + size * 0.4;
   const th = lines.length * lh;
-  const rx = Math.max(tw * 0.62 + 22, 70), ry = Math.max(th * 0.72 + 20, 42);
-  const pad = 60;
-  const W = rx * 2 + pad * 2, Hh = ry * 2 + pad * 2 + 70;
-  const cx = W / 2, cy = pad + ry;
+  let rx = Math.max(tw * 0.6 + 24, 70), ry = Math.max(th * 0.74 + 22, 42);
+  ry = Math.max(ry, rx * 0.44);          // a bubble, not a sausage
+  const pad = 70;
   const tailDir = {
-    'down-left': [-0.55, 1], 'down-right': [0.55, 1], down: [R(-0.15, 0.15), 1], left: [-1, 0.45], right: [1, 0.45],
+    'down-left': [-0.55, 1], 'down-right': [0.55, 1], down: [R(-0.15, 0.15), 1], left: [-1, 0.35], right: [1, 0.35],
   }[tail] || [-0.5, 1];
   const tdl = Math.hypot(...tailDir);
-  const reach = 1 + 46 / Math.min(rx, ry);
-  const tip = [cx + (tailDir[0] / tdl) * rx * reach * 1.02, cy + (tailDir[1] / tdl) * ry * reach + 30];
+  const ux = tailDir[0] / tdl, uy = tailDir[1] / tdl;
+  // the tail: from the ellipse's edge in that direction, a fixed length out
+  const ea = Math.atan2(uy * rx, ux * ry);
+  const edge = [Math.cos(ea) * rx, Math.sin(ea) * ry];
+  const tlen = Math.max(34, Math.min(58, Math.min(rx, ry) * 0.7));
+  const W = rx * 2 + pad * 2 + Math.abs(ux) * tlen * 2, Hh = ry * 2 + pad * 2 + Math.max(0, uy) * tlen;
+  const cx = W / 2, cy = pad + ry;
+  const tip = [cx + edge[0] + ux * tlen, cy + edge[1] + uy * tlen];
 
   const svg = el('svg', { width: W, height: Hh + 30, viewBox: `0 0 ${W} ${Hh + 30}`, role: 'img', 'aria-label': text });
   const defs = el('defs', {}, svg);
@@ -231,11 +236,17 @@ export function place(box, x, y, scale = 1) {
   box.firstChild.style.transformOrigin = `${ax}px ${ay}px`;
 }
 
-/* show one for a while, then let it go */
-export function say(layer, text, x, y, { size = 26, maxWidth = 300, tail = 'down-left', ms = 1800, scale = 1 } = {}) {
+/* put one up (the caller decides when it goes: dismiss()) */
+export function say(layer, text, x, y, { size = 26, maxWidth = 300, tail = 'down-left', scale = 1 } = {}) {
   const b = makeBubble(text, { size, maxWidth, tail });
   layer.appendChild(b);
   place(b, x, y, scale);
-  if (ms > 0) setTimeout(() => { b.classList.remove('slap'); b.classList.add('out'); setTimeout(() => b.remove(), 320); }, ms);
   return b;
+}
+
+/* let it go: a quick shrink, then gone */
+export function dismiss(b) {
+  if (!b.isConnected) return;
+  b.classList.remove('slap'); b.classList.add('out');
+  b.addEventListener('animationend', () => b.remove(), { once: true });
 }

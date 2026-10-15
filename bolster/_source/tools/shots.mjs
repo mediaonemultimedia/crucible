@@ -32,6 +32,14 @@ const D = 8, P = 32, O = 16, SP = 64, R = 2, L = 1, UP = 4;
 const fightQ = (p1, p2, extra = '') => `?p1=${p1}&p2=${p2}&cpu=normal&p1cpu=normal&seed=7&hold&webgl&noportraits${extra}`;
 const SCENES = {
   title: { q: '?hold&webgl&noportraits', run: `B.step(0.5)` },
+  bubbles: {
+    q: '?hold&webgl&noportraits',
+    run: `document.querySelector('#title-screen').classList.remove('on'); B.step(0.2);
+      const L = ['Knocked out cold.', 'You just lost to a pillow.', 'Eight arms, zero chances.', 'Tentacle-ly speaking… you lost.', "Game, set, match… sorry 'bout that.", "My mom has a better backhand, and she's a house cat.", "Right. That's you squashed.", 'Blimey, you look absolutely cream crackered.', 'Heads up next time, eh.', "I can see your house from up here. It's sad, eh.", 'Patience, love.', 'Calma!', 'Not yet, bud.', 'Toques on, eh.'];
+      const T = ['down-left', 'down-right', 'left', 'right', 'down'];
+      L.forEach((t, k) => B.say(t, 230 + (k % 4) * 330, 190 + Math.floor(k / 4) * 190, { size: k > 9 ? 22 : 26, maxWidth: 260, tail: T[k % 5] }));`,
+    settle: 900,
+  },
   'title-mobile': { q: '?hold&webgl&noportraits', mobile: true, run: `B.step(0.5)` },
   select: { q: '?screen=select&hold&webgl', run: `B.step(1.2)` },
   'select-cpu': { q: '?screen=select&hold&webgl', run: `B._lock(); B._cursor(2); B.step(1.2)` },
@@ -94,24 +102,32 @@ const SCENES = {
     q: fightQ('sumaura', 'k8e'),
     run: `toFight(); F().cpu = [null, null]; place(-1500, 900); ST().f[1].hp = 1;
       script((i) => [i === 1 ? ${P} : 0, 0]);
-      until(() => ST().phase === 'ko', 3); B.step(0.4); await new Promise((r) => setTimeout(r, 1800)); B.step(0.2)`,
+      until(() => ST().phase === 'ko', 3); B.step(2.1)`,
   },
   winner: {
     q: fightQ('kevalanche', 'rubberta'),
     run: `toFight(); F().cpu = [null, null]; place(-1500, 900); ST().f[1].hp = 1; ST().wins = [1, 0];
       script((i) => [i === 1 ? ${P} : 0, 0]);
-      until(() => ST().phase === 'end', 6); B.step(0.3); await new Promise((r) => setTimeout(r, 1500)); B.step(1.2); await new Promise((r) => setTimeout(r, 900)); B.step(0.1)`,
-    settle: 800, clip: '.bubble',
+      until(() => ST().phase === 'end', 6); until(() => B.screen === 'win', 3); B.step(1.6)`,
+    settle: 700, clip: '.bubble',
+  },
+  'winner-egg': {
+    q: fightQ('johnny', 'sumaura'),
+    run: `toFight(); F().cpu = [null, null]; place(-1500, 900); ST().f[1].hp = 1; ST().wins = [1, 0];
+      script((i) => [i === 1 ? ${P} : 0, 0]);
+      until(() => ST().phase === 'end', 6); ST().egg = 1; until(() => B.screen === 'win', 3); B.step(1.6)`,
+    settle: 700, clip: '.bubble',
   },
   impatient: {
     q: fightQ('sumaura', 'kevalanche'),
     run: `toFight(); F().cpu = [null, null]; place(-2400, 2400);
       script((i) => [i % 2 === 0 && i < 10 ? ${SP} : 0, 0]);
-      B.step(0.3)`,
+      B.step(0.6)`,
     settle: 500,
   },
   mirror: { q: fightQ('sumaura', 'sumaura'), run: `toFight(); B.step(2.6)` },
   'toques-fight': { q: fightQ('k8e', 'rubberta', '&toques=1'), run: `toFight(); B.step(2.2)` },
+  pause: { q: fightQ('rubberta', 'sumaura'), run: `toFight(); B.step(1.5); dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' })); B.step(0.1)` },
   'fight-mobile': { q: fightQ('johnny', 'kevalanche'), mobile: true, run: `toFight(); B.step(2.5)` },
 };
 
@@ -125,7 +141,7 @@ let errors = 0;
 for (const name of names) {
   const S = SCENES[name];
   if (!S) { console.log(`no scene ${name}`); continue; }
-  const page = await browser.newPage({ viewport: S.mobile ? { width: 390, height: 844 } : { width: 1440, height: 810 }, deviceScaleFactor: 1 });
+  const page = await browser.newPage(S.mobile ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true } : { viewport: { width: 1440, height: 810 }, deviceScaleFactor: 1 });
   const errs = [];
   page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
   page.on('pageerror', (e) => errs.push(String(e)));

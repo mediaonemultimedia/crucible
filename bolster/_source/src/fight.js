@@ -32,6 +32,7 @@ export class Fight {
     this.slow = 0;          // seconds of slow motion (a K.O.)
     this.lastInputs = [0, 0];
     this.override = null;
+    this.focus = null;         // the winner screen: the camera on one spot
     this._place(1);
   }
 
@@ -97,7 +98,7 @@ export class Fight {
       this.plush[k].update(Math.min(dt, 0.05), F, O, P[k].x, P[k].y, P[1 - k].x, P[1 - k].y, threat);
     }
     const extra = this.stage.projectiles(st.proj, a, this.prevProj);
-    this.stage.frame(P[0].x, P[1].x, dt || 0.016, innerWidth / innerHeight);
+    this.stage.frame(P[0].x, P[1].x, dt || 0.016, innerWidth / innerHeight, this.focus);
     this.stage.paintShadows(this.plush, extra);
     this.stage.update(dt);
   }

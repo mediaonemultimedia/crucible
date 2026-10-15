@@ -6,13 +6,13 @@
 
 import * as THREE from 'three/webgpu';
 import { makeRenderer, Stage } from './render/stage.js';
-import { Showcase, portraits } from './render/showcase.js';
+import { Showcase, Lineup, portraits } from './render/showcase.js';
 import { Fight } from './fight.js';
 import { Keyboard } from './input/keyboard.js';
 import { FIGHTERS, ROSTER, MAX_METER } from './fighters/index.js';
 import { ROUND_TICKS } from './sim/sim.js';
 import { FLAGS } from './ui/flags.js';
-import { say } from './ui/bubble.js';
+import { say, dismiss } from './ui/bubble.js';
 import { SAYINGS } from './ui/sayings.js';
 
 const $ = (s) => document.querySelector(s);
@@ -52,11 +52,23 @@ class App {
     this.portraits = {};
     this.backend = renderer.backend && renderer.backend.isWebGPUBackend ? 'WebGPU' : 'WebGL 2';
     this.errors = [];
+    this.timers = [];
     $('#controls-select').innerHTML = CONTROLS;
     $('#controls-pause').innerHTML = CONTROLS;
     this._bindUI();
     this.resize();
     addEventListener('resize', () => this.resize());
+  }
+
+  /* after `sec` seconds of the app's own time (paused while held or paused,
+     so banners and bubbles keep step with the game, not the wall clock) */
+  later(sec, fn) { this.timers.push({ t: sec, fn }); }
+
+  _timers(dt) {
+    if (!this.timers.length) return;
+    const due = [];
+    this.timers = this.timers.filter((q) => { q.t -= dt; if (q.t <= 0) { due.push(q); return false; } return true; });
+    for (const q of due) q.fn();
   }
 
   resize() {
@@ -73,6 +85,8 @@ class App {
     this.idle = 0;
     document.body.classList.remove('napping');
     if (name === 'select') this._enterSelect();
+    if (name === 'title' && !this.lineup) this.lineup = new Lineup(this.stage, ROSTER);
+    if (name !== 'title' && this.lineup) { this.lineup.dispose(); this.lineup = null; }
     if (name !== 'select' && name !== 'diff' && this.show && name !== 'pause') { this.show.dispose(); this.show = null; }
   }
 
@@ -209,7 +223,8 @@ class App {
     this._paintSelect();
     const t = $('#toast');
     t.textContent = '';
-    say(t, SAYINGS[0], 0, 70, { size: 28, tail: 'down', ms: 2600 });
+    const b = say(t, SAYINGS[0], 0, 120, { size: 28, tail: 'down' });
+    this.later(2.6, () => dismiss(b));
   }
 
   /* nap time: 30 s with nothing pressed and the cards doze off */
@@ -217,7 +232,7 @@ class App {
     this.idle = 0;
     if (document.body.classList.contains('napping')) {
       document.body.classList.remove('napping');
-      for (const c of $$('.card')) { c.classList.remove('startle'); void c.offsetWidth; c.classList.add('startle'); setTimeout(() => c.classList.remove('startle'), 700); }
+      for (const c of $$('.card')) { c.classList.remove('startle'); void c.offsetWidth; c.classList.add('startle'); this.later(0.7, () => c.classList.remove('startle')); }
     }
   }
 
@@ -285,8 +300,8 @@ class App {
   banner(text, cls = '', ms = 1200, sub = '') {
     const B = $('#banner');
     B.innerHTML = `<span class="b pop ${cls}">${text}</span>${sub ? `<span class="sub">${sub}</span>` : ''}`;
-    clearTimeout(this._bt);
-    if (ms) this._bt = setTimeout(() => { B.textContent = ''; }, ms);
+    const mine = (this._bn = (this._bn || 0) + 1);
+    if (ms) this.later(ms / 1000, () => { if (this._bn === mine) B.textContent = ''; });
   }
 
   /* where a fighter's head is on screen */
@@ -311,26 +326,25 @@ class App {
       const loser = dbl ? -1 : 1 - e.w;
       if (e.fluff && loser >= 0) {
         // Fluffatality: the loser goes up in a cloud of stuffing and flops
-        setTimeout(() => {
+        this.later(1.1, () => {
           const p = f.plush[loser];
           this.stage.burst(p);
           this.stage.shake(0.9);
-          const t0 = performance.now();
-          const tick = () => { const k = Math.min(1, (performance.now() - t0) / 450); p.deflate = k; if (k < 1) requestAnimationFrame(tick); };
-          tick();
+          p.deflateTarget = 1;
           this.banner('Fluffatality', 'fluffatality', 2600);
-        }, 1100);
-      } else if (e.perfect) setTimeout(() => this.banner('Fluffless Victory!', 'fluffless', 1700), 1550);
+        });
+      } else if (e.perfect) this.later(1.55, () => this.banner('Fluffless Victory!', 'fluffless', 1700));
     }
     if (e.k === 'time') {
       this.banner(e.w === 2 ? 'Draw' : 'Time', '', 1500);
-      if (e.perfect) setTimeout(() => this.banner('Fluffless Victory!', 'fluffless', 1700), 1550);
+      if (e.perfect) this.later(1.55, () => this.banner('Fluffless Victory!', 'fluffless', 1700));
     }
     if (e.k === 'impatient') {
       const [x, y] = this.headScreen(e.p);
-      say($('#bubbles'), FIGHTERS[st.f[e.p].id].impatient, x, y, { size: Math.max(20, Math.min(26, innerWidth / 50)), tail: e.p === 0 ? 'down-left' : 'down-right', ms: 1700, maxWidth: 240 });
+      const b = say($('#bubbles'), FIGHTERS[st.f[e.p].id].impatient, x, y, { size: Math.max(20, Math.min(26, innerWidth / 50)), tail: e.p === 0 ? 'down-left' : 'down-right', maxWidth: 240 });
+      this.later(1.8, () => dismiss(b));
     }
-    if (e.k === 'end') setTimeout(() => this._winner(), 1300);
+    if (e.k === 'end') this.later(1.3, () => this._winner());
   }
 
   _winner() {
@@ -339,7 +353,6 @@ class App {
     const st = f.st, w = st.winner;
     $('#banner').textContent = '';
     this.go('win');
-    document.body.classList.add('fighting');
     if (w === 2) {
       $('#win-eyebrow').textContent = 'No winner';
       $('#win-name').textContent = 'Draw';
@@ -349,40 +362,40 @@ class App {
     $('#win-name').innerHTML = `${f.name(w)} wins`;
     const id = st.f[w].id, line = st.egg ? FIGHTERS[id].catchphrase.egg : FIGHTERS[id].catchphrase.main;
     this.catchline = line;
-    // the camera comes in on the winner; the bubble goes over his head
-    this.winFocus = w;
-    setTimeout(() => {
-      const [x, y] = this.headScreen(w, 0.2);
-      const size = Math.max(22, Math.min(34, innerWidth / 38));
-      const left = x > innerWidth * 0.55;
-      const b = say($('#bubbles'), line, x, y, { size, tail: left ? 'down-right' : 'down-left', ms: 0, maxWidth: Math.min(380, innerWidth * 0.55) });
+    // the camera comes in on the winner (off to one side, to leave room for
+    // what he says), and the bubble goes up beside his head
+    const x = f.plush[w].pos.x, k = innerWidth / innerHeight < 1 ? 0 : 1;
+    const dir = x > f.plush[1 - w].pos.x ? 1 : -1;     // the loser's on the other side: talk away from him
+    f.focus = { x: x + dir * 2.2 * k, d: k ? 11.5 : 19, y: 0.4 };
+    this.later(0.9, () => {
+      if (this.screen !== 'win') return;
+      const [hx, hy] = this.headScreen(w, -0.3);
+      const size = Math.max(22, Math.min(36, innerWidth / 36));
+      const right = dir > 0;
+      const bx = k ? hx + (right ? 70 : -70) : hx, by = k ? hy + 40 : hy - 10;
+      const b = say($('#bubbles'), line, bx, by, { size, tail: !k ? 'down' : right ? 'left' : 'right', maxWidth: Math.min(300, innerWidth * 0.55) });
       // keep it on screen
       const r = b.getBoundingClientRect();
       let dx = 0, dy = 0;
       if (r.left < 12) dx = 12 - r.left;
       if (r.right > innerWidth - 12) dx = innerWidth - 12 - r.right;
-      if (r.top < 90) dy = 90 - r.top;
+      if (r.top < 150) dy = 150 - r.top;
       if (dx || dy) { b.style.left = `${parseFloat(b.style.left) + dx}px`; b.style.top = `${parseFloat(b.style.top) + dy}px`; }
       this.winBubble = b;
-    }, 700);
+    });
   }
 
   /* ── the loop ─────────────────────────────────────────────────────────── */
   frame(dt, draw = true) {
+    this._timers(this.fight?.paused ? 0 : dt);
     if (this.screen === 'select' || this.screen === 'diff') {
       this.idle += dt;
       if (this.screen === 'select' && this.idle > 30 && !document.body.classList.contains('napping')) document.body.classList.add('napping');
     }
     if (this.fight) {
       this.fight.frame(dt);
-      if (this.screen === 'win' && this.winFocus !== undefined) {
-        // drift in on the winner
-        const c = this.stage.cam, x = this.fight.plush[this.winFocus].pos.x;
-        c.x += (x - c.x) * Math.min(1, dt * 2);
-        c.d += (12.5 - c.d) * Math.min(1, dt * 2);
-        this.stage.frame(c.x, c.x, 0, innerWidth / innerHeight);
-      }
     } else if (this.show) this.show.frame(dt);
+    else if (this.lineup) this.lineup.frame(dt);
     else this.stage.frame(-2.7, 2.7, dt, innerWidth / innerHeight), this.stage.update(dt);
     if (draw) this.renderer.render(this.stage.scene, this.stage.camera);
   }
@@ -402,6 +415,7 @@ async function start() {
   if (document.fonts?.load) { try { await Promise.all([document.fonts.load('26px "Bolster Hand"'), document.fonts.load('26px "Bolster Display"')]); } catch { /* the fallback hand will do */ } }
   const app = new App(renderer, canvas);
   window.__bolster = app;
+  app.say = (text, x, y, o) => say($('#bubbles'), text, x, y, o);
   // portraits for the cards
   if (!params.has('noportraits')) { try { app.portraits = await portraits(renderer, app.stage, ROSTER); } catch (err) { console.warn('portraits', err); } }
   let last = performance.now();
@@ -421,6 +435,7 @@ async function start() {
     app.startFight({ p1, p2, level: params.get('cpu') || 'normal', p1cpu: params.get('p1cpu'), seed: (params.get('seed') | 0) || null });
     if (params.get('speed')) app.fight.speed = +params.get('speed');
   } else if (params.get('screen') === 'select') app.go('select');
+  else app.go('title');
   document.body.classList.add('is-live');
 }
 

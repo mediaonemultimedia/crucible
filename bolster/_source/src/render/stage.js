@@ -123,11 +123,16 @@ export class Stage {
   }
 
   /* ── camera: frames both fighters, a little shake on a big hit ─────────── */
-  frame(xa, xb, dt, aspect) {
-    const mid = (xa + xb) / 2, sep = Math.abs(xa - xb);
+  frame(xa, xb, dt, aspect, focus = null) {
+    let mid = (xa + xb) / 2;
+    const sep = Math.abs(xa - xb);
     const narrow = aspect < 1.2;
-    const want = Math.max(narrow ? 22 : 15.5, Math.min(narrow ? 36 : 25, 12 + sep * (narrow ? 1.6 : 1.05)));
-    const k = Math.min(1, dt * 3.2);
+    let want = Math.max(narrow ? 24 : 17, Math.min(narrow ? 38 : 26, 12.5 + sep * (narrow ? 1.7 : 1.1)));
+    let k = Math.min(1, dt * 4.5);
+    // never let either of them leave the frame: zoom out without the lag
+    if (want > this.cam.d + 0.8) this.cam.d += (want - this.cam.d) * Math.min(1, dt * 12);
+    if (focus) { mid = focus.x; want = focus.d; k = Math.min(1, dt * 2.2); }
+    this.cam.lift = (this.cam.lift || 0) + (((focus && focus.y) || 0) - (this.cam.lift || 0)) * k;
     this.cam.x += (mid - this.cam.x) * k;
     this.cam.d += (want - this.cam.d) * k;
     this.cam.t += dt;
@@ -137,8 +142,9 @@ export class Stage {
     const C = this.camera;
     C.aspect = aspect;
     C.fov = narrow ? 34 : 26;
-    C.position.set(this.cam.x + jx, 3.6 + jy, this.cam.d);
-    C.lookAt(this.cam.x + jx * 0.5, 1.85 + jy * 0.5, 0);
+    const L = this.cam.lift || 0;
+    C.position.set(this.cam.x + jx, 3.7 + jy - L, this.cam.d);
+    C.lookAt(this.cam.x + jx * 0.5, 2.1 + jy * 0.5 - L * 0.4, 0);
     C.updateProjectionMatrix();
   }
 

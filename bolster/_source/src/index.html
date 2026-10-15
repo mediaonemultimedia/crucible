@@ -44,7 +44,8 @@ button{font:inherit}
 body.fighting #mark{display:none}
 
 /* title --------------------------------------------------------------------- */
-#title-screen .big{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);text-align:center;width:min(92vw,900px)}
+#title-screen .big{position:absolute;left:50%;top:24%;transform:translate(-50%,-50%);text-align:center;width:min(92vw,900px)}
+#title-screen .press-wrap{position:absolute;left:0;right:0;bottom:7%;text-align:center}
 .wordmark{font-family:var(--heavy);font-weight:400;font-size:clamp(64px,13vw,190px);line-height:.85;letter-spacing:-.02em;margin:0;color:var(--stuff);
   -webkit-text-stroke:clamp(3px,.6vw,7px) var(--ink-s);paint-order:stroke fill;text-shadow:0 .06em 0 var(--ink-s),0 .1em .2em rgba(43,38,34,.25);transform:skewX(-6deg)}
 .wordmark span{display:inline-block;animation:bob 2.6s ease-in-out infinite}
@@ -52,9 +53,9 @@ body.fighting #mark{display:none}
 .wordmark span:nth-child(3n){animation-delay:-1.3s}
 @keyframes bob{50%{transform:translateY(-.04em) rotate(-1.5deg)}}
 .tagline{font-family:var(--serif);font-style:italic;font-size:clamp(15px,1.8vw,20px);color:var(--dim-s);margin:22px 0 0}
-.press{margin-top:34px;font-family:var(--mono);font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-s);animation:blink 1.3s steps(2) infinite}
+.press{margin-top:0;font-family:var(--mono);font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-s);animation:blink 1.3s steps(2) infinite}
 @keyframes blink{50%{opacity:.25}}
-.keyboard-only{display:none;margin:28px auto 0;max-width:320px;font-family:var(--serif);font-style:italic;font-size:16px;line-height:1.5;color:var(--ink-s);background:rgba(251,246,234,.8);border:1px solid rgba(43,38,34,.15);padding:14px 18px}
+.keyboard-only{display:none;margin:0 auto;max-width:320px;font-family:var(--serif);font-style:italic;font-size:16px;line-height:1.5;color:var(--ink-s);background:rgba(251,246,234,.8);border:1px solid rgba(43,38,34,.15);padding:14px 18px}
 body.touch .keyboard-only{display:block}
 body.touch .press{display:none}
 
@@ -101,7 +102,7 @@ kbd{display:inline-block;min-width:22px;text-align:center;font-family:var(--mono
 .card .tag{position:absolute;top:6px;font-family:var(--mono);font-size:10px;font-weight:700;color:#fff;padding:1px 5px}
 .card .tag.t1{left:6px;background:var(--p1)}
 .card .tag.t2{right:6px;background:var(--p2)}
-.card .zzz{position:absolute;right:10%;top:18%;font-family:var(--hand);font-size:22px;color:var(--ink-s);opacity:0;pointer-events:none}
+.card .zzz{position:absolute;right:16%;top:22%;font-family:var(--hand);font-size:30px;color:#fff;-webkit-text-stroke:5px var(--ink-s);paint-order:stroke fill;opacity:0;pointer-events:none}
 .card .zzz i{position:absolute;font-style:normal;opacity:0}
 body.napping .card img{animation:doze 3.2s ease-in-out infinite}
 body.napping .card:nth-child(2) img{animation-delay:-.7s}
@@ -118,12 +119,16 @@ body.napping .card .zzz i:nth-child(3){animation-delay:1.6s;font-size:.65em}
 .card.startle::after{content:"!";position:absolute;right:12%;top:8%;font-family:var(--heavy);font-size:32px;color:var(--p1);-webkit-text-stroke:2px var(--ink-s);paint-order:stroke fill;animation:bang .6s ease-out forwards}
 @keyframes startle{0%{transform:translateY(0)}30%{transform:translateY(-14px) scale(1.06)}60%{transform:translateY(2px) rotate(3deg)}100%{transform:none}}
 @keyframes bang{0%{transform:scale(.2);opacity:0}30%{transform:scale(1.3);opacity:1}100%{transform:scale(1);opacity:0}}
-#select-screen .controls{position:absolute;left:3.5vw;bottom:calc(22px + clamp(96px,11vw,150px) * 4 / 3 + 26px);max-width:260px}
+#select-screen .controls{position:absolute;left:50%;top:104px;transform:translateX(-50%);max-width:none;display:flex;flex-wrap:wrap;justify-content:center;gap:4px 14px;padding:8px 14px;font-size:11.5px;width:max-content;max-width:min(94vw,820px)}
+#select-screen .controls h4{display:none}
+#select-screen .controls span{white-space:nowrap}
+#select-screen .controls span:nth-child(odd){margin-right:-9px}
 #select-screen .step{position:absolute;right:3.5vw;bottom:calc(22px + clamp(96px,11vw,150px) * 4 / 3 + 26px);font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-s);background:rgba(251,246,234,.92);border:2px solid var(--ink-s);padding:8px 12px;box-shadow:3px 3px 0 var(--ink-s)}
 
 /* HUD ----------------------------------------------------------------------- */
 #hud{position:absolute;left:0;right:0;top:0;display:none;pointer-events:none;padding:18px 3vw 0}
 body.fighting #hud{display:block}
+body[data-screen=win] #hud{display:none}
 #hud .top{display:grid;grid-template-columns:1fr auto 1fr;gap:14px;align-items:start}
 .side{display:flex;flex-direction:column;gap:5px}
 .side.r{align-items:flex-end}
@@ -171,7 +176,7 @@ body.fighting #hud{display:block}
 #pause-screen .col{display:flex;flex-direction:column;gap:12px;width:min(86vw,300px)}
 
 /* winner -------------------------------------------------------------------- */
-#win-screen .who{position:absolute;left:50%;top:7%;transform:translateX(-50%);text-align:center;width:90vw}
+#win-screen .who{position:absolute;left:50%;top:5%;transform:translateX(-50%);text-align:center;width:90vw}
 #win-screen .who .eyebrow{display:block;margin-bottom:8px}
 #win-screen .menu{top:auto;bottom:4%;transform:translateX(-50%);flex-direction:row;width:auto;gap:16px}
 #bubbles{position:absolute;inset:0;pointer-events:none;overflow:visible}
@@ -216,6 +221,8 @@ body.fighting #hud{display:block}
     <div class="big">
       <h1 class="wordmark" aria-label="Bolster"><span>B</span><span>O</span><span>L</span><span>S</span><span>T</span><span>E</span><span>R</span></h1>
       <p class="tagline">Five plush fighters knock the stuffing out of each other.</p>
+    </div>
+    <div class="press-wrap">
       <div class="press">Press any key</div>
       <div class="keyboard-only">Bolster is best on a keyboard. Come back on a computer to fight — A D W S to move, O and P to hit, Space for the special.</div>
     </div>
@@ -272,8 +279,6 @@ body.fighting #hud{display:block}
   </div>
 
   <div id="banner"></div>
-  <div id="bubbles"></div>
-  <div id="toast"></div>
 
   <section id="pause-screen" class="screen">
     <div class="menu">
@@ -294,6 +299,8 @@ body.fighting #hud{display:block}
       <button class="opt" data-act="select">Character select</button>
     </div>
   </section>
+  <div id="bubbles"></div>
+  <div id="toast"></div>
 </div>
 <!--BUNDLE-->
 </body>

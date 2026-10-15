@@ -120,8 +120,9 @@ export class BipedPuppet extends FightMixin(Athlete) {
     if (act === 'hitstun') { const s = clamp(1 - F.t / 14, 0, 1); R = [-0.8, 0.2, -0.2]; L = [0.8, 0.3, -0.1]; lean = [-0.35 * s, 0, 0.1 * s]; k = 400; }
     if (act === 'grabbed') { R = [-0.3, 0.9, 0.2]; L = [0.3, 0.9, 0.2]; lean = [-0.15, 0, Math.sin(this.time * 30) * 0.1]; k = 500; }
     if (act === 'win') {
-      const w = Math.sin(this.time * TAU * 1.4);
-      R = [-0.35, 1, 0.1]; L = [0.35, 1, 0.1]; lean = [-0.1, 0, 0.08 * w];
+      // a fist pumped at the sky, one then the other
+      const w = Math.sin(this.time * TAU * 1.1);
+      R = [-0.55, 0.75 + 0.35 * w, 0.15]; L = [0.55, 0.75 - 0.35 * w, 0.15]; lean = [-0.12, 0, 0.08 * w];
       if (st === 'tennis') L = [0.5, -0.4, 0.4];
     }
     if (act === 'lose') { R = [-0.4, -0.9, 0.2]; L = [0.4, -0.9, 0.2]; lean = [0.35, 0, 0]; }
@@ -505,7 +506,7 @@ export class OctopusPuppet extends FightMixin(class {}) {
         const R = mix(1.2, 0.75, sq);
         this.arms.forEach((a, j) => {
           const th = (j / 8) * TAU;
-          plan.push({ a, t: at(Math.cos(th) * R, 1.3 + Math.sin(th) * R * 1.1 + 0.2, 1.5 + Math.sin(th * 2) * 0.3), k: 0.32 });
+          plan.push({ a, t: at(Math.cos(th) * R * 0.9, 1.9 + Math.sin(th) * R * 1.2, 1.55 + Math.cos(th * 2) * 0.35), k: 0.32 });
         });
         squash = -0.15; sway = 0;
       }

@@ -178,6 +178,7 @@ export class Plush {
     group.add(this.monocle);
     scene.add(group);
 
+    this.yawScale = 1;              // the title lineup turns them nearly to face us
     this.yaw = { x: side ? -L.yaw : L.yaw, v: 0 };
     this.pos = new THREE.Vector3();
     this.vel = new THREE.Vector3();
@@ -216,7 +217,7 @@ export class Plush {
     this.time += dt;
     const g = this.group;
     // facing: a turn (eased) when the sim flips him
-    const want = F.face > 0 ? L.yaw : -L.yaw;
+    const want = (F.face > 0 ? L.yaw : -L.yaw) * this.yawScale;
     const k = 120;
     this.yaw.v += (k * (want - this.yaw.x) - 2 * Math.sqrt(k) * this.yaw.v) * dt;
     this.yaw.x += this.yaw.v * dt;
@@ -245,6 +246,7 @@ export class Plush {
     const sq = Math.max(-0.25, Math.min(0.2, this.squash.x * 0.06));
     const crouch = this.puppet.crouchT ? 0.84 : 1;
     this._crouch = this._crouch === undefined ? 1 : this._crouch + (crouch - this._crouch) * Math.min(1, dt * 18);
+    this.deflate += ((this.deflateTarget || 0) - this.deflate) * Math.min(1, dt * 7);
     const df = this.deflate;
     g.scale.set(1 - sq * 0.5 + df * 0.35, (1 + sq) * this._crouch * (1 - df * 0.62), 1 - sq * 0.5 + df * 0.35);
     g.updateMatrixWorld(true);
@@ -337,6 +339,7 @@ export class Plush {
     this.puppet.fallen = 0;
     if (this.puppet.balanceK !== undefined && this.puppet.balanceK === 0) this.puppet.balanceK = 0.011;
     this.deflate = 0;
+    this.deflateTarget = 0;
     this.group.visible = true;
     for (let i = 0; i < 40; i++) this.soft.advance(1 / 120, (h) => this.puppet.update(h), (h) => { this.body.update(h); this.cloth?.update(h); });
   }

@@ -40,6 +40,33 @@ export class Showcase {
   dispose() { for (let k = 0; k < 2; k++) this.set(k, null); }
 }
 
+/* the title: all five in a row on the mat, turned nearly to face us */
+export class Lineup {
+  constructor(stage, ids) {
+    this.stage = stage;
+    const n = ids.length;
+    this.x = ids.map((_, k) => (k - (n - 1) / 2) * 2.95);
+    this.items = ids.map((id, k) => {
+      const p = new Plush(stage.scene, id, { side: this.x[k] > 0 ? 1 : 0 });
+      p.yawScale = this.x[k] === 0 ? 0.15 : 0.32;
+      return p;
+    });
+  }
+
+  frame(dt) {
+    this.items.forEach((p, k) => {
+      const F = still(p.id, this.x[k] > 0 ? -1 : 1);
+      p.update(dt, F, F, this.x[k], 0, this.x[k] > 0 ? this.x[k] - 3 : this.x[k] + 3, 0, false);
+    });
+    const half = this.x[this.x.length - 1] + 1.2;
+    this.stage.frame(-half, half, dt, innerWidth / innerHeight);
+    this.stage.paintShadows(this.items);
+    this.stage.update(dt);
+  }
+
+  dispose() { for (const p of this.items) p.dispose(this.stage.scene); this.items = []; }
+}
+
 /* render each fighter's portrait once; returns {id: dataURL} */
 export async function portraits(renderer, stage, ids) {
   const W = 240, H = 320;
@@ -56,8 +83,7 @@ export async function portraits(renderer, stage, ids) {
     stage.paintShadows([p]);
     // frame his head and shoulders, a little from his good side
     const box = new THREE.Box3().setFromObject(p.shells);
-    const top = id === 'k8e' ? 4.6 : id === 'rubberta' ? 2.6 : 3.3;
-    const cy = top * 0.62, d = top * 1.95;
+    const [cy, d] = { k8e: [2.85, 9], rubberta: [1.3, 6.4] }[id] || [2.05, 6.4];
     cam.position.set(1.6, cy + 0.5, d);
     cam.lookAt(0.15, cy, 0);
     renderer.setRenderTarget(rt);
