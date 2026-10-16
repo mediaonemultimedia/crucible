@@ -13,7 +13,7 @@
    STUFFING (health), meter → the round (timer, K.O., time) → the match
    (best of 3, the winner's catchphrase, a rare Fluffatality).            */
 
-import { FIGHTERS, MAX_METER } from '../fighters/index.js';
+import { FIGHTERS, MAX_METER, dashOf, isShot } from '../fighters/index.js';
 import { LEFT, RIGHT, UP, DOWN, LIGHT, HEAVY, SPECIAL } from './input.js';
 import { rngInt } from './rng.js';
 
@@ -27,6 +27,8 @@ export const OUTRO = 180;            // after a K.O. or time, before the next ro
 export const BUFFER = 6;             // a press is remembered this many ticks
 export const DOWN_T = 40;            // lying after a knockdown
 export const GETUP_T = 24;           // getting up (invulnerable)
+export const TAP = 12;               // a double-tap's second press within this many ticks
+export const OFFSCREEN = 4500;       // a shot this far past the one it was thrown at is gone
 
 const sgn = (v) => (v > 0 ? 1 : v < 0 ? -1 : 0);
 const tdiv = (a, b) => Math.trunc(a / b);
@@ -42,6 +44,7 @@ function newFighter(id, side) {
     stun: 0, air: 0, aired: 0, inv: 0, tx: 0,
     prev: 0, bl: 0, bh: 0, bs: 0, back: 0, down: 0,
     combo: 0, taken: 0, nag: 0,
+    tf: 0, tb: 0, dash: 0, db: 0, dd: 0,
   };
 }
 
@@ -113,7 +116,13 @@ function readInput(st, k, m) {
   f.down = m & DOWN ? 1 : 0;
   f.fwd = m & fwd ? 1 : 0;
   f.up = m & UP ? 1 : 0;
-  if (st.pause === 0) { f.bl = Math.max(0, f.bl - 1); f.bh = Math.max(0, f.bh - 1); f.bs = Math.max(0, f.bs - 1); }
+  if (st.pause === 0) {
+    f.bl = Math.max(0, f.bl - 1); f.bh = Math.max(0, f.bh - 1); f.bs = Math.max(0, f.bs - 1);
+    f.tf = Math.max(0, f.tf - 1); f.tb = Math.max(0, f.tb - 1); f.db = Math.max(0, f.db - 1);
+  }
+  // a double-tap (press, release, press within TAP ticks) asks for a dash
+  if (pressed & fwd) { if (f.tf) { f.dash = 1; f.db = BUFFER; f.tf = 0; } else f.tf = TAP; f.tb = 0; }
+  if (pressed & bk) { if (f.tb) { f.dash = -1; f.db = BUFFER; f.tb = 0; } else f.tb = TAP; f.tf = 0; }
   if (pressed & LIGHT) f.bl = BUFFER;
   if (pressed & HEAVY) f.bh = BUFFER;
   if (pressed & SPECIAL) {
@@ -144,8 +153,17 @@ function think(st, k) {
   if (f.inv > 0) f.inv--;
   if (GROUND_FREE[f.act] && !f.air) {
     if (f.bs && f.meter >= MAX_METER) return startMove(st, k, 'special');
-    if (f.bh) return startMove(st, k, f.down ? 'signature' : 'heavy');
+    if (f.bh) {
+      // one shot of your own on screen at a time: no throw while it's out
+      if (f.down && shotOut(st, k, D.moves.signature)) f.bh = 0;
+      else return startMove(st, k, f.down ? 'signature' : 'heavy');
+    }
     if (f.bl) return startMove(st, k, f.down ? 'lowLight' : 'light');
+    if (f.db && f.dash) {
+      f.act = 'dash'; f.t = 0; f.dd = f.dash; f.dash = 0; f.db = 0;
+      st.ev.push({ k: 'dash', p: k, d: f.dd });
+      return dashTick(f);
+    }
     if (f.up) {
       f.act = 'jump'; f.t = 0; f.air = 1; f.aired = 0;
       f.vy = D.jumpV; f.vx = f.fwd ? D.jumpX * f.face : f.back ? -D.jumpX * f.face : 0;
@@ -165,6 +183,7 @@ function think(st, k) {
       if (!f.aired && (f.bl || f.bh)) { f.aired = 1; startMove(st, k, f.bh ? 'airHeavy' : 'airLight'); }
       return;
     case 'attack': return attackTick(st, k, f, o, D);
+    case 'dash': return dashTick(f);
     case 'hitstun':
     case 'blockstun':
       if (--f.stun <= 0) { f.act = 'idle'; f.t = 0; f.combo = 0; }
@@ -184,12 +203,25 @@ function think(st, k) {
   }
 }
 
+/* is one of this fighter's own shots still out (for a move that throws)? */
+function shotOut(st, k, m) {
+  return isShot(m) && st.proj.some((p) => p.o === k);
+}
+
+/* a dash: full speed, easing off over the last few ticks, then free */
+function dashTick(f) {
+  const [n, v] = dashOf(f.id)[f.dd > 0 ? 'f' : 'b'];
+  if (f.t >= n) { f.act = 'idle'; f.t = 0; f.vx = 0; f.dd = 0; return; }
+  const left = n - f.t;
+  f.vx = tdiv(v * Math.min(4, left), 4) * f.dd * f.face;
+}
+
 function attackTick(st, k, f, o, D) {
   const m = D.moves[f.mv], t = f.t;
   // light normals cancel into heavy, the signature or the special on contact
   if (m.cancel && f.hm && t >= m.hits[0].from && t <= m.hits[m.hits.length - 1].to + 9) {
     if (f.bs && f.meter >= MAX_METER) return startMove(st, k, 'special');
-    if (f.bh) return startMove(st, k, f.down ? 'signature' : 'heavy');
+    if (f.bh && !(f.down && shotOut(st, k, D.moves.signature))) return startMove(st, k, f.down ? 'signature' : 'heavy');
   }
   // motion: a forward push over a window, a hop at a frame
   let vx = null;
@@ -310,6 +342,11 @@ export function hurtBox(f) {
   if (f.air) b = H.air;
   else if (f.act === 'crouch' || (f.act === 'blockstun' && f.down) || (f.act === 'attack' && FIGHTERS[f.id].moves[f.mv].low)) b = H.crouch;
   else b = H.stand;
+  if (f.act === 'attack') {
+    // a heavy's limb out in front is there to be hit
+    const e = FIGHTERS[f.id].moves[f.mv].ext;
+    if (e && f.t >= e.from && f.t <= e.to && e.x1 > b.x + b.w) b = { ...b, w: e.x1 - b.x };
+  }
   return worldBox(f, b);
 }
 
@@ -433,7 +470,8 @@ function projectiles(st) {
       land_hit(st, p.o, p, sgn(p.vx), !!p.sp, [p.x, p.y], p.sp ? 'special' : 'signature');
       continue;
     }
-    if (p.life <= 0 || p.x < -STAGE - 1500 || p.x > STAGE + 1500) continue;
+    // gone once it's off the screen: well past the one it was thrown at, or the walls
+    if (p.life <= 0 || p.x < -STAGE - 1500 || p.x > STAGE + 1500 || (p.x - d.x) * sgn(p.vx) > OFFSCREEN) continue;
     keep.push(p);
   }
   st.proj = keep.filter((p) => !p.dead);
