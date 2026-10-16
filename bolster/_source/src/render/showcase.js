@@ -58,8 +58,10 @@ export class Lineup {
       const F = still(p.id, this.x[k] > 0 ? -1 : 1);
       p.update(dt, F, F, this.x[k], 0, this.x[k] > 0 ? this.x[k] - 3 : this.x[k] + 3, 0, false);
     });
-    const half = this.x[this.x.length - 1] + 1.2;
-    this.stage.frame(-half, half, dt, innerWidth / innerHeight);
+    const half = this.x[this.x.length - 1] + 1.2, aspect = innerWidth / innerHeight;
+    // the camera a little higher and back, so the row stands in the lower
+    // half and the Pillow Fight logo has the top of the screen
+    this.stage.frame(-half, half, dt, aspect, aspect < 1.2 ? null : { x: 0, d: 24, y: -2.6 });
     this.stage.paintShadows(this.items);
     this.stage.update(dt);
   }

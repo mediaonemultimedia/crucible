@@ -1,5 +1,7 @@
 /* The stage: renderer (WebGPU, WebGL 2 fallback — exactly Grommet's
-   makeRenderer), camera, the felt mat and studio paper, contact shadows,
+   makeRenderer), camera, the neon arena (a violet felt mat on a dark
+   floor, the back wall glowing pink on player 1's side and mint on player
+   2's — Pillow Fight's palette), contact shadows,
    and the cosmetic effects — hit sparks, tufts of stuffing, screen shake,
    the projectiles (tennis balls, felt rings), and a Fluffatality's burst.
    All of it reads the sim and the plush; none of it feeds back.          */
@@ -37,7 +39,7 @@ const SX = 18, SZ = 9;   // the shadow canvas covers x ∈ [−SX, SX], z ∈ [�
 export class Stage {
   constructor() {
     const scene = (this.scene = new THREE.Scene());
-    this.bg = new THREE.Color().setRGB(0.83, 0.8, 0.765, THREE.LinearSRGBColorSpace);
+    this.bg = new THREE.Color('#120d1f');
     scene.background = this.bg;
     this.camera = new THREE.PerspectiveCamera(26, 16 / 9, 0.1, 200);
     this.cam = { x: 0, y: 2.4, d: 17, shake: 0, t: 0 };
@@ -64,13 +66,19 @@ export class Stage {
       const suv = vec2(xz.x.div(SX * 2).add(0.5), xz.y.div(SZ * 2).add(0.5));
       const sh = texture(stex, vec2(suv.x, float(1).sub(suv.y))).a;
       const r = length(xz.mul(vec2(0.55, 1)).sub(vec2(0, 0.5)));
-      const paper = mix(vec3(0.925, 0.9, 0.865), vec3(0.83, 0.8, 0.765), smoothstep(3, 13, r)).toVar();
+      // a dark arena floor, a violet pool of light in the middle, the side
+      // lights spilling pink from the left and mint from the right
+      const deep = vec3(0.006, 0.004, 0.013), pool = vec3(0.05, 0.026, 0.12);
+      const paper = mix(pool, deep, smoothstep(2, 13, r)).toVar();
+      const side = xz.x.div(14).clamp(-1, 1);
+      paper.addAssign(vec3(0.09, 0.008, 0.025).mul(smoothstep(0.2, 1, side.negate())).mul(smoothstep(12, 4, r)));
+      paper.addAssign(vec3(0.008, 0.07, 0.05).mul(smoothstep(0.2, 1, side)).mul(smoothstep(12, 4, r)));
       const muv = vec2(xz.x.div(32).add(0.5), xz.y.div(8).add(0.5));
       const inMat = step(0, muv.x).mul(step(muv.x, 1)).mul(step(0, muv.y)).mul(step(muv.y, 1));
       const felt = texture(mtex, vec2(muv.x, float(1).sub(muv.y)));
-      paper.assign(mix(paper, felt.rgb, felt.a.mul(inMat).mul(smoothstep(15, 8, r))));
-      const grain = mx_noise_float(vec3(xz.mul(9), 0)).mul(0.012);
-      return vec4(paper.add(grain).mul(float(1).sub(sh.mul(0.6))), 1);
+      paper.assign(mix(paper, felt.rgb.mul(mix(1, 0.45, smoothstep(6, 14, r))), felt.a.mul(inMat)));
+      const grain = mx_noise_float(vec3(xz.mul(9), 0)).mul(0.004);
+      return vec4(paper.add(grain).mul(float(1).sub(sh.mul(0.75))), 1);
     })();
     this.floor = new THREE.Mesh(new THREE.PlaneGeometry(120, 60).rotateX(-Math.PI / 2), mat);
     scene.add(this.floor);
@@ -79,9 +87,18 @@ export class Stage {
     const wall = new THREE.MeshBasicNodeMaterial();
     const bgc = this.bg;
     wall.colorNode = Fn(() => {
-      const y = positionWorld.y;
-      const base = mix(vec3(0.83, 0.8, 0.765), vec3(0.88, 0.85, 0.81), smoothstep(0, 9, y));
-      return vec4(base.add(mx_noise_float(vec3(positionWorld.x.mul(3), y.mul(3), 0)).mul(0.008)), 1);
+      const y = positionWorld.y, x = positionWorld.x;
+      // dusk over the arena: dark at the top, a glow along the horizon —
+      // pink on player 1's side, violet in the middle, mint on player 2's —
+      // and two thin neon tubes along the wall
+      const side = x.div(22).clamp(-1, 1);
+      const hue = mix(mix(vec3(0.42, 0.02, 0.1), vec3(0.16, 0.05, 0.5), smoothstep(-1, 0, side)), vec3(0.03, 0.4, 0.28), smoothstep(0, 1, side));
+      const base = mix(vec3(0.02, 0.012, 0.05), vec3(0.006, 0.004, 0.013), smoothstep(0, 12, y)).toVar();
+      base.addAssign(hue.mul(0.32).mul(smoothstep(9, 0, y)));
+      const tube = (h, w) => smoothstep(w, 0, abs(y.sub(h)));
+      base.addAssign(hue.mul(1.6).mul(tube(4.6, 0.06).add(tube(4.6, 0.4).mul(0.25))));
+      base.addAssign(vec3(0.3, 0.12, 0.9).mul(tube(7.4, 0.04).add(tube(7.4, 0.35).mul(0.2))).mul(0.6));
+      return vec4(base.add(mx_noise_float(vec3(x.mul(3), y.mul(3), 0)).mul(0.003)), 1);
     })();
     this.wall = new THREE.Mesh(new THREE.PlaneGeometry(140, 40), wall);
     this.wall.position.set(0, 20, -14);
@@ -101,24 +118,27 @@ export class Stage {
     g.clearRect(0, 0, W, H);
     // felt: a warm blue-grey, the fibres a faint noise of strokes
     const x0 = W * (0.5 - 10.4 / 32), x1 = W * (0.5 + 10.4 / 32), y0 = H * (0.5 - 3.2 / 8), y1 = H * (0.5 + 3.2 / 8);
-    g.fillStyle = '#5f7f95';
+    g.fillStyle = '#2a2140';
     roundRect(g, x0, y0, x1 - x0, y1 - y0, 40); g.fill();
     let s = 7;
     const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
     for (let i = 0; i < 9000; i++) {
       const x = x0 + rnd() * (x1 - x0), y = y0 + rnd() * (y1 - y0), a = rnd() * Math.PI;
-      g.strokeStyle = rnd() < 0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+      g.strokeStyle = rnd() < 0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.08)';
       g.lineWidth = 1;
       g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * 6, y + Math.sin(a) * 6); g.stroke();
     }
-    // a contrasting border band and a running stitch round it
-    g.strokeStyle = '#e9c46a'; g.lineWidth = 16;
+    // a violet border band (pink at player 1's end, mint at player 2's) and
+    // a running stitch round it
+    const band = g.createLinearGradient(x0, 0, x1, 0);
+    band.addColorStop(0, '#ff3b6b'); band.addColorStop(0.5, '#9b5cff'); band.addColorStop(1, '#3ff0c8');
+    g.strokeStyle = band; g.lineWidth = 16;
     roundRect(g, x0 + 22, y0 + 22, x1 - x0 - 44, y1 - y0 - 44, 26); g.stroke();
-    g.setLineDash([18, 14]); g.strokeStyle = '#f7f1e3'; g.lineWidth = 4;
+    g.setLineDash([18, 14]); g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 4;
     roundRect(g, x0 + 44, y0 + 44, x1 - x0 - 88, y1 - y0 - 88, 18); g.stroke();
     g.setLineDash([]);
-    // the centre mark: a little stitched star
-    g.strokeStyle = 'rgba(247,241,227,0.8)'; g.lineWidth = 4; g.setLineDash([10, 8]);
+    // the centre mark: a little stitched ring
+    g.strokeStyle = 'rgba(205,182,255,0.8)'; g.lineWidth = 4; g.setLineDash([10, 8]);
     g.beginPath(); g.arc(W / 2, H / 2, 46, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
   }
 

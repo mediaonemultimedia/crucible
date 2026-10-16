@@ -31,11 +31,19 @@ if (!html.includes('/*FONTFACE*/')) throw new Error('index.html is missing the /
    family name (a modified OFL font doesn't carry its Reserved Font Name). */
 const font = fs.readFileSync(path.join(src, 'assets/gochi-hand-subset.woff2')).toString('base64');
 const font2 = fs.readFileSync(path.join(src, 'assets/lilita-one-subset.woff2')).toString('base64');
+const cond = fs.readFileSync(path.join(src, 'assets/oswald-subset.woff2')).toString('base64');
 const face = `/* Bubble lettering: a subset of Gochi Hand, Copyright (c) 2011 HT Fonts, SIL Open Font License 1.1.
-   Display type: a subset of Lilita One, Copyright (c) 2011 Juan Montoreano, SIL Open Font License 1.1. */
+   Display type: a subset of Lilita One, Copyright (c) 2011 Juan Montoreano, SIL Open Font License 1.1.
+   HUD condensed caps: a subset of Oswald, Copyright 2016 The Oswald Project Authors, SIL Open Font License 1.1. */
 @font-face{font-family:"Bolster Hand";src:url(data:font/woff2;base64,${font}) format("woff2");font-display:block}
-@font-face{font-family:"Bolster Display";src:url(data:font/woff2;base64,${font2}) format("woff2");font-display:block}`;
+@font-face{font-family:"Bolster Display";src:url(data:font/woff2;base64,${font2}) format("woff2");font-display:block}
+@font-face{font-family:"Bolster Condensed";src:url(data:font/woff2;base64,${cond}) format("woff2");font-weight:700;font-display:block}`;
 html = html.replace('/*FONTFACE*/', () => face);
+
+/* the Pillow Fight logo (the owner's artwork, transparent WebP), inlined */
+if (!html.includes('__LOGO__')) throw new Error('index.html is missing the __LOGO__ marker');
+const logo = fs.readFileSync(path.join(root, 'assets/pillow-fight-logo.webp')).toString('base64');
+html = html.replace('__LOGO__', () => `data:image/webp;base64,${logo}`);
 
 const final = html.replace('<!--BUNDLE-->', () => `<script>\n${js}\n</script>`);
 const dest = path.join(root, 'final.html');

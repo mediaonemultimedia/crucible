@@ -1,4 +1,4 @@
-/* Bolster — No. 23. The app: title → mode → character select → difficulty
+/* Bolster — No. 23. The game is called Pillow Fight. The app: title → mode → character select → difficulty
    → best of three → winner, the HUD and banners, speech bubbles, the
    easter eggs, deep links (?p1=kevalanche&p2=sumaura&cpu=hard), and a test
    hook (window.__bolster). The game itself is the sim (src/sim/); this
@@ -23,9 +23,11 @@ const params = new URLSearchParams(location.search);
 const CONTROLS = `
   <h4>Controls</h4>
   <span><kbd>A</kbd><kbd>D</kbd></span><span>walk · hold back to block</span>
+  <span><kbd>D</kbd><kbd>D</kbd></span><span>dash in (double-tap forward)</span>
+  <span><kbd>A</kbd><kbd>A</kbd></span><span>backdash (double-tap back)</span>
   <span><kbd>W</kbd> <kbd>S</kbd></span><span>jump · crouch (crouch-block lows)</span>
-  <span><kbd>O</kbd></span><span>light attack</span>
-  <span><kbd>P</kbd></span><span>heavy attack</span>
+  <span><kbd>O</kbd></span><span>light attack — quick, short</span>
+  <span><kbd>P</kbd></span><span>heavy attack — wind-up, lunge, long reach</span>
   <span><kbd>S</kbd>+<kbd>O</kbd></span><span>low attack</span>
   <span><kbd>S</kbd>+<kbd>P</kbd></span><span>signature move</span>
   <span><kbd>Space</kbd></span><span>special (full meter)</span>
@@ -359,7 +361,7 @@ class App {
       $('#win-name').textContent = 'Draw';
       return;
     }
-    $('#win-eyebrow').textContent = w === 0 ? 'Player 1 wins' : f.cpu[0] ? 'CPU 2 wins' : 'The computer wins';
+    $('#win-eyebrow').textContent = `Pillow Fight · ${w === 0 ? 'Player 1 wins' : f.cpu[0] ? 'CPU 2 wins' : 'The computer wins'}`;
     $('#win-name').innerHTML = `${f.name(w)} wins`;
     const id = st.f[w].id, line = st.egg ? FIGHTERS[id].catchphrase.egg : FIGHTERS[id].catchphrase.main;
     this.catchline = line;
@@ -381,7 +383,7 @@ class App {
       let dx = 0, dy = 0;
       if (left < 12) dx = 12 - left;
       if (left + bw > innerWidth - 12) dx = innerWidth - 12 - bw - left;
-      if (top + 50 < 135) dy = 135 - top - 50;
+      if (top + 50 < 150) dy = 150 - top - 50;
       if (dx || dy) { b.style.left = `${left + dx}px`; b.style.top = `${top + dy}px`; }
       this.winBubble = b;
     });
@@ -440,7 +442,7 @@ async function start() {
   const touch = matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches;
   document.body.classList.toggle('touch', touch);
   const { renderer, canvas } = await makeRenderer($('#stage'));
-  if (document.fonts?.load) { try { await Promise.all([document.fonts.load('26px "Bolster Hand"'), document.fonts.load('26px "Bolster Display"')]); } catch { /* the fallback hand will do */ } }
+  if (document.fonts?.load) { try { await Promise.all([document.fonts.load('26px "Bolster Hand"'), document.fonts.load('26px "Bolster Display"'), document.fonts.load('700 26px "Bolster Condensed"')]); } catch { /* the fallback hand will do */ } }
   const app = new App(renderer, canvas);
   window.__bolster = app;
   app.moveOf = moveOf;
@@ -471,5 +473,5 @@ async function start() {
 
 start().catch((err) => {
   console.error(err);
-  document.body.insertAdjacentHTML('beforeend', `<p style="position:fixed;inset:auto 30px 30px;font:12px ui-monospace,monospace;color:#7a4030">Bolster couldn't start: ${String(err.message || err)}</p>`);
+  document.body.insertAdjacentHTML('beforeend', `<p style="position:fixed;inset:auto 30px 30px;font:12px ui-monospace,monospace;color:#ffd0db">Pillow Fight couldn't start: ${String(err.message || err)}</p>`);
 });

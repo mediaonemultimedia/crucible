@@ -30,3 +30,11 @@ const out2 = path.join(root, 'src/assets/lilita-one-subset.woff2');
 execFileSync('pyftsubset', [src2, `--text=${ui}`, `--output-file=${out2}`, '--flavor=woff2', '--layout-features=*', '--no-hinting'], { stdio: 'inherit' });
 fs.copyFileSync(path.join(root, 'node_modules/@fontsource/lilita-one/LICENSE'), path.join(root, 'src/assets/lilita-one-OFL.txt'));
 console.log(`${out2}: ${fs.statSync(out2).size} bytes (from ${fs.statSync(src2).size})`);
+
+/* the HUD's condensed caps (labels, timer, names): Oswald 700 (SIL OFL
+   1.1), subset to printable ASCII */
+const src3 = path.join(root, 'node_modules/@fontsource/oswald/files/oswald-latin-700-normal.woff2');
+const out3 = path.join(root, 'src/assets/oswald-subset.woff2');
+execFileSync('pyftsubset', [src3, `--text=${ui}`, `--output-file=${out3}`, '--flavor=woff2', '--layout-features=*', '--no-hinting'], { stdio: 'inherit' });
+fs.copyFileSync(path.join(root, 'node_modules/@fontsource/oswald/LICENSE'), path.join(root, 'src/assets/oswald-OFL.txt'));
+console.log(`${out3}: ${fs.statSync(out3).size} bytes (from ${fs.statSync(src3).size})`);
