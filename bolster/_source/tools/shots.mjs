@@ -35,7 +35,7 @@ const SCENES = {
   bubbles: {
     q: '?hold&webgl&noportraits',
     run: `document.querySelector('#title-screen').classList.remove('on'); B.step(0.2);
-      const L = ['Knocked out cold.', 'You just lost to a pillow.', 'Eight arms, zero chances.', 'Tentacle-ly speaking… you lost.', "Game, set, match… sorry 'bout that.", "My mom has a better backhand, and she's a house cat.", "Right. That's you squashed.", 'Blimey, you look absolutely cream crackered.', 'Heads up next time, eh.', "I can see your house from up here. It's sad, eh.", 'Patience, love.', 'Calma!', 'Not yet, bud.', 'Toques on, eh.'];
+      const L = ['Knocked out cold.', 'You just lost to a pillow.', 'Eight arms, zero chances.', 'Tentacle-ly speaking… you lost.', "Game, set, match… sorry 'bout that.", "My mom has a better backhand, and she's a house cat.", "Right. That's you squashed.", 'Blimey, you look absolutely cream crackered.', 'Heads up next time, eh.', "I can see your house from up here. It's sad, eh.", 'Patience, love.', 'Calma!', 'Nog niet!', 'Not yet, bud.', 'Toques on, eh.'];
       const T = ['down-left', 'down-right', 'left', 'right', 'down'];
       L.forEach((t, k) => B.say(t, 230 + (k % 4) * 330, 190 + Math.floor(k / 4) * 190, { size: k > 9 ? 22 : 26, maxWidth: 260, tail: T[k % 5] }));`,
     settle: 900,

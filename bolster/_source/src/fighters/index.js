@@ -102,7 +102,7 @@ export const FIGHTERS = {
   },
 
   johnny: {
-    id: 'johnny', name: 'Johnny Deuce', animal: 'Leopard', flag: '🇨🇦', nation: 'ca', style: 'Racquet up close, tennis balls at range',
+    id: 'johnny', name: 'Johnny Deuce', animal: 'Leopard', flag: '🇳🇱', nation: 'nl', style: 'Racquet up close, tennis balls at range',
     health: 960, walkF: 60, walkB: 48, jumpV: 268, jumpX: 54, grav: 12,
     push: { w: 1250, h: 2900 },
     hurt: { stand: { x: -640, y: 0, w: 1280, h: 3200 }, crouch: { x: -640, y: 0, w: 1280, h: 2200 }, air: { x: -600, y: 300, w: 1200, h: 2600 } },
@@ -119,7 +119,7 @@ export const FIGHTERS = {
     },
     signatureName: 'Serve', specialName: 'Match Point',
     catchphrase: { main: 'Game, set, match… sorry \'bout that.', egg: 'My mom has a better backhand, and she\'s a house cat.' },
-    impatient: 'Not yet, bud.',
+    impatient: 'Nog niet!',
   },
 
   sumaura: {

@@ -194,3 +194,15 @@ test('K8-E on Normal throws at a sane rate (and Easy less, Hard more)', () => {
   assert.ok(rate.easy < rate.normal && rate.normal < rate.hard, JSON.stringify(rate));
   assert.ok(rate.hard < 20, `hard ${rate.hard.toFixed(1)} throws/min`);
 });
+
+test('nationalities: Johnny Deuce is Dutch (and says so when impatient); Kevalanche and K8-E stay Canadian', async () => {
+  const { FIGHTERS } = await import('../src/fighters/index.js');
+  assert.equal(FIGHTERS.johnny.flag, '🇳🇱');
+  assert.equal(FIGHTERS.johnny.nation, 'nl');
+  assert.equal(FIGHTERS.johnny.impatient, 'Nog niet!');
+  assert.equal(FIGHTERS.johnny.catchphrase.main, 'Game, set, match… sorry \'bout that.');
+  assert.equal(FIGHTERS.johnny.catchphrase.egg, 'My mom has a better backhand, and she\'s a house cat.');
+  for (const id of ['kevalanche', 'k8e']) assert.equal(FIGHTERS[id].nation, 'ca');
+  const { FLAGS } = await import('../src/ui/flags.js').catch(() => ({ FLAGS: null }));
+  if (FLAGS) assert.ok(FLAGS.nl.includes('Netherlands'));
+});

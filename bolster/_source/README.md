@@ -37,7 +37,7 @@ the WebGL 2 path; `hold` stops the free-running loop for scripted stepping;
 |---|---|---|---|---|
 | Kevalanche 🇨🇦 | polar bear | Grommet's keeper, in red boxing gloves | Glacier Uppercut (anti-air, invulnerable to air attacks early) | Avalanche Rush — a charging flurry, a last hook |
 | Rubberta 🇧🇷 | octopus | Flock's octopus | Tentacle Sweep (low, long) | Abraço — eight-arm grab and squeeze, unblockable up close |
-| Johnny Deuce 🇨🇦 | leopard | Grommet's tennis leopard, racquet in hand | Serve (a tennis-ball projectile) | Match Point — a volley of five serves |
+| Johnny Deuce 🇳🇱 | leopard | Grommet's tennis leopard, racquet in hand | Serve (a tennis-ball projectile) | Match Point — a volley of five serves |
 | Sumaura 🇬🇧 | panda | one of Grommet's sumo pandas (the champion) | Bamboo Headbutt (a flying charge) | Hundred Paw Slap ending in the Royal Squash |
 | K8-E 🇨🇦 | giraffe | Grommet's ring-toss giraffe | Ring Toss (a felt-ring projectile) | Sky Neck — the neck goes up out of shot and comes down on them |
 
