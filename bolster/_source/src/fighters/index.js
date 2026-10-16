@@ -110,7 +110,7 @@ export const FIGHTERS = {
       ...normals({ lReach: 2100, hReach: 2550, cReach: 2150, lDmg: 36, hDmg: 84, lY: 1700, hY: 1500, hStart: 13, hTotal: 40, lW: 1100, hW: 1400, lungeV: 45, lunge: 7 }),
       signature: move({
         kind: 'signature', total: 60,
-        spawn: [{ at: 16, proj: { kind: 'ball', dx: 900, y: 1550, vx: 128, vy: 0, box: { w: 420, h: 420 }, dmg: 58, level: 'mid', life: 150, hitstun: 20, blockstun: 13, push: 36, chip: 4 } }],
+        spawn: [{ at: 16, proj: { kind: 'ball', dx: 900, y: 1400, vx: 128, vy: 0, box: { w: 420, h: 420 }, dmg: 58, level: 'mid', life: 150, hitstun: 20, blockstun: 13, push: 36, chip: 4 } }],
       }),
       special: move({
         kind: 'special', total: 66,
@@ -155,7 +155,7 @@ export const FIGHTERS = {
       ...normals({ lReach: 2600, hReach: 3350, cReach: 2400, lDmg: 32, hDmg: 78, cDmg: 32, lY: 1900, hY: 1650, hStart: 15, hTotal: 44, lW: 1300, hW: 1700, lungeV: 20, lunge: 7 }),
       signature: move({
         kind: 'signature', total: 64,
-        spawn: [{ at: 18, proj: { kind: 'ring', dx: 1200, y: 1600, vx: 100, vy: 0, box: { w: 600, h: 460 }, dmg: 60, level: 'mid', life: 180, hitstun: 20, blockstun: 13, push: 36, chip: 4 } }],
+        spawn: [{ at: 18, proj: { kind: 'ring', dx: 1200, y: 1450, vx: 100, vy: 0, box: { w: 600, h: 460 }, dmg: 60, level: 'mid', life: 180, hitstun: 20, blockstun: 13, push: 36, chip: 4 } }],
       }),
       special: move({
         kind: 'special', total: 64, track: 14,
