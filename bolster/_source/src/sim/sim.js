@@ -29,6 +29,9 @@ export const DOWN_T = 40;            // lying after a knockdown
 export const GETUP_T = 24;           // getting up (invulnerable)
 export const TAP = 12;               // a double-tap's second press within this many ticks
 export const OFFSCREEN = 4500;       // a shot this far past the one it was thrown at is gone
+export const SQUAT = 3;              // the crouch before a jump leaves the floor
+export const HANG_V = 70;            // |vy| under this at the top of a jump: the hang (a third of the gravity)
+export const DIVE_HANG = 6;          // a dive slam: hangs this long, then drops
 
 const sgn = (v) => (v > 0 ? 1 : v < 0 ? -1 : 0);
 const tdiv = (a, b) => Math.trunc(a / b);
@@ -45,6 +48,7 @@ function newFighter(id, side) {
     prev: 0, bl: 0, bh: 0, bs: 0, back: 0, down: 0,
     combo: 0, taken: 0, nag: 0,
     tf: 0, tb: 0, hf: 0, hb: 0, dash: 0, db: 0, dd: 0,
+    jmp: 0, jd: 0, dl: 0,
   };
 }
 
@@ -172,9 +176,9 @@ function think(st, k) {
       return dashTick(f);
     }
     if (f.up) {
-      f.act = 'jump'; f.t = 0; f.air = 1; f.aired = 0;
-      f.vy = D.jumpV; f.vx = f.fwd ? D.jumpX * f.face : f.back ? -D.jumpX * f.face : 0;
-      st.ev.push({ k: 'jump', p: k });
+      // a short crouch first (committed: no block, no attack), then off
+      f.act = 'jumpsquat'; f.t = 0; f.vx = 0; f.jd = f.fwd ? 1 : f.back ? -1 : 0;
+      st.ev.push({ k: 'jumpsquat', p: k });
       return;
     }
     const was = f.act;
@@ -186,8 +190,19 @@ function think(st, k) {
     return;
   }
   switch (f.act) {
+    case 'jumpsquat':
+      if (f.t >= SQUAT) {
+        // a ballistic leap: a hard take-off (the rise's own gravity takes it
+        // off toward the top), a hang there, a faster fall (see move())
+        f.act = 'jump'; f.t = 0; f.air = 1; f.aired = 0; f.jmp = 1;
+        f.vy = D.jumpV; f.vx = f.jd > 0 ? D.jumpX * f.face : f.jd < 0 ? -D.jumpB * f.face : 0;
+        st.ev.push({ k: 'jump', p: k });
+      }
+      return;
     case 'jump':
-      if (!f.aired && (f.bl || f.bh)) { f.aired = 1; startMove(st, k, f.bh ? 'airHeavy' : 'airLight'); }
+      // S+P in the air: the dive slam; P the air heavy, O the air light
+      if (!f.aired && f.bh && f.down) { f.aired = 1; startMove(st, k, 'dive'); }
+      else if (!f.aired && (f.bl || f.bh)) { f.aired = 1; startMove(st, k, f.bh ? 'airHeavy' : 'airLight'); }
       return;
     case 'attack': return attackTick(st, k, f, o, D);
     case 'dash': return dashTick(f);
@@ -239,6 +254,13 @@ function attackTick(st, k, f, o, D) {
   }
   if (vx !== null) f.vx = vx;
   else if (!f.air) f.vx = 0;
+  if (m.dive) {
+    // hang in the air, then straight down hard
+    if (t < DIVE_HANG) { f.vx = 0; f.vy = 0; }
+    else if (t === DIVE_HANG) { f.vy = -m.dive; f.vx = 12 * f.face; }
+  }
+  // the dive's landing: shorter if the drop connected, the whole lag on a whiff
+  if (m.impact && f.dl && t >= m.impact) { f.act = 'idle'; f.t = 0; f.mv = ''; f.dl = 0; return; }
   if (m.track && t === m.track) f.tx = o.x;
   for (const s of m.spawn) if (s.at === t) spawn(st, k, s.proj);
   if (m.grab && t >= m.grab.from && t <= m.grab.to && grabbable(f, o, m.grab.range)) {
@@ -278,7 +300,13 @@ function move(st, k) {
   const f = st.f[k], D = FIGHTERS[f.id];
   if (f.act === 'grabbed') return;
   if (f.air) {
-    f.vy -= D.grav;
+    // a jump's own arc (and the air moves out of one): the rise, a hang at
+    // the top, a faster fall. Knockdowns and hops keep the plain gravity.
+    const diving = f.act === 'attack' && f.t <= DIVE_HANG && FIGHTERS[f.id].moves[f.mv].dive;
+    if (diving) { /* hanging */ }
+    else if (!f.jmp) f.vy -= D.grav;
+    else if (f.vy < HANG_V && f.vy > -HANG_V) f.vy -= tdiv(D.jumpG, 3);
+    else f.vy -= f.vy > 0 ? D.jumpG : D.fallG;
     f.x += f.vx;
     f.y += f.vy;
     if (f.y <= 0) land(st, k, f);
@@ -289,12 +317,18 @@ function move(st, k) {
 }
 
 function land(st, k, f) {
-  f.y = 0; f.vy = 0; f.air = 0;
+  f.y = 0; f.vy = 0; f.air = 0; f.jmp = 0;
   st.ev.push({ k: 'land', p: k, hard: f.act === 'down' || f.act === 'ko' ? 1 : 0 });
   if (f.act === 'jump') { f.act = 'idle'; f.t = 0; f.vx = 0; }
   else if (f.act === 'attack') {
     const m = FIGHTERS[f.id].moves[f.mv];
-    if (m.air) { f.act = 'idle'; f.t = 0; f.mv = ''; }
+    if (m.dive) {
+      // the impact: a shockwave round his feet (only if the drop missed —
+      // one or the other connects), then the landing lag
+      st.ev.push({ k: 'slam', p: k, x: f.x });
+      f.dl = f.hm ? 1 : 0;
+      f.mv = 'diveLand'; f.t = 0; f.hm = f.dl;
+    } else if (m.air) { f.act = 'idle'; f.t = 0; f.mv = ''; }
     f.vx = 0;
   } else if (f.act === 'down') { f.stun = DOWN_T; f.vx = 0; }
   else if (f.act === 'ko') f.vx = 0;

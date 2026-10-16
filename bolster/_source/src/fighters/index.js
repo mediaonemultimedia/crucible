@@ -27,7 +27,7 @@ const move = (o) => ({ ext: null, total: 20, hits: [], motion: [], spawn: [], ai
    the limb goes out well past the jab — more damage, a long recovery. While
    the limb is out his own hurt box goes out with it (`ext`), so a whiffed
    heavy can be punished. Bigger fighters lunge further.                   */
-function normals({ lReach, hReach, cReach, lDmg = 40, hDmg = 85, cDmg = 35, aDmg = 55, ahDmg = 80, lY = 1800, hY = 1700, hStart = 14, hTotal = 42, lW = 900, hW = 1000, lungeV = 50, lunge = 8 }) {
+function normals({ lReach, hReach, cReach, lDmg = 40, hDmg = 85, cDmg = 35, aDmg = 55, ahDmg = 80, dDmg = 70, lY = 1800, hY = 1700, hStart = 14, hTotal = 42, lW = 900, hW = 1000, lungeV = 50, lunge = 8 }) {
   const lungeFrom = hStart - lunge + 2;
   return {
     light: move({ total: 14, cancel: 1, hits: [hit(4, 5, { x: lReach - lW, y: lY, w: lW, h: 700 }, lDmg, { hitstun: 18, blockstun: 10, push: 30, pause: 7 })] }),
@@ -38,8 +38,13 @@ function normals({ lReach, hReach, cReach, lDmg = 40, hDmg = 85, cDmg = 35, aDmg
       hits: [hit(hStart, hStart + 3, { x: hReach - hW, y: hY, w: hW, h: 900 }, hDmg, { hitstun: 21, blockstun: 15, push: 48, pause: 11 })],
     }),
     lowLight: move({ total: 17, low: 1, cancel: 1, hits: [hit(5, 7, { x: cReach - 1000, y: 150, w: 1000, h: 650 }, cDmg, { level: 'low', hitstun: 15, blockstun: 10, push: 26, pause: 7 })] }),
-    airLight: move({ total: 22, air: 1, hits: [hit(4, 12, { x: 100, y: -700, w: 1100, h: 1500 }, aDmg, { level: 'high', hitstun: 16, blockstun: 11, pause: 8 })] }),
-    airHeavy: move({ total: 26, air: 1, hits: [hit(7, 14, { x: 0, y: -1000, w: 1400, h: 1700 }, ahDmg, { level: 'high', hitstun: 20, blockstun: 14, push: 40, pause: 11 })] }),
+    airLight: move({ total: 26, air: 1, hits: [hit(4, 18, { x: 100, y: -1000, w: 1100, h: 1800 }, aDmg, { level: 'high', hitstun: 16, blockstun: 11, pause: 8 })] }),
+    airHeavy: move({ total: 32, air: 1, hits: [hit(7, 24, { x: 0, y: -1300, w: 1400, h: 2000 }, ahDmg, { level: 'high', hitstun: 20, blockstun: 14, push: 40, pause: 11 })] }),
+    // the dive slam (S+P in the air): a hang, a fast drop — an overhead on
+    // the way down — and the impact round his feet when he lands; a whiff
+    // leaves him sat in the landing lag, long enough to punish
+    dive: move({ total: 200, air: 1, dive: 520, hits: [hit(7, 199, { x: -300, y: -900, w: 1600, h: 1700 }, dDmg, { level: 'high', hitstun: 20, blockstun: 16, push: 36, pause: 10 })] }),
+    diveLand: move({ total: 30, impact: 10, hits: [hit(0, 2, { x: -1100, y: 0, w: 2200 + 400, h: 700 }, 45, { level: 'high', hitstun: 18, blockstun: 12, push: 44, pause: 9, chip: 4 })] }),
   };
 }
 
@@ -53,7 +58,7 @@ const DASH = { f: [16, 150], b: [14, 100] };
 export const FIGHTERS = {
   kevalanche: {
     id: 'kevalanche', name: 'Kevalanche', animal: 'Polar bear', flag: '🇨🇦', nation: 'ca', style: 'Boxer — quick jabs, heavy hooks',
-    health: 1020, walkF: 56, walkB: 42, jumpV: 262, jumpX: 50, grav: 12,
+    health: 1020, walkF: 56, walkB: 42, jumpV: 440, jumpX: 135, jumpB: 110, jumpG: 22, fallG: 30, grav: 12,
     push: { w: 1500, h: 2900 },
     hurt: { stand: { x: -760, y: 0, w: 1520, h: 3250 }, crouch: { x: -760, y: 0, w: 1520, h: 2300 }, air: { x: -700, y: 300, w: 1400, h: 2700 } },
     moves: {
@@ -77,7 +82,7 @@ export const FIGHTERS = {
 
   rubberta: {
     id: 'rubberta', name: 'Rubberta', animal: 'Octopus', flag: '🇧🇷', nation: 'br', style: 'Capoeira; tentacles strike like long rubbery punches',
-    health: 980, walkF: 52, walkB: 46, jumpV: 270, jumpX: 52, grav: 12,
+    health: 980, walkF: 52, walkB: 46, jumpV: 450, jumpX: 140, jumpB: 115, jumpG: 22, fallG: 30, grav: 12,
     push: { w: 2100, h: 2300 },
     hurt: { stand: { x: -950, y: 0, w: 1900, h: 2500 }, crouch: { x: -950, y: 0, w: 1900, h: 1700 }, air: { x: -850, y: 200, w: 1700, h: 2200 } },
     moves: {
@@ -103,7 +108,7 @@ export const FIGHTERS = {
 
   johnny: {
     id: 'johnny', name: 'Johnny Deuce', animal: 'Leopard', flag: '🇳🇱', nation: 'nl', style: 'Racquet up close, tennis balls at range',
-    health: 960, walkF: 60, walkB: 48, jumpV: 268, jumpX: 54, grav: 12,
+    health: 960, walkF: 60, walkB: 48, jumpV: 455, jumpX: 145, jumpB: 115, jumpG: 22, fallG: 30, grav: 12,
     push: { w: 1250, h: 2900 },
     hurt: { stand: { x: -640, y: 0, w: 1280, h: 3200 }, crouch: { x: -640, y: 0, w: 1280, h: 2200 }, air: { x: -600, y: 300, w: 1200, h: 2600 } },
     moves: {
@@ -124,7 +129,7 @@ export const FIGHTERS = {
 
   sumaura: {
     id: 'sumaura', name: 'Sumaura', animal: 'Panda', flag: '🇬🇧', nation: 'gb', style: 'Sumo',
-    health: 1080, walkF: 46, walkB: 36, jumpV: 250, jumpX: 44, grav: 12,
+    health: 1080, walkF: 46, walkB: 36, jumpV: 430, jumpX: 130, jumpB: 105, jumpG: 22, fallG: 31, grav: 12,
     push: { w: 1700, h: 2900 },
     hurt: { stand: { x: -880, y: 0, w: 1760, h: 3250 }, crouch: { x: -880, y: 0, w: 1760, h: 2300 }, air: { x: -820, y: 300, w: 1640, h: 2700 } },
     moves: {
@@ -148,8 +153,8 @@ export const FIGHTERS = {
 
   k8e: {
     id: 'k8e', name: 'K8-E', animal: 'Giraffe', flag: '🇨🇦', nation: 'ca', style: 'Long reach; the neck stretches',
-    health: 950, walkF: 50, walkB: 44, jumpV: 255, jumpX: 46, grav: 12,
-    push: { w: 1500, h: 3000 },
+    health: 950, walkF: 50, walkB: 44, jumpV: 440, jumpX: 135, jumpB: 110, jumpG: 22, fallG: 30, grav: 12,
+    push: { w: 1500, h: 5200 },   // the neck: nobody jumps over a giraffe
     hurt: { stand: { x: -800, y: 0, w: 1600, h: 3400 }, crouch: { x: -800, y: 0, w: 1600, h: 2400 }, air: { x: -750, y: 400, w: 1500, h: 2800 } },
     moves: {
       ...normals({ lReach: 2600, hReach: 3350, cReach: 2400, lDmg: 32, hDmg: 78, cDmg: 32, lY: 1900, hY: 1900, hStart: 15, hTotal: 44, lW: 1300, hW: 1700, lungeV: 20, lunge: 7 }),
