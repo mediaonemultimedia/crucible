@@ -124,6 +124,27 @@ for (const name of names) {
     console.log(`${name}: ${((Date.now() - t0) / 1000).toFixed(1)} s${errs.length ? '  ERRORS:\n    ' + errs.join('\n    ') : ''}`);
     errors += errs.length;
     await page.close();
+  } else if (kind === 'gloves') {
+    // close on the fists: at rest, mid-jab, mid-heavy × front, 3/4, side
+    const { page, errs } = await open(`?p1=${id}&p2=k8e&cpu=normal&seed=7&hold&webgl&noportraits`, { width: 480, height: 480 });
+    const tiles = [];
+    for (const [pose, btn] of [['rest', 0], ['jab', LP], ['heavy', HP]]) {
+      await page.evaluate(`toFight(); F().cpu = [null, null]; place(-1500, 8500); script(() => [0, 0]); B.step(1.2, false);
+        ${btn ? `script((i) => [i === 1 ? ${btn} : 0, 0]);
+          until(() => ST().f[0].act === 'attack' && ST().f[0].t >= first(ST().f[0]) + 1, 3); B.step(0, false);` : ''}`);
+      for (const [view, th] of [['front', 20], ['34', 55], ['side', 95]]) {
+        await page.evaluate(`orbit(${th}, 4.6, 1.75, 30)`);
+        const f = path.join(out, `_${id}-${pose}-${view}.png`);
+        await page.screenshot({ path: f });
+        tiles.push(f);
+      }
+    }
+    const sheet = path.join(out, `gloves-${id}.png`);
+    execFileSync('montage', [...tiles, '-tile', '3x3', '-geometry', '+4+4', '-background', '#222', sheet]);
+    for (const f of tiles) fs.unlinkSync(f);
+    console.log(`${name}: ${((Date.now() - t0) / 1000).toFixed(1)} s${errs.length ? '  ERRORS:\n    ' + errs.join('\n    ') : ''}`);
+    errors += errs.length;
+    await page.close();
   } else console.log(`no scene ${name}`);
 }
 await browser.close();

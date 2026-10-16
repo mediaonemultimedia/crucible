@@ -26,13 +26,14 @@ import { buildRig as buildFlockRig } from '../../shared/flock/rig.js';
 import { makeRacquet, poseRacquet, makeStars, poseStars, shade } from '../../shared/grommet/props.js';
 import { BipedPuppet, GiraffePuppet, OctopusPuppet, phaseOf } from './puppets.js';
 import { FIGHTERS } from '../fighters/index.js';
+import { Gloves, shaveCaps, cuffOnly } from './gloves.js';
 
 export const SHELLS_EACH = 48;
 
 const G = G_INFO;
 export const LOOKS = {
   kevalanche: {
-    build: buildBear, info: () => G.bear, paint: 'bear', Puppet: (s) => new BipedPuppet(s, 'boxer'), yaw: 0.85,
+    build: buildBear, info: () => G.bear, paint: 'bear', Puppet: (s) => new BipedPuppet(s, 'boxer'), yaw: 0.85, gloves: true,
     // polar fur and red boxing gloves; evil: a brown bear in black
     colors: { ...G.bear.colors.polar, cloth: '#c9302a', trim: '#f4efe6' },
     evil: { ...G.bear.colors.honey, cloth: '#1d1b1f', trim: '#c9302a' },
@@ -133,6 +134,7 @@ export class Plush {
     soft.params.stuffing = 0.5;
     soft.params.damping = 0.5;
     this.puppet = L.Puppet(soft);
+    if (L.gloves) cuffOnly(rig);
     this.body = new Body(rig, soft);
     this.cloth = rig.cloth ? new Body(rig, soft, { cloth: true }) : null;
 
@@ -152,6 +154,7 @@ export class Plush {
       this.patTex.needsUpdate = true;
     } else if (L.paint === 'panda') paintSoloPanda(this.maskTex, this.patTex, rig);
     else paintAthlete(this.maskTex, this.patTex, L.paint, rig);
+    shaveCaps(this.maskTex, rig);
     this.setColors(evil ? L.evil : L.colors);
     this.fur.uniforms.pile.value = (info.pile || 9) / 90;
     this.fur.uniforms.shells.value = SHELLS_EACH;
@@ -170,6 +173,7 @@ export class Plush {
     const eyeMat = makeEyeMaterial(), eyeGeo = new THREE.SphereGeometry(1, 32, 22);
     this.eyes = [-1, 1].map((s) => { const m = new THREE.Mesh(eyeGeo, eyeMat); m.userData.side = s; group.add(m); return m; });
     if (rig.racquet) { this.racquet = makeRacquet(); group.add(this.racquet); }
+    if (L.gloves) this.gloves = new Gloves(group, soft, rig, (evil ? L.evil : L.colors).cloth);
     this.stars = makeStars();
     group.add(this.stars);
     this.toque = makeToque();
@@ -294,6 +298,7 @@ export class Plush {
     if (this.groom.dirty) { this.groomTex.needsUpdate = true; this.groom.dirty = false; }
 
     if (this.racquet && P.rq) poseRacquet(this.racquet, P.rq);
+    this.gloves?.update();
     P.headCentre(this.hc);
     poseStars(this.stars, this.hc, P.daze, this.time);
     this._eyes();
