@@ -44,7 +44,7 @@ function newFighter(id, side) {
     stun: 0, air: 0, aired: 0, inv: 0, tx: 0,
     prev: 0, bl: 0, bh: 0, bs: 0, back: 0, down: 0,
     combo: 0, taken: 0, nag: 0,
-    tf: 0, tb: 0, dash: 0, db: 0, dd: 0,
+    tf: 0, tb: 0, hf: 0, hb: 0, dash: 0, db: 0, dd: 0,
   };
 }
 
@@ -109,7 +109,7 @@ export function stepInPlace(st, in1, in2) {
 
 function readInput(st, k, m) {
   const f = st.f[k];
-  const pressed = m & ~f.prev;
+  const was = f.prev, pressed = m & ~was;
   f.prev = m;
   const fwd = f.face > 0 ? RIGHT : LEFT, bk = f.face > 0 ? LEFT : RIGHT;
   f.back = m & bk ? 1 : 0;
@@ -120,9 +120,16 @@ function readInput(st, k, m) {
     f.bl = Math.max(0, f.bl - 1); f.bh = Math.max(0, f.bh - 1); f.bs = Math.max(0, f.bs - 1);
     f.tf = Math.max(0, f.tf - 1); f.tb = Math.max(0, f.tb - 1); f.db = Math.max(0, f.db - 1);
   }
-  // a double-tap (press, release, press within TAP ticks) asks for a dash
-  if (pressed & fwd) { if (f.tf) { f.dash = 1; f.db = BUFFER; f.tf = 0; } else f.tf = TAP; f.tb = 0; }
-  if (pressed & bk) { if (f.tb) { f.dash = -1; f.db = BUFFER; f.tb = 0; } else f.tb = TAP; f.tf = 0; }
+  // a double-tap asks for a dash: a tap (pressed and let go within TAP
+  // ticks), then pressed again within TAP ticks of letting go. A walk that
+  // stops and starts again, or a block held and let go, isn't one.
+  const released = was & ~m;
+  if (m & fwd) f.hf++; else if (!(released & fwd)) f.hf = 0;
+  if (m & bk) f.hb++; else if (!(released & bk)) f.hb = 0;
+  if (released & fwd) { f.tf = f.hf <= TAP ? TAP : 0; f.hf = 0; }
+  if (released & bk) { f.tb = f.hb <= TAP ? TAP : 0; f.hb = 0; }
+  if (pressed & fwd) { if (f.tf) { f.dash = 1; f.db = BUFFER; } f.tf = 0; f.tb = 0; f.hf = 1; }
+  if (pressed & bk) { if (f.tb) { f.dash = -1; f.db = BUFFER; } f.tb = 0; f.tf = 0; f.hb = 1; }
   if (pressed & LIGHT) f.bl = BUFFER;
   if (pressed & HEAVY) f.bh = BUFFER;
   if (pressed & SPECIAL) {
@@ -342,12 +349,25 @@ export function hurtBox(f) {
   if (f.air) b = H.air;
   else if (f.act === 'crouch' || (f.act === 'blockstun' && f.down) || (f.act === 'attack' && FIGHTERS[f.id].moves[f.mv].low)) b = H.crouch;
   else b = H.stand;
-  if (f.act === 'attack') {
-    // a heavy's limb out in front is there to be hit
-    const e = FIGHTERS[f.id].moves[f.mv].ext;
-    if (e && f.t >= e.from && f.t <= e.to && e.x1 > b.x + b.w) b = { ...b, w: e.x1 - b.x };
-  }
   return worldBox(f, b);
+}
+
+/* a heavy's limb, out in front while it's extended: there to be hit (at
+   the limb's own height), so a whiffed heavy can be punished */
+export function limbBox(f) {
+  if (f.act !== 'attack' || f.inv > 0) return null;
+  const m = FIGHTERS[f.id].moves[f.mv], e = m.ext;
+  if (!e || f.t < e.from || f.t > e.to) return null;
+  const hb = m.hits[0].box, x0 = FIGHTERS[f.id].hurt.stand.x + FIGHTERS[f.id].hurt.stand.w;
+  return worldBox(f, { x: x0, y: hb.y - 150, w: Math.max(0, e.x1 - x0), h: hb.h + 300 });
+}
+
+/* the first of a fighter's hurt boxes a box touches, or null */
+function touches(f, box) {
+  const hb = hurtBox(f);
+  if (hb && overlap(box, hb)) return hb;
+  const lb = limbBox(f);
+  return lb && overlap(box, lb) ? lb : null;
 }
 
 export function worldBox(f, b) {
@@ -384,8 +404,8 @@ function strike(st) {
         if (o.act === 'grabbed') { contacts.push({ k, h, j }); }
         continue;
       }
-      const hb = hurtBox(o);
-      if (!hb || !box || invulnTo(o, !!f.air) || !overlap(box, hb)) continue;
+      const hb = box && !invulnTo(o, !!f.air) ? touches(o, box) : null;
+      if (!hb) continue;
       contacts.push({ k, h, j, box, hb });
     }
   }
@@ -465,8 +485,7 @@ function projectiles(st) {
     }
     if (p.dead) continue;
     const d = st.f[1 - p.o];
-    const hb = hurtBox(d);
-    if (hb && !invulnTo(d, false) && overlap(projBox(p), hb)) {
+    if (!invulnTo(d, false) && touches(d, projBox(p))) {
       land_hit(st, p.o, p, sgn(p.vx), !!p.sp, [p.x, p.y], p.sp ? 'special' : 'signature');
       continue;
     }

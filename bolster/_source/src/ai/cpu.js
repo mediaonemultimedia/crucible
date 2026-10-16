@@ -18,6 +18,7 @@
 import { FIGHTERS, MAX_METER, reachOf, isShot } from '../fighters/index.js';
 import { LEFT, RIGHT, UP, DOWN, LIGHT, HEAVY, SPECIAL } from '../sim/input.js';
 import { makeRng } from '../sim/rng.js';
+import { TAP } from '../sim/sim.js';
 
 /* shotCd: ticks between its own throws; shotP: the chance it throws when
    it could; zone: how often a shooter hangs back at range rather than
@@ -27,7 +28,7 @@ import { makeRng } from '../sim/rng.js';
 export const LEVELS = {
   easy:   { delay: 24, think: 12, block: 0.12, guess: 0.5, aa: 0.08, punish: 0.05, special: 0.25, aggro: 0.3, jump: 0.04, whiffy: 0.45, shotCd: 320, shotP: 0.15, zone: 0.25, approach: 0.5, leap: 0.15, dash: 0.25 },
   normal: { delay: 14, think: 6,  block: 0.5,  guess: 0.75, aa: 0.4, punish: 0.35, special: 0.6, aggro: 0.5, jump: 0.06, whiffy: 0.2, shotCd: 180, shotP: 0.3, zone: 0.4, approach: 0.7, leap: 0.4, dash: 0.45 },
-  hard:   { delay: 7,  think: 3,  block: 0.88, guess: 0.95, aa: 0.8, punish: 0.85, special: 0.95, aggro: 0.6, jump: 0.05, whiffy: 0.04, shotCd: 80, shotP: 0.55, zone: 0.75, approach: 0.8, leap: 0.6, dash: 0.6 },
+  hard:   { delay: 7,  think: 3,  block: 0.88, guess: 0.95, aa: 0.8, punish: 0.85, special: 0.95, aggro: 0.6, jump: 0.05, whiffy: 0.04, shotCd: 140, shotP: 0.4, zone: 0.6, approach: 0.8, leap: 0.75, dash: 0.6, space: 0.7 },
 };
 
 const reach = (m) => reachOf(m);
@@ -73,6 +74,7 @@ export class CPU {
   }
 
   input(st) {
+    this.now = st.tick;
     const o = this._observe(st);
     const me = st.f[this.side];
     if (st.phase !== 'fight') { this.last = 0; return 0; }
@@ -89,20 +91,33 @@ export class CPU {
       if (dist < r && o.t <= lastActive(m)) threat = { key: `${o.mv}:${o.x}`, low: !!m.low, high: !!m.air || (m.hits[0] && m.hits[0].level === 'high'), grab: !!m.grab };
     }
     let leap = false;
-    for (const p of o.proj) {
+    // a throw it can see coming: where that shot will be now, as if it
+    // were already out (so it can jump on the wind-up, as a player would)
+    const shots = [...o.proj];
+    if (o.act === 'attack') {
+      const om = FIGHTERS[o.id].moves[o.mv];
+      for (const sp of om.spawn) {
+        const tau = o.t + this.L.delay - sp.at;
+        if (tau >= 0 || tau < -20) continue;
+        const dir = Math.sign(me.x - o.x) || 1;
+        shots.push({ x: o.x + dir * (sp.proj.dx + sp.proj.vx * tau), y: sp.proj.y, vx: dir * sp.proj.vx, id: `w${o.mv}${sp.at}:${o.x >> 6}`, coming: 1 });
+        break;
+      }
+    }
+    for (const p of shots) {
       // where the shot is now: what it saw, carried on by its reaction time
-      const px = p.x + p.vx * this.L.delay;
+      const px = p.coming ? p.x : p.x + p.vx * this.L.delay;
       const toward = (px - me.x) * p.vx < 0, d = Math.abs(px - me.x);
       if (!toward) continue;
       // in the window for a jump over it? decide once per shot
-      if (d > 1500 && d < 3300 && free) {
+      if (free && this._leapWindow(D, p, d)) {
         if (this.leapFor !== p.id) { this.leapFor = p.id; this.leapGo = this.chance(this.L.leap); }
         if (this.leapGo) leap = true;
       }
-      if (d < 3000) threat = threat || { key: `p${p.id}`, low: false, high: false, proj: true };
+      if (d < 3000 && !p.coming) threat = threat || { key: `p${p.id}`, low: false, high: false, proj: true };
     }
-    if (this.queue.length) return this._emit(this.queue.shift());
-    if (leap) { this.queue = []; this.btn = 0; return this._emit(UP | fwd); }
+    if (this.queue.length) return this._emit(this.queue.shift(), true);
+    if (leap) { this.queue = []; this.btn = 0; return this._emit(UP | fwd, true); }
 
     let out = 0;
     if (threat && free) {
@@ -117,9 +132,9 @@ export class CPU {
       if (this.blockAs & 4) out = UP | back;
       else if (this.blockAs & 8) out = UP | fwd;
       else if (this.blockAs & 1) out = back | (this.blockAs & 2 ? DOWN : 0);
-      if (out) return this._emit(out);
+      if (out) return this._emit(out, true);
     }
-    if (me.act === 'blockstun') return this._emit(back | (me.down ? DOWN : 0));
+    if (me.act === 'blockstun') return this._emit(back | (me.down ? DOWN : 0), true);
 
     if (this.btn || st.tick < this.next) return this._emit(this.plan);
     this.next = st.tick + this.L.think + this.rng.int(this.L.think + 1);
@@ -127,6 +142,11 @@ export class CPU {
     // ── choices ────────────────────────────────────────────────────────────
     const M = D.moves;
     const rl = reach(M.light), rh = reach(M.heavy), rs = reach(M.signature) || 0;
+    // how far in front of each of them their hurt box reaches
+    const myFront = D.hurt.stand.x + D.hurt.stand.w, oFront = FIGHTERS[o.id].hurt.stand.x + FIGHTERS[o.id].hurt.stand.w;
+    // Hard knows its jab's true range (to the front of the other one's body)
+    const poke = this.L.space ? rl + oFront - 150 : rl + 150;
+    const lunge = this.L.space ? rh + oFront - 250 : rh + 100;
     const shooter = isShot(M.signature);
     const canShoot = shooter && !st.proj.some((p) => p.o === this.side) && st.tick - this.lastShot >= this.L.shotCd;
     const oppM = o.act === 'attack' ? FIGHTERS[o.id].moves[o.mv] : null;
@@ -156,20 +176,20 @@ export class CPU {
       // they threw from range: in on the recovery
       else if (theyThrew && dist > rh && this.chance(this.L.punish + 0.3)) {
         if (dist < rh + 1400) press = HEAVY; else if (this.chance(this.L.dash)) dash = true; else hold = fwd;
-      } else if (dist <= rl + 150 && this.chance(this.L.aggro + 0.2)) {
+      } else if (dist <= poke && this.chance(this.L.aggro + 0.2)) {
         const r = this.rng.int(100);
         if (r < 40) press = LIGHT;
         else if (r < 62) { hold = DOWN; press = LIGHT; }
         else if (r < 85) press = HEAVY;
         else if (!shooter) { hold = DOWN; press = HEAVY; } else press = LIGHT;
-      } else if (dist <= rh + 100 && this.chance(this.L.aggro)) {
+      } else if (dist <= lunge && this.chance(this.L.aggro)) {
         press = this.chance(0.7) ? HEAVY : LIGHT;
       } else if (canShoot && dist > 3500 && this.chance(this.L.shotP)) {
         hold = DOWN; press = HEAVY;
         this.lastShot = st.tick;
       } else if (!shooter && rs > 2400 && dist < rs && dist > rh && this.chance(0.4)) {
         hold = DOWN; press = HEAVY;                          // the long sweep
-      } else if (me.id === 'sumaura' && dist > 2200 && dist < 5000 && this.chance(0.25)) {
+      } else if (me.id === 'sumaura' && dist > 2200 && dist < 5000 && this.chance(0.12)) {
         hold = DOWN; press = HEAVY;                          // the headbutt
       } else if (dist > 4000 && this.chance(this.L.jump)) {
         hold = UP | fwd;
@@ -181,7 +201,12 @@ export class CPU {
       } else {
         // footsies: drift toward the range its pokes like (a shooter
         // sometimes hangs back to zone; everyone comes in from far off)
-        if (this.want === undefined || this.chance(0.08)) this.want = shooter && this.chance(this.L.zone) ? 4500 : rl * 0.9;
+        // (Hard spaces itself just outside the other one's jab, then whiffs
+        // its heavy's reach in from there)
+        if (this.want === undefined || this.chance(0.08)) {
+          this.want = shooter && this.chance(this.L.zone) ? 4500 : rl * 0.9;
+          if (this.L.space && this.chance(this.L.space)) this.want = Math.max(this.want, reach(FIGHTERS[o.id].moves.light) + myFront + 200);
+        }
         const want = this.want;
         if (dist > want + 400) {
           if (dist > want + 2200 && this.chance(this.L.approach * this.L.dash)) dash = true;
@@ -196,16 +221,35 @@ export class CPU {
       this.btn = 0;
       this.plan = fwd;
       this.next = st.tick + 6;
-      return this._emit(this.queue.shift());
+      return this._emit(this.queue.shift(), true);
     }
     this.plan = hold & ~UP;
     this.btn = press;
     return this._emit(hold);
   }
 
-  /* buttons are presses: release, then press on the next tick */
-  _emit(dirs) {
+  /* would a forward jump started now clear this shot? (its own jump:
+     when its air hurt box is above the shot, and how fast they close) */
+  _leapWindow(D, p, d) {
+    const need = p.y + 260 - D.hurt.air.y, v = D.jumpV, g = D.grav;
+    const disc = v * v - 2 * g * need;
+    if (disc <= 0) return false;
+    const t1 = (v - Math.sqrt(disc)) / g, t2 = (v + Math.sqrt(disc)) / g;
+    const rel = Math.abs(p.vx) + D.jumpX, half = D.hurt.air.w / 2 + 320;
+    return d > t1 * rel + half + 150 && d < t2 * rel - half - 400;
+  }
+
+  /* buttons are presses: release, then press on the next tick. Its walks
+     aren't taps: unless it means to dash, a direction it pressed stays held
+     a little past a tap's length (so a stop-start never reads as a dash) */
+  _emit(dirs, dashing = false) {
     let m = dirs;
+    this.pressT = this.pressT || { [LEFT]: -99, [RIGHT]: -99 };
+    for (const d of [LEFT, RIGHT]) {
+      const other = d === LEFT ? RIGHT : LEFT;
+      if (m & d) { if (!(this.last & d)) this.pressT[d] = this.now; }
+      else if (!dashing && this.last & d && !(m & other) && this.now - this.pressT[d] <= TAP + 1) m |= d;
+    }
     if (this.btn) {
       if (this.last & this.btn) { /* still held from last time: release first */ }
       else { m |= this.btn; this.btn = 0; }
