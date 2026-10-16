@@ -1,7 +1,11 @@
 # Bolster — source
 
 Readable source for **Bolster** (Crucible No. 23): a Street Fighter–style
-one-on-one fighting game whose fighters are Crucible's plush soft bodies. The
+one-on-one fighting game whose fighters are Crucible's plush soft bodies.
+The piece is Bolster; the game itself is called **Pillow Fight** (title
+screen, page title, menus, winner screen), with the owner's logo
+(`assets/pillow-fight-logo.webp`, inlined by the build) and a neon arcade
+palette to match it. The
 gameplay is 2D (one line, a side camera); the fighters are the same 3D plush
 models, fur and soft-body rigs as Grommet (No. 22) and Flock (No. 21).
 
@@ -14,13 +18,18 @@ npm test                         # node --test test/*.test.mjs
 npm run build                    # → final.html (self-contained; fails on any network reference)
 node tools/shots.mjs [scene …]   # headless Chromium screenshots → shots/ (WebGL 2 on SwiftShader)
 node tools/cpu-match.mjs         # a whole CPU-vs-CPU match in the browser, zero console errors
-node tools/font.mjs              # re-subset the two embedded fonts (needs fonttools)
+node tools/font.mjs              # re-subset the three embedded fonts (needs fonttools)
+node tools/balance.mjs normal 50 # seeded CPU-vs-CPU win rates, every pairing, in the sim
+node tools/framedata.mjs         # frame data for every fighter → docs/FRAMES.md
+node tools/polish-shots.mjs [--html F] [--out D] [--q '&boxes'] [scene …]
+                                 # shoulder sheets and light/heavy strips, any build
 ```
 
 Open `final.html`, or deep-link straight into a fight:
 `final.html?p1=kevalanche&p2=sumaura&cpu=hard` (`p1cpu=normal` hands player 1
 to the computer too; `seed=N` fixes the match seed; `toques=1`; `webgl` forces
-the WebGL 2 path; `hold` stops the free-running loop for scripted stepping).
+the WebGL 2 path; `hold` stops the free-running loop for scripted stepping;
+`boxes` draws the sim's hurt, limb, hit and shot boxes over the picture).
 
 ## The roster
 
@@ -46,7 +55,10 @@ src/
                     motion, projectiles, grab; names, flags, lines
   ai/cpu.js         the computer: reads the sim (the opponent `delay` ticks
                     late), returns the same mask a keyboard would; difficulty
-                    = reaction time, block/guess rate, anti-air, punish, special
+                    = reaction time, block/guess rate, anti-air, punish, special,
+                    and per-difficulty projectile cooldown / throw chance /
+                    zoning, approach and dash rates, and jumping shots (on
+                    the thrower's wind-up)
   input/keyboard.js keys → mask, sampled once per tick (taps latched)
   render/stage.js   renderer (WebGPU, WebGL 2 fallback — Grommet's), camera,
                     felt mat, contact shadows, sparks, stuffing, projectiles
@@ -79,10 +91,22 @@ the match) — is drawn from the state's PRNG, so two peers replaying the same
 inputs see the same thing. Stage 2's `net/` (PeerJS, rollback) only needs:
 the input mask per tick, `clone`, `step`, `hash` — all here and tested.
 
-Rules: holding away blocks; standing blocks high and mid, crouching blocks
+Rules: double-tap forward dashes in, double-tap back backdashes (a tap is
+a press let go within 12 ticks; a held walk that stops and starts again is
+not one); holding away blocks; standing blocks high and mid, crouching blocks
 low and mid; jumping attacks and Sky Neck are high (overheads); the Abraço is
-unblockable. Light normals cancel into heavy, the signature or the special on
-contact. Meter fills from hits landed (90% of damage) and taken (35%), a
+unblockable. Light (O) is quick, short and weak with a fast recovery, and cancels into
+heavy, the signature or the special on contact. Heavy (P) winds up (13–15
+ticks: he rears back and loads it), then lunges — the body steps in and the
+limb goes well past the jab — for more damage and a long recovery; while
+the limb is out it has its own hurt box at its height, so a whiffed heavy
+can be punished. The big fighters (Kevalanche, Sumaura) lunge furthest.
+Projectiles (Ring Toss, Serve): one of your own on screen at a time (gone
+when it hits, is blocked, passes 4500 units beyond the other fighter or
+reaches the walls), 16–18 ticks of startup, 44–46 of recovery, mid height
+(a jump clears it), slow (100 and 128 per tick), 4 chip on block and no
+more. Match Point's volley is a special and may have five out. Frame data
+for every move: `docs/FRAMES.md`. Meter fills from hits landed (90% of damage) and taken (35%), a
 little on block, none from a special's own hits; tuned for about one full
 meter a round. Combos scale down (a special much less). 99-second rounds, best
 of three; a draw on time gives both a round.
@@ -113,6 +137,16 @@ The group's acceleration reaches the stuffing as inertia (a jump squashes, a
 landing slumps), and blows are velocity kicks on the upper body. None of it
 reaches back into the sim.
 
+Arms: Grommet sews a biped's arm with its first point on the torso's
+surface, so an arm turned far from its sewn pose showed its round end
+standing off the body. In Bolster's copies of the rigs the shoulder socket
+is sunk into the torso (`shared/grommet/athletes/standing.js: sunk`), so the
+arm turns about a point inside the stuffing and always comes out of the fur
+(and, for Johnny Deuce, out of his sleeve). The puppets can also stretch a
+limb along itself (`ChainStretch`: links, windows and tethers scale, the
+posed chain slides out) so a jab and a heavy reach their hit boxes' far
+edges — check with `?boxes`.
+
 ### Bubbles
 
 `ui/bubble.js` builds every bubble fresh as SVG: a kraft card cut as an
@@ -124,13 +158,27 @@ register, a halftone shadow lower right, shine ticks, and Gochi Hand lettering
 with a wandering baseline and each letter turned ±2.8°. Tilted a few degrees,
 slapped down (squash, settle). Cosmetic randomness uses `Math.random`.
 
+## Palette
+
+Neon arcade, from the logo: deep #120d1f (backdrop, menus; #1d1630 and
+#2a2140 for panels and empty bar tracks), hot pink #ff3b6b for player 1,
+mint #3ff0c8 for player 2, violet #9b5cff shared (special meter, selection,
+highlights), white text. Text on pink or mint is #120d1f (white on #ff3b6b
+would miss AA); white on the deep panels is ~18:1, the dim #bdb3dc ~10:1.
+The arena is a dark floor with a violet pool of light, a felt mat bordered
+pink → violet → mint, and a back wall glowing pink on player 1's side and
+mint on player 2's with two neon tubes; the plush keep their own fur colours
+(their lighting is their own). The cardboard speech bubbles are unchanged:
+handmade props against the neon.
+
 ## Fonts
 
-Two OFL fonts are subset and inlined (base64) by the build: Gochi Hand (the
-bubble lettering — subset to exactly the characters the fighters say) and
-Lilita One (HUD, menus, banners — subset to printable ASCII). They're declared
-as "Bolster Hand" and "Bolster Display" (a modified OFL font doesn't carry its
-Reserved Font Name). Licences: `src/assets/*-OFL.txt`.
+Three OFL fonts are subset and inlined (base64) by the build: Gochi Hand (the
+bubble lettering — subset to exactly the characters the fighters say), Lilita
+One (a few display bits — printable ASCII) and Oswald Bold (the HUD's and
+menus' condensed caps — printable ASCII). They're declared as "Bolster Hand",
+"Bolster Display" and "Bolster Condensed" (a modified OFL font doesn't carry
+its Reserved Font Name). Licences: `src/assets/*-OFL.txt`.
 
 ## Verification
 
@@ -147,7 +195,14 @@ special K.O. at about 1 in 10, rollback (clone at N, resimulate → same hash; a
 JSON round trip keeps the hash), random play always finishes; the CPU at every
 difficulty finishes a match with every fighter, CPU vs CPU is reproducible,
 Hard beats Easy (10 seeded matches), Hard concedes far fewer hits than Easy,
-and both spend the special.
+and both spend the special. `test/polish.test.mjs`: no second shot while
+one is out (and never two in a whole Hard-vs-Hard match), shots' startup,
+recovery, speed and chip, a shot can be jumped clean, dashes both ways for
+every fighter (and a walk isn't one), light vs heavy (startup, recovery,
+damage, reach; the big ones gain the most), a heavy lands from beyond the
+jab's range, a whiffed heavy's limb can be hit, Kevalanche (Normal) closes
+in on K8-E (Normal) and lands hits over seeded matches, and K8-E's throw
+rate on each difficulty (Normal under 8 a minute).
 
 There is no GPU in the build sandbox: screenshots are SwiftShader, and frame
 rate / WebGPU behaviour have to be checked on real hardware.
