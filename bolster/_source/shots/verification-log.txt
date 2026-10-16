@@ -1,45 +1,113 @@
-# pass 20
+# polish pass verification (2026-10-16)
+# tests 30
+# pass 30
 # fail 0
-final    1101.4 KB  -> /home/user/crucible/bolster/_source/final.html
+final    1421.5 KB  -> /home/user/crucible/bolster/_source/final.html
 fetched refs   none
 dynamic import none
 url literals   none (in script)
-fetch sites    0 (three's loaders, never reached)
-
 self-contained OK
-title: 20.6 s ["title",null]
-bubbles: 25.0 s ["title",null]
-title-mobile: 15.5 s ["title",null]
-select: 28.3 s ["select",null]
-select-cpu: 33.6 s ["select",null]
-nap-time: 47.1 s ["select",null]
-toques: 28.1 s ["select",null]
-fight-kevalanche: 17.2 s ["fight","fight"]
-fight-rubberta: 22.8 s ["fight","fight"]
-fight-johnny: 17.7 s ["fight","fight"]
-fight-sumaura: 19.3 s ["fight","fight"]
-fight-k8e: 17.8 s ["fight","fight"]
-signature-uppercut: 14.6 s ["fight","fight"]
-signature-serve: 13.0 s ["fight","fight"]
-special-avalanche: 14.1 s ["fight","fight"]
-special-abraco: 17.1 s ["fight","fight"]
-special-skyneck: 16.5 s ["fight","fight"]
-special-matchpoint: 14.9 s ["fight","fight"]
-special-squash: 14.8 s ["fight","fight"]
-ko: 15.3 s ["fight","ko"]
-fluffless: 15.6 s ["fight","ko"]
-winner: 24.0 s ["win","end"]
-winner-egg: 22.9 s ["win","end"]
-impatient: 13.3 s ["fight","fight"]
-mirror: 15.7 s ["fight","fight"]
-toques-fight: 18.5 s ["fight","fight"]
-pause: 26.9 s ["pause","fight"]
-fight-mobile: 14.9 s ["fight","fight"]
+
+## shots.mjs (all scenes)
+title: 37.4 s ["title",null,null,null]
+bubbles: 41.5 s ["title",null,null,null]
+title-mobile: 21.7 s ["title",null,null,null]
+select: 53.5 s ["select",null,null,null]
+select-cpu: 59.5 s ["select",null,null,null]
+nap-time: 69.0 s ["select",null,null,null]
+toques: 44.7 s ["select",null,null,null]
+fight-kevalanche: 22.9 s ["fight","fight",0,"hitstun"]
+fight-rubberta: 27.9 s ["fight","fight",0,"idle"]
+fight-johnny: 23.2 s ["fight","fight",0,"attack"]
+fight-sumaura: 26.3 s ["fight","fight",0,"attack"]
+fight-k8e: 21.2 s ["fight","fight",0,"attack"]
+signature-uppercut: 19.3 s ["fight","fight",0,"attack"]
+signature-serve: 17.7 s ["fight","fight",1,"attack"]
+special-avalanche: 18.5 s ["fight","fight",0,"attack"]
+special-abraco: 22.4 s ["fight","fight",0,"attack"]
+special-skyneck: 18.9 s ["fight","fight",0,"attack"]
+special-matchpoint: 19.7 s ["fight","fight",3,"attack"]
+special-squash: 18.5 s ["fight","fight",0,"attack"]
+ko: 21.1 s ["fight","ko",0,"attack"]
+fluffless: 23.1 s ["fight","ko",0,"win"]
+winner: 28.8 s ["win","end",0,"win"]
+winner-egg: 21.9 s ["win","end",0,"win"]
+impatient: 14.4 s ["fight","fight",0,"idle"]
+mirror: 16.4 s ["fight","fight",0,"hitstun"]
+toques-fight: 17.3 s ["fight","fight",0,"attack"]
+pause: 26.6 s ["pause","fight",0,"attack"]
+projectile-one: 12.7 s ["fight","fight",1,"attack"]
+dash: 11.4 s ["fight","fight",0,"dash"]
+fight-mobile: 12.7 s ["fight","fight",0,"attack"]
 zero console errors
-end {"screen":"win","winner":0,"wins":[2,1],"ticks":5649,"seconds":"94.2","name":"Rubberta wins","line":"Eight arms, zero chances."}
-wall 191 s
-CPU vs CPU match completed: zero console errors
-end {"screen":"win","winner":0,"wins":[2,1],"ticks":5649,"seconds":"94.2","name":"Johnny Deuce wins","line":"Game, set, match… sorry 'bout that."}
-wall 162 s
-CPU vs CPU match completed: zero console errors
-DONE
+
+## CPU vs CPU in the browser, Normal vs Normal, seed 23, every pairing
+johnny-johnny: end {"screen":"win","winner":0,"wins":[2,1],"ticks":5049,"seconds":"84.2","name":"Johnny Deuce wins","line":"Game, set, match… sorry 'bout that."} | CPU vs CPU match completed: zero console errors
+johnny-k8e: end {"screen":"win","winner":0,"wins":[2,1],"ticks":5949,"seconds":"99.2","name":"Johnny Deuce wins","line":"Game, set, match… sorry 'bout that."} | CPU vs CPU match completed: zero console errors
+johnny-sumaura: end {"screen":"win","winner":1,"wins":[1,2],"ticks":5649,"seconds":"94.2","name":"Sumaura wins","line":"Right. That's you squashed."} | CPU vs CPU match completed: zero console errors
+k8e-k8e: end {"screen":"win","winner":0,"wins":[2,0],"ticks":4496,"seconds":"74.9","name":"K8-E wins","line":"Heads up next time, eh."} | CPU vs CPU match completed: zero console errors
+kevalanche-johnny: end {"screen":"win","winner":1,"wins":[1,2],"ticks":5349,"seconds":"89.2","name":"Johnny Deuce wins","line":"Game, set, match… sorry 'bout that."} | CPU vs CPU match completed: zero console errors
+kevalanche-k8e: end {"screen":"win","winner":1,"wins":[0,2],"ticks":3896,"seconds":"64.9","name":"K8-E wins","line":"Heads up next time, eh."} | CPU vs CPU match completed: zero console errors
+kevalanche-kevalanche: end {"screen":"win","winner":0,"wins":[2,0],"ticks":3296,"seconds":"54.9","name":"Kevalanche wins","line":"Knocked out cold."} | CPU vs CPU match completed: zero console errors
+kevalanche-rubberta: end {"screen":"win","winner":0,"wins":[2,0],"ticks":3596,"seconds":"59.9","name":"Kevalanche wins","line":"Knocked out cold."} | CPU vs CPU match completed: zero console errors
+kevalanche-sumaura: end {"screen":"win","winner":0,"wins":[2,1],"ticks":5049,"seconds":"84.2","name":"Kevalanche wins","line":"Knocked out cold."} | CPU vs CPU match completed: zero console errors
+rubberta-johnny: end {"screen":"win","winner":0,"wins":[2,0],"ticks":2996,"seconds":"49.9","name":"Rubberta wins","line":"Eight arms, zero chances."} | CPU vs CPU match completed: zero console errors
+rubberta-k8e: end {"screen":"win","winner":1,"wins":[0,2],"ticks":4196,"seconds":"69.9","name":"K8-E wins","line":"Heads up next time, eh."} | CPU vs CPU match completed: zero console errors
+rubberta-rubberta: end {"screen":"win","winner":0,"wins":[2,0],"ticks":4196,"seconds":"69.9","name":"Rubberta wins","line":"Eight arms, zero chances."} | CPU vs CPU match completed: zero console errors
+rubberta-sumaura: end {"screen":"win","winner":0,"wins":[2,0],"ticks":3596,"seconds":"59.9","name":"Rubberta wins","line":"Eight arms, zero chances."} | CPU vs CPU match completed: zero console errors
+sumaura-k8e: end {"screen":"win","winner":0,"wins":[2,0],"ticks":3896,"seconds":"64.9","name":"Sumaura wins","line":"Right. That's you squashed."} | CPU vs CPU match completed: zero console errors
+sumaura-sumaura: end {"screen":"win","winner":1,"wins":[1,2],"ticks":5949,"seconds":"99.2","name":"Evil Sumaura wins","line":"Right. That's you squashed."} | CPU vs CPU match completed: zero console errors
+
+## balance.mjs normal 50 (100 matches per pairing, 50 from each side)
+kevalanche  vs rubberta     35 – 64  (1 draws)
+kevalanche  vs johnny       40 – 60  
+kevalanche  vs sumaura      65 – 35  
+kevalanche  vs k8e          63 – 37  
+rubberta    vs johnny       39 – 61  
+rubberta    vs sumaura      47 – 53  
+rubberta    vs k8e          60 – 40  
+johnny      vs sumaura      61 – 39  
+johnny      vs k8e          39 – 61  
+sumaura     vs k8e          68 – 32  
+
+kevalanche  wins 51%  throws/min 0.00
+rubberta    wins 53%  throws/min 0.00
+johnny      wins 55%  throws/min 3.69
+sumaura     wins 49%  throws/min 0.00
+k8e         wins 43%  throws/min 3.40
+
+## hard 20
+kevalanche  vs rubberta     16 – 24  
+kevalanche  vs johnny       24 – 16  
+kevalanche  vs sumaura      25 – 15  
+kevalanche  vs k8e          26 – 14  
+rubberta    vs johnny       16 – 24  
+rubberta    vs sumaura      26 – 14  
+rubberta    vs k8e          29 – 11    ⚠ beyond 70/30
+johnny      vs sumaura      39 – 1     ⚠ beyond 70/30
+johnny      vs k8e          15 – 25  
+sumaura     vs k8e          12 – 28  
+
+kevalanche  wins 57%  throws/min 0.00
+rubberta    wins 59%  throws/min 0.00
+johnny      wins 59%  throws/min 8.77
+sumaura     wins 26%  throws/min 0.00
+k8e         wins 49%  throws/min 6.27
+
+## easy 20
+kevalanche  vs rubberta     22 – 18  
+kevalanche  vs johnny       22 – 18  
+kevalanche  vs sumaura      13 – 27  
+kevalanche  vs k8e          18 – 22  
+rubberta    vs johnny       18 – 22  
+rubberta    vs sumaura      12 – 28  
+rubberta    vs k8e          16 – 24  
+johnny      vs sumaura      17 – 22  (1 draws)
+johnny      vs k8e          14 – 26  
+sumaura     vs k8e          31 – 9     ⚠ beyond 70/30
+
+kevalanche  wins 47%  throws/min 0.00
+rubberta    wins 40%  throws/min 0.00
+johnny      wins 44%  throws/min 1.44
+sumaura     wins 68%  throws/min 0.00
+k8e         wins 51%  throws/min 1.48
