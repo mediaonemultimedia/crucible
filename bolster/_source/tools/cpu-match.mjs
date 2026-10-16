@@ -41,7 +41,7 @@ for (let k = 0; k < 120 && !done; k++) {
 fs.mkdirSync(path.join(root, 'shots'), { recursive: true });
 await page.evaluate(() => window.__bolster.step(1.5, true));
 await page.waitForTimeout(500);
-await page.screenshot({ path: path.join(root, 'shots', 'cpu-match-end.png'), timeout: 240000 });
+await page.screenshot({ path: process.env.SHOT || path.join(root, 'shots', 'cpu-match-end.png'), timeout: 240000 });
 const end = await page.evaluate(() => {
   const B = window.__bolster, st = B.fight.st;
   return { screen: B.screen, winner: st.winner, wins: st.wins, ticks: st.tick, seconds: (st.tick / 60).toFixed(1), name: document.querySelector('#win-name').textContent, line: document.querySelector('#bubbles .bubble svg')?.getAttribute('aria-label') ?? null };

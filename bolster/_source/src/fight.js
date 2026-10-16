@@ -74,6 +74,11 @@ export class Fight {
     }
     if (e.k === 'ko') { S.shake(1); this.slow = 1.2; }
     if (e.k === 'land' && e.hard) S.shake(0.25);
+    if (e.k === 'dash') {
+      // a kick of fluff off the mat behind the feet
+      const f = st.f[e.p], back = -f.face * e.d;
+      S.tufts(f.x / U + back * 0.4, 0.15, 4, 0.45, back);
+    }
     if (e.k === 'clash') { S.spark(e.x / U, e.y / U, 'hit', 1.2); S.tufts(e.x / U, e.y / U, 4, 0.6, 1); }
     this.onEvent(e, this);
   }

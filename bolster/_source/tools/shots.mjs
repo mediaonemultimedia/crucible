@@ -128,6 +128,21 @@ const SCENES = {
   mirror: { q: fightQ('sumaura', 'sumaura'), run: `toFight(); B.step(2.6)` },
   'toques-fight': { q: fightQ('k8e', 'rubberta', '&toques=1'), run: `toFight(); B.step(2.2)` },
   pause: { q: fightQ('rubberta', 'sumaura'), run: `toFight(); B.step(1.5); dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' })); B.step(0.1)` },
+  // one ring in flight, K8-E mashing S+P: no second one comes out (boxes on)
+  'projectile-one': {
+    q: fightQ('k8e', 'kevalanche', '&boxes'),
+    run: `toFight(); F().cpu = [null, null]; place(-5200, 4200);
+      script((i) => [i === 1 ? ${D} : i > 1 && i % 3 === 0 ? ${D | P} : ${D}, 0]);
+      until(() => ST().proj.length && Math.abs(ST().proj[0].x - ST().f[0].x) > 3600, 4);
+      window.__shotCount = ST().proj.length; B.step(0)`,
+  },
+  // Kevalanche dashing in (double-tap forward), mid-dash
+  dash: {
+    q: fightQ('kevalanche', 'k8e'),
+    run: `toFight(); F().cpu = [null, null]; place(-4200, 3600);
+      script((i) => [i === 1 || i === 3 ? ${R} : 0, 0]);
+      until(() => ST().f[0].act === 'dash' && ST().f[0].t >= 7, 2); B.step(0)`,
+  },
   'fight-mobile': { q: fightQ('johnny', 'kevalanche'), mobile: true, run: `toFight(); B.step(2.5)` },
 };
 
@@ -150,7 +165,7 @@ for (const name of names) {
   await page.goto(url + S.q);
   await page.waitForFunction(() => document.body.classList.contains('is-live') && window.__bolster, null, { timeout: 240000 });
   await page.evaluate(PRE);
-  const r = await page.evaluate(`(async () => { ${S.run}; return [B.screen, B.fight ? B.fight.st.phase : null]; })()`);
+  const r = await page.evaluate(`(async () => { ${S.run}; return [B.screen, B.fight ? B.fight.st.phase : null, B.fight ? B.fight.st.proj.length : null, B.fight ? B.fight.st.f[0].act : null]; })()`);
   await page.waitForTimeout(S.settle || 250);
   await page.screenshot({ path: path.join(out, name + '.png'), timeout: 240000 });
   if (S.clip) {
