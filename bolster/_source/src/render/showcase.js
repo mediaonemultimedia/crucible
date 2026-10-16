@@ -5,6 +5,7 @@
 
 import * as THREE from 'three/webgpu';
 import { Plush } from './plush.js';
+import { unpackRows } from './readback.js';
 
 const still = (id, face, act = 'idle') => ({ id, act, face, x: 0, y: 0, t: 0, mv: '', back: 0, down: 0 });
 
@@ -71,7 +72,9 @@ export class Lineup {
 
 /* render each fighter's portrait once; returns {id: dataURL} */
 export async function portraits(renderer, stage, ids) {
-  const W = 240, H = 320;
+  // 256 px wide: 1024-byte rows, already WebGPU's 256-byte copy alignment
+  // (unpackRows honours the padded stride anyway, whatever the width)
+  const W = 256, H = 320;
   const rt = new THREE.RenderTarget(W, H, { samples: 4 });
   rt.texture.colorSpace = THREE.SRGBColorSpace;
   const cam = new THREE.PerspectiveCamera(30, W / H, 0.1, 100);
@@ -96,11 +99,7 @@ export async function portraits(renderer, stage, ids) {
     c.width = W; c.height = H;
     const g = c.getContext('2d');
     const img = g.createImageData(W, H);
-    const row = W * 4;
-    for (let y = 0; y < H; y++) {
-      const src = (webgl ? H - 1 - y : y) * row;
-      img.data.set(px.subarray(src, src + row), y * row);
-    }
+    img.data.set(unpackRows(px, W, H, { flip: webgl, stride: webgl ? W * 4 : Math.ceil(W * 4 / 256) * 256 }));
     g.putImageData(img, 0, 0);
     out[id] = c.toDataURL('image/png');
     p.dispose(stage.scene);
