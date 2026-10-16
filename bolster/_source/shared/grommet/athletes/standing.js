@@ -64,3 +64,16 @@ export function athleteCfg(b, h0, h1, extra) {
     ...extra,
   };
 }
+
+/* Bolster: where a biped's arm is rooted. Grommet sews the arm's first
+   point on the torso's surface, so an arm turned far from its sewn pose
+   (a punch, a guard) shows its round end standing off the body. Sunk into
+   the torso, the arm turns about a socket inside the stuffing and always
+   comes out of the fur. `x` is the socket's distance from the middle. */
+export function sunk(root0, s, x = Math.abs(root0[0]) - 0.24) {
+  return [s * x, root0[1] - 0.05, root0[2]];
+}
+
+/* a fraction along the original (surface-rooted) arm → the same place
+   along the longer, sunk arm chain */
+export const remap = (L0, ch) => (s) => (ch.len - L0 + s * L0) / ch.len;

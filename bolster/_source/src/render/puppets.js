@@ -73,6 +73,50 @@ const FightMixin = (Base) => class extends Base {
   }
 };
 
+/* A chain that can grow along itself (an arm thrown out in a heavy): its
+   links, bending windows and tethers scale, and the posed chain slides out
+   from its root, so the soft body is pulled to the longer shape and the
+   limb (and anything skinned to it — a glove, a sleeve) goes with it. The
+   giraffe's neck does the same thing its own way, below.               */
+class ChainStretch {
+  constructor(soft, chain) {
+    const rig = soft.rig, idx = [...chain.idx];
+    this.soft = soft; this.idx = chain.idx; this.s = 1;
+    this.links = [];
+    for (let l = 0; l < rig.linkA.length; l++) if (idx.includes(rig.linkA[l]) && idx.includes(rig.linkB[l])) this.links.push([l, rig.linkLen[l]]);
+    this.wins = [];
+    for (const g of soft.windows) if ([...g.ix].every((i) => idx.includes(i))) this.wins.push([g, Float64Array.from(g.q)]);
+    this.teth = [];
+    const T = soft._tethers;
+    if (T) for (let q = 0; q < T.i.length; q++) if (idx.includes(T.i[q]) && T.i[q] !== idx[0]) this.teth.push([q, T.lim[q]]);
+    const R = rig.rest, a = idx[0], b = idx[idx.length - 1];
+    this.len = Math.hypot(R[b * 3] - R[a * 3], R[b * 3 + 1] - R[a * 3 + 1], R[b * 3 + 2] - R[a * 3 + 2]);
+    this.root = [R[a * 3], R[a * 3 + 1], R[a * 3 + 2]];
+    this.tipR = soft.r[b];
+  }
+
+  set(s) {
+    if (Math.abs(s - this.s) < 1e-3) return;
+    this.s = s;
+    const rig = this.soft.rig, T = this.soft._tethers;
+    for (const [l, L] of this.links) rig.linkLen[l] = L * s;
+    for (const [g, q] of this.wins) for (let j = 0; j < q.length; j++) g.q[j] = q[j] * s;
+    for (const [q, L] of this.teth) T.lim[q] = L * s;
+  }
+
+  /* after the pose bones: the posed chain slid out from its root */
+  pose() {
+    const s = this.s, P = this.soft.pose;
+    if (s < 1.001 || !P) return;
+    const idx = this.idx, r = idx[0];
+    const rx = P[r * 3], ry = P[r * 3 + 1], rz = P[r * 3 + 2];
+    for (let j = 1; j < idx.length; j++) {
+      const i = idx[j];
+      P[i * 3] = rx + (P[i * 3] - rx) * s; P[i * 3 + 1] = ry + (P[i * 3 + 1] - ry) * s; P[i * 3 + 2] = rz + (P[i * 3 + 2] - rz) * s;
+    }
+  }
+}
+
 /* ── the bipeds ──────────────────────────────────────────────────────────── */
 
 const READY = {
@@ -97,9 +141,26 @@ export class BipedPuppet extends FightMixin(Athlete) {
     this.stiff = 260;
     this.rq = style === 'tennis' ? racquetFrame(soft, this.cfg.armR, 0.9) : null;
     this.restY = this.c0[1];
+    // the arms can be thrown out past their sewn length (a heavy's reach)
+    this.reachR = new ChainStretch(soft, this.rig.arms[this.cfg.armR]);
+    this.reachL = new ChainStretch(soft, this.rig.arms[this.cfg.armL]);
+    this.sR = spring(); this.sR.x = 1; this.sL = spring(); this.sL.x = 1;
+    this.tS = [1, 1];
   }
 
-  _springs() { return [...super._springs(), ...this.armR, ...this.armL, ...this.lean3, this.wrist]; }
+  _springs() { return [...super._springs(), ...this.armR, ...this.armL, ...this.lean3, this.wrist, this.sR, this.sL]; }
+
+  /* how much an arm must grow for its fist to reach `x` world units in
+     front of his middle (the sim's hit box edge), the body leaning `lean`
+     into it: the socket's own place along the aim, the arm's length, the
+     fist's size (and the racquet's, for the leopard) */
+  _reachFor(arm, x, lean = 0) {
+    const C = arm.root, c0 = this.c0, a = this.aim;
+    const along = (C[0] - c0[0]) * a[0] + (C[2] - c0[2]) * a[2];
+    const prop = this.style === 'tennis' && arm === this.reachR ? 0.75 : 0;
+    const lift = Math.sin(lean) * (C[1] - 0.2);
+    return clamp((x - along - lift - arm.tipR - prop) / arm.len, 1, 2.6);
+  }
 
   /* the sim says what he's doing; pick the pose targets */
   perform(F, ph) {
@@ -108,6 +169,14 @@ export class BipedPuppet extends FightMixin(Athlete) {
     const bob = Math.sin(this.time * TAU * 1.6) * 0.06;
     let R = R0.R, L = R0.L, lean = [R0.lean + bob * 0.3, 0, 0], k = 260, wrist = 0.9;
     const act = F.act;
+    this.tS = [1, 1];
+    if (act === 'dash') {
+      // a dash: the body thrown low into the direction of travel, arms tucked
+      const fwd = F.dd > 0;
+      lean = fwd ? [0.55, 0, 0] : [-0.35, 0, 0];
+      R = [-0.35, 0.3, fwd ? 0.75 : 0.5]; L = [0.3, 0.35, fwd ? 0.75 : 0.5];
+      k = 500;
+    }
     this.lookAt = this.oppHead;
     if (act === 'walkF') lean = [R0.lean + 0.1, 0, Math.sin(this.time * TAU * 2.2) * 0.06];
     if (act === 'walkB') lean = [R0.lean - 0.05, 0, Math.sin(this.time * TAU * 2.2) * 0.06];
@@ -134,20 +203,51 @@ export class BipedPuppet extends FightMixin(Athlete) {
 
   _attack(F, ph, R, L, lean, k, wrist) {
     const st = this.style, mv = F.mv, t = ph.t;
-    const w = ph.wind, o = ph.out;
+    const w = ph.wind;
+    let o = ph.out;
+    const tip = (h) => (h.box.x + h.box.w) / 1000 - 0.12;     // the hit box's far edge, world units
     k = 900;
     if (mv === 'light') {
-      // a jab: the lead (left) hand straight out
+      // a jab: the lead (left) hand snapped straight out to the hit box's edge
+      // (thrown from the first frame: the stuffing needs the head start)
+      o = t < ph.first ? smooth(0, ph.first, t + 1) : o;
       L = mix3([0.25, 0.45, 0.85], [0.05, 0.12, 1], o); lean = [0.15 + 0.2 * o, 0.25 * o, 0];
-      if (st === 'tennis') { R = mix3([-0.9, 0.2, 0.2], [-0.2, 0.15, 1], o); L = [0.5, 0.1, 0.7]; wrist = 0.3; lean = [0.15, -0.35 * o, 0]; }
+      this.tS[1] = mix(1, this._reachFor(this.reachL, tip(ph.m.hits[0]), lean[0]) * 1.12, o);
+      if (st === 'tennis') {
+        R = mix3([-0.9, 0.2, 0.2], [-0.2, 0.15, 1], o); L = [0.5, 0.1, 0.7]; wrist = 0.3; lean = [0.15, -0.35 * o, 0];
+        this.tS = [mix(1, this._reachFor(this.reachR, tip(ph.m.hits[0]), lean[0]), o), 1];
+      }
       if (st === 'sumo') { L = mix3([0.6, 0.3, 0.7], [0.15, 0.35, 1], o); lean = [0.25 + 0.2 * o, 0.2 * o, 0]; }
     } else if (mv === 'heavy') {
-      // a hook: the back hand round from the side, the body turning into it
-      const sw = smooth(0, 1, (t - ph.first + 4) / 8);
-      R = mix3([-1, 0.25, -0.1], [0.35, 0.3, 1], sw * o + (1 - o) * 0.1);
-      lean = [0.2 + 0.15 * o, mix(-0.35, 0.5, sw) * Math.max(o, w), 0];
-      if (st === 'tennis') { R = mix3([-0.95, 0.4, -0.5], [0.5, 0.5, 0.9], sw); wrist = mix(1.4, 0.2, sw); lean = [0.1, mix(-0.4, 0.6, sw), 0]; }
-      if (st === 'sumo') { R = mix3([-0.7, 0.6, 0.4], [-0.1, 0.1, 1], sw); L = mix3([0.7, 0.6, 0.4], [0.1, 0.1, 1], sw); lean = [0.35 * o + 0.1, 0, 0]; }
+      // the heavy: a wind-up (he rears back, the punching arm drawn far
+      // behind him, the body turned away and sinking), then the lunge —
+      // he steps in, turns through it and the arm goes all the way out,
+      // well past the jab, to the hit box's far edge; then a slow return
+      const first = ph.first, load = smooth(0, first * 0.55, t), fire = smooth(first - 5, first - 1, t);
+      const back = load * (1 - fire);
+      const reachX = tip(ph.m.hits[0]);
+      const leanOut = 0.42;
+      const S = this._reachFor(st === 'sumo' ? this.reachL : this.reachR, reachX, leanOut) * 1.2;
+      const out = Math.max(fire * (t <= ph.last ? 1 : o), 0);
+      if (st === 'boxer') {
+        R = mix3(mix3(R, [-0.75, 0.45, -0.7], back), [0.04, 0.2, 1], out);
+        L = mix3(L, [0.35, 0.55, 0.6], back);
+        lean = [mix(-0.22 * back, leanOut, out), mix(-0.7 * back, 0.55, out), 0];
+        this.tS = [mix(1, S, out), 1];
+      } else if (st === 'tennis') {
+        // the racquet taken right back over the shoulder, then a long flat drive
+        R = mix3(mix3(R, [-0.9, 0.6, -0.75], back), [0.15, 0.25, 1], out);
+        wrist = mix(mix(0.9, 1.7, back), 0.15, out);
+        lean = [mix(-0.2 * back, leanOut, out), mix(-0.75 * back, 0.6, out), 0];
+        this.tS = [mix(1, S, out), 1];
+      } else {
+        // sumo: both palms drawn back to the hips, then a two-handed shove
+        R = mix3(mix3(R, [-0.75, -0.2, -0.65], back), [-0.12, 0.2, 1], out);
+        L = mix3(mix3(L, [0.75, -0.2, -0.65], back), [0.12, 0.2, 1], out);
+        lean = [mix(-0.25 * back, leanOut + 0.1, out), 0, 0];
+        this.tS = [mix(1, S, out), mix(1, S, out)];
+      }
+      k = back > 0.05 && out < 0.05 ? 500 : 1800;
     } else if (mv === 'lowLight') {
       L = mix3([0.3, -0.1, 0.8], [0.1, -0.55, 1], o); lean = [0.45, 0.15 * o, 0];
       if (st === 'tennis') { R = mix3([-0.6, -0.2, 0.5], [-0.1, -0.6, 1], o); wrist = 0.1; }
@@ -203,6 +303,10 @@ export class BipedPuppet extends FightMixin(Athlete) {
       ease(this.lean3[d], this.tLean[d], 140, dt);
     }
     ease(this.wrist, this.tWrist ?? 0.9, 300, dt);
+    ease(this.sR, this.tS[0], this.stiff > 600 ? 2600 : 300, dt);
+    ease(this.sL, this.tS[1], this.stiff > 600 ? 2600 : 300, dt);
+    this.reachR.set(clamp(this.sR.x, 1, 2.6));
+    this.reachL.set(clamp(this.sL.x, 1, 2.6));
     // a lean in the fight frame → a rotation vector in the plush's frame:
     // forward lean is a turn about the side axis, a twist about up
     const l = this.lean3.map((s) => s.x);
@@ -211,6 +315,11 @@ export class BipedPuppet extends FightMixin(Athlete) {
     this.face = Math.atan2(this.aim[0], this.aim[2]) * 0.35;
     this.daze = Math.max(0, this.daze - dt * 0.6);
     if (this.rq) this.rq = racquetFrame(this.soft, this.cfg.armR, this.wrist.x, this.rq);
+  }
+
+  _applyPose() {
+    super._applyPose();
+    if (this.pose.active) { this.reachR.pose(); this.reachL.pose(); }
   }
 
   _bones() {
@@ -301,9 +410,19 @@ export class GiraffePuppet extends FightMixin(Athlete) {
       if (neck.idx.includes(i) || cfg.skull.includes(i)) this._tethSet.push([q, T.lim[q]]);
     }
     this._curS = 1;
+    { const a = neck.idx[0], b = neck.idx[N - 1]; this.neckLen = Math.hypot(rest[b * 3] - rest[a * 3], rest[b * 3 + 1] - rest[a * 3 + 1], rest[b * 3 + 2] - rest[a * 3 + 2]); }
   }
 
   _springs() { return [...super._springs(), this.nx, this.ny, this.curl, this.headP, this.stretch, ...this.lean3]; }
+
+  /* how far the neck must stretch for the head to reach a hit box's far
+     edge (world units in front of her middle): measured at rest, scaled */
+  neckReach(h) {
+    const R = this.rig.rest, r = this.neckCh.idx[0], c0 = this.c0, a = this.aim;
+    const along = (R[r * 3] - c0[0]) * a[0] + (R[r * 3 + 2] - c0[2]) * a[2];
+    const want = (h.box.x + h.box.w) / 1000 - 0.15 - along - 0.45;          // less the head's own length
+    return clamp(want / (this.neckLen * 0.82), 1, 3.2);
+  }
 
   perform(F, ph) {
     this.F = F;
@@ -320,8 +439,16 @@ export class GiraffePuppet extends FightMixin(Athlete) {
     if (ph) {
       const t = ph.t, o = ph.out, w = ph.wind;
       T.k = 700;
-      if (F.mv === 'light') { T.nx = mix(0.25, 1.15, o); T.head = -0.6 * o; T.stretch = 1 + 0.35 * o; }
-      else if (F.mv === 'heavy') { T.nx = mix(-0.3, 1.35, o) * Math.max(o, w * 0.3); T.head = -0.9 * o; T.stretch = 1 + 0.7 * o; T.lean = [0.1 * o, 0]; }
+      if (F.mv === 'light') { T.nx = mix(0.25, 1.1, o); T.head = -0.6 * o; T.stretch = mix(1, this.neckReach(ph.m.hits[0]), o); }
+      else if (F.mv === 'heavy') {
+        // the wind-up: the neck drawn right back and up, coiled; then it
+        // snaps forward and down, stretched out to the hit box's far edge
+        const back = smooth(0, ph.first * 0.6, t) * (1 - smooth(ph.first - 3, ph.first, t));
+        const out = smooth(ph.first - 3, ph.first, t) * (t <= ph.last ? 1 : o);
+        T.nx = mix(mix(0.15, -0.55, back), 1.25, out); T.head = mix(0.35 * back, -0.7, out);
+        T.stretch = mix(mix(1, 0.92, back), this.neckReach(ph.m.hits[0]), out); T.lean = [mix(-0.12 * back, 0.14, out), 0];
+        T.k = back > 0.05 && out < 0.05 ? 450 : 900;
+      }
       else if (F.mv === 'lowLight') { T.nx = mix(0.6, 1.9, o); T.head = -1 * o; T.stretch = 1 + 0.3 * o; }
       else if (F.mv === 'airLight' || F.mv === 'airHeavy') { T.nx = mix(0.4, 1.6, o); T.head = -0.8; T.stretch = 1 + 0.3 * o; }
       else if (F.mv === 'signature') {
@@ -471,14 +598,23 @@ export class OctopusPuppet extends FightMixin(class {}) {
     if (act === 'lose') squash = 0.4;
     if (ph) {
       const t = ph.t, o = ph.out;
+      const tip = (h) => (h.box.x + h.box.w) / 1000 - 0.15;
       if (F.mv === 'light') {
-        // a long rubbery jab: one tentacle pulled out to the target and back
-        if (o > 0.05) plan.push({ a: front[0], t: at(0.15, 1.35, mix(1.6, 2.7, o)), k: 0.45 * o });
+        // a long rubbery jab: one tentacle pulled out to the hit box and back
+        if (o > 0.05) plan.push({ a: front[0], t: at(0.15, 1.35, mix(1.6, tip(ph.m.hits[0]), o)), k: 0.45 * o });
       } else if (F.mv === 'heavy') {
-        if (o > 0.05) {
-          plan.push({ a: front[0], t: at(-0.3, 1.25, mix(1.8, 3.2, o)), k: 0.5 * o });
-          plan.push({ a: front[1], t: at(0.3, 1.25, mix(1.8, 3.2, o)), k: 0.5 * o });
-        } else { squash = -0.15 * ph.wind; }
+        // the wind-up: two arms coiled back behind her, the head pulled down;
+        // then both whipped out together, all the way to the far edge
+        const back = smooth(0, ph.first * 0.6, t) * (1 - smooth(ph.first - 3, ph.first, t));
+        const out = smooth(ph.first - 3, ph.first, t) * (t <= ph.last ? 1 : o);
+        if (out > 0.05) {
+          plan.push({ a: front[0], t: at(-0.3, 1.25, mix(1.8, tip(ph.m.hits[0]), out)), k: 0.55 * out });
+          plan.push({ a: front[1], t: at(0.3, 1.25, mix(1.8, tip(ph.m.hits[0]), out)), k: 0.55 * out });
+        } else if (back > 0.05) {
+          plan.push({ a: front[0], t: at(-0.9, 1.9, -0.6), k: 0.3 * back });
+          plan.push({ a: front[1], t: at(0.9, 1.9, -0.6), k: 0.3 * back });
+          squash = 0.25 * back; sway = 0;
+        }
       } else if (F.mv === 'lowLight') {
         if (o > 0.05) plan.push({ a: front[0], t: at(0, 0.2, mix(1.4, 2.6, o)), k: 0.45 * o });
         squash = 0.3;

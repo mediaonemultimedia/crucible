@@ -8,7 +8,7 @@
    stuffing and has to haul himself back up.                               */
 
 import { RigBuilder, smooth, rotX, lerp3 } from '../rigbuilder.js';
-import { standingBody, athleteCfg } from './standing.js';
+import { standingBody, athleteCfg, sunk, remap } from './standing.js';
 
 export const BEAR = {
   TORSO: { c: [0, 1.36, 0], r: [0.82, 0.76, 0.64], B: null, bulge: (phi) => 0.9 + 0.18 * (phi / Math.PI) },
@@ -50,11 +50,14 @@ export function buildBear() {
   // thick arms hanging a little out from the sides, paws forward
   const arms = [];
   for (const s of [-1, 1]) {
-    const root = [s * BEAR.SHOULDER, BEAR.SHOULDER_Y, 0.04];
+    const root0 = [s * BEAR.SHOULDER, BEAR.SHOULDER_Y, 0.04];
     let d = [s * 0.5, -0.8, 0.3];
     const dl = Math.hypot(...d);
     d = d.map((v) => v / dl);
-    const end = [root[0] + d[0] * BEAR.ARM_LEN, root[1] + d[1] * BEAR.ARM_LEN, root[2] + d[2] * BEAR.ARM_LEN];
+    const end = [root0[0] + d[0] * BEAR.ARM_LEN, root0[1] + d[1] * BEAR.ARM_LEN, root0[2] + d[2] * BEAR.ARM_LEN];
+    // Bolster: the shoulder socket sunk into the torso (the arm turns about
+    // a point inside the body, so it comes out of the fur, never off it)
+    const root = sunk(root0, s);
     arms.push(b.chain({
       name: s < 0 ? 'right arm' : 'left arm', kind: 'arm', cloud: 0, n: 6,
       anchor: [s * 0.4, 1.86, 0.0],
@@ -73,10 +76,13 @@ export function buildBear() {
 
   // goalkeeper gloves: over the paws and halfway up the forearm, with a
   // wide cuff
+  // (Bolster: the arm is longer inside the body now; the glove and its cuff
+  // stay where they were along the arm's visible length)
+  const at = remap(BEAR.ARM_LEN, arms[0]);
   for (const ch of arms) {
     b.clothTube({
-      name: ch.name + ' glove', chain: ch.k, s0: 0.6, s1: 1, rs: 1.12, rAdd: 0.075, AS: 14, AA: 20, CAP: 7, style: 2,
-      trim: (s) => smooth(0.62, 0.64, s) * smooth(0.72, 0.7, s),
+      name: ch.name + ' glove', chain: ch.k, s0: at(0.6), s1: 1, rs: 1.12, rAdd: 0.075, AS: 14, AA: 20, CAP: 7, style: 2,
+      trim: (s) => smooth(at(0.62), at(0.64), s) * smooth(at(0.72), at(0.7), s),
     });
   }
 
@@ -84,8 +90,8 @@ export function buildBear() {
     camY: 0.1,
     toy: athleteCfg(b, h0, h1, { pivot: [0, 2.02, 0.04], chest: [0, 1.6, 0.6], armR: arms[0].k, armL: arms[1].k }),
     furMask: [
-      { chain: 'right arm', s0: 0.58, s1: 1, pile: 0 },
-      { chain: 'left arm', s0: 0.58, s1: 1, pile: 0 },
+      { chain: 'right arm', s0: at(0.58), s1: 1, pile: 0 },
+      { chain: 'left arm', s0: at(0.58), s1: 1, pile: 0 },
     ],
   });
 }

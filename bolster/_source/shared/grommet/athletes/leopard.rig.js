@@ -12,7 +12,7 @@
    so the swing never fights the arm's own sewn bend.                       */
 
 import { RigBuilder, smooth, rotX, spline, lerp3 } from '../rigbuilder.js';
-import { standingBody, athleteCfg } from './standing.js';
+import { standingBody, athleteCfg, sunk, remap } from './standing.js';
 
 export const LEOPARD = {
   TORSO: { c: [0, 1.42, 0], r: [0.6, 0.6, 0.48], B: null, bulge: (phi) => 0.92 + 0.14 * (phi / Math.PI) },
@@ -57,14 +57,16 @@ export function buildLeopard() {
   // the left one hanging a little out from the side
   const arms = [];
   for (const s of [-1, 1]) {
-    const root = [s * LEOPARD.SHOULDER, LEOPARD.SHOULDER_Y, 0.02];
+    const root0 = [s * LEOPARD.SHOULDER, LEOPARD.SHOULDER_Y, 0.02];
     let d = s < 0 ? [-0.42, -0.72, 0.55] : [0.42, -0.86, 0.2];
     const dl = Math.hypot(...d);
     d = d.map((v) => v / dl);
     const L = LEOPARD.ARM_LEN;
-    const end = [root[0] + d[0] * L, root[1] + d[1] * L, root[2] + d[2] * L];
+    const end = [root0[0] + d[0] * L, root0[1] + d[1] * L, root0[2] + d[2] * L];
+    // Bolster: the shoulder socket sunk into the torso (under the shirt)
+    const root = sunk(root0, s, 0.26);
     // a whisper of a bend at the elbow so the tube doesn't read as a pipe
-    const mid = lerp3(root, end, 0.5);
+    const mid = lerp3(root0, end, 0.5);
     mid[1] += 0.03; mid[2] += s < 0 ? -0.02 : 0.03;
     arms.push(b.chain({
       name: s < 0 ? 'right arm' : 'left arm', kind: 'arm', cloud: 0, n: 6,
@@ -102,10 +104,13 @@ export function buildLeopard() {
     name: 'collar', cloud: 0, c: [0, 2.0, 0.03], torus: { R: 0.36, r: 0.075 }, B: rotX(Math.PI / 2 - 0.32), U: 44, V: 12, style: 0,
     trim: (u, v, l) => 0,
   });
+  // (Bolster: the arm starts inside the body now; the sleeve keeps its
+  // length out of the shirt)
+  const at = remap(LEOPARD.ARM_LEN, arms[0]);
   for (const ch of arms) {
     b.clothTube({
-      name: ch.name + ' sleeve', chain: ch.k, s0: 0.0, s1: 0.4, rs: 1.25, rAdd: 0.06, AS: 12, AA: 20, style: 0,
-      sway: (s) => smooth(0.15, 0.4, s) * 0.7, trim: (s) => smooth(0.33, 0.345, s) * smooth(0.375, 0.36, s),
+      name: ch.name + ' sleeve', chain: ch.k, s0: 0.0, s1: at(0.4), rs: 1.25, rAdd: 0.06, AS: 12, AA: 20, style: 0,
+      sway: (s) => smooth(at(0.15), at(0.4), s) * 0.7, trim: (s) => smooth(at(0.33), at(0.345), s) * smooth(at(0.375), at(0.36), s),
     });
   }
   // the terry headband round the brow, just above the eyes
@@ -123,8 +128,8 @@ export function buildLeopard() {
     furMask: [
       { part: 'torso', v0: 0.16, v1: 0.745, pile: 0 },
       { part: 'head', v0: 0.255, v1: 0.375, pile: 0.15 },
-      { chain: 'right arm', s0: 0, s1: 0.41, pile: 0 },
-      { chain: 'left arm', s0: 0, s1: 0.41, pile: 0 },
+      { chain: 'right arm', s0: 0, s1: at(0.41), pile: 0 },
+      { chain: 'left arm', s0: 0, s1: at(0.41), pile: 0 },
     ],
     racquet: { arm: arms[0].k },
   });

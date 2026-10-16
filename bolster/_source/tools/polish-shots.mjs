@@ -43,9 +43,10 @@ const PRE = `
   /* the fight from the front, close: framed on the attacker and his reach */
   window.stageCam = () => {
     const x = F().plush[0].group.position.x + 1.6;
-    const cam = B.__scam || (B.__scam = new (B.stage.camera.constructor)(26, innerWidth / innerHeight, 0.1, 200));
-    cam.aspect = innerWidth / innerHeight; cam.position.set(x, 3.0, 12.5); cam.lookAt(x, 1.9, 0); cam.updateProjectionMatrix();
+    const cam = B.stage.camera;
+    cam.aspect = innerWidth / innerHeight; cam.fov = 26; cam.position.set(x, 3.0, 12.5); cam.lookAt(x, 1.9, 0); cam.updateProjectionMatrix();
     B.renderer.render(B.stage.scene, cam);
+    if (B.boxes) B._boxes();
   };
   /* a fixed camera round fighter 0: theta from his own forward (0 front, 90° his side) */
   window.orbit = (theta, dist, ty, fov = 30) => {
@@ -103,9 +104,9 @@ for (const name of names) {
     const { page, errs } = await open(`?p1=${id}&p2=johnny&cpu=normal&seed=7&hold&webgl&noportraits`, { width: 960, height: 600 });
     const tiles = [];
     const shots = [
-      ['light', LP, `ST().f[0].mv === 'light' && ST().f[0].t >= first(ST().f[0])`],
+      ['light', LP, `ST().f[0].mv === 'light' && ST().f[0].t >= first(ST().f[0]) + 1`],
       ['windup', HP, `ST().f[0].mv === 'heavy' && ST().f[0].t >= first(ST().f[0]) - 4`],
-      ['heavy', HP, `ST().f[0].mv === 'heavy' && ST().f[0].t >= first(ST().f[0]) + 1`],
+      ['heavy', HP, `ST().f[0].mv === 'heavy' && ST().f[0].t >= first(ST().f[0]) + 2`],
     ];
     for (const [label, btn, cond] of shots) {
       await page.evaluate(`toFight(); F().cpu = [null, null]; place(-2600, 3400); script(() => [0, 0]); B.step(1.0, false);

@@ -10,7 +10,8 @@ import { Showcase, Lineup, portraits } from './render/showcase.js';
 import { Fight } from './fight.js';
 import { Keyboard } from './input/keyboard.js';
 import { FIGHTERS, ROSTER, MAX_METER } from './fighters/index.js';
-import { ROUND_TICKS } from './sim/sim.js';
+import { ROUND_TICKS, hurtBox, limbBox, activeHits } from './sim/sim.js';
+import { moveOf } from './fighters/index.js';
 import { FLAGS } from './ui/flags.js';
 import { say, dismiss } from './ui/bubble.js';
 import { SAYINGS } from './ui/sayings.js';
@@ -399,6 +400,32 @@ class App {
     else if (this.lineup) this.lineup.frame(dt);
     else this.stage.frame(-2.7, 2.7, dt, innerWidth / innerHeight), this.stage.update(dt);
     if (draw) this.renderer.render(this.stage.scene, this.stage.camera);
+    if (draw && this.boxes) this._boxes();
+  }
+
+  /* ?boxes: the sim's boxes over the picture — hurt (blue), a heavy's limb
+     (cyan), active hits (red), shots (amber) — to check reach against the
+     plush */
+  _boxes() {
+    const c = this.boxCanvas || (this.boxCanvas = Object.assign(document.createElement('canvas'), { id: 'boxes' }));
+    if (!c.isConnected) { c.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:4'; document.body.appendChild(c); }
+    c.width = innerWidth; c.height = innerHeight;
+    const g = c.getContext('2d');
+    g.clearRect(0, 0, c.width, c.height);
+    if (!this.fight) return;
+    const cam = this.stage.camera, v = new THREE.Vector3();
+    const P = (x, y) => { v.set(x / 1000, y / 1000, 0).project(cam); return [(v.x * 0.5 + 0.5) * c.width, (-v.y * 0.5 + 0.5) * c.height]; };
+    const box = (b, col) => {
+      if (!b) return;
+      const [x0, y0] = P(b.x0, b.y1), [x1, y1] = P(b.x1, b.y0);
+      g.fillStyle = col + '33'; g.strokeStyle = col; g.lineWidth = 2;
+      g.fillRect(x0, y0, x1 - x0, y1 - y0); g.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    };
+    for (const f of this.fight.st.f) {
+      box(hurtBox(f), '#3b8bff'); box(limbBox(f), '#3ff0c8');
+      for (const h of activeHits(f)) box(h.box, '#ff3b3b');
+    }
+    for (const p of this.fight.st.proj) box({ x0: p.x - p.w / 2, x1: p.x + p.w / 2, y0: p.y - p.h / 2, y1: p.y + p.h / 2 }, '#ffb020');
   }
 
   /* advance by `seconds` without drawing (slow or headless hosts: tests,
@@ -416,6 +443,8 @@ async function start() {
   if (document.fonts?.load) { try { await Promise.all([document.fonts.load('26px "Bolster Hand"'), document.fonts.load('26px "Bolster Display"')]); } catch { /* the fallback hand will do */ } }
   const app = new App(renderer, canvas);
   window.__bolster = app;
+  app.moveOf = moveOf;
+  app.boxes = params.has('boxes');
   app.say = (text, x, y, o) => say($('#bubbles'), text, x, y, o);
   // portraits for the cards
   if (!params.has('noportraits')) { try { app.portraits = await portraits(renderer, app.stage, ROSTER); } catch (err) { console.warn('portraits', err); } }

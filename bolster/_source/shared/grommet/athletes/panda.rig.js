@@ -20,6 +20,7 @@
    Units: 1 = 9 cm; a panda stands about 29 cm tall.                       */
 
 import { RigBuilder, smooth, rotX, lerp3 } from '../rigbuilder.js';
+import { sunk } from './standing.js';
 
 export const PANDA = {
   TORSO: { c: [0, 1.38, 0], r: [0.86, 0.8, 0.72], B: null, bulge: (phi) => 0.9 + 0.2 * (phi / Math.PI) },
@@ -95,11 +96,13 @@ function buildOne(b, k, champion) {
   // thick black arms, hanging a little out and forward
   const arms = [];
   for (const s of [-1, 1]) {
-    const root = [s * PANDA.SHOULDER, PANDA.SHOULDER_Y, 0.06];
+    const root0 = [s * PANDA.SHOULDER, PANDA.SHOULDER_Y, 0.06];
     let d = [s * 0.5, -0.78, 0.36];
     const dl = Math.hypot(...d);
     d = d.map((v) => v / dl);
-    const end = [root[0] + d[0] * PANDA.ARM_LEN, root[1] + d[1] * PANDA.ARM_LEN, root[2] + d[2] * PANDA.ARM_LEN];
+    const end = [root0[0] + d[0] * PANDA.ARM_LEN, root0[1] + d[1] * PANDA.ARM_LEN, root0[2] + d[2] * PANDA.ARM_LEN];
+    // Bolster: the shoulder socket sunk into the torso
+    const root = sunk(root0, s);
     arms.push(b.chain({
       name: name(s < 0 ? 'right arm' : 'left arm'), kind: 'arm', cloud: k, n: 6,
       anchor: [s * 0.42, 1.86, 0.0], path: (u) => lerp3(root, end, u),
