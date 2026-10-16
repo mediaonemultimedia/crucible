@@ -164,7 +164,7 @@ Neon arcade, from the logo: deep #120d1f (backdrop, menus; #1d1630 and
 #2a2140 for panels and empty bar tracks), hot pink #ff3b6b for player 1,
 mint #3ff0c8 for player 2, violet #9b5cff shared (special meter, selection,
 highlights), white text. Text on pink or mint is #120d1f (white on #ff3b6b
-would miss AA); white on the deep panels is ~18:1, the dim #bdb3dc ~10:1.
+would miss AA); white on the deep backdrop and panels is 15–19:1, the dim #bdb3dc 7.7–9.7:1, the pink label on the backdrop 5.5:1.
 The arena is a dark floor with a violet pool of light, a felt mat bordered
 pink → violet → mint, and a back wall glowing pink on player 1's side and
 mint on player 2's with two neon tubes; the plush keep their own fur colours
