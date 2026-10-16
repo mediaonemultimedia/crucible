@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sumi bleed — prototype</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #EFE7D8; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: crosshair; touch-action: none; }
+  #hud { position: fixed; left: 18px; bottom: 16px; font: 12px/1.6 ui-monospace, Menlo, monospace; color: #6b6158; letter-spacing: .02em;
+         background: rgba(239,231,216,.7); padding: 8px 12px; border-radius: 4px; pointer-events: none; transition: opacity .6s; }
+  #hud b { color: #2a2420; font-weight: 600; }
+  #swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <span id="swatch"></span><b id="ink">sumi</b> &nbsp;·&nbsp; size <b id="size"></b><br>
+  click &amp; hold to bloom · drag to stroke · <b>1</b> sumi <b>2</b> vermilion <b>3</b> gold<br>
+  <b>shift</b>-drag clear water · <b>[ ]</b> size · <b>D</b> hold to dry · <b>C</b> clear · <b>P</b> demo · <b>H</b> hide
+</div>
+<script>
+// A real-time watercolour sketch: a wet layer (water + suspended pigment) that flows through paper fibres as a
+// porous medium (it spreads fast while pooled and stalls at a front), carries pigment with it, evaporates fastest at
+// thin edges (so pigment piles up there: edge darkening), and settles into a stain layer as it dries.
+const cv = document.getElementById('c');
+const gl = cv.getContext('webgl2', { antialias: false, premultipliedAlpha: false });
+if (!gl || !gl.getExtension('EXT_color_buffer_float')) document.body.innerHTML = '<p style="font:16px sans-serif;padding:40px">Needs WebGL2 with float render targets.</p>';
+const LINEAR_F = !!gl.getExtension('OES_texture_float_linear');
+
+const SCALE = 3, SUB = 10;                 // sim at 1/3 resolution; 10 substeps a frame
+let W, H, SW, SH;
+const INKS = {
+  sumi:      { abs: [1.00, 1.04, 1.12], load: 2.6, css: '#1f1b19' },
+  vermilion: { abs: [0.06, 0.95, 0.80], load: 1.5, css: '#c8323c' },
+  gold:      { abs: [0.10, 0.30, 0.90], load: 1.0, css: '#c9973a' },
+};
+let ink = 'sumi', size = 34;
+
+// ---------- GL helpers ----------
+const VS = `#version 300 es
+in vec2 p; out vec2 vUv; void main(){ vUv = p * .5 + .5; gl_Position = vec4(p, 0, 1); }`;
+function prog(fs) {
+  const mk = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(o); return o; };
+  const p = gl.createProgram(); gl.attachShader(p, mk(gl.VERTEX_SHADER, VS)); gl.attachShader(p, mk(gl.FRAGMENT_SHADER, fs));
+  gl.bindAttribLocation(p, 0, 'p'); gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw gl.getProgramInfoLog(p);
+  const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++) { const a = gl.getActiveUniform(p, i); u[a.name] = gl.getUniformLocation(p, a.name); }
+  return { p, u };
+}
+const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+function tex(w, h, data = null, fmt = 'f32', filter = gl.NEAREST) {
+  const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+  if (fmt === 'f32') gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, data);
+  else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+function fbo(...ts) {
+  const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+  ts.forEach((t, i) => gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, t, 0));
+  gl.drawBuffers(ts.map((_, i) => gl.COLOR_ATTACHMENT0 + i)); return f;
+}
+const bind = (unit, t) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t); return unit; };
+
+// ---------- shaders ----------
+const SIM = prog(`#version 300 es
+precision highp float;
+uniform sampler2D uState, uStain, uAbs; uniform float uDt, uDry;
+in vec2 vUv; layout(location=0) out vec4 oState; layout(location=1) out vec4 oStain;
+ivec2 SZ;
+vec4 S(ivec2 p) { return texelFetch(uState, clamp(p, ivec2(0), SZ - 1), 0); }
+float A(ivec2 p) { return texelFetch(uAbs, clamp(p, ivec2(0), SZ - 1), 0).r; }
+// water flux from a to b (positive = a loses water). Porous-medium mobility: pooled water moves, thin water stalls.
+float flux(vec4 a, vec4 b, float da, float db) {
+  float mob = pow(max(0., .5 * (a.a + b.a)), 1.6) * min(da, db);
+  return min(.32 * mob, .2) * (a.a - b.a);
+}
+// pigment carried along with that water, capped so a cell never gives away more than it has
+vec3 carry(vec4 from, float f) { return min(from.rgb / max(from.a, 1e-4) * f, from.rgb * .2); }
+void main() {
+  SZ = textureSize(uState, 0);
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  vec4 s = S(p); float ds = A(p);
+  float w = s.a; vec3 P = s.rgb;
+  ivec2 O[4] = ivec2[4](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1));
+  float dw = 0.; vec3 dP = vec3(0);
+  for (int i = 0; i < 4; i++) {
+    vec4 n = S(p + O[i]); float dn = A(p + O[i]);
+    float f = flux(s, n, ds, dn);
+    dw -= f;
+    if (f > 0.) dP -= carry(s, f); else dP += carry(n, -f);
+  }
+  w = max(0., w + dw); P = max(vec3(0), P + dP);
+  // evaporation: faster at thin edges, so pigment is stranded there (edge darkening); the hair dryer speeds it up
+  float ev = uDt * (.05 + .35 * (1. - smoothstep(0., .22, w))) * (1. + 9. * uDry);
+  w = max(0., w - ev);
+  // pigment settles into the paper a little all the time (more where the paper is thirsty), and all of it once dry
+  float settle = clamp(uDt * (.06 + .14 * ds) + (w < .012 ? 1. : 0.), 0., 1.);
+  vec3 d = P * settle; P -= d;
+  oState = vec4(P, w);
+  oStain = vec4(texelFetch(uStain, p, 0).rgb + d, 1.);
+}`);
+
+const BRUSH = prog(`#version 300 es
+precision highp float;
+uniform sampler2D uState; uniform vec2 uA, uB; uniform float uR, uWater, uInk, uBristle, uSeed, uHold; uniform vec3 uPig; uniform vec2 uDir;
+in vec2 vUv; out vec4 o;
+float h1(float x) { return fract(sin(x * 127.1 + uSeed * 31.7) * 43758.5453); }
+float n1(float x) { float i = floor(x), f = fract(x); return mix(h1(i), h1(i + 1.), f * f * (3. - 2. * f)); }
+void main() {
+  vec2 p = gl_FragCoord.xy; vec4 s = texelFetch(uState, ivec2(p), 0);
+  vec2 ab = uB - uA; float L = length(ab);
+  float h = clamp(dot(p - uA, ab) / max(L * L, 1e-4), 0., 1.); float d = length(p - (uA + ab * h));
+  float m = 1. - smoothstep(uR * .55, uR, d);
+  if (m <= 0.) { o = s; return; }
+  vec2 dir = uDir; float perp = dot(p - uA, vec2(-dir.y, dir.x));
+  float br = smoothstep(.25, .55, n1(perp * .38)) * (.7 + .3 * n1(perp * 1.7 + 7.));   // bristle streaks across the stroke
+  m *= mix(1., br, uBristle * smoothstep(uR * .15, uR * .7, abs(perp)));                 // dry-brush breaks at the edges, the core stays loaded
+  float centre = 1. - smoothstep(0., uR * .6, d) * .35 * uHold;                       // a held brush pools at its centre
+  o = vec4(s.rgb + uPig * m * uInk * centre, s.a + m * uWater * centre);
+}`);
+
+const RENDER = prog(`#version 300 es
+precision highp float;
+uniform sampler2D uState, uStain, uPaper; uniform vec2 uSimTexel;
+in vec2 vUv; out vec4 o;
+void main() {
+  vec4 st = texture(uState, vUv); vec3 sn = texture(uStain, vUv).rgb; vec4 pp = texture(uPaper, vUv);
+  // a hint of extra darkening along stain edges, and granulation from the paper tooth
+  vec3 gx = texture(uStain, vUv + vec2(uSimTexel.x, 0)).rgb - texture(uStain, vUv - vec2(uSimTexel.x, 0)).rgb;
+  vec3 gy = texture(uStain, vUv + vec2(0, uSimTexel.y)).rgb - texture(uStain, vUv - vec2(0, uSimTexel.y)).rgb;
+  float edge = length(vec2(length(gx), length(gy)));
+  vec3 Ab = sn * (.82 + .36 * pp.a) * (1. + .5 * edge) + st.rgb * .75;
+  Ab = Ab / (1. + .3 * Ab);                                                             // pigment saturates rather than going muddy
+  vec3 col = pp.rgb * exp(-Ab * 1.25);
+  col *= 1. - .06 * smoothstep(0., .8, st.a);                                            // wet paper reads a touch darker
+  o = vec4(col, 1);
+}`);
+
+// ---------- paper ----------
+function makePaper() {
+  // full-res colour + tooth (alpha) and sim-res absorbency (fibres make the bleed irregular)
+  const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  g.fillStyle = '#F1EADC'; g.fillRect(0, 0, W, H);
+  let seed = 7; const R = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < W * H / 260; i++) {                      // fibres
+    const x = R() * W, y = R() * H, a = R() * Math.PI, l = 4 + R() * 22;
+    g.strokeStyle = R() < .5 ? 'rgba(120,96,60,.06)' : 'rgba(255,255,250,.35)'; g.lineWidth = .5 + R() * .7;
+    g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + Math.cos(a + .5) * l * .5, y + Math.sin(a + .5) * l * .5, x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+  }
+  const id = g.getImageData(0, 0, W, H), d = id.data;
+  for (let i = 0; i < W * H; i++) { const n = (R() - .5) * 6; d[i * 4] += n; d[i * 4 + 1] += n; d[i * 4 + 2] += n * .9; d[i * 4 + 3] = 255 * R(); }
+  // absorbency: smooth cloudy value noise plus fibre direction streaks, at sim resolution
+  const ab = new Float32Array(SW * SH * 4), grid = 14, GW = Math.ceil(SW / grid) + 2, GH = Math.ceil(SH / grid) + 2, G = [];
+  for (let i = 0; i < GW * GH; i++) G.push(R());
+  const vn = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    const v = (a, b) => G[(b % GH) * GW + (a % GW)]; return (v(xi, yi) * (1 - sx) + v(xi + 1, yi) * sx) * (1 - sy) + (v(xi, yi + 1) * (1 - sx) + v(xi + 1, yi + 1) * sx) * sy; };
+  for (let y = 0; y < SH; y++) for (let x = 0; x < SW; x++) {
+    const v = .55 * vn(x / grid, y / grid) + .3 * vn(x / grid * 2.7 + 11, y / grid * 2.7) + .15 * R();
+    ab[(y * SW + x) * 4] = .12 + .88 * Math.min(1, Math.max(0, (v - .25) * 2.0));
+  }
+  return { col: tex(W, H, new Uint8Array(id.data.buffer), 'u8', gl.LINEAR), abs: tex(SW, SH, ab) };
+}
+
+// ---------- state ----------
+let state, stain, paper, FB = new Map();
+const target = (...ts) => { const k = ts.map(t => t.__id).join(','); if (!FB.has(k)) FB.set(k, fbo(...ts)); return FB.get(k); };
+let _tid = 0;
+function setup() {
+  W = Math.min(innerWidth, 2560); H = Math.round(W * innerHeight / innerWidth); cv.width = W; cv.height = H;
+  SW = Math.ceil(W / SCALE); SH = Math.ceil(H / SCALE);
+  const lin = LINEAR_F ? gl.LINEAR : gl.NEAREST;
+  const mk = () => { const t = tex(SW, SH, null, 'f32', lin); t.__id = ++_tid; return t; };
+  FB = new Map(); state = [mk(), mk()]; stain = [mk(), mk()];
+  paper = makePaper(); clear();
+}
+function clear() { for (const t of [...state, ...stain]) { gl.bindFramebuffer(gl.FRAMEBUFFER, target(t)); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); } }
+
+// ---------- input ----------
+const ptr = { down: false, x: 0, y: 0, lx: 0, ly: 0, hold: 0, travel: 0, water: false, still: 0 };
+let dry = false;
+cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); Object.assign(ptr, { down: true, x: e.offsetX, y: e.offsetY, lx: e.offsetX, ly: e.offsetY, hold: 0, travel: 0, water: e.shiftKey }); seed = Math.random() * 100; });
+cv.addEventListener('pointermove', e => { ptr.x = e.offsetX; ptr.y = e.offsetY; ptr.water = e.shiftKey; });
+addEventListener('pointerup', () => ptr.down = false);
+addEventListener('keydown', e => {
+  if (e.key === '1') ink = 'sumi'; if (e.key === '2') ink = 'vermilion'; if (e.key === '3') ink = 'gold';
+  if (e.key === '[') size = Math.max(8, size - 6); if (e.key === ']') size = Math.min(140, size + 6);
+  if (e.key === 'c' || e.key === 'C') clear(); if (e.key === 'd' || e.key === 'D') dry = true;
+  if (e.key === 'h' || e.key === 'H') hud.style.opacity = hud.style.opacity === '0' ? '1' : '0';
+  updHud();
+});
+addEventListener('keyup', e => { if (e.key === 'd' || e.key === 'D') dry = false; });
+const hud = document.getElementById('hud');
+function updHud() { document.getElementById('ink').textContent = ink; document.getElementById('size').textContent = size; document.getElementById('swatch').style.background = INKS[ink].css; }
+let seed = 0;
+
+function brush(dt) {
+  const sx = cv.width / cv.clientWidth, x = ptr.x * sx, y = ptr.y * sx, lx = ptr.lx * sx, ly = ptr.ly * sx;
+  const dist = Math.hypot(x - lx, y - ly), speed = dist / Math.max(dt, 1e-3);
+  if (speed < 40) ptr.hold += dt; else ptr.hold = Math.max(0, ptr.hold - dt * 4);
+  ptr.travel += dist;
+  const load = Math.exp(-ptr.travel / 2600);                    // the brush runs dry over a long stroke
+  const hold = Math.min(ptr.hold, 4);
+  const press = speed > 40 ? 1.15 - .55 * Math.min(1, speed / 1600) : 1.15;
+  const r = (size * press * (.45 + .55 * load) + size * Math.sqrt(hold) * .3) / SCALE;
+  const water = (ptr.water ? .5 : .3 * (.35 + .65 * load)) * (1 + .9 * hold) * (speed > 40 ? Math.min(1, 700 / speed) * .55 : 1) * dt * 60 * .14 * Math.min(1.4, Math.max(.35, 28 / size));
+  const I = INKS[ink], pig = ptr.water ? [0, 0, 0] : I.abs.map(a => a * I.load * (.6 + .4 * load));
+  const bristle = ptr.water ? 0 : Math.min(1, speed / 2200 + (1 - load) * 1.6);
+  // a moving brush lays concentrated ink with little water (crisp); a held one floods water and thins its ink (blooms)
+  const inkAmt = ptr.water ? 0 : (speed > 40 ? .24 * (.3 + .7 * load) * Math.min(1.4, 500 / speed + .4) : .028 * (1 + .25 * hold)) * dt * 60;
+  gl.useProgram(BRUSH.p); gl.viewport(0, 0, SW, SH);
+  // stamp evenly spaced round dabs along this frame's path, so a stroke is smooth at any frame rate
+  const rPx = r * SCALE, n = Math.max(1, Math.ceil(dist / (rPx * .25))), dl = dist > 1e-3 ? [(x - lx) / dist, (y - ly) / dist] : [1, 0];
+  for (let i = 1; i <= n; i++) {
+    const k = i / n, px = lx + (x - lx) * k, py = ly + (y - ly) * k;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target(state[1]));
+    gl.uniform1i(BRUSH.u.uState, bind(0, state[0]));
+    gl.uniform2f(BRUSH.u.uA, px / SCALE, SH - py / SCALE); gl.uniform2f(BRUSH.u.uB, px / SCALE, SH - py / SCALE);
+    gl.uniform2f(BRUSH.u.uDir, dl[0], -dl[1]);
+    gl.uniform1f(BRUSH.u.uR, r); gl.uniform1f(BRUSH.u.uWater, water / n); gl.uniform1f(BRUSH.u.uInk, inkAmt / n); gl.uniform1f(BRUSH.u.uBristle, bristle);
+    gl.uniform1f(BRUSH.u.uSeed, seed); gl.uniform1f(BRUSH.u.uHold, Math.min(1, hold)); gl.uniform3fv(BRUSH.u.uPig, pig);
+    gl.drawArrays(gl.TRIANGLES, 0, 3); state.reverse();
+  }
+  ptr.lx = ptr.x; ptr.ly = ptr.y;
+}
+
+// ---------- loop ----------
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  demoStep(dt);
+  if (ptr.down) brush(dt);
+  gl.useProgram(SIM.p); gl.viewport(0, 0, SW, SH);
+  gl.uniform1f(SIM.u.uDt, dt / SUB); gl.uniform1f(SIM.u.uDry, dry ? 1 : 0);
+  for (let i = 0; i < SUB; i++) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target(state[1], stain[1]));
+    gl.uniform1i(SIM.u.uState, bind(0, state[0])); gl.uniform1i(SIM.u.uStain, bind(1, stain[0])); gl.uniform1i(SIM.u.uAbs, bind(2, paper.abs));
+    gl.drawArrays(gl.TRIANGLES, 0, 3); state.reverse(); stain.reverse();
+  }
+  gl.useProgram(RENDER.p); gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, W, H);
+  gl.uniform1i(RENDER.u.uState, bind(0, state[0])); gl.uniform1i(RENDER.u.uStain, bind(1, stain[0])); gl.uniform1i(RENDER.u.uPaper, bind(2, paper.col));
+  gl.uniform2f(RENDER.u.uSimTexel, 1 / SW, 1 / SH);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  requestAnimationFrame(frame);
+}
+setup(); updHud(); requestAnimationFrame(frame);
+// a scripted demo (P, or ?demo): a plum branch, blossoms held into blooms, a gold sun, a pooled wash, a clear-water
+// pass. It runs on the frame clock, so it pauses with the page rather than racing ahead of it.
+let demoQ = null, demoT = 0;
+function demo() {
+  clear(); const X = cv.clientWidth, Y = cv.clientHeight, q = [];
+  const H = (i, z, x, y, s) => q.push({ i, z, s, pts: [[X * x, Y * y]] });
+  const S = (i, z, pts, s, water = false) => q.push({ i, z, s, water, pts: pts.map(([x, y]) => [X * x, Y * y]) });
+  H('gold', 70, .8, .22, 1.2);
+  S('sumi', 42, [[.04, .08], [.18, .2], [.3, .34], [.44, .42], [.6, .46], [.7, .52]], .9);
+  S('sumi', 18, [[.3, .34], [.34, .22], [.36, .13]], .35);
+  S('sumi', 16, [[.5, .44], [.55, .58]], .3);
+  for (const [x, y, s] of [[.16, .14, .5], [.26, .26, .9], [.34, .16, .4], [.4, .36, 1.4], [.52, .38, .5], [.62, .52, 1.0]]) H('vermilion', 22, x, y, s);
+  H('sumi', 60, .3, .82, 2.2);
+  S('sumi', 40, [[.45, .85], [.95, .8]], .8, true);
+  demoQ = q; demoT = 0;
+}
+function demoStep(dt) {
+  if (!demoQ) return;
+  let t = demoT += dt, k = 0;
+  while (k < demoQ.length && t > demoQ[k].s + .08) { t -= demoQ[k].s + .08; k++; }
+  if (k >= demoQ.length) { demoQ = null; ptr.down = false; return; }
+  const a = demoQ[k], live = t <= a.s;
+  if (!live) { ptr.down = false; return; }
+  if (ink !== a.i || size !== a.z) { ink = a.i; size = a.z; updHud(); }
+  const f = Math.pow(t / a.s, .8) * (a.pts.length - 1), j = Math.min(a.pts.length - 1, Math.floor(f)), u = f - j;
+  const P0 = a.pts[j], P1 = a.pts[Math.min(j + 1, a.pts.length - 1)], x = P0[0] + (P1[0] - P0[0]) * u, y = P0[1] + (P1[1] - P0[1]) * u;
+  if (!ptr.down || ptr.demoIdx !== k) Object.assign(ptr, { down: true, x, y, lx: x, ly: y, hold: 0, travel: 0, water: !!a.water, demoIdx: k });
+  else { ptr.x = x; ptr.y = y; }
+}
+addEventListener('keydown', e => { if (e.key === 'p' || e.key === 'P') demo(); });
+if (location.search.includes('demo')) demo();
+window.__api = { ptr, demo, clear };
+</script>
+</body>
+</html>
