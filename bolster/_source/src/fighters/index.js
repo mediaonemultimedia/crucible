@@ -152,7 +152,7 @@ export const FIGHTERS = {
     push: { w: 1500, h: 3000 },
     hurt: { stand: { x: -800, y: 0, w: 1600, h: 3400 }, crouch: { x: -800, y: 0, w: 1600, h: 2400 }, air: { x: -750, y: 400, w: 1500, h: 2800 } },
     moves: {
-      ...normals({ lReach: 2600, hReach: 3350, cReach: 2400, lDmg: 32, hDmg: 78, cDmg: 32, lY: 1900, hY: 1650, hStart: 15, hTotal: 44, lW: 1300, hW: 1700, lungeV: 20, lunge: 7 }),
+      ...normals({ lReach: 2600, hReach: 3350, cReach: 2400, lDmg: 32, hDmg: 78, cDmg: 32, lY: 1900, hY: 1900, hStart: 15, hTotal: 44, lW: 1300, hW: 1700, lungeV: 20, lunge: 7 }),
       signature: move({
         kind: 'signature', total: 64,
         spawn: [{ at: 18, proj: { kind: 'ring', dx: 1200, y: 1450, vx: 100, vy: 0, box: { w: 600, h: 460 }, dmg: 60, level: 'mid', life: 180, hitstun: 20, blockstun: 13, push: 36, chip: 4 } }],

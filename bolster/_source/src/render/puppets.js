@@ -439,15 +439,19 @@ export class GiraffePuppet extends FightMixin(Athlete) {
     if (ph) {
       const t = ph.t, o = ph.out, w = ph.wind;
       T.k = 700;
-      if (F.mv === 'light') { T.nx = mix(0.25, 1.1, o); T.head = -0.6 * o; T.stretch = mix(1, this.neckReach(ph.m.hits[0]), o); }
+      if (F.mv === 'light') {
+        // a quick neck jab, thrown from the first frame, forward and down to the box
+        const e = t < ph.first ? smooth(0, ph.first, t + 1) : o;
+        T.nx = mix(0.25, 1.5, e); T.head = -0.3 * e; T.stretch = mix(1, this.neckReach(ph.m.hits[0]), e); T.k = 1400;
+      }
       else if (F.mv === 'heavy') {
         // the wind-up: the neck drawn right back and up, coiled; then it
         // snaps forward and down, stretched out to the hit box's far edge
         const back = smooth(0, ph.first * 0.6, t) * (1 - smooth(ph.first - 3, ph.first, t));
         const out = smooth(ph.first - 3, ph.first, t) * (t <= ph.last ? 1 : o);
-        T.nx = mix(mix(0.15, -0.55, back), 1.25, out); T.head = mix(0.35 * back, -0.7, out);
+        T.nx = mix(mix(0.15, -0.55, back), 1.8, out); T.head = mix(0.35 * back, -0.35, out);
         T.stretch = mix(mix(1, 0.92, back), this.neckReach(ph.m.hits[0]), out); T.lean = [mix(-0.12 * back, 0.14, out), 0];
-        T.k = back > 0.05 && out < 0.05 ? 450 : 900;
+        T.k = back > 0.05 && out < 0.05 ? 450 : 1500;
       }
       else if (F.mv === 'lowLight') { T.nx = mix(0.6, 1.9, o); T.head = -1 * o; T.stretch = 1 + 0.3 * o; }
       else if (F.mv === 'airLight' || F.mv === 'airHeavy') { T.nx = mix(0.4, 1.6, o); T.head = -0.8; T.stretch = 1 + 0.3 * o; }
@@ -601,15 +605,16 @@ export class OctopusPuppet extends FightMixin(class {}) {
       const tip = (h) => (h.box.x + h.box.w) / 1000 - 0.15;
       if (F.mv === 'light') {
         // a long rubbery jab: one tentacle pulled out to the hit box and back
-        if (o > 0.05) plan.push({ a: front[0], t: at(0.15, 1.35, mix(1.6, tip(ph.m.hits[0]), o)), k: 0.45 * o });
+        const e = t < ph.first ? smooth(0, ph.first, t + 1) : o;
+        if (e > 0.05) plan.push({ a: front[0], t: at(0.15, 1.5, mix(1.6, tip(ph.m.hits[0]) + 0.2, e)), k: 0.6 * e });
       } else if (F.mv === 'heavy') {
         // the wind-up: two arms coiled back behind her, the head pulled down;
         // then both whipped out together, all the way to the far edge
         const back = smooth(0, ph.first * 0.6, t) * (1 - smooth(ph.first - 3, ph.first, t));
         const out = smooth(ph.first - 3, ph.first, t) * (t <= ph.last ? 1 : o);
         if (out > 0.05) {
-          plan.push({ a: front[0], t: at(-0.3, 1.25, mix(1.8, tip(ph.m.hits[0]), out)), k: 0.55 * out });
-          plan.push({ a: front[1], t: at(0.3, 1.25, mix(1.8, tip(ph.m.hits[0]), out)), k: 0.55 * out });
+          plan.push({ a: front[0], t: at(-0.3, 1.6, mix(1.8, tip(ph.m.hits[0]) + 0.2, out)), k: 0.6 * out });
+          plan.push({ a: front[1], t: at(0.3, 1.6, mix(1.8, tip(ph.m.hits[0]) + 0.2, out)), k: 0.6 * out });
         } else if (back > 0.05) {
           plan.push({ a: front[0], t: at(-0.9, 1.9, -0.6), k: 0.3 * back });
           plan.push({ a: front[1], t: at(0.9, 1.9, -0.6), k: 0.3 * back });
