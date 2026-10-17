@@ -14,37 +14,48 @@
 export const MAX_METER = 1000;
 
 const hit = (from, to, box, dmg, o = {}) => ({
-  from, to, box, dmg, level: 'mid', hitstun: 16, blockstun: 11, push: 34, kd: 0, chip: 0, pause: 8, ...o,
+  from, to, box, dmg, level: 'mid', hitstun: 16, blockstun: 11, push: 34, bpush: 0, kd: 0, chip: 0, pause: 8, ...o,
 });
-const move = (o) => ({ ext: null, total: 20, hits: [], motion: [], spawn: [], air: 0, cancel: 0, low: 0, invuln: null, grab: null, kind: 'normal', ...o });
+const move = (o) => ({ ext: null, total: 20, hits: [], motion: [], spawn: [], air: 0, cancel: 0, lite: 0, whiffLag: 0, low: 0, invuln: null, grab: null, kind: 'normal', ...o });
 
 /* shared shape of the ordinary moves; each fighter tunes reach and power.
 
    Light (O): quick startup, short reach, low damage, fast recovery — the
-   poke, and it links into a heavy on hit.
+   poke; -1 on block (safe), and it chains on contact into another light
+   (three in a string, then a short lockout), the heavy, the signature or
+   the special.
    Heavy (P): a wind-up of `hStart` frames (he rears back and loads it), then
    a lunge — the body steps in over `lunge` frames at `lungeV` per tick and
    the limb goes out well past the jab — more damage, a long recovery. While
    the limb is out his own hurt box goes out with it (`ext`), so a whiffed
-   heavy can be punished. Bigger fighters lunge further.                   */
-function normals({ lReach, hReach, cReach, lDmg = 40, hDmg = 85, cDmg = 35, aDmg = 55, ahDmg = 80, dDmg = 70, lY = 1800, hY = 1700, hStart = 14, hTotal = 42, lW = 900, hW = 1000, lungeV = 50, lunge = 8 }) {
+   heavy can be punished — and a whiff adds `whiffLag` more. On block it's
+   -9 to -11: the blocker gets out first and hits back with a light or a
+   throw. On contact it cancels into the signature (S+P) or, on a full
+   meter, the special.
+   Throw (O+P together, close): grabs, holds, tosses — beats a blocker,
+   escaped (teched) by O+P inside the first TECH ticks of the hold.       */
+function normals({ tDmg = 100, lReach, hReach, cReach, lDmg = 40, hDmg = 85, cDmg = 35, aDmg = 55, ahDmg = 80, dDmg = 70, lY = 1800, hY = 1700, hStart = 14, hTotal = 42, lW = 900, hW = 1000, lungeV = 50, lunge = 8 }) {
   const lungeFrom = hStart - lunge + 2;
   return {
-    light: move({ total: 14, cancel: 1, hits: [hit(4, 5, { x: lReach - lW, y: lY, w: lW, h: 700 }, lDmg, { hitstun: 18, blockstun: 10, push: 30, pause: 7 })] }),
+    light: move({ total: 14, cancel: 1, lite: 1, hits: [hit(4, 5, { x: lReach - lW, y: lY, w: lW, h: 700 }, lDmg, { hitstun: 18, blockstun: 8, push: 30, pause: 7 })] }),
     heavy: move({
-      total: hTotal,
+      total: hTotal, cancel: 2, whiffLag: 6,
       motion: [{ from: lungeFrom, to: hStart + 1, vx: lungeV }],
       ext: { from: hStart - 1, to: hTotal - 12, x1: hReach - 500 },
-      hits: [hit(hStart, hStart + 3, { x: hReach - hW, y: hY, w: hW, h: 900 }, hDmg, { hitstun: 21, blockstun: 15, push: 48, pause: 11 })],
+      hits: [hit(hStart, hStart + 3, { x: hReach - hW, y: hY, w: hW, h: 900 }, hDmg, { hitstun: 21, blockstun: 15, push: 48, bpush: 16, pause: 11 })],
     }),
-    lowLight: move({ total: 17, low: 1, cancel: 1, hits: [hit(5, 7, { x: cReach - 1000, y: 150, w: 1000, h: 650 }, cDmg, { level: 'low', hitstun: 15, blockstun: 10, push: 26, pause: 7 })] }),
+    lowLight: move({ total: 17, low: 1, cancel: 1, lite: 1, hits: [hit(5, 7, { x: cReach - 1000, y: 150, w: 1000, h: 650 }, cDmg, { level: 'low', hitstun: 17, blockstun: 9, push: 26, pause: 7 })] }),
     airLight: move({ total: 26, air: 1, hits: [hit(4, 18, { x: 100, y: -1000, w: 1100, h: 1800 }, aDmg, { level: 'high', hitstun: 16, blockstun: 11, pause: 8 })] }),
     airHeavy: move({ total: 32, air: 1, hits: [hit(7, 24, { x: 0, y: -1300, w: 1400, h: 2000 }, ahDmg, { level: 'high', hitstun: 20, blockstun: 14, push: 40, pause: 11 })] }),
     // the dive slam (S+P in the air): a hang, a fast drop — an overhead on
     // the way down — and the impact round his feet when he lands; a whiff
     // leaves him sat in the landing lag, long enough to punish
     dive: move({ total: 200, air: 1, dive: 520, hits: [hit(7, 199, { x: -300, y: -900, w: 1600, h: 1700 }, dDmg, { level: 'high', hitstun: 20, blockstun: 16, push: 36, pause: 10 })] }),
-    diveLand: move({ total: 30, impact: 10, hits: [hit(0, 2, { x: -1100, y: 0, w: 2200 + 400, h: 700 }, 45, { level: 'high', hitstun: 18, blockstun: 12, push: 44, pause: 9, chip: 4 })] }),
+    diveLand: move({ total: 30, impact: 10, hits: [hit(0, 2, { x: -1100, y: 0, w: 2200 + 400, h: 700 }, 45, { level: 'high', hitstun: 18, blockstun: 12, push: 44, pause: 9 })] }),
+    // the throw: a grab inside `near` of touching, a hold (the victim can
+    // tech it), the toss — knockdown, unblockable, no combo after it
+    throw: move({ kind: 'throw', total: 30, grab: { from: 4, to: 6, near: 520, hold: 'throwHold', throw: 1 } }),
+    throwHold: move({ kind: 'throw', total: 44, hits: [hit(24, 24, null, tDmg, { auto: 1, level: 'unblockable', kd: 1, toss: 1, push: 0, pause: 10 })] }),
   };
 }
 
@@ -133,11 +144,11 @@ export const FIGHTERS = {
     push: { w: 1700, h: 2900 },
     hurt: { stand: { x: -880, y: 0, w: 1760, h: 3250 }, crouch: { x: -880, y: 0, w: 1760, h: 2300 }, air: { x: -820, y: 300, w: 1640, h: 2700 } },
     moves: {
-      ...normals({ lReach: 1850, hReach: 2450, cReach: 1950, lDmg: 42, hDmg: 102, cDmg: 40, aDmg: 60, ahDmg: 92, lY: 1700, hY: 1500, hStart: 14, hTotal: 43, hW: 1300, lungeV: 75, lunge: 9 }),
+      ...normals({ tDmg: 115, lReach: 1850, hReach: 2450, cReach: 1950, lDmg: 42, hDmg: 102, cDmg: 40, aDmg: 60, ahDmg: 92, lY: 1700, hY: 1500, hStart: 14, hTotal: 43, hW: 1300, lungeV: 75, lunge: 9 }),
       signature: move({
         kind: 'signature', total: 52, stopOnHit: 1,
         motion: [{ from: 11, to: 32, vx: 165 }],
-        hits: [hit(12, 32, { x: 200, y: 900, w: 1200, h: 1800 }, 86, { kd: 1, hitstun: 24, blockstun: 16, push: 50, pause: 13, chip: 10 })],
+        hits: [hit(12, 32, { x: 200, y: 900, w: 1200, h: 1800 }, 86, { kd: 1, hitstun: 24, blockstun: 8, push: 50, bpush: 30, pause: 13, chip: 10 })],
       }),
       special: move({
         kind: 'special', total: 92,
@@ -157,7 +168,7 @@ export const FIGHTERS = {
     push: { w: 1500, h: 5200 },   // the neck: nobody jumps over a giraffe
     hurt: { stand: { x: -800, y: 0, w: 1600, h: 3400 }, crouch: { x: -800, y: 0, w: 1600, h: 2400 }, air: { x: -750, y: 400, w: 1500, h: 2800 } },
     moves: {
-      ...normals({ lReach: 2600, hReach: 3350, cReach: 2400, lDmg: 32, hDmg: 78, cDmg: 32, lY: 1900, hY: 1900, hStart: 15, hTotal: 44, lW: 1300, hW: 1700, lungeV: 20, lunge: 7 }),
+      ...normals({ tDmg: 90, lReach: 2600, hReach: 3350, cReach: 2400, lDmg: 32, hDmg: 78, cDmg: 32, lY: 1900, hY: 1900, hStart: 15, hTotal: 44, lW: 1300, hW: 1700, lungeV: 20, lunge: 7 }),
       signature: move({
         kind: 'signature', total: 64,
         spawn: [{ at: 18, proj: { kind: 'ring', dx: 1200, y: 1450, vx: 100, vy: 0, box: { w: 600, h: 460 }, dmg: 60, level: 'mid', life: 180, hitstun: 20, blockstun: 13, push: 36, chip: 4 } }],
@@ -182,8 +193,8 @@ export const moveOf = (id, name) => FIGHTERS[id].moves[name];
 
 /* frame data a player could read in a training mode (and the AI uses) */
 export function frameData(m) {
-  const first = m.hits.length ? m.hits[0].from : m.spawn.length ? m.spawn[0].at : m.grab ? m.grab.from : m.total;
-  const last = m.hits.length ? m.hits[m.hits.length - 1].to : first;
+  const first = m.grab ? m.grab.from : m.hits.length ? m.hits[0].from : m.spawn.length ? m.spawn[0].at : m.total;
+  const last = m.grab ? m.grab.to : m.hits.length ? m.hits[m.hits.length - 1].to : first;
   return { startup: first, active: last - first + 1, recovery: m.total - last };
 }
 

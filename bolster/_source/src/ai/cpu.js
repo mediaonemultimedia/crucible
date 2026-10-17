@@ -13,10 +13,16 @@
    Hard keeps you out but still one shot at a time. Against a shooter it
    closes in: jumps the shot, dashes in on the thrower's recovery. Its
    dice are its own seeded PRNG, so a CPU-vs-CPU match is reproducible end
-   to end.                                                                 */
+   to end.
 
-import { FIGHTERS, MAX_METER, reachOf, isShot } from '../fighters/index.js';
-import { LEFT, RIGHT, UP, DOWN, LIGHT, HEAVY, SPECIAL } from '../sim/input.js';
+   Combat pass: it blocks with E (BLOCK) like a player — Easy rarely, Hard
+   well, guessing low/high from what's coming — and punishes an unsafe
+   move it blocked (a light, or a throw up close), throws a blocker, techs
+   throws (per-difficulty chance and reaction), and chains light → light →
+   heavy when its light makes contact (Hard confirms the hit first).     */
+
+import { FIGHTERS, MAX_METER, reachOf, isShot, frameData } from '../fighters/index.js';
+import { LEFT, RIGHT, UP, DOWN, LIGHT, HEAVY, SPECIAL, BLOCK } from '../sim/input.js';
 import { makeRng } from '../sim/rng.js';
 import { TAP } from '../sim/sim.js';
 
@@ -24,14 +30,19 @@ import { TAP } from '../sim/sim.js';
    it could; zone: how often a shooter hangs back at range rather than
    coming in; approach: how often it walks/dashes in from far off; leap:
    how often it jumps a shot coming at it; dash: how often an approach is
-   a dash */
+   a dash; combo: how often it chains on contact (`confirm`: only on a hit);
+   tech / techT: chance and reaction (ticks) to escape a throw; throwP:
+   how often it throws someone guarding up close; bpunish: how often it
+   hits back after blocking an unsafe move */
 export const LEVELS = {
-  easy:   { dive: 0.05, delay: 24, think: 12, block: 0.12, guess: 0.5, aa: 0.08, punish: 0.05, special: 0.25, aggro: 0.3, jump: 0.04, whiffy: 0.45, shotCd: 320, shotP: 0.15, zone: 0.25, approach: 0.5, leap: 0.15, dash: 0.25 },
-  normal: { dive: 0.1, delay: 14, think: 6,  block: 0.5,  guess: 0.75, aa: 0.4, punish: 0.35, special: 0.6, aggro: 0.5, jump: 0.06, whiffy: 0.2, shotCd: 180, shotP: 0.3, zone: 0.4, approach: 0.7, leap: 0.4, dash: 0.45 },
-  hard:   { dive: 0.3, delay: 7,  think: 3,  block: 0.88, guess: 0.95, aa: 0.8, punish: 0.85, special: 0.95, aggro: 0.6, jump: 0.05, whiffy: 0.04, shotCd: 140, shotP: 0.4, zone: 0.6, approach: 0.8, leap: 0.75, dash: 0.6, space: 0.7 },
+  easy:   { combo: 0.12, confirm: 0, tech: 0.1, techT: 9, throwP: 0.05, bpunish: 0.1, dive: 0.05, delay: 24, think: 12, block: 0.12, guess: 0.5, aa: 0.08, punish: 0.05, special: 0.25, aggro: 0.3, jump: 0.04, whiffy: 0.45, shotCd: 320, shotP: 0.15, zone: 0.25, approach: 0.5, leap: 0.15, dash: 0.25 },
+  normal: { combo: 0.6, confirm: 0, tech: 0.4, techT: 6, throwP: 0.25, bpunish: 0.6, dive: 0.1, delay: 14, think: 6,  block: 0.5,  guess: 0.75, aa: 0.4, punish: 0.35, special: 0.6, aggro: 0.5, jump: 0.06, whiffy: 0.2, shotCd: 180, shotP: 0.3, zone: 0.4, approach: 0.7, leap: 0.4, dash: 0.45 },
+  hard:   { combo: 0.9, confirm: 1, tech: 0.75, techT: 3, throwP: 0.4, bpunish: 0.9, dive: 0.3, delay: 7,  think: 3,  block: 0.88, guess: 0.95, aa: 0.8, punish: 0.85, special: 0.95, aggro: 0.6, jump: 0.05, whiffy: 0.04, shotCd: 140, shotP: 0.4, zone: 0.6, approach: 0.8, leap: 0.75, dash: 0.6, space: 0.7 },
 };
 
 const reach = (m) => reachOf(m);
+/* a move that leaves its user open when blocked (a light, 4 ticks, gets in) */
+const unsafe = (m) => m && !m.air && m.hits.length && !m.hits[0].auto && m.hits[m.hits.length - 1].blockstun - frameData(m).recovery <= -6;
 const lastActive = (m) => (m.hits.length ? m.hits[m.hits.length - 1].to : m.spawn.length ? m.spawn[m.spawn.length - 1].at : 0);
 
 /* how far this fighter's special reaches (projectiles and Sky Neck: anywhere) */
@@ -81,7 +92,36 @@ export class CPU {
     const D = FIGHTERS[me.id];
     const fwd = me.face > 0 ? RIGHT : LEFT, back = me.face > 0 ? LEFT : RIGHT;
     const dist = Math.abs(o.x - me.x);
-    const free = (me.act === 'idle' || me.act === 'walkF' || me.act === 'walkB' || me.act === 'crouch' || me.act === 'blockstun') && !me.air;
+    const free = (me.act === 'idle' || me.act === 'walkF' || me.act === 'walkB' || me.act === 'crouch' || me.act === 'guard' || me.act === 'blockstun') && !me.air;
+    const live = st.f[1 - this.side];   // only what a player feels: being grabbed, what he just blocked, his own hit landing
+
+    // thrown: O+P to escape, if it reacts in time
+    if (me.act === 'grabbed' && live.mv === 'throwHold') {
+      const key = st.tick - me.t;
+      if (this.techFor !== key) { this.techFor = key; this.techGo = this.chance(this.L.tech); }
+      if (this.techGo && me.t >= this.L.techT && me.t <= 11) { this.btn = LIGHT | HEAVY; return this._emit(0, true); }
+      return this._emit(0, true);
+    }
+    // its own move made contact: chain (light → light → heavy)
+    if (me.act === 'attack' && me.hm) {
+      const mm = D.moves[me.mv], la = lastActive(mm);
+      if (mm.cancel && me.t > la && me.t <= la + 7) {
+        const key = `${st.tick - me.t}`;
+        if (this.comboFor !== key) {
+          this.comboFor = key;
+          this.comboGo = this.chance(this.L.combo) && (!this.L.confirm || live.act === 'hitstun');
+        }
+        if (this.comboGo && !this.btn) {
+          if (mm.cancel === 1 && me.ch === 0 && !me.lk && this.chance(0.75)) this.btn = LIGHT;
+          else if (mm.cancel === 1) this.btn = HEAVY;
+          else if (me.meter >= MAX_METER && this.chance(this.L.special)) this.btn = SPECIAL;
+          this.comboGo = mm.cancel === 1;
+          if (this.btn) return this._emit(0, true);
+        }
+      }
+    }
+    // what it's blocking right now (it saw the move coming)
+    if (me.act === 'blockstun' && me.t <= 1) this.blocked = live.act === 'attack' ? FIGHTERS[live.id].moves[live.mv] : null;
 
     // ── threats: an attack within reach, a shot on its way ─────────────────
     let threat = null;
@@ -131,10 +171,21 @@ export class CPU {
       }
       if (this.blockAs & 4) out = UP | back;
       else if (this.blockAs & 8) out = UP | fwd;
-      else if (this.blockAs & 1) out = back | (this.blockAs & 2 ? DOWN : 0);
-      if (out) return this._emit(out, true);
+      else if (this.blockAs & 1) out = BLOCK | (this.blockAs & 2 ? DOWN : 0);
+      if (out && !(me.act === 'blockstun' && me.stun <= 3 && this.punishing)) return this._emit(out, true);
     }
-    if (me.act === 'blockstun') return this._emit(back | (me.down ? DOWN : 0), true);
+    if (me.act === 'blockstun') {
+      // blocked something unsafe: hit back as soon as the blockstun ends
+      // (a light; a throw now and then when it's right on top of them)
+      if (me.t <= 1) this.punishing = unsafe(this.blocked) && this.chance(this.L.bpunish);
+      if (this.punishing && me.stun <= 3) {
+        this.punishing = false;
+        const close = Math.abs(live.x - me.x) <= ((D.push.w + FIGHTERS[live.id].push.w) >> 1) + 400;
+        this.btn = close && this.chance(0.3) ? LIGHT | HEAVY : LIGHT;
+        return this._emit(0, true);
+      }
+      return this._emit(BLOCK | (me.down ? DOWN : 0), true);
+    }
 
     if (this.btn || st.tick < this.next) return this._emit(this.plan);
     this.next = st.tick + this.L.think + this.rng.int(this.L.think + 1);
@@ -158,6 +209,7 @@ export class CPU {
     if (!free && me.act === 'jump' && dist < 1800 && !me.aired && me.vy < 120 && this.chance(this.L.dive)) { press = HEAVY; hold = DOWN; }
     else if (!free && me.act === 'jump' && dist < 2600 && !me.aired && this.chance(0.5)) press = this.chance(0.5) ? HEAVY : LIGHT;
     else if (free) {
+      const throwR = ((D.push.w + FIGHTERS[o.id].push.w) >> 1) + 400;
       // a full meter: spend it when it'll reach
       if (me.meter >= MAX_METER && dist <= specialRange(me.id) && this.chance(this.L.special)) press = SPECIAL;
       // anti-air: they're jumping in
@@ -178,6 +230,12 @@ export class CPU {
       // they threw from range: in on the recovery
       else if (theyThrew && dist > rh && this.chance(this.L.punish + 0.3)) {
         if (dist < rh + 1400) press = HEAVY; else if (this.chance(this.L.dash)) dash = true; else hold = fwd;
+      } else if (dist < reach(FIGHTERS[o.id].moves.heavy) + 300 && !o.air && o.act !== 'hitstun' && o.act !== 'down' && this.chance(this.L.block * 0.6)) {
+        // they're coming in (or swinging) within their heavy's reach: guard
+        // on the guess (nobody reacts to a jab), mostly standing
+        hold = BLOCK | (this.chance(0.25) ? DOWN : 0);
+      } else if (dist <= throwR && !o.air && (o.act === 'guard' || o.act === 'idle' || o.act === 'crouch') && this.chance(this.L.throwP)) {
+        press = LIGHT | HEAVY;                               // they're turtling: throw them
       } else if (dist <= poke && this.chance(this.L.aggro + 0.2)) {
         const r = this.rng.int(100);
         if (r < 40) press = LIGHT;
@@ -199,7 +257,7 @@ export class CPU {
         press = this.chance(0.5) ? LIGHT : HEAVY;          // swinging at air
       } else if (dist < reach(FIGHTERS[o.id].moves.light) + 700 && this.chance(this.L.block * 0.7)) {
         // inside their poke range: guard (a guess at high or low)
-        hold = back | (this.chance(0.35) ? DOWN : 0);
+        hold = BLOCK | (this.chance(0.35) ? DOWN : 0);
       } else {
         // footsies: drift toward the range its pokes like (a shooter
         // sometimes hangs back to zone; everyone comes in from far off)

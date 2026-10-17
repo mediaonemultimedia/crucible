@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createMatch, stepInPlace, step, clone, hash, run, OUTRO, ROUND_TICKS } from '../src/sim/sim.js';
-import { LEFT, RIGHT, UP, DOWN, LIGHT, HEAVY, SPECIAL } from '../src/sim/input.js';
+import { createMatch, stepInPlace, step, clone, hash, run, OUTRO, ROUND_TICKS, KO_AFTER } from '../src/sim/sim.js';
+import { LEFT, RIGHT, UP, DOWN, LIGHT, HEAVY, SPECIAL, BLOCK } from '../src/sim/input.js';
 import { makeRng } from '../src/sim/rng.js';
 import { FIGHTERS, ROSTER, MAX_METER } from '../src/fighters/index.js';
 
@@ -66,14 +66,16 @@ test('a jab lands: STUFFING down, both meters up (the attacker more), hit-pause'
   assert.ok(st.f[0].meter > 0 && st.f[1].meter > 0 && st.f[0].meter > st.f[1].meter);
 });
 
-test('blocking: standing stops high and mid, crouching stops low and mid', () => {
+test('blocking (E): standing stops high and mid, crouching (S+E) stops low and mid; holding back no longer blocks', () => {
   // P2 faces left, so holding RIGHT is holding back
   const cases = [
-    { move: LIGHT, hold: RIGHT, blocked: true, what: 'mid vs standing block' },
-    { move: LIGHT, hold: RIGHT | DOWN, blocked: true, what: 'mid vs crouch block' },
-    { move: LIGHT | 0, holdA: DOWN, hold: RIGHT, blocked: false, what: 'low vs standing block' },
-    { move: LIGHT, holdA: DOWN, hold: RIGHT | DOWN, blocked: true, what: 'low vs crouch block' },
+    { move: LIGHT, hold: BLOCK, blocked: true, what: 'mid vs standing block' },
+    { move: LIGHT, hold: BLOCK | DOWN, blocked: true, what: 'mid vs crouch block' },
+    { move: LIGHT | 0, holdA: DOWN, hold: BLOCK, blocked: false, what: 'low vs standing block' },
+    { move: LIGHT, holdA: DOWN, hold: BLOCK | DOWN, blocked: true, what: 'low vs crouch block' },
     { move: LIGHT, hold: 0, blocked: false, what: 'mid vs no block' },
+    { move: LIGHT, hold: RIGHT, blocked: false, what: 'mid vs holding back (just a walk now)' },
+    { move: LIGHT, holdA: DOWN, hold: RIGHT | DOWN, blocked: false, what: 'low vs holding down-back' },
   ];
   for (const c of cases) {
     const st = fight('kevalanche', 'kevalanche', { x1: -900, x2: 900 });
@@ -87,8 +89,8 @@ test('blocking: standing stops high and mid, crouching stops low and mid', () =>
     if (c.blocked) assert.equal(st.f[1].hp, hp, `${c.what}: no chip from a normal`);
   }
   // a jumping attack is high: it beats a crouch block, a standing block stops it
-  for (const [hold, blocked] of [[RIGHT | DOWN, false], [RIGHT, true]]) {
-    // against the right wall, so holding back can't walk him out of reach
+  for (const [hold, blocked] of [[BLOCK | DOWN, false], [BLOCK, true]]) {
+    // against the right wall
     const st = fight('kevalanche', 'kevalanche', { x1: 6100, x2: 9400 });
     let evs = [];
     evs = go(st, 70, (i) => [i === 0 ? UP | RIGHT : i === 20 ? HEAVY : 0, hold]);
@@ -124,7 +126,7 @@ test('a K.O. ends the round, and a perfect one is a Fluffless Victory', () => {
   assert.equal(st.phase, 'ko');
   assert.deepEqual(st.wins, [1, 0]);
   assert.equal(st.perfect, 1, 'winner took no damage');
-  go(st, OUTRO + 2);
+  go(st, st.kn + KO_AFTER + 2);
   assert.equal(st.phase, 'intro');
   assert.equal(st.round, 2);
   assert.equal(st.f[1].hp, FIGHTERS.johnny.health);
@@ -156,7 +158,7 @@ test('best of three: two round wins take the match', () => {
     st.f[1].hp = 1;
     go(st, 14, press(LIGHT));
     assert.equal(st.wins[0], r + 1);
-    go(st, OUTRO + 1);
+    go(st, st.kn + KO_AFTER + 1);
   }
   assert.equal(st.phase, 'end');
   assert.equal(st.winner, 0);
@@ -320,12 +322,12 @@ test('jumps: crossing over switches sides — both re-face, and blocking follows
   assert.ok(r.cleared);
   assert.equal(st.f[0].face, -1, 'the jumper turns round on landing');
   assert.equal(st.f[1].face, 1, 'the one jumped over turns round');
-  // the one jumped over now faces right: he blocks by holding LEFT (away from him)
+  // the one jumped over now faces right: E blocks whichever side it comes from
   go(st, 20);
   const hp = st.f[1].hp;
   st.f[0].x = st.f[1].x + 1400;
-  const evs = go(st, 20, (i) => [i === 0 ? LIGHT : 0, LEFT]);
-  assert.ok(evs.some((e) => e.k === 'block'), 'blocked holding away from the new side');
+  const evs = go(st, 20, (i) => [i === 0 ? LIGHT : 0, BLOCK]);
+  assert.ok(evs.some((e) => e.k === 'block'), 'blocked from the new side');
   assert.equal(st.f[1].hp, hp);
 });
 
@@ -343,7 +345,7 @@ test('jumps: landing on top of someone resolves the push boxes cleanly', () => {
 
 /* ── the dive slam (S+P in the air) ─────────────────────────────────────── */
 function dive(a, b, hold, { dx = 2600 } = {}) {
-  // against the right wall, so holding back can't walk out of it
+  // against the right wall
   const st = fight(a, b, { x1: 9400 - dx, x2: 9400 });
   const evs = go(st, 90, (i) => [i === 0 ? UP | RIGHT : i === 14 ? DOWN | HEAVY : i === 15 ? DOWN : 0, hold]);
   return { st, evs };
@@ -351,10 +353,10 @@ function dive(a, b, hold, { dx = 2600 } = {}) {
 
 test('dive slam: every fighter has one; an overhead — a crouch block doesn\'t stop it, a standing block does', () => {
   for (const id of ROSTER) {
-    const d = dive(id, 'kevalanche', RIGHT | DOWN);
+    const d = dive(id, 'kevalanche', BLOCK | DOWN);
     assert.ok(d.evs.some((e) => e.k === 'slam' && e.p === 0), `${id}: slams down`);
     assert.ok(d.evs.some((e) => e.k === 'hit' && e.p === 0), `${id}: beats the crouch block`);
-    const s = dive(id, 'kevalanche', RIGHT);
+    const s = dive(id, 'kevalanche', BLOCK);
     assert.ok(s.evs.some((e) => e.k === 'block'), `${id}: a standing block stops it`);
     assert.ok(!s.evs.some((e) => e.k === 'hit'), `${id}: no hit through a standing block`);
   }

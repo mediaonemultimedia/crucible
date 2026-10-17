@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMatch, stepInPlace, TAP } from '../src/sim/sim.js';
-import { LEFT, RIGHT, UP, DOWN, LIGHT, HEAVY } from '../src/sim/input.js';
+import { LEFT, RIGHT, UP, DOWN, LIGHT, HEAVY, BLOCK } from '../src/sim/input.js';
 import { FIGHTERS, ROSTER, reachOf, frameData, isShot } from '../src/fighters/index.js';
 import { CPU } from '../src/ai/cpu.js';
 
@@ -63,7 +63,7 @@ test('projectiles: long startup and recovery, slower, small chip on block only',
   // blocked: a sliver of chip, no more
   const st = fight('k8e', 'kevalanche', { x1: -2500, x2: 2500 });
   const hp = st.f[1].hp;
-  const evs = go(st, 120, (i) => [i === 1 ? DOWN : i === 2 ? DOWN | HEAVY : 0, RIGHT]);
+  const evs = go(st, 120, (i) => [i === 1 ? DOWN : i === 2 ? DOWN | HEAVY : 0, BLOCK]);
   assert.ok(evs.some((e) => e.k === 'block' && e.p === 0), 'the ring was blocked');
   assert.ok(hp - st.f[1].hp > 0 && hp - st.f[1].hp <= 5, `chip ${hp - st.f[1].hp}`);
 });

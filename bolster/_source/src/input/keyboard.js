@@ -1,12 +1,13 @@
-/* The keyboard, sampled once per sim tick into the 7-bit input mask.
+/* The keyboard, sampled once per sim tick into the 8-bit input mask.
    A tap shorter than a tick still counts: presses are latched until the
-   next sample. A / D walk, W jump, S crouch, O light, P heavy, Space the
-   special (arrow keys walk and jump too).                                 */
+   next sample. A / D walk, W jump, S crouch, E block (S+E low), O light,
+   P heavy, O+P together a throw, Space the special (arrow keys walk and
+   jump too).                                                              */
 
-import { LEFT, RIGHT, UP, DOWN, LIGHT, HEAVY, SPECIAL } from '../sim/input.js';
+import { LEFT, RIGHT, UP, DOWN, LIGHT, HEAVY, SPECIAL, BLOCK } from '../sim/input.js';
 
 const MAP = {
-  KeyA: LEFT, KeyD: RIGHT, KeyW: UP, KeyS: DOWN, KeyO: LIGHT, KeyP: HEAVY, Space: SPECIAL,
+  KeyA: LEFT, KeyD: RIGHT, KeyW: UP, KeyS: DOWN, KeyO: LIGHT, KeyP: HEAVY, Space: SPECIAL, KeyE: BLOCK,
   ArrowLeft: LEFT, ArrowRight: RIGHT, ArrowUp: UP, ArrowDown: DOWN,
 };
 
