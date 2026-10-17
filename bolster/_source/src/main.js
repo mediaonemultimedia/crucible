@@ -16,6 +16,7 @@ import { FLAGS } from './ui/flags.js';
 import { say, dismiss } from './ui/bubble.js';
 import { SAYINGS } from './ui/sayings.js';
 import { Online } from './online.js';
+import { CPU } from './ai/cpu.js';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -464,6 +465,7 @@ async function start() {
   const app = new App(renderer, canvas);
   window.__bolster = app;
   app.moveOf = moveOf;
+  app.cpuFor = (k, level, seed) => new CPU(k, level, seed);   // tests: scripted online play
   app.boxes = params.has('boxes');
   app.say = (text, x, y, o) => say($('#bubbles'), text, x, y, o);
   // portraits for the cards

@@ -13,6 +13,8 @@ import { ROSTER } from './fighters/index.js';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 const now = () => performance.now();
+// the quiet-opponent clock runs on the app's own time (frames), so a tab that
+// stops drawing — or a slow headless test — isn't 'quiet' by itself
 
 const QUIET = 1500;          // ms without a word: the opponent's gone quiet
 const GRACE = 10;            // then this many seconds' wait before giving up
@@ -42,6 +44,7 @@ export class Online {
     this.rtt = 0;
     this.pingT = 0;
     this.lastHeard = 0;
+    this.clock = 0;              // app time, ms
     this.waiting = false;
     this.desynced = null;
   }
@@ -167,7 +170,7 @@ export class Online {
   _linked(link) {
     this.link = link;
     this.on = true;
-    this.lastHeard = now();
+    this.lastHeard = this.clock;
     document.body.classList.add('online');
     link.on = (ch, m) => this._msg(ch, m);
     link.onclose = () => this._closed();
@@ -178,7 +181,7 @@ export class Online {
   _closed() {
     if (!this.on) return;
     // mid-match: the wait (and its countdown) decides; elsewhere it's over
-    if (this.app.screen === 'fight' || this.app.screen === 'win') { this.lastHeard = Math.min(this.lastHeard, now() - QUIET); return; }
+    if (this.app.screen === 'fight' || this.app.screen === 'win') { this.lastHeard = Math.min(this.lastHeard, this.clock - QUIET); return; }
     this.fail(this.role === 'guest' ? 'hostleft' : 'left');
   }
 
@@ -280,7 +283,7 @@ export class Online {
     const S = A.fight.session;
     for (const p of this.early.filter((p) => p.n === m.n)) S.receive(p);
     this.early = [];
-    this.lastHeard = now();
+    this.lastHeard = this.clock;
   }
 
   desync(d, st) {
@@ -301,7 +304,7 @@ export class Online {
   }
 
   _msg(ch, m) {
-    this.lastHeard = now();
+    this.lastHeard = this.clock;
     const A = this.app;
     if (ch === 'in') {
       const S = A.fight?.session;
@@ -327,9 +330,10 @@ export class Online {
   /* every frame: pings, the indicator, the quiet-opponent wait */
   frame(dt) {
     if (!this.on) return;
+    this.clock += dt * 1000;
     const t = now(), A = this.app;
     if (t - this.pingT > 500) { this.pingT = t; this.send({ t: 'ping', ts: t }); }
-    const quiet = t - this.lastHeard;
+    const quiet = this.clock - this.lastHeard;
     const inMatch = A.screen === 'fight' || A.screen === 'win';
     if (inMatch && quiet > QUIET) {
       const left = Math.ceil(GRACE - (quiet - QUIET) / 1000);
