@@ -37,7 +37,7 @@ const move = (o) => ({ ext: null, total: 20, hits: [], motion: [], spawn: [], ai
 function normals({ tDmg = 100, lReach, hReach, cReach, lDmg = 40, hDmg = 85, cDmg = 35, aDmg = 55, ahDmg = 80, dDmg = 70, lY = 1800, hY = 1700, hStart = 14, hTotal = 42, lW = 900, hW = 1000, lungeV = 50, lunge = 8 }) {
   const lungeFrom = hStart - lunge + 2;
   return {
-    light: move({ total: 14, cancel: 1, lite: 1, hits: [hit(4, 5, { x: lReach - lW, y: lY, w: lW, h: 700 }, lDmg, { hitstun: 18, blockstun: 8, push: 30, pause: 7 })] }),
+    light: move({ total: 14, cancel: 1, lite: 1, hits: [hit(4, 5, { x: lReach - lW, y: lY, w: lW, h: 700 }, lDmg, { hitstun: 21, blockstun: 8, push: 30, pause: 7 })] }),
     heavy: move({
       total: hTotal, cancel: 2, whiffLag: 6,
       motion: [{ from: lungeFrom, to: hStart + 1, vx: lungeV }],
@@ -76,8 +76,8 @@ export const FIGHTERS = {
       ...normals({ lReach: 1950, hReach: 2450, cReach: 1950, lDmg: 40, hDmg: 95, lY: 2000, hY: 1800, hStart: 14, hTotal: 42, lungeV: 72, lunge: 9, hW: 1200 }),
       signature: move({
         kind: 'signature', total: 46, invuln: { from: 1, to: 9, vs: 'air' },
-        motion: [{ from: 5, to: 5, vy: 210 }, { from: 5, to: 14, vx: 22 }],
-        hits: [hit(5, 13, { x: 100, y: 1600, w: 1300, h: 2600 }, 115, { kd: 1, hitstun: 24, blockstun: 16, push: 30, pause: 13, chip: 10 })],
+        motion: [{ from: 5, to: 5, vy: 210 }, { from: 5, to: 14, vx: 40 }],
+        hits: [hit(5, 13, { x: 100, y: 1500, w: 1600, h: 2700 }, 115, { kd: 1, hitstun: 24, blockstun: 16, push: 30, pause: 13, chip: 10 })],
       }),
       special: move({
         kind: 'special', total: 72, invuln: { from: 1, to: 5, vs: 'all' },

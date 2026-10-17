@@ -182,7 +182,10 @@ test('events: cosmetic and flow events fire exactly once despite rollbacks', () 
     for (const kind of ['hit', 'block', 'special', 'signature', 'throw', 'dash']) {
       const real = count(ref.ev, kind), got = count(res.evs[k], kind);
       // every real one fired once; a mispredicted one may have fired too (it can't be unfired), never twice
-      assert.ok(got >= real && got <= real * 1.25 + 3, `${kind} on peer ${k}: ${got} vs ${real}`);
+      // (blocking is its own button now, so a remote E press mispredicted for
+      // a couple of ticks can show a phantom block spark: a little more slack)
+      console.log(`  ${kind} peer ${k}: ${got} fired, ${real} real`);
+      assert.ok(got >= real && got <= real * 1.25 + (kind === 'block' ? 8 : 3), `${kind} on peer ${k}: ${got} vs ${real}`);
     }
   }
 });

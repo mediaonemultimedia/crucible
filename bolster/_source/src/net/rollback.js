@@ -25,7 +25,7 @@ export const MAX_PREDICT = 8;      // stall rather than predict further than thi
 export const RING = 16;            // snapshots kept (≥ MAX_PREDICT + DELAY)
 export const HASH_EVERY = 60;      // state hash exchange interval, ticks
 const MAX_SEND = 32;               // inputs per packet, at most
-const FLOW = new Set(['banner', 'round', 'ko', 'time', 'end']);
+const FLOW = new Set(['banner', 'round', 'ko', 'kobanner', 'time', 'end']);
 
 export class Rollback {
   /* st: the match state at tick 0 (identical on both peers); local: 0 or 1 */

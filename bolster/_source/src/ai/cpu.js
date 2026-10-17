@@ -33,11 +33,12 @@ import { TAP } from '../sim/sim.js';
    a dash; combo: how often it chains on contact (`confirm`: only on a hit);
    tech / techT: chance and reaction (ticks) to escape a throw; throwP:
    how often it throws someone guarding up close; bpunish: how often it
-   hits back after blocking an unsafe move */
+   hits back after blocking an unsafe move; read: how much it adapts to an
+   opponent who never stops swinging (guards more, so it can punish) */
 export const LEVELS = {
-  easy:   { combo: 0.12, confirm: 0, tech: 0.1, techT: 9, throwP: 0.05, bpunish: 0.1, dive: 0.05, delay: 24, think: 12, block: 0.12, guess: 0.5, aa: 0.08, punish: 0.05, special: 0.25, aggro: 0.3, jump: 0.04, whiffy: 0.45, shotCd: 320, shotP: 0.15, zone: 0.25, approach: 0.5, leap: 0.15, dash: 0.25 },
-  normal: { combo: 0.6, confirm: 0, tech: 0.4, techT: 6, throwP: 0.25, bpunish: 0.6, dive: 0.1, delay: 14, think: 6,  block: 0.5,  guess: 0.75, aa: 0.4, punish: 0.35, special: 0.6, aggro: 0.5, jump: 0.06, whiffy: 0.2, shotCd: 180, shotP: 0.3, zone: 0.4, approach: 0.7, leap: 0.4, dash: 0.45 },
-  hard:   { combo: 0.9, confirm: 1, tech: 0.75, techT: 3, throwP: 0.4, bpunish: 0.9, dive: 0.3, delay: 7,  think: 3,  block: 0.88, guess: 0.95, aa: 0.8, punish: 0.85, special: 0.95, aggro: 0.6, jump: 0.05, whiffy: 0.04, shotCd: 140, shotP: 0.4, zone: 0.6, approach: 0.8, leap: 0.75, dash: 0.6, space: 0.7 },
+  easy:   { read: 0.2, combo: 0.12, confirm: 0, tech: 0.1, techT: 9, throwP: 0.05, bpunish: 0.1, dive: 0.05, delay: 24, think: 12, block: 0.12, guess: 0.5, aa: 0.08, punish: 0.05, special: 0.25, aggro: 0.3, jump: 0.04, whiffy: 0.45, shotCd: 320, shotP: 0.15, zone: 0.25, approach: 0.5, leap: 0.15, dash: 0.25 },
+  normal: { read: 1, combo: 0.85, confirm: 0, tech: 0.4, techT: 6, throwP: 0.25, bpunish: 0.6, dive: 0.1, delay: 14, think: 6,  block: 0.5,  guess: 0.75, aa: 0.4, punish: 0.35, special: 0.6, aggro: 0.5, jump: 0.06, whiffy: 0.2, shotCd: 180, shotP: 0.3, zone: 0.4, approach: 0.7, leap: 0.4, dash: 0.45 },
+  hard:   { read: 1.2, combo: 0.9, confirm: 1, tech: 0.75, techT: 3, throwP: 0.4, bpunish: 0.9, dive: 0.3, delay: 7,  think: 3,  block: 0.88, guess: 0.95, aa: 0.8, punish: 0.85, special: 0.95, aggro: 0.6, jump: 0.05, whiffy: 0.04, shotCd: 140, shotP: 0.4, zone: 0.6, approach: 0.8, leap: 0.75, dash: 0.6, space: 0.7 },
 };
 
 const reach = (m) => reachOf(m);
@@ -81,7 +82,10 @@ export class CPU {
       proj: st.proj.filter((p) => p.o !== this.side).map((p) => ({ x: p.x, vx: p.vx, y: p.y, id: p.id })),
     });
     if (this.seen.length > this.L.delay + 1) this.seen.shift();
-    return this.seen[0];
+    // how much they've been swinging lately (attack starts, decaying over ~1.5 s)
+    const s0 = this.seen[0];
+    this.heat = (this.heat || 0) * 0.985 + (s0.act === 'attack' && s0.t === 1 ? 1 : 0);
+    return s0;
   }
 
   input(st) {
@@ -225,19 +229,21 @@ export class CPU {
         if (left > hs + 1 && dist < rh) press = HEAVY;
         else if (left > ls + 1 && dist < rl + 300) press = LIGHT;
         else if (rs && dist < rs && !shooter && left > M.signature.hits[0].from) { hold = DOWN; press = HEAVY; }
-        else hold = back;
+        else hold = BLOCK;
       }
       // they threw from range: in on the recovery
       else if (theyThrew && dist > rh && this.chance(this.L.punish + 0.3)) {
         if (dist < rh + 1400) press = HEAVY; else if (this.chance(this.L.dash)) dash = true; else hold = fwd;
-      } else if (dist < reach(FIGHTERS[o.id].moves.heavy) + 300 && !o.air && o.act !== 'hitstun' && o.act !== 'down' && this.chance(this.L.block * 0.6)) {
+      } else if (dist < reach(FIGHTERS[o.id].moves.heavy) + 300 && !o.air && o.act !== 'hitstun' && o.act !== 'down' && this.chance(this.L.block * 0.6 + Math.min(0.4, this.heat * 0.06) * this.L.read)) {
         // they're coming in (or swinging) within their heavy's reach: guard
         // on the guess (nobody reacts to a jab), mostly standing
         hold = BLOCK | (this.chance(0.25) ? DOWN : 0);
       } else if (dist <= throwR && !o.air && (o.act === 'guard' || o.act === 'idle' || o.act === 'crouch') && this.chance(this.L.throwP)) {
         press = LIGHT | HEAVY;                               // they're turtling: throw them
       } else if (dist <= poke && this.chance(this.L.aggro + 0.2)) {
-        const r = this.rng.int(100);
+        // against someone swinging all the time, up close: the quick light
+        // (it beats a heavy's wind-up — a counter-hit), not a heavy of its own
+        const r = this.heat > 3 * (2 - this.L.read) ? this.rng.int(62) : this.rng.int(100);
         if (r < 40) press = LIGHT;
         else if (r < 62) { hold = DOWN; press = LIGHT; }
         else if (r < 85) press = HEAVY;
@@ -268,11 +274,13 @@ export class CPU {
           if (this.L.space && this.chance(this.L.space)) this.want = Math.max(this.want, reach(FIGHTERS[o.id].moves.light) + myFront + 200);
         }
         const want = this.want;
+        // backing off inside their reach just gets hit now (back is only a walk): guard there instead
+        const inTheirReach = dist < reach(FIGHTERS[o.id].moves.light) + 500 && this.chance(this.L.block + 0.2);
         if (dist > want + 400) {
           if (dist > want + 2200 && this.chance(this.L.approach * this.L.dash)) dash = true;
           else hold = this.chance(this.L.approach) ? fwd : 0;
-        } else if (dist < want - 900 && this.chance(0.5)) hold = back;
-        else hold = this.chance(0.3) ? back : 0;
+        } else if (dist < want - 900 && this.chance(0.5)) hold = inTheirReach ? BLOCK : back;
+        else hold = this.chance(0.3) ? (inTheirReach ? BLOCK : back) : 0;
       }
     }
     if (dash) {

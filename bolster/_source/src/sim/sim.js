@@ -38,6 +38,7 @@ export const OFFSCREEN = 4500;       // a shot this far past the one it was thro
 export const SQUAT = 3;              // the crouch before a jump leaves the floor
 export const HANG_V = 70;            // |vy| under this at the top of a jump: the hang (a third of the gravity)
 export const DIVE_HANG = 6;          // a dive slam: hangs this long, then drops
+export const THROW_GAP = 2;          // O and P count as together this many ticks apart
 export const TECH = 12;              // a throw can be escaped (O+P) this many ticks into the hold
 export const CANCEL = 9;             // a chain/cancel is taken up to this many ticks after the last active frame
 export const LOCK = 26;              // a third light in a string: no more lights for this long
@@ -65,7 +66,7 @@ function newFighter(id, side) {
     combo: 0, taken: 0, nag: 0,
     tf: 0, tb: 0, hf: 0, hb: 0, dash: 0, db: 0, dd: 0,
     jmp: 0, jd: 0, dl: 0,
-    blk: 0, ok: 0, ch: 0, lc: 0, lk: 0, it: 99, rep: 0, lmv: '', rt: -999,
+    blk: 0, lt: -99, ht: -99, ok: 0, ch: 0, lc: 0, lk: 0, it: 99, rep: 0, lmv: '', rt: -999,
     kx: 0, ky: 0, kvx: 0, kvy: 0, kb: 0, kr: 0, kdir: 0,
   };
 }
@@ -157,8 +158,8 @@ function readInput(st, k, m) {
   if (released & bk) { f.tb = f.hb <= TAP ? TAP : 0; f.hb = 0; }
   if (pressed & fwd) { if (f.tf) { f.dash = 1; f.db = BUFFER; } f.tf = 0; f.tb = 0; f.hf = 1; }
   if (pressed & bk) { if (f.tb) { f.dash = -1; f.db = BUFFER; } f.tb = 0; f.tf = 0; f.hb = 1; }
-  if (pressed & LIGHT) f.bl = BUFFER;
-  if (pressed & HEAVY) f.bh = BUFFER;
+  if (pressed & LIGHT) { f.bl = BUFFER; f.lt = st.tick; }
+  if (pressed & HEAVY) { f.bh = BUFFER; f.ht = st.tick; }
   if (pressed & SPECIAL) {
     f.bs = BUFFER;
     // the impatient special: five presses on an empty meter and he says so
@@ -168,6 +169,9 @@ function readInput(st, k, m) {
     }
   }
 }
+
+/* O and P pressed together: within THROW_GAP real ticks (hit-pause or not) */
+const together = (f) => Math.abs(f.lt - f.ht) <= THROW_GAP;
 
 const GROUND_FREE = { idle: 1, walkF: 1, walkB: 1, crouch: 1, guard: 1 };
 
@@ -196,8 +200,8 @@ function think(st, k) {
   if (f.act === 'attack') f.it = 0; else if (f.it < 99) f.it++;
   if (GROUND_FREE[f.act] && !f.air) {
     if (f.bs && f.meter >= MAX_METER) return startMove(st, k, 'special');
-    // O and P together: the throw
-    if (f.bl && f.bh) return startMove(st, k, 'throw');
+    // O and P together (pressed within THROW_GAP ticks of each other): the throw
+    if (f.bl && f.bh && together(f)) return startMove(st, k, 'throw');
     if (f.bh) {
       // one shot of your own on screen at a time: no throw while it's out
       if (f.down && shotOut(st, k, D.moves.signature)) f.bh = 0;
@@ -261,7 +265,7 @@ function think(st, k) {
       const g = o;
       if (!(g.act === 'attack' && (g.mv === 'specialHold' || g.mv === 'throwHold'))) { f.act = 'idle'; f.t = 0; f.combo = 0; return; }
       // a throw: O+P early in the hold escapes it — both pushed apart
-      if (g.mv === 'throwHold' && f.t <= TECH && f.bl && f.bh) tech(st, k);
+      if (g.mv === 'throwHold' && f.t <= TECH && f.bl && f.bh && together(f)) tech(st, k);
       return;
     }
     default: return;   // ko, win, lose
@@ -293,7 +297,7 @@ function dashTick(f) {
 function attackTick(st, k, f, o, D) {
   const m = D.moves[f.mv], t = f.t;
   // O and P a tick or two apart still throw: a light or heavy just begun turns into it
-  if (t <= 2 && !f.air && !f.ch && ((m.lite && f.bh) || (f.mv === 'heavy' && f.bl))) return startMove(st, k, 'throw');
+  if (t <= THROW_GAP + 1 && !f.air && !f.ch && ((m.lite && f.bh) || (f.mv === 'heavy' && f.bl)) && together(f)) return startMove(st, k, 'throw');
   // chains and cancels on contact (hit or block), inside the window:
   // light → light / heavy / signature / special; heavy → signature / special
   if (m.cancel && f.hm && t >= m.hits[0].from && t <= m.hits[m.hits.length - 1].to + CANCEL) {
