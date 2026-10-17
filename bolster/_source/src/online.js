@@ -316,7 +316,7 @@ export class Online {
       case 'cur': A.pick[this.remote] = m.i; if (A.screen === 'select') A._paintSelect(); break;
       case 'lock': A.pick[this.remote] = m.i; A.locked[this.remote] = true; if (A.screen === 'select') A._paintSelect(); this._maybeStart(); break;
       case 'unlock': A.locked[this.remote] = false; if (A.screen === 'select') A._paintSelect(); break;
-      case 'start': if (this.role === 'guest') this.start(m); break;
+      case 'start': if (this.role === 'guest') A.later(0.6, () => this.start(m)); break;   // the same beat as the host
       case 'ping': this.send({ t: 'pong', ts: m.ts }); break;
       case 'pong': { const r = now() - m.ts; this.rtt = this.rtt ? this.rtt * 0.7 + r * 0.3 : r; break; }
       case 'rematch': if (A.screen === 'win' || A.screen === 'fight') this.goSelect(); break;
