@@ -50,7 +50,12 @@ const dest = path.join(root, 'final.html');
 fs.writeFileSync(dest, final);
 
 /* ── self-containment gate ────────────────────────────────────────────────
-   The rule for this series is zero runtime network requests: no `src`
+   The rule for this series is zero runtime network requests, with one
+   exception that stage 2 brings: online play. After the player picks
+   Online or opens a ?room= link — never before, never in the offline modes
+   — the page may reach exactly the PeerJS cloud broker (0.peerjs.com, the
+   handshake), public STUN (stun.l.google.com:19302) and the peer itself.
+   PeerJS is bundled (no script fetch). Everything else: no `src`
    anywhere, no <link href>, no dynamic import, no absolute URL reachable
    from the script. Anchors are allowed — an anchor is a place the reader
    may choose to go, not a resource the page loads — but there are none in
@@ -77,8 +82,29 @@ const NS_ALLOW = [
   'http://www.w3.org/1999/xlink',
 ];
 
+/* PeerJS's own strings: links in its log/error text and package metadata,
+   never requested */
+const PEERJS_TEXT = [
+  'https://peerjs.com',
+  'https://github.com/peers/peerjs',
+  'https://github.com/peers/peerjs/issues',
+  'https://opencollective.com/peer',
+];
+
 const urlLiterals = [...new Set([...js.matchAll(/["'`](https?:\/\/[^"'`\s]+)["'`]/gi)].map((m) => m[1]))]
-  .filter((u) => !NS_ALLOW.includes(u));
+  .filter((u) => !NS_ALLOW.includes(u) && !PEERJS_TEXT.includes(u));
+
+/* the network the online mode may use: the broker host, and ICE servers.
+   Our STUN is the only one passed to PeerJS; its built-in defaults (a
+   Google STUN and two peerjs TURN hosts) are in the bundle but overridden
+   by src/net/link.js, so never contacted. Any other ws(s):// or stun:/turn:
+   literal fails the build. */
+const NET_ALLOW = ['0.peerjs.com', 'stun:stun.l.google.com:19302', 'turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'];
+const netLiterals = [...new Set([
+  ...[...js.matchAll(/["'`]((?:wss?:\/\/|stuns?:|turns?:)[^"'`\s]+)["'`]/gi)].map((m) => m[1]),
+  ...[...js.matchAll(/["'`]([a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|net|org|io))["'`]/gi)].map((m) => m[1]),
+])].filter((u) => !NET_ALLOW.includes(u));
+const stunOk = /stun:stun\.l\.google\.com:19302/.test(js) && js.includes('0.peerjs.com');
 
 const netCalls = [...js.matchAll(/\b(?:fetch|XMLHttpRequest|EventSource|WebSocket)\s*\(/g)].map((m) => m[0]);
 
@@ -87,12 +113,15 @@ console.log(`final    ${(fs.statSync(dest).size / 1024).toFixed(1)} KB  -> ${des
 console.log(`fetched refs   ${fetched.length ? fetched.join(', ') : 'none'}`);
 console.log(`dynamic import ${dynImports.length ? dynImports.join(', ') : 'none'}`);
 console.log(`url literals   ${urlLiterals.length ? urlLiterals.join(', ') : 'none'} (in script)`);
-console.log(`fetch sites    ${netCalls.length} (three's loaders, never reached)`);
+console.log(`fetch sites    ${netCalls.length} (three's loaders, never reached; PeerJS's broker calls, online only)`);
+console.log(`online net     ${NET_ALLOW.join(', ')}${netLiterals.length ? ` — and NOT ALLOWED: ${netLiterals.join(', ')}` : ''}`);
 
 const fail = [];
 if (fetched.length) fail.push('page fetches external resources');
 if (dynImports.length) fail.push('page has dynamic imports');
 if (urlLiterals.length) fail.push(`script contains absolute URLs: ${urlLiterals.join(', ')}`);
+if (netLiterals.length) fail.push(`script names network hosts outside the online allowlist: ${netLiterals.join(', ')}`);
+if (!stunOk) fail.push('online: the broker / STUN configuration is missing');
 if (fail.length) {
   console.error(`\nNOT SELF-CONTAINED\n  ${fail.join('\n  ')}`);
   process.exit(1);

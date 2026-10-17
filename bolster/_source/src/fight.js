@@ -9,13 +9,17 @@ import { FIGHTERS, MAX_METER } from './fighters/index.js';
 import { CPU } from './ai/cpu.js';
 import { Plush } from './render/plush.js';
 import { U } from './render/stage.js';
+import { Rollback } from './net/rollback.js';
 
 export const TICK = 1 / 60;
 
 export class Fight {
-  constructor(stage, { p1, p2, seed = 1, cpu = [null, 'normal'], keyboard = null, toques = false }) {
+  constructor(stage, { p1, p2, seed = 1, cpu = [null, 'normal'], keyboard = null, toques = false, net = null }) {
     this.stage = stage;
     this.st = createMatch({ p1, p2, seed });
+    // online: the sim runs inside a rollback session; this side's keyboard is player `net.local`
+    this.session = net ? new Rollback(this.st, { local: net.local, send: net.send, onDesync: net.onDesync }) : null;
+    if (net) cpu = [null, null];
     this.mirror = p1 === p2;
     this.cpu = cpu.map((lv, k) => (lv ? new CPU(k, lv, seed * 7 + k) : null));
     this.kb = keyboard;
@@ -43,6 +47,7 @@ export class Fight {
 
   /* one sim tick */
   tick() {
+    if (this.session) return this._netTick();
     const st = this.st;
     this.prev = st.f.map((f) => ({ x: f.x, y: f.y }));
     this.prevProj = new Map(st.proj.map((p) => [p.id, { x: p.x, y: p.y }]));
@@ -54,6 +59,22 @@ export class Fight {
     stepInPlace(st, a, b);
     for (const e of st.ev) this._fx(e);
     this.onTick(st);
+  }
+
+  /* online: the local mask goes into the session, which may roll back and
+     resimulate; it hands back each event once */
+  _netTick() {
+    const S = this.session, before = S.st.f.map((f) => ({ x: f.x, y: f.y }));
+    const projBefore = new Map(S.st.proj.map((p) => [p.id, { x: p.x, y: p.y }]));
+    const m = this.kb ? this.kb.sample() : 0;
+    const ev = this.override ? S.advance(this.override(S.st)[S.local] ?? m) : S.advance(m);
+    this.st = S.st;
+    if (!ev) return;
+    this.prev = before;
+    this.prevProj = projBefore;
+    this.lastInputs = S.local === 0 ? [m, S.lastRemote] : [S.lastRemote, m];
+    for (const e of ev) this._fx(e);
+    this.onTick(this.st);
   }
 
   _fx(e) {

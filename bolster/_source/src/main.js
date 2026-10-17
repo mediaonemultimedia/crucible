@@ -15,6 +15,7 @@ import { moveOf } from './fighters/index.js';
 import { FLAGS } from './ui/flags.js';
 import { say, dismiss } from './ui/bubble.js';
 import { SAYINGS } from './ui/sayings.js';
+import { Online } from './online.js';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -54,6 +55,7 @@ class App {
     this.idle = 0;
     this.seed = (params.get('seed') | 0) || ((Date.now() & 0xffff) + 1);
     this.portraits = {};
+    this.net = new Online(this);
     this.backend = renderer.backend && renderer.backend.isWebGPUBackend ? 'WebGPU' : 'WebGL 2';
     this.errors = [];
     this.timers = [];
@@ -95,7 +97,8 @@ class App {
   }
 
   _bindUI() {
-    for (const b of $$('#mode-screen .opt')) b.onclick = () => { if (!b.disabled) this.go('select'); };
+    for (const b of $$('#mode-screen .opt')) b.onclick = () => { if (b.disabled) return; if (b.dataset.mode === 'online') this.net.menu(); else this.go('select'); };
+    for (const b of $$('#online-screen .opt')) b.onclick = () => this.net.act(b.dataset.act);
     for (const b of $$('#diff-screen .opt')) b.onclick = () => { this.level = b.dataset.level; this.startFight(); };
     for (const b of $$('#pause-screen .opt')) b.onclick = () => this._pauseAct(b.dataset.act);
     for (const b of $$('#win-screen .opt')) b.onclick = () => this._winAct(b.dataset.act);
@@ -128,6 +131,14 @@ class App {
       else if (back) this.go('title');
       return;
     }
+    if (s === 'online') {
+      const sel = `#online-screen .ol-${$('#online-screen').dataset.state} .opt`;
+      if (up || down) this._menuMove(sel, up ? -1 : 1);
+      else if (ok) this._menuFire(sel);
+      else if (k === 'Escape') this.net.act('cancel');
+      return;
+    }
+    if (s === 'select' && this.net.on) { this.net.selectKey(k, { left, right, ok, back }); return; }
     if (s === 'select') {
       // the toque code: E then H
       if (k === 'KeyE') this.eggKeys = 'e';
@@ -144,7 +155,7 @@ class App {
       else if (back) { this.go('select'); }
       return;
     }
-    if (s === 'fight') { if (k === 'Escape') { e.preventDefault(); this.pause(true); } return; }
+    if (s === 'fight') { if (k === 'Escape' && !this.net.on) { e.preventDefault(); this.pause(true); } return; }
     if (s === 'pause') {
       if (k === 'Escape') this.pause(false);
       else if (up || down) this._menuMove('#pause-screen .opt', up ? -1 : 1);
@@ -152,6 +163,7 @@ class App {
       return;
     }
     if (s === 'win') {
+      if (this.net.on && back && k === 'Escape') { this._winAct('select'); return; }
       if (left || right || up || down) this._menuMove('#win-screen .opt', left || up ? -1 : 1);
       else if (ok) this._menuFire('#win-screen .opt');
     }
@@ -173,8 +185,8 @@ class App {
       c.dataset.id = id;
       c.innerHTML = `<span class="zzz"><i>z</i><i>z</i><i>z</i></span><span class="flag">${flagOf(id)}</span><span class="lab">${f.name}</span>`;
       if (this.portraits[id]) { const im = new Image(); im.alt = ''; im.src = this.portraits[id]; c.prepend(im); }
-      c.onclick = () => { this.pick[this.picking] = i; this._lock(); };
-      c.onmouseenter = () => { if (this.screen === 'select') { this.pick[this.picking] = i; this._paintSelect(); } };
+      c.onclick = () => { if (this.net.on) { this.net.choose(i, true); return; } this.pick[this.picking] = i; this._lock(); };
+      c.onmouseenter = () => { if (this.screen !== 'select') return; if (this.net.on) { this.net.choose(i, false); return; } this.pick[this.picking] = i; this._paintSelect(); };
       cards.appendChild(c);
     });
     this._paintSelect();
@@ -216,6 +228,8 @@ class App {
     plate('.plate.p2', ids[1], mirror && (this.picking === 1 || this.locked[1]), this.locked[1], this.picking === 1);
     $('#select-step').textContent = this.picking === 0 ? 'Pick for Player 1' : 'Pick the Computer’s fighter';
     $('#select-hint').textContent = this.picking === 0 ? 'Player 1 — A / D to choose, O to pick' : 'Computer — A / D to choose, O to pick, P to go back';
+    $('.plate.p2 .who').textContent = this.net.on ? 'Player 2' : 'Computer';
+    if (this.net.on) this.net.paintSelect(ids, mirror, plate);
     if (this.show) {
       this.show.set(0, ids[0], { toque: this.toques });
       this.show.set(1, this.picking === 1 || this.locked[1] ? ids[1] : null, { evil: mirror, toque: this.toques });
@@ -241,13 +255,13 @@ class App {
   }
 
   /* ── the fight ───────────────────────────────────────────────────────── */
-  startFight({ p1 = ROSTER[this.pick[0]], p2 = ROSTER[this.pick[1]], level = this.level, p1cpu = null, seed = null } = {}) {
+  startFight({ p1 = ROSTER[this.pick[0]], p2 = ROSTER[this.pick[1]], level = this.level, p1cpu = null, seed = null, net = null } = {}) {
     if (this.show) { this.show.dispose(); this.show = null; }
     if (this.fight) this.fight.dispose();
     this.seed = seed ?? (((this.seed * 1103515245 + 12345) >>> 0) || 1);
     this.last = { p1, p2, level, p1cpu };
     this.kb.clear();
-    const f = (this.fight = new Fight(this.stage, { p1, p2, seed: this.seed, cpu: [p1cpu, level], keyboard: this.kb, toques: this.toques }));
+    const f = (this.fight = new Fight(this.stage, { p1, p2, seed: this.seed, cpu: [p1cpu, level], keyboard: this.kb, toques: this.toques, net }));
     f.onEvent = (e) => this._event(e);
     f.onTick = (st) => this._hud(st);
     $('#banner').textContent = '';
@@ -274,6 +288,7 @@ class App {
 
   _winAct(a) {
     $('#bubbles').textContent = '';
+    if (this.net.on) { this.net.winAct(a); return; }
     if (a === 'rematch') this.startFight(this.last);
     if (a === 'select') { this.fight?.dispose(); this.fight = null; this.go('select'); }
   }
@@ -357,12 +372,13 @@ class App {
     const st = f.st, w = st.winner;
     $('#banner').textContent = '';
     this.go('win');
+    this.net.winScreen();
     if (w === 2) {
       $('#win-eyebrow').textContent = 'No winner';
       $('#win-name').textContent = 'Draw';
       return;
     }
-    $('#win-eyebrow').textContent = `Pillow Fight · ${w === 0 ? 'Player 1 wins' : f.cpu[0] ? 'CPU 2 wins' : 'The computer wins'}`;
+    $('#win-eyebrow').textContent = `Pillow Fight · ${this.net.on ? `Player ${w + 1} wins${w === this.net.local ? ' — that’s you' : ''}` : w === 0 ? 'Player 1 wins' : f.cpu[0] ? 'CPU 2 wins' : 'The computer wins'}`;
     $('#win-name').innerHTML = `${f.name(w)} wins`;
     const id = st.f[w].id, line = st.egg ? FIGHTERS[id].catchphrase.egg : FIGHTERS[id].catchphrase.main;
     this.catchline = line;
@@ -393,6 +409,7 @@ class App {
   /* ── the loop ─────────────────────────────────────────────────────────── */
   frame(dt, draw = true) {
     this._timers(this.fight?.paused ? 0 : dt);
+    this.net.frame(dt);
     if (this.screen === 'select' || this.screen === 'diff') {
       this.idle += dt;
       if (this.screen === 'select' && this.idle > 30 && !document.body.classList.contains('napping')) document.body.classList.add('napping');
@@ -467,7 +484,8 @@ async function start() {
     app.toques = params.get('toques') === '1';
     app.startFight({ p1, p2, level: params.get('cpu') || 'normal', p1cpu: params.get('p1cpu'), seed: (params.get('seed') | 0) || null });
     if (params.get('speed')) app.fight.speed = +params.get('speed');
-  } else if (params.get('screen') === 'select') app.go('select');
+  } else if (params.get('room')) app.net.joinRoom(params.get('room'));
+  else if (params.get('screen') === 'select') app.go('select');
   else app.go('title');
   document.body.classList.add('is-live');
 }

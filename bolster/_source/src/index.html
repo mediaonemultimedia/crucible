@@ -218,6 +218,28 @@ body[data-screen=win] #hud{display:none}
   #pause-screen .menu{flex-direction:column;align-items:center}
 }
 @media (prefers-reduced-motion:reduce){.logo,.press{animation:none}}
+
+/* online */
+#online-screen .menu{width:min(90vw,460px)}
+#online-screen .ol{display:none;flex-direction:column;gap:14px}
+#online-screen[data-state=menu] .ol-menu,#online-screen[data-state=hosting] .ol-hosting,#online-screen[data-state=joining] .ol-joining,#online-screen[data-state=error] .ol-error{display:flex}
+.olnote{font-family:var(--cond);font-weight:700;font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);text-align:center;display:flex;gap:10px;align-items:center;justify-content:center}
+.olnote.big{font-size:18px;color:var(--ink);padding:18px 0}
+.olnote.err{font-size:16px;color:#ffd0db;line-height:1.5;text-transform:none;letter-spacing:.04em;background:rgba(29,22,48,.92);border:2px solid var(--p1);border-radius:4px;padding:14px}
+#online-screen .code{font-family:var(--cond);font-weight:700;font-size:clamp(54px,9vw,84px);letter-spacing:.22em;text-align:center;color:var(--ink);text-shadow:var(--glow-v);background:rgba(29,22,48,.92);border:2px solid var(--violet);border-radius:4px;padding:6px 0 6px .22em}
+.linkrow{display:flex;gap:10px}
+.linkrow input{flex:1;min-width:0;font:13px ui-monospace,monospace;color:var(--ink);background:rgba(29,22,48,.94);border:2px solid var(--line);border-radius:4px;padding:0 10px}
+.opt.small{padding:10px 14px;white-space:nowrap}
+.spin{width:16px;height:16px;border-radius:50%;border:3px solid rgba(255,255,255,.18);border-top-color:var(--violet);animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+#net{position:fixed;top:6px;left:50%;transform:translateX(-50%);display:none;font-family:var(--cond);font-weight:700;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);pointer-events:none;z-index:5;white-space:nowrap}
+body.online.fighting #net,body.online[data-screen=select] #net{display:block}
+#net i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:#3ff0a0;vertical-align:0}
+#net.mid i{background:#ffd23f}#net.bad i{background:#ff3b5c}
+#net .desync{color:#ffd23f;margin-left:10px}
+#netwait{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(10,6,22,.55);z-index:6}
+body.netwait #netwait{display:flex}
+#netwait .box{display:flex;gap:12px;align-items:center;font-family:var(--cond);font-weight:700;font-size:20px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);background:rgba(29,22,48,.95);border:2px solid var(--violet);border-radius:4px;padding:18px 26px}
 </style>
 </head>
 <body>
@@ -246,8 +268,35 @@ body[data-screen=win] #hud{display:none}
     <div class="menu">
       <h2>Mode</h2>
       <button class="opt sel" data-mode="cpu">Vs Computer <small>1 player</small></button>
-      <button class="opt" data-mode="online" disabled>Online <small>coming soon</small></button>
+      <button class="opt" data-mode="online">Online <small>play a friend</small></button>
       <div class="hintline">W / S choose · O or Enter to go</div>
+    </div>
+  </section>
+
+  <section id="online-screen" class="screen" data-state="menu">
+    <div class="menu">
+      <h2>Online</h2>
+      <div class="ol ol-menu">
+        <button class="opt sel" data-act="host">Host a match <small>you're player 1</small></button>
+        <button class="opt" data-act="back">Back</button>
+        <div class="hintline">Host, then send your friend the link</div>
+      </div>
+      <div class="ol ol-hosting">
+        <div class="olnote">Send this link to your friend</div>
+        <div class="code" id="ol-code">·····</div>
+        <div class="linkrow"><input id="ol-link" readonly value="" aria-label="share link"><button class="opt small sel" data-act="copy" id="ol-copy">Copy link</button></div>
+        <div class="olnote wait"><span class="spin"></span><span id="ol-wait">Waiting for your friend to open it…</span></div>
+        <button class="opt" data-act="cancel">Cancel</button>
+      </div>
+      <div class="ol ol-joining">
+        <div class="olnote big"><span class="spin"></span><span id="ol-joinmsg">Joining the match…</span></div>
+        <button class="opt" data-act="cancel">Cancel</button>
+      </div>
+      <div class="ol ol-error">
+        <div class="olnote err" id="ol-err">Connection failed</div>
+        <button class="opt sel" data-act="retry">Try again</button>
+        <button class="opt" data-act="cpu">Play vs Computer</button>
+      </div>
     </div>
   </section>
 
@@ -291,6 +340,9 @@ body[data-screen=win] #hud{display:none}
       <div class="meter r" id="m2"><span class="mlab">SPECIAL</span><div class="mbar"><i></i></div></div>
     </div>
   </div>
+
+  <div id="net" aria-live="polite"></div>
+  <div id="netwait"><div class="box"><span class="spin"></span><span id="netwait-msg">Waiting for opponent (10s)</span></div></div>
 
   <div id="banner"></div>
 
