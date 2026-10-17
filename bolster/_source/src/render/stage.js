@@ -143,7 +143,7 @@ export class Stage {
   }
 
   /* ── camera: frames both fighters, a little shake on a big hit ─────────── */
-  frame(xa, xb, dt, aspect, focus = null) {
+  frame(xa, xb, dt, aspect, focus = null, high = 0) {
     let mid = (xa + xb) / 2;
     const sep = Math.abs(xa - xb);
     const narrow = aspect < 1.2;
@@ -162,8 +162,11 @@ export class Stage {
     const C = this.camera;
     C.aspect = aspect;
     C.fov = narrow ? 34 : 26;
-    const L = this.cam.lift || 0;
-    C.position.set(this.cam.x + jx, 3.7 + jy - L, this.cam.d);
+    // someone high in a jump: the camera rises and eases back to keep him in
+    const hw = focus ? 0 : Math.max(0, high - 0.8);
+    this.cam.up = (this.cam.up || 0) + (hw - (this.cam.up || 0)) * Math.min(1, dt * 9);
+    const L = (this.cam.lift || 0) - this.cam.up * 1.0, D = this.cam.d + this.cam.up * 1.6;
+    C.position.set(this.cam.x + jx, 3.7 + jy - L, D);
     C.lookAt(this.cam.x + jx * 0.5, 2.1 + jy * 0.5 - L * 0.4, 0);
     C.updateProjectionMatrix();
   }

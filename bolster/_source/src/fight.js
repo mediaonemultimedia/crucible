@@ -109,7 +109,7 @@ export class Fight {
       this.plush[k].update(Math.min(dt, 0.05), F, O, P[k].x, P[k].y, P[1 - k].x, P[1 - k].y, threat);
     }
     const extra = this.stage.projectiles(st.proj, a, this.prevProj);
-    this.stage.frame(P[0].x, P[1].x, dt || 0.016, innerWidth / innerHeight, this.focus);
+    this.stage.frame(P[0].x, P[1].x, dt || 0.016, innerWidth / innerHeight, this.focus, Math.max(P[0].y, P[1].y));
     this.stage.paintShadows(this.plush, extra);
     this.stage.update(dt);
   }

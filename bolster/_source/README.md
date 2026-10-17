@@ -31,6 +31,37 @@ to the computer too; `seed=N` fixes the match seed; `toques=1`; `webgl` forces
 the WebGL 2 path; `hold` stops the free-running loop for scripted stepping;
 `boxes` draws the sim's hurt, limb, hit and shot boxes over the picture).
 
+## Moves pass (bolster-moves)
+
+- **Card portraits** were stripes under WebGPU: three's `copyTextureToBuffer`
+  pads each row to 256 bytes (a 240-px portrait came back at 1024 bytes a
+  row, not 960) and the readback was read as packed. `render/readback.js`
+  honours the stride; portraits are 256 px wide (already aligned).
+  `test/readback.test.mjs` covers padded/flipped rows at several sizes;
+  `node tools/portrait-check.mjs [--shear out.png]` scores each real portrait
+  (row-vs-column difference ratio, subject centred) and can draw the old shear.
+- **Kevalanche's gloves**: the arm's fur mask stopped at v = 0.985 of the tube
+  region, but the paw's end cap is mapped 0.985–1.0, so the fist kept full
+  pile and it came out through the glove (and the face painter left the mask
+  canvas in `lighter` mode). `render/gloves.js`: `shaveCaps()` masks the caps;
+  the old glove tube is kept as the cuff; a padded boxing-glove mesh (~1.4×,
+  thumb pad, laces, seams, glossy leather) rides the end of each arm chain.
+- **Jumps**: a 3-tick crouch (`jumpsquat`), then a ballistic leap — rise
+  gravity `jumpG`, a hang under `HANG_V`, a faster fall `fallG` (~48–51 ticks
+  in the air, apex ~4.3 units). A forward leap clears every fighter's standing
+  hurt box but K8-E's (her push box is 5.2 units tall: the neck). Landing
+  re-faces both; air normals' windows were lengthened for the higher arc.
+  The camera rises and eases back while someone is high.
+- **Dive slam** (S+P in the air, all fighters): a 6-tick hang, a fast drop
+  that's an overhead (standing block only), an impact shockwave round the
+  feet if the drop missed, 30 ticks of landing lag (12 if it connected).
+  Poses: double-fist hammer, tentacle splat, overhead smash, belly-flop,
+  neck chop. The CPU uses it now and then (`dive` per difficulty).
+- **Johnny Deuce is Dutch** 🇳🇱 ("Nog niet!").
+
+`node tools/moves-shots.mjs [jump-johnny|jump-k8e|dives]` and
+`node tools/polish-shots.mjs gloves-kevalanche` make the evidence in `shots/moves/`.
+
 ## The roster
 
 | Fighter | Animal | From | Signature (S+P) | Special (Space, full meter) |
