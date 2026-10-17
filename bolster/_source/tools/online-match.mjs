@@ -21,7 +21,7 @@ fs.mkdirSync(out, { recursive: true });
 
 const browser = await chromium.launch({
   executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
+  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', ...(broker ? ['--disable-features=WebRtcHideLocalIpsWithMdns'] : [])],
 });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
 const errs = [], reqs = [];
@@ -31,7 +31,7 @@ const watch = (page, who) => {
   page.on('request', (r) => { const u = r.url(); if (!u.startsWith('file:') && !u.startsWith('data:')) reqs.push(`${who}: ${u}`); });
 };
 const base = `file://${path.join(root, 'final.html')}`;
-const q = (broker ? `net=peer&broker=localhost:${broker}` : `net=local${lag ? `&lag=${lag}` : ''}`);
+const q = (broker ? `net=peer&broker=127.0.0.1:${broker}` : `net=local${lag ? `&lag=${lag}` : ''}`);
 const A = await ctx.newPage(); watch(A, 'host');
 await A.goto(`${base}?${q}&hold&webgl&noportraits`);
 await A.waitForFunction(() => document.body.classList.contains('is-live'), null, { timeout: 240000 });
@@ -154,7 +154,7 @@ await step(A, 0, true);
 await A.screenshot({ path: path.join(out, '9-opponent-left-host.png') });
 
 await browser.close();
-const allowed = (u) => broker ? /^(https?|wss?):\/\/localhost:\d+\//.test(u.replace(/^(host|guest): /, '')) : false;
+const allowed = (u) => broker ? /^(https?|wss?):\/\/(localhost|127\.0\.0\.1):\d+\//.test(u.replace(/^(host|guest): /, '')) : false;
 const bad = reqs.filter((r) => !allowed(r));
 console.log(`requests: ${reqs.length} (${bad.length} not allowed)`);
 if (bad.length) { errs.push(...bad.slice(0, 10).map((r) => `request ${r}`)); }

@@ -31,6 +31,76 @@ to the computer too; `seed=N` fixes the match seed; `toques=1`; `webgl` forces
 the WebGL 2 path; `hold` stops the free-running loop for scripted stepping;
 `boxes` draws the sim's hurt, limb, hit and shot boxes over the picture).
 
+## Online (stage 2: bolster-online)
+
+Mode → **Online** → **Host a match** opens a room and shows its code (5
+characters, no 0/O/1/I) and a share link, `…/bolster/?room=ABCDE`, with
+**Copy link**. The friend opens the link and lands on *Joining match
+ABCDE…*, then both are on a shared character select: the host is Player 1
+(pink), the guest Player 2 (mint); each moves only their own cursor (A / D,
+O to lock in, P to change, Esc to leave) and sees the other's live. When
+both are locked the host picks the seed and sends it with both fighters;
+then the usual best of three. **Rematch** (either player) takes both back to
+select; **Leave** ends it. Same keys on both computers. Esc doesn't pause an
+online match.
+
+```
+src/net/rollback.js  the rollback session (GGPO-style): 2-tick input delay,
+                     remote predicted as 'same as last', a 16-snapshot ring,
+                     restore + resimulate on a misprediction, a hard stall
+                     8 ticks past the last confirmed remote input, time sync
+                     (the side that's ahead skips a tick now and then),
+                     inputs sent redundantly (every unacked one, each packet),
+                     a state hash every 60 ticks riding on every packet.
+                     Events: cosmetic ones fire once per tick (keyed, so a
+                     resimulation doesn't repeat them); banners / round /
+                     K.O. / time / end only once their tick is confirmed.
+src/net/link.js      PeerJS (bundled; WebRTC data channels — 'ctl' reliable,
+                     'in' unordered) or a BroadcastChannel loopback (?net=local)
+src/online.js        the screens: host / join / errors, the shared select,
+                     start, rematch, leave, ping, 'Waiting for opponent (10s)'
+```
+
+Network: nothing until Online is picked or a `?room=` link is opened. Then
+only the PeerJS cloud broker (`0.peerjs.com`, the handshake) and public
+STUN (`stun.l.google.com:19302`) — PeerJS's built-in TURN servers are
+overridden — and the peer connection itself. `npm run build` fails on any
+other host, ws/stun/turn literal or URL in the bundle; `tools/online-errors.mjs`
+checks in the browser that the offline modes make zero requests.
+
+Errors: *Room not found* (bad or stale link / host gone), *Connection failed —
+some office or school networks block this* (no TURN relay, so strict NATs
+and firewalls can't connect) with **Try again** and **Play vs Computer**; an
+opponent who goes quiet mid-match pauses it with *Waiting for opponent
+(10s)*, then back to the menu. The HUD shows round-trip ping (green < 90 ms,
+yellow < 180, red) and *desync* if a hash ever disagrees (`?netdebug` logs
+both states and PeerJS's own trace).
+
+Tests and tools:
+
+```
+node --test test/net.test.mjs        two peers over an in-memory link at 0–150 ms ± jitter,
+                                     5% loss, skewed clocks, CPU and random inputs: hashes
+                                     agree every 60 ticks, final state = a fresh sim of the
+                                     true inputs, rollback ≤ 10 ticks, events exactly once
+node tools/online-match.mjs [--lag 40]      two pages over the loopback: host, join by link,
+                                     select, a whole match, K.O., winner, rematch, leave
+node tools/online-match.mjs --broker 9000   the same over real PeerJS + WebRTC, with a
+                                     PeerServer on 127.0.0.1:9000 (npm i peer; see below)
+node tools/online-errors.mjs [--broker 9000] offline = zero requests; the cloud broker
+                                     attempt and 'Connection failed'; 'Room not found'
+node tools/online-drop.mjs           the opponent vanishes mid-match
+```
+
+A local PeerServer for the `--broker` runs: `npm i peer` somewhere, then
+`ExpressPeerServer` on 127.0.0.1:9000 at path `/` (the page only accepts
+`?broker=localhost:PORT` or `127.0.0.1:PORT`). The sandbox these were built
+in can't reach `0.peerjs.com` (its proxy refuses), so the public broker was
+verified only as far as the attempt and the error screen; real-internet
+latency and NAT traversal can't be measured here.
+
+Evidence: `shots/online/` (loopback) and `shots/online-peerjs/` (real PeerJS).
+
 ## Moves pass (bolster-moves)
 
 - **Card portraits** were stripes under WebGPU: three's `copyTextureToBuffer`
@@ -119,8 +189,8 @@ list of input pairs. State is plain data with a fixed shape, so a snapshot is
 over its JSON. Visible randomness — the catchphrase (main line 4 in 5, the
 easter egg 1 in 5) and the Fluffatality roll (1 in 10 on a special that ends
 the match) — is drawn from the state's PRNG, so two peers replaying the same
-inputs see the same thing. Stage 2's `net/` (PeerJS, rollback) only needs:
-the input mask per tick, `clone`, `step`, `hash` — all here and tested.
+inputs see the same thing. Stage 2's `net/` (PeerJS, rollback) uses only
+the input mask per tick, `clone`, `stepInPlace`, `hash` — see *Online* above.
 
 Rules: double-tap forward dashes in, double-tap back backdashes (a tap is
 a press let go within 12 ticks; a held walk that stops and starts again is

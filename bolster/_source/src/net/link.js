@@ -34,7 +34,7 @@ class Link {
 /* ── PeerJS ────────────────────────────────────────────────────────────── */
 
 function peerOpts(params) {
-  const o = { debug: 0, config: { iceServers: STUN } };
+  const o = { debug: params.has('netdebug') ? 3 : 0, config: { iceServers: STUN } };
   // tests: a PeerServer on this machine (only localhost is accepted)
   const b = params.get('broker');
   if (b && /^(localhost|127\.0\.0\.1):\d+$/.test(b)) { const [host, port] = b.split(':'); Object.assign(o, { host, port: +port, path: '/', secure: false, key: 'peerjs' }); }
