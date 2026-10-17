@@ -271,10 +271,22 @@ export class Plush {
     this.squash.x += this.squash.v * dt;
     const sq = Math.max(-0.25, Math.min(0.2, this.squash.x * 0.06));
     const crouch = this.puppet.crouchT ? 0.84 : 1;
+    // the jump: squashed in the crouch before it, stretched going up fast
+    // (and coming down in a dive), squashed again on landing
+    let sy = 1;
+    if (F.act === 'jumpsquat') sy = 0.8;
+    else if (F.air && F.vy > 160) sy = 1.12;
+    else if (F.air && F.vy < -300) sy = 1.08;
+    if (this._wasAir && !F.air) this._land = 1;
+    this._wasAir = !!F.air;
+    this._land = Math.max(0, (this._land || 0) - dt * 7);
+    sy *= 1 - 0.2 * Math.sin(Math.min(1, this._land) * Math.PI * 0.5);
+    this._ss = this._ss === undefined ? 1 : this._ss + (sy - this._ss) * Math.min(1, dt * 30);
     this._crouch = this._crouch === undefined ? 1 : this._crouch + (crouch - this._crouch) * Math.min(1, dt * 18);
     this.deflate += ((this.deflateTarget || 0) - this.deflate) * Math.min(1, dt * 7);
     const df = this.deflate;
-    g.scale.set(1 - sq * 0.5 + df * 0.35, (1 + sq) * this._crouch * (1 - df * 0.62), 1 - sq * 0.5 + df * 0.35);
+    const sx = 1 / Math.sqrt(this._ss);
+    g.scale.set((1 - sq * 0.5 + df * 0.35) * sx, (1 + sq) * this._crouch * (1 - df * 0.62) * this._ss, (1 - sq * 0.5 + df * 0.35) * sx);
     g.updateMatrixWorld(true);
 
     // the fight frame in the plush's own frame

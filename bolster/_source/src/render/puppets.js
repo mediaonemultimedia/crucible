@@ -251,6 +251,24 @@ export class BipedPuppet extends FightMixin(Athlete) {
     } else if (mv === 'lowLight') {
       L = mix3([0.3, -0.1, 0.8], [0.1, -0.55, 1], o); lean = [0.45, 0.15 * o, 0];
       if (st === 'tennis') { R = mix3([-0.6, -0.2, 0.5], [-0.1, -0.6, 1], o); wrist = 0.1; }
+    } else if (mv === 'dive' || mv === 'diveLand') {
+      // the dive slam: wound up through the hang, slammed down through the drop
+      const d = mv === 'diveLand' ? 1 : smooth(5, 9, t), rec = mv === 'diveLand' ? smooth(10, 28, t) : 0;
+      if (st === 'boxer') {
+        // a double-fist hammer: both gloves up over his head, then down together
+        R = mix3([-0.15, 1, 0.1], [-0.12, -0.35, 0.95], d); L = mix3([0.15, 1, 0.1], [0.12, -0.35, 0.95], d);
+        lean = [mix(-0.3, 0.55, d), 0, 0];
+      } else if (st === 'tennis') {
+        // an overhead smash: the racquet back over his shoulder, then down through it
+        R = mix3([-0.3, 1, -0.5], [0.05, -0.55, 1], d); L = [0.45, 0.4, 0.5]; wrist = mix(1.9, 0.1, d);
+        lean = [mix(-0.35, 0.6, d), 0, 0];
+      } else {
+        // the belly-flop: arms flung wide, flat out
+        R = mix3([-0.9, 0.7, 0], [-1, 0.1, 0.25], d); L = mix3([0.9, 0.7, 0], [1, 0.1, 0.25], d);
+        lean = [mix(-0.2, 1.05, d), 0, 0];
+      }
+      if (rec) { R = mix3(R, READY[st].R, rec); L = mix3(L, READY[st].L, rec); lean = mix3(lean, [READY[st].lean, 0, 0], rec); }
+      k = 1100;
     } else if (mv === 'airLight' || mv === 'airHeavy') {
       const a = mv === 'airHeavy';
       R = mix3([-0.5, 0.7, 0.3], [-0.1, -0.7, 0.9], o); L = a ? mix3([0.5, 0.7, 0.3], [0.1, -0.7, 0.9], o) : [0.6, 0.3, 0.5];
@@ -455,6 +473,11 @@ export class GiraffePuppet extends FightMixin(Athlete) {
       }
       else if (F.mv === 'lowLight') { T.nx = mix(0.6, 1.9, o); T.head = -1 * o; T.stretch = 1 + 0.3 * o; }
       else if (F.mv === 'airLight' || F.mv === 'airHeavy') { T.nx = mix(0.4, 1.6, o); T.head = -0.8; T.stretch = 1 + 0.3 * o; }
+      else if (F.mv === 'dive' || F.mv === 'diveLand') {
+        // the neck chop: the neck reared back through the hang, brought down like an axe
+        const d = F.mv === 'diveLand' ? 1 - smooth(10, 28, F.t) * 0.8 : smooth(5, 9, F.t);
+        T.nx = mix(-0.45, 1.7, d); T.head = mix(0.7, -1.1, d); T.stretch = mix(1, 1.25, d); T.k = 1600;
+      }
       else if (F.mv === 'signature') {
         // Ring Toss: the nose flicks up, then the throw
         const fl = smooth(2, 12, t) * (1 - smooth(14, 22, t));
@@ -631,6 +654,14 @@ export class OctopusPuppet extends FightMixin(class {}) {
           plan.push({ a: front[1], t: at(mix(-1.4, 1.6, sw), 0.15, mix(1.5, 2.8, Math.sin(sw * Math.PI) * 0.6 + 0.4)), k: 0.4 });
         }
         squash = 0.35; sway = mix(-1, 1, sw) * 1.2;
+      } else if (F.mv === 'dive' || F.mv === 'diveLand') {
+        // the tentacle splat: every arm flung out flat round her as she comes down
+        const d = F.mv === 'diveLand' ? 1 - smooth(10, 28, F.t) : smooth(5, 9, F.t);
+        this.arms.forEach((a, j) => {
+          const ang = (j / this.arms.length) * TAU;
+          plan.push({ a, t: at(Math.sin(ang) * mix(1.2, 2.4, d), mix(1.4, 0.05, d), Math.cos(ang) * mix(1.2, 2.4, d)), k: 0.4 * Math.max(0.3, d) });
+        });
+        squash = mix(-0.1, 0.55, d); sway = 0;
       } else if (F.mv === 'airLight' || F.mv === 'airHeavy') {
         if (o > 0.05) {
           plan.push({ a: front[0], t: at(-0.3, -0.5, mix(1, 2.2, o)), k: 0.45 * o });

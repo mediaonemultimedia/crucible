@@ -73,6 +73,12 @@ export class Fight {
       }
     }
     if (e.k === 'ko') { S.shake(1); this.slow = 1.2; }
+    if (e.k === 'slam') {
+      // the dive slam hits the mat: a ring of fluff thrown out both ways, a little shake
+      const x = e.x / U;
+      for (const d of [-1, 1]) { S.tufts(x + d * 0.35, 0.12, 7, 1.0, d); S.tufts(x + d * 0.8, 0.08, 4, 0.6, d); }
+      S.shake(0.4);
+    }
     if (e.k === 'land' && e.hard) S.shake(0.25);
     if (e.k === 'dash') {
       // a kick of fluff off the mat behind the feet

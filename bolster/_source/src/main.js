@@ -30,6 +30,7 @@ const CONTROLS = `
   <span><kbd>P</kbd></span><span>heavy attack — wind-up, lunge, long reach</span>
   <span><kbd>S</kbd>+<kbd>O</kbd></span><span>low attack</span>
   <span><kbd>S</kbd>+<kbd>P</kbd></span><span>signature move</span>
+  <span><kbd>W</kbd> then <kbd>S</kbd>+<kbd>P</kbd></span><span>dive slam (in the air: an overhead — block it standing)</span>
   <span><kbd>Space</kbd></span><span>special (full meter)</span>
   <span><kbd>Esc</kbd></span><span>pause</span>`;
 

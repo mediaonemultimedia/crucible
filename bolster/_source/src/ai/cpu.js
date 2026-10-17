@@ -26,9 +26,9 @@ import { TAP } from '../sim/sim.js';
    how often it jumps a shot coming at it; dash: how often an approach is
    a dash */
 export const LEVELS = {
-  easy:   { delay: 24, think: 12, block: 0.12, guess: 0.5, aa: 0.08, punish: 0.05, special: 0.25, aggro: 0.3, jump: 0.04, whiffy: 0.45, shotCd: 320, shotP: 0.15, zone: 0.25, approach: 0.5, leap: 0.15, dash: 0.25 },
-  normal: { delay: 14, think: 6,  block: 0.5,  guess: 0.75, aa: 0.4, punish: 0.35, special: 0.6, aggro: 0.5, jump: 0.06, whiffy: 0.2, shotCd: 180, shotP: 0.3, zone: 0.4, approach: 0.7, leap: 0.4, dash: 0.45 },
-  hard:   { delay: 7,  think: 3,  block: 0.88, guess: 0.95, aa: 0.8, punish: 0.85, special: 0.95, aggro: 0.6, jump: 0.05, whiffy: 0.04, shotCd: 140, shotP: 0.4, zone: 0.6, approach: 0.8, leap: 0.75, dash: 0.6, space: 0.7 },
+  easy:   { dive: 0.05, delay: 24, think: 12, block: 0.12, guess: 0.5, aa: 0.08, punish: 0.05, special: 0.25, aggro: 0.3, jump: 0.04, whiffy: 0.45, shotCd: 320, shotP: 0.15, zone: 0.25, approach: 0.5, leap: 0.15, dash: 0.25 },
+  normal: { dive: 0.1, delay: 14, think: 6,  block: 0.5,  guess: 0.75, aa: 0.4, punish: 0.35, special: 0.6, aggro: 0.5, jump: 0.06, whiffy: 0.2, shotCd: 180, shotP: 0.3, zone: 0.4, approach: 0.7, leap: 0.4, dash: 0.45 },
+  hard:   { dive: 0.3, delay: 7,  think: 3,  block: 0.88, guess: 0.95, aa: 0.8, punish: 0.85, special: 0.95, aggro: 0.6, jump: 0.05, whiffy: 0.04, shotCd: 140, shotP: 0.4, zone: 0.6, approach: 0.8, leap: 0.75, dash: 0.6, space: 0.7 },
 };
 
 const reach = (m) => reachOf(m);
@@ -154,7 +154,9 @@ export class CPU {
     const theyThrew = oppM && oppM.spawn.length && o.t > oppM.spawn[0].at;
     let press = 0, hold = 0, dash = false;
 
-    if (!free && me.act === 'jump' && dist < 2600 && !me.aired && this.chance(0.5)) press = this.chance(0.5) ? HEAVY : LIGHT;
+    // in the air over them: now and then the dive slam (an overhead), else a jump-in
+    if (!free && me.act === 'jump' && dist < 1800 && !me.aired && me.vy < 120 && this.chance(this.L.dive)) { press = HEAVY; hold = DOWN; }
+    else if (!free && me.act === 'jump' && dist < 2600 && !me.aired && this.chance(0.5)) press = this.chance(0.5) ? HEAVY : LIGHT;
     else if (free) {
       // a full meter: spend it when it'll reach
       if (me.meter >= MAX_METER && dist <= specialRange(me.id) && this.chance(this.L.special)) press = SPECIAL;
