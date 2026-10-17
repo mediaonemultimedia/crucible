@@ -1,0 +1,11 @@
+[{"kind":"hold","ink":"sumi","size":40,"pts":[[0.1,0.2]],"dur":0.5},
+ {"kind":"hold","ink":"sumi","size":40,"pts":[[0.3,0.2]],"dur":2.0},
+ {"kind":"hold","ink":"vermilion","size":40,"pts":[[0.58,0.2]],"dur":1.0},
+ {"kind":"hold","ink":"sumi","size":18,"pts":[[0.62,0.24]],"dur":0.4},
+ {"kind":"hold","ink":"gold","size":44,"pts":[[0.86,0.2]],"dur":1.2},
+ {"kind":"stroke","ink":"sumi","size":36,"pts":[[0.05,0.52],[0.25,0.56],[0.45,0.58]],"dur":0.25,"ease":"in"},
+ {"kind":"stroke","ink":"sumi","size":30,"pts":[[0.05,0.82],[0.25,0.86],[0.45,0.88]],"dur":1.2,"ease":"inout"},
+ {"kind":"stroke","ink":"sumi","size":60,"pts":[[0.55,0.62],[0.72,0.6],[0.92,0.63]],"dur":1.0,"ease":"inout","wMul":1.6,"kMul":0.35},
+ {"kind":"wait","dur":2.2},
+ {"kind":"hold","ink":"water","size":30,"pts":[[0.73,0.62]],"dur":0.7},
+ {"kind":"wait","dur":0.1}]
