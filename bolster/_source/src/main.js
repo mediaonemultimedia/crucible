@@ -10,6 +10,7 @@ import { Showcase, Lineup, portraits } from './render/showcase.js';
 import { Fight } from './fight.js';
 import { Keyboard } from './input/keyboard.js';
 import { FIGHTERS, ROSTER, MAX_METER } from './fighters/index.js';
+import { U } from './render/stage.js';
 import { ROUND_TICKS, hurtBox, limbBox, activeHits } from './sim/sim.js';
 import { moveOf } from './fighters/index.js';
 import { FLAGS } from './ui/flags.js';
@@ -24,17 +25,22 @@ const params = new URLSearchParams(location.search);
 
 const CONTROLS = `
   <h4>Controls</h4>
-  <span><kbd>A</kbd><kbd>D</kbd></span><span>walk · hold back to block</span>
+  <span><kbd>A</kbd><kbd>D</kbd></span><span>walk (back is only a walk)</span>
   <span><kbd>D</kbd><kbd>D</kbd></span><span>dash in (double-tap forward)</span>
   <span><kbd>A</kbd><kbd>A</kbd></span><span>backdash (double-tap back)</span>
-  <span><kbd>W</kbd> <kbd>S</kbd></span><span>jump · crouch (crouch-block lows)</span>
-  <span><kbd>O</kbd></span><span>light attack — quick, short</span>
-  <span><kbd>P</kbd></span><span>heavy attack — wind-up, lunge, long reach</span>
+  <span><kbd>W</kbd> <kbd>S</kbd></span><span>jump · crouch</span>
+  <span class="new"><kbd>E</kbd></span><span class="new">block — high and mid; you stand your ground</span>
+  <span class="new"><kbd>S</kbd>+<kbd>E</kbd></span><span class="new">crouch block — lows and mids, not overheads</span>
+  <span><kbd>O</kbd></span><span>light attack — quick, safe</span>
+  <span><kbd>P</kbd></span><span>heavy attack — long reach; punishable if blocked</span>
   <span><kbd>S</kbd>+<kbd>O</kbd></span><span>low attack</span>
   <span><kbd>S</kbd>+<kbd>P</kbd></span><span>signature move</span>
+  <span class="new"><kbd>O</kbd>+<kbd>P</kbd></span><span class="new">throw (close) — beats a block; O+P as you're grabbed escapes</span>
+  <span class="new"><kbd>O</kbd> <kbd>O</kbd> <kbd>P</kbd></span><span class="new">combo — chain as each hit lands; the last one's amplified</span>
   <span><kbd>W</kbd> then <kbd>S</kbd>+<kbd>P</kbd></span><span>dive slam (in the air: an overhead — block it standing)</span>
   <span><kbd>Space</kbd></span><span>special (full meter)</span>
-  <span><kbd>Esc</kbd></span><span>pause</span>`;
+  <span><kbd>Esc</kbd></span><span>pause</span>
+  <p class="tip">Don't just mash forward: block their heavy, then hit back — a light or a throw gets in first. Hitting them as they wind up is a COUNTER.</p>`;
 
 const flagOf = (id) => FLAGS[FIGHTERS[id].nation];
 
@@ -267,6 +273,8 @@ class App {
     f.onTick = (st) => this._hud(st);
     $('#banner').textContent = '';
     $('#bubbles').textContent = '';
+    $('#pops').textContent = '';
+    for (const c of $$('.combo')) c.classList.remove('on', 'amp');
     for (let k = 0; k < 2; k++) $(`#n${k + 1}`).innerHTML = k === 0 ? `${flagOf(f.st.f[k].id)}<span>${f.name(k)}</span>` : `<span>${f.name(k)}</span>${flagOf(f.st.f[k].id)}`;
     this._hudCache = {};
     this._hud(f.st);
@@ -324,6 +332,58 @@ class App {
     if (ms) this.later(ms / 1000, () => { if (this._bn === mine) B.textContent = ''; });
   }
 
+  /* the combo counter on the attacker's side: '3 HIT COMBO', 'AMPLIFIED!' on the finisher */
+  combo(k, n, amp) {
+    const c = $(`#combo${k + 1}`);
+    c.querySelector('b').textContent = n;
+    c.querySelector('span').textContent = n >= 3 ? 'HIT COMBO' : 'HIT';
+    c.classList.remove('on', 'amp');
+    void c.offsetWidth;            // restart the pop
+    c.classList.add('on');
+    if (amp) c.classList.add('amp');
+    const mine = (this._cn = this._cn || [0, 0])[k] = this._cn[k] + 1;
+    this.later(amp ? 1.6 : 1.1, () => { if (this._cn[k] === mine) c.classList.remove('on', 'amp'); });
+  }
+
+  /* a small neon word popped up where it happened (COUNTER, TECH) */
+  pop(text, x, y, cls = '') {
+    const v = new THREE.Vector3(x / U, y / U, 0).project(this.stage.camera);
+    const el = document.createElement('div');
+    el.className = `pop ${cls}`;
+    el.textContent = text;
+    el.style.left = `${Math.max(60, Math.min(innerWidth - 60, (v.x * 0.5 + 0.5) * innerWidth))}px`;
+    el.style.top = `${Math.max(150, (-v.y * 0.5 + 0.5) * innerHeight - 110)}px`;
+    $('#pops').appendChild(el);
+    (this.pops = this.pops || []).push({ el, t: 0 });
+    this._pops(0);
+  }
+
+  /* the pops run on the app's own time (like the banners): a slam in, a hold, a drift up and out */
+  _pops(dt) {
+    if (!this.pops?.length) return;
+    this.pops = this.pops.filter((p) => {
+      p.t += dt;
+      const t = p.t;
+      if (t >= 0.9) { p.el.remove(); return false; }
+      const sc = t < 0.12 ? 1.7 - 0.7 * (t / 0.12) : 1, up = t > 0.6 ? (t - 0.6) / 0.3 : 0;
+      p.el.style.opacity = 1 - up;
+      p.el.style.transform = `translate(-50%, ${-50 - 70 * up}%) skewX(-10deg) scale(${sc})`;
+      return true;
+    });
+  }
+
+  /* the K.O.'s white flash: bright through the sim's hit-freeze, gone as
+     the slow motion starts (so it's the same on both screens online) */
+  _flash(st) {
+    const el = $('#flash');
+    let a = 0;
+    if (st && st.phase === 'ko' && st.kt < st.kn) {
+      const n = st.kf ? 12 : 9;
+      a = st.kt < n ? 0.92 * (1 - st.kt / n) : 0;
+    }
+    if (this._fa !== a) { this._fa = a; el.style.opacity = a; }
+  }
+
   /* where a fighter's head is on screen */
   headScreen(k, lift = 0.6) {
     const p = this.fight.plush[k];
@@ -340,20 +400,28 @@ class App {
       else this.banner('Fight!', '', 800);
     }
     if (e.k === 'round') { for (const p of f.plush) p.reset(); }
-    if (e.k === 'ko') {
+    if (e.k === 'hit') {
+      if (e.n >= 2) this.combo(e.p, e.n, e.amp);
+      if (e.ctr) this.pop('COUNTER', e.x, e.y, e.p ? 'p2' : 'p1');
+    }
+    if (e.k === 'tech') this.pop('TECH', e.x, e.y, 'tech');
+    // the K.O.: the white flash on contact; the launch, the slow motion and
+    // the bounce are the sim's (fight.js shows them); then the banner
+    if (e.k === 'koapex' && st.fluff && st.f[e.p].act === 'ko' && !this._fluffed) {
+      // Fluffatality: he bursts at the top of the arc, in slow motion
+      this._fluffed = true;
+      const p = f.plush[e.p];
+      this.stage.burst(p);
+      this.stage.shake(0.9);
+      p.deflateTarget = 1;
+      this.banner('Fluffatality', 'fluffatality', 0);
+    }
+    if (e.k === 'ko') this._fluffed = false;
+    if (e.k === 'kobanner') {
       const dbl = e.w === 2;
-      this.banner(dbl ? 'Double K.O.' : 'K.O.', 'ko', 1500);
-      const loser = dbl ? -1 : 1 - e.w;
-      if (e.fluff && loser >= 0) {
-        // Fluffatality: the loser goes up in a cloud of stuffing and flops
-        this.later(1.1, () => {
-          const p = f.plush[loser];
-          this.stage.burst(p);
-          this.stage.shake(0.9);
-          p.deflateTarget = 1;
-          this.banner('Fluffatality', 'fluffatality', 2600);
-        });
-      } else if (e.perfect) this.later(1.55, () => this.banner('Fluffless Victory!', 'fluffless', 1700));
+      if (e.fluff) this.later(0.6, () => this.banner('Fluffatality', 'fluffatality', 1800, dbl ? '' : 'K.O.'));
+      else this.banner(dbl ? 'Double K.O.' : 'K.O.', 'ko', 1500);
+      if (e.perfect) this.later(e.fluff ? 2.5 : 1.55, () => this.banner('Fluffless Victory!', 'fluffless', 1700));
     }
     if (e.k === 'time') {
       this.banner(e.w === 2 ? 'Draw' : 'Time', '', 1500);
@@ -417,6 +485,8 @@ class App {
     }
     if (this.fight) {
       this.fight.frame(dt);
+      this._flash(this.fight.st);
+      this._pops(this.fight.paused ? 0 : dt);
     } else if (this.show) this.show.frame(dt);
     else if (this.lineup) this.lineup.frame(dt);
     else this.stage.frame(-2.7, 2.7, dt, innerWidth / innerHeight), this.stage.update(dt);

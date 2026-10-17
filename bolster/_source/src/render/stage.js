@@ -15,6 +15,7 @@ import { RING_COLORS } from '../../shared/grommet/giraffeprops.js';
 import { KEY } from '../../shared/grommet/fur.js';
 
 export const U = 1000;   // sim units per world unit
+const lerp = (a, b, t) => a + (b - a) * t;
 
 /* WebGPU when the adapter answers; WebGL 2 when it doesn't (Grommet's) */
 export async function makeRenderer(canvas) {
@@ -142,7 +143,7 @@ export class Stage {
     g.beginPath(); g.arc(W / 2, H / 2, 46, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
   }
 
-  /* ── camera: frames both fighters, a little shake on a big hit ─────────── */
+/* ── camera: frames both fighters, a little shake on a big hit ─────────── */
   frame(xa, xb, dt, aspect, focus = null, high = 0) {
     let mid = (xa + xb) / 2;
     const sep = Math.abs(xa - xb);
@@ -166,8 +167,14 @@ export class Stage {
     const hw = focus ? 0 : Math.max(0, high - 0.8);
     this.cam.up = (this.cam.up || 0) + (hw - (this.cam.up || 0)) * Math.min(1, dt * 9);
     const L = (this.cam.lift || 0) - this.cam.up * 1.0, D = this.cam.d + this.cam.up * 1.6;
-    C.position.set(this.cam.x + jx, 3.7 + jy - L, D);
-    C.lookAt(this.cam.x + jx * 0.5, 2.1 + jy * 0.5 - L * 0.4, 0);
+    // a focus with a height to track (the K.O. launch): the camera follows
+    // that height, eased in and out
+    const tw = focus && focus.ty !== undefined ? 1 : 0;
+    this.cam.tw = (this.cam.tw || 0) + (tw - (this.cam.tw || 0)) * Math.min(1, dt * 3);
+    if (tw) this.cam.ty = this.cam.ty === undefined ? focus.ty : this.cam.ty + (focus.ty - this.cam.ty) * Math.min(1, dt * 6);
+    const w = this.cam.tw, ty = this.cam.ty || 0;
+    C.position.set(this.cam.x + jx, lerp(3.7 - L, ty + 1.1, w) + jy, D);
+    C.lookAt(this.cam.x + jx * 0.5, lerp(2.1 - L * 0.4, ty, w) + jy * 0.5, 0);
     C.updateProjectionMatrix();
   }
 

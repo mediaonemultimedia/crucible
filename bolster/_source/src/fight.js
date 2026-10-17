@@ -32,8 +32,7 @@ export class Fight {
     this.prevProj = new Map();
     this.onEvent = () => {};
     this.onTick = () => {};
-    this.speed = 1;
-    this.slow = 0;          // seconds of slow motion (a K.O.)
+    this.speed = 1;          // (the K.O.'s slow motion is the sim's own: st.ks)
     this.lastInputs = [0, 0];
     this.override = null;
     this.focus = null;         // the winner screen: the camera on one spot
@@ -84,16 +83,32 @@ export class Fight {
       const victim = this.plush[1 - e.p], dir = Math.sign(st.f[1 - e.p].x - st.f[e.p].x) || 1;
       if (e.k === 'hit') {
         const big = e.dmg >= 70 || e.kd;
-        S.spark(x, y, big ? 'big' : 'hit', big ? 2.1 : 1.4);
-        S.tufts(x, y, big ? 10 : 5, big ? 1.3 : 0.9, dir);
-        S.shake(big ? 0.55 : 0.18);
-        victim.hit(e.dmg, e.kd, dir);
+        // an amplified finisher: a bigger spark, more stuffing, a harder shake
+        S.spark(x, y, big || e.amp ? 'big' : 'hit', e.amp ? 3.1 : big ? 2.1 : e.ctr ? 1.8 : 1.4);
+        S.tufts(x, y, e.amp ? 20 : big ? 10 : 5, e.amp ? 1.8 : big ? 1.3 : 0.9, dir);
+        S.shake(e.amp ? 0.85 : big ? 0.55 : 0.18);
+        victim.hit(e.amp ? e.dmg * 1.6 : e.dmg, e.kd, dir);
       } else {
         S.spark(x, y, 'block', 1.5, dir);
         victim.hit(e.dmg * 0.3, 0, dir);
       }
     }
-    if (e.k === 'ko') { S.shake(1); this.slow = 1.2; }
+    if (e.k === 'koflash') {
+      // the K.O. hit: a white flash (the UI's), a big burst of stuffing, the camera kicked
+      const x = e.x / U, y = e.y / U, dir = Math.sign(st.f[1 - e.p].x - st.f[e.p].x) || 1;
+      S.spark(x, y, 'big', e.final ? 4 : 3.3);
+      S.tufts(x, y, e.final ? 46 : 30, e.final ? 2.6 : 2, dir);
+      if (e.final) { S.tufts(x, y + 0.6, 24, 3, -dir); S.tufts(x, y - 0.4, 18, 2.4, dir); }
+      S.shake(1.1);
+      this.plush[1 - e.p].hit(260, 1, dir);
+    }
+    if (e.k === 'kobounce') {
+      // the floor: a squash and a puff of fluff both ways
+      const x = e.x / U;
+      for (const d of [-1, 1]) S.tufts(x + d * 0.4, 0.1, 9, 0.9, d);
+      S.shake(0.45);
+      this.plush[e.p].hit(140, 1, 0);
+    }
     if (e.k === 'slam') {
       // the dive slam hits the mat: a ring of fluff thrown out both ways, a little shake
       const x = e.x / U;
@@ -113,8 +128,7 @@ export class Fight {
   /* real time in; whole ticks out; then draw, interpolated */
   frame(dt) {
     if (!this.paused) {
-      let d = dt * this.speed;
-      if (this.slow > 0) { this.slow -= dt; d *= 0.35; }
+      const d = dt * this.speed;
       this.acc = Math.min(this.acc + d, TICK * 8);
       while (this.acc >= TICK) { this.acc -= TICK; this.tick(); }
     }
@@ -123,16 +137,29 @@ export class Fight {
 
   _place(dt) {
     const st = this.st, a = this.acc / TICK;
+    // the K.O. cinematic: the camera eases in on the one flying and follows
+    // him up; the stuffing (soft bodies, sparks, tufts) runs at the sim's
+    // time scale, so the slow motion is the same on every screen
+    const koSeq = st.phase === 'ko' && st.kt < st.kn;
+    const slow = koSeq ? st.ks / 100 : 1;
     const P = st.f.map((f, k) => ({ x: (this.prev[k].x + (f.x - this.prev[k].x) * a) / U, y: (this.prev[k].y + (f.y - this.prev[k].y) * a) / U }));
     for (let k = 0; k < 2; k++) {
       const F = st.f[k], O = st.f[1 - k];
       const threat = O.act === 'attack' || st.proj.some((p) => p.o !== k);
-      this.plush[k].update(Math.min(dt, 0.05), F, O, P[k].x, P[k].y, P[1 - k].x, P[1 - k].y, threat);
+      this.plush[k].update(Math.min(dt, 0.05) * slow, F, O, P[k].x, P[k].y, P[1 - k].x, P[1 - k].y, threat);
     }
+    if (koSeq) {
+      const L = st.f.map((f, k) => (f.act === 'ko' ? k : -1)).filter((k) => k >= 0);
+      const k = L.length === 1 ? L[0] : -1;
+      const x = k >= 0 ? P[k].x : (P[0].x + P[1].x) / 2, y = k >= 0 ? P[k].y : 0;
+      // (ty: the height to keep in the middle — his middle, a little low in the climb)
+      this.koCam = { x, d: st.kf ? 9 : 10, y: 0, ty: Math.max(1.8, y + 1.2) };
+      this.focus = this.koCam;
+    } else if (this.koCam) { if (this.focus === this.koCam) this.focus = null; this.koCam = null; }
     const extra = this.stage.projectiles(st.proj, a, this.prevProj);
     this.stage.frame(P[0].x, P[1].x, dt || 0.016, innerWidth / innerHeight, this.focus, Math.max(P[0].y, P[1].y));
     this.stage.paintShadows(this.plush, extra);
-    this.stage.update(dt);
+    this.stage.update(dt * slow);
   }
 
   dispose() { for (const p of this.plush) p.dispose(this.stage.scene); this.stage.projectiles([], 0, null); }

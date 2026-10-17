@@ -265,6 +265,16 @@ export class Plush {
     this.pos.set(nx, ny, 0);
     g.position.set(nx, ny, 0);
     g.rotation.y = this.yaw.x;
+    // the K.O. launch: he tumbles end over end (the sim's own spin, kr in
+    // thousandths of a turn), about his middle; flat out once he's down
+    if (F.act === 'ko' && F.kb < 1 && F.kdir) this._spin = -F.kdir * (F.kr / 1000) * Math.PI * 2;
+    else { const w = Math.atan2(Math.sin(this._spin || 0), Math.cos(this._spin || 0)); this._spin = w * Math.max(0, 1 - dt * 10); if (Math.abs(this._spin) < 0.01) this._spin = 0; }
+    if (this._spin) {
+      const h = 1.5, a = this._spin;
+      g.rotation.order = 'ZYX';
+      g.rotation.z = a;
+      g.position.set(nx + h * Math.sin(a), ny + h - h * Math.cos(a), 0);
+    } else g.rotation.z = 0;
     // hit squash
     const ks = 260;
     this.squash.v += (ks * (0 - this.squash.x) - 2 * Math.sqrt(ks) * 0.5 * this.squash.v) * dt;
@@ -379,6 +389,8 @@ export class Plush {
     if (this.puppet.balanceK !== undefined && this.puppet.balanceK === 0) this.puppet.balanceK = 0.011;
     this.deflate = 0;
     this.deflateTarget = 0;
+    this._spin = 0;
+    this.group.rotation.z = 0;
     this.group.visible = true;
     for (let i = 0; i < 40; i++) this.soft.advance(1 / 120, (h) => this.puppet.update(h), (h) => { this.body.update(h); this.cloth?.update(h); });
   }

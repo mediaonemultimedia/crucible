@@ -172,6 +172,30 @@ body[data-screen=win] #hud{display:none}
 .meter.full .mlab::after{content:" — READY [SPACE]"}
 .meter.r.full .mlab::after{content:" — READY"}
 
+/* combo counter, pops, the K.O. flash ---------------------------------------- */
+.combo{position:absolute;top:clamp(104px,13vw,140px);display:flex;flex-direction:column;align-items:flex-start;opacity:0;font-family:var(--cond);font-weight:700;font-style:italic;text-transform:uppercase;transform:skewX(-10deg);pointer-events:none}
+.combo.l{left:3vw}
+.combo.r{right:3vw;align-items:flex-end}
+.combo b{font-size:clamp(46px,6vw,78px);line-height:.9;color:#fff;-webkit-text-stroke:2px var(--stage);paint-order:stroke fill;text-shadow:0 0 12px var(--p1),0 0 30px rgba(255,59,107,.55)}
+.combo.r b{text-shadow:0 0 12px var(--p2),0 0 30px rgba(63,240,200,.5)}
+.combo span{font-size:clamp(14px,1.6vw,20px);letter-spacing:.22em;color:#ffd0db;text-shadow:0 0 8px var(--p1)}
+.combo.r span{color:#dffff6;text-shadow:0 0 8px var(--p2)}
+.combo em{display:none;margin-top:4px;font-style:italic;font-size:clamp(20px,2.6vw,34px);letter-spacing:.06em;color:#fff;background:var(--violet);padding:0 10px 2px;box-shadow:0 0 18px var(--violet),0 0 40px rgba(155,92,255,.6)}
+.combo.on{animation:combopop .32s cubic-bezier(.2,1.7,.4,1) forwards}
+.combo.amp em{display:block;animation:ampflash .5s steps(2) 3}
+@keyframes combopop{0%{opacity:0;transform:skewX(-10deg) scale(1.6)}100%{opacity:1;transform:skewX(-10deg) scale(1)}}
+@keyframes ampflash{50%{background:#fff;color:var(--violet)}}
+#pops{position:absolute;inset:0;pointer-events:none}
+.pop{position:absolute;transform:translate(-50%,-50%) skewX(-10deg);font-family:var(--cond);font-weight:700;font-style:italic;font-size:clamp(22px,2.6vw,34px);letter-spacing:.08em;color:#fff;-webkit-text-stroke:1.5px var(--stage);paint-order:stroke fill;text-shadow:0 0 10px #ffd23f,0 0 26px rgba(255,210,63,.6);white-space:nowrap}
+.pop.p1{text-shadow:0 0 10px #ffd23f,0 0 22px var(--p1)}
+.pop.p2{text-shadow:0 0 10px #ffd23f,0 0 22px var(--p2)}
+.pop.tech{color:#dffff6;text-shadow:0 0 10px var(--violet),0 0 26px var(--violet)}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none}
+.controls .new{color:#fff}
+.controls span.new:nth-child(even){color:#e8dcff}
+.controls .tip{grid-column:1/-1;margin:6px 0 0;font-size:11.5px;line-height:1.35;color:#cdb6ff;border-top:1px solid var(--line);padding-top:6px}
+#select-screen .controls .tip{display:none}
+
 /* banners ------------------------------------------------------------------- */
 #banner{position:absolute;left:0;right:0;top:38%;text-align:center;pointer-events:none}
 #banner .b{display:inline-block;font-family:var(--cond);font-weight:700;font-style:italic;font-size:clamp(54px,10vw,140px);line-height:1;color:var(--ink);
@@ -187,6 +211,11 @@ body[data-screen=win] #hud{display:none}
 #pause-screen{background:rgba(18,13,31,.72);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
 #pause-screen .menu{width:min(90vw,660px);flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:18px}
 #pause-screen .col{display:flex;flex-direction:column;gap:12px;width:min(86vw,300px)}
+@media (min-width:900px){
+  #pause-screen .menu{width:min(96vw,980px);flex-wrap:nowrap}
+  #pause-screen .col{width:260px;flex:0 0 auto}
+  #pause-screen .controls{grid-template-columns:auto 1fr auto 1fr;max-width:640px;gap:6px 10px}
+}
 
 /* winner -------------------------------------------------------------------- */
 #win-screen .who{position:absolute;left:50%;top:5%;transform:translateX(-50%);text-align:center;width:90vw}
@@ -335,6 +364,9 @@ body.netwait #netwait{display:flex}
         <div class="pips" id="pips2"><b></b><b></b></div>
       </div>
     </div>
+    <div class="combo l" id="combo1"><b>2</b><span>HIT</span><em>AMPLIFIED!</em></div>
+    <div class="combo r" id="combo2"><b>2</b><span>HIT</span><em>AMPLIFIED!</em></div>
+    <div id="pops"></div>
     <div class="meters">
       <div class="meter" id="m1"><span class="mlab">SPECIAL</span><div class="mbar"><i></i></div></div>
       <div class="meter r" id="m2"><span class="mlab">SPECIAL</span><div class="mbar"><i></i></div></div>
@@ -344,6 +376,7 @@ body.netwait #netwait{display:flex}
   <div id="net" aria-live="polite"></div>
   <div id="netwait"><div class="box"><span class="spin"></span><span id="netwait-msg">Waiting for opponent (10s)</span></div></div>
 
+  <div id="flash"></div>
   <div id="banner"></div>
 
   <section id="pause-screen" class="screen">
