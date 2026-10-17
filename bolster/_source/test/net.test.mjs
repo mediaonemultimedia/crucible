@@ -63,6 +63,9 @@ function playOnline({ p1, p2, seed, net, inputs, maxMs = 60 * 60 * 1000 * 0.25, 
       if (ev) for (const e of ev) evs[P.local].push(e);
     }
   }
+  // one more pass: confirmation can arrive after a peer's last flush (the
+  // game keeps ticking; this harness stops, so flush what's now final)
+  for (const P of peers) { const ev = P.idle(); if (ev) for (const e of ev) evs[P.local].push(e); }
   return { peers, evs, desyncs };
 }
 

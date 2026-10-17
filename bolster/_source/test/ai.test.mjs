@@ -76,3 +76,49 @@ test('Hard defends far better than Easy (blocks, out-pokes), and both use the sp
     assert.ok(sp > 0, `${level} used its special`);
   }
 });
+
+/* a scripted attacker for the guard tests: walks in, then only lows (S+O)
+   or only jump-in dive slams (overheads) */
+function guardRun(level, kind) {
+  let g = 0, gc = 0, blocked = 0, hit = 0;
+  for (let s = 0; s < 6; s++) {
+    const st = createMatch({ p1: 'kevalanche', p2: 'johnny', seed: 50 + s });
+    st.phase = 'fight';
+    const cpu = new CPU(1, level, 50 + s);
+    for (let i = 0; i < 3000; i++) {
+      const d = st.f[1].x - st.f[0].x;
+      const a = kind === 'low' ? (d > 1900 ? 2 : i % 40 === 0 ? 8 | 16 : 8) : (d > 2600 ? 2 : i % 90 === 0 ? 4 | 2 : i % 90 === 16 ? 8 | 32 : 0);
+      stepInPlace(st, a, cpu.input(st));
+      if (st.f[1].act === 'guard') { g++; if (st.f[1].down) gc++; }
+      for (const e of st.ev) if (e.p === 0) { if (e.k === 'block') blocked++; if (e.k === 'hit') hit++; }
+      st.f[0].hp = Math.max(st.f[0].hp, 500); st.f[1].hp = Math.max(st.f[1].hp, 500); st.phase = 'fight';
+    }
+  }
+  return { crouched: gc / Math.max(1, g), blocked, hit, share: blocked / Math.max(1, blocked + hit) };
+}
+
+test('blocking with E: Easy rarely, Hard well — it crouch-guards against lows and stands up to overheads', () => {
+  const lo = { easy: guardRun('easy', 'low'), hard: guardRun('hard', 'low') };
+  assert.ok(lo.hard.crouched >= 0.6, `hard crouches ${lo.hard.crouched.toFixed(2)} of its guard against lows`);
+  assert.ok(lo.hard.hit * 3 < lo.easy.hit, `lows landed: hard ${lo.hard.hit}, easy ${lo.easy.hit}`);
+  const hi = { easy: guardRun('easy', 'dive'), hard: guardRun('hard', 'dive') };
+  assert.ok(hi.hard.share > hi.easy.share * 2, `overheads blocked: hard ${hi.hard.share.toFixed(2)}, easy ${hi.easy.share.toFixed(2)}`);
+});
+
+test('the CPU techs throws: Hard often, Easy seldom', () => {
+  const rate = {};
+  for (const level of ['easy', 'hard']) {
+    let techs = 0, grabs = 0;
+    for (let s = 0; s < 30; s++) {
+      const st = createMatch({ p1: 'sumaura', p2: 'johnny', seed: 70 + s });
+      st.phase = 'fight'; st.f[0].x = -800; st.f[1].x = 800;
+      const cpu = new CPU(1, level, 70 + s);
+      for (let i = 0; i < 60; i++) {
+        stepInPlace(st, i === 0 ? 48 : 0, cpu.input(st));
+        for (const e of st.ev) { if (e.k === 'grab' && e.throw) grabs++; if (e.k === 'tech') techs++; }
+      }
+    }
+    rate[level] = techs / Math.max(1, grabs);
+  }
+  assert.ok(rate.hard > 0.5 && rate.easy < 0.25, JSON.stringify(rate));
+});

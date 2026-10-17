@@ -75,6 +75,16 @@ export class CPU {
 
   chance(p) { return this.rng.int(10000) < p * 10000; }
 
+  /* the guard it holds on a guess: crouching about as often as they've been
+     going low (Hard reads that well, Easy hardly at all); never crouched
+     against someone in the air (an overhead's coming) */
+  guard(o) {
+    if (o.air) return BLOCK;
+    const r = Math.min(1, this.L.read);
+    const p = 0.25 * (1 - r) + Math.min(0.9, (this.lows ?? 0.25) * 1.15) * r;
+    return BLOCK | (this.chance(p) ? DOWN : 0);
+  }
+
   _observe(st) {
     const o = st.f[1 - this.side];
     this.seen.push({
@@ -85,6 +95,11 @@ export class CPU {
     // how much they've been swinging lately (attack starts, decaying over ~1.5 s)
     const s0 = this.seen[0];
     this.heat = (this.heat || 0) * 0.985 + (s0.act === 'attack' && s0.t === 1 ? 1 : 0);
+    // and what with: lows vs everything else (its guard leans the way they do)
+    if (s0.act === 'attack' && s0.t === 1) {
+      const m = FIGHTERS[s0.id].moves[s0.mv];
+      this.lows = (this.lows ?? 0.25) * 0.85 + (m.low ? 0.15 : 0);
+    }
     return s0;
   }
 
@@ -229,7 +244,7 @@ export class CPU {
         if (left > hs + 1 && dist < rh) press = HEAVY;
         else if (left > ls + 1 && dist < rl + 300) press = LIGHT;
         else if (rs && dist < rs && !shooter && left > M.signature.hits[0].from) { hold = DOWN; press = HEAVY; }
-        else hold = BLOCK;
+        else hold = this.guard(o);
       }
       // they threw from range: in on the recovery
       else if (theyThrew && dist > rh && this.chance(this.L.punish + 0.3)) {
@@ -237,7 +252,7 @@ export class CPU {
       } else if (dist < reach(FIGHTERS[o.id].moves.heavy) + 300 && !o.air && o.act !== 'hitstun' && o.act !== 'down' && this.chance(this.L.block * 0.6 + Math.min(0.4, this.heat * 0.06) * this.L.read)) {
         // they're coming in (or swinging) within their heavy's reach: guard
         // on the guess (nobody reacts to a jab), mostly standing
-        hold = BLOCK | (this.chance(0.25) ? DOWN : 0);
+        hold = this.guard(o);
       } else if (dist <= throwR && !o.air && (o.act === 'guard' || o.act === 'idle' || o.act === 'crouch') && this.chance(this.L.throwP)) {
         press = LIGHT | HEAVY;                               // they're turtling: throw them
       } else if (dist <= poke && this.chance(this.L.aggro + 0.2)) {
@@ -263,7 +278,7 @@ export class CPU {
         press = this.chance(0.5) ? LIGHT : HEAVY;          // swinging at air
       } else if (dist < reach(FIGHTERS[o.id].moves.light) + 700 && this.chance(this.L.block * 0.7)) {
         // inside their poke range: guard (a guess at high or low)
-        hold = BLOCK | (this.chance(0.35) ? DOWN : 0);
+        hold = this.guard(o);
       } else {
         // footsies: drift toward the range its pokes like (a shooter
         // sometimes hangs back to zone; everyone comes in from far off)
@@ -279,8 +294,8 @@ export class CPU {
         if (dist > want + 400) {
           if (dist > want + 2200 && this.chance(this.L.approach * this.L.dash)) dash = true;
           else hold = this.chance(this.L.approach) ? fwd : 0;
-        } else if (dist < want - 900 && this.chance(0.5)) hold = inTheirReach ? BLOCK : back;
-        else hold = this.chance(0.3) ? (inTheirReach ? BLOCK : back) : 0;
+        } else if (dist < want - 900 && this.chance(0.5)) hold = inTheirReach ? this.guard(o) : back;
+        else hold = this.chance(0.3) ? (inTheirReach ? this.guard(o) : back) : 0;
       }
     }
     if (dash) {

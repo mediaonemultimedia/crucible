@@ -23,6 +23,8 @@ node tools/balance.mjs normal 50 # seeded CPU-vs-CPU win rates, every pairing, i
 node tools/framedata.mjs         # frame data for every fighter → docs/FRAMES.md
 node tools/polish-shots.mjs [--html F] [--out D] [--q '&boxes'] [scene …]
                                  # shoulder sheets and light/heavy strips, any build
+node tools/combat-shots.mjs [block|throws|counter|combo|controls|ko|ko-final]
+                                 # the combat pass's evidence → shots/combat/
 ```
 
 Open `final.html`, or deep-link straight into a fight:
@@ -30,6 +32,72 @@ Open `final.html`, or deep-link straight into a fight:
 to the computer too; `seed=N` fixes the match seed; `toques=1`; `webgl` forces
 the WebGL 2 path; `hold` stops the free-running loop for scripted stepping;
 `boxes` draws the sim's hurt, limb, hit and shot boxes over the picture).
+
+## Combat pass (bolster-combat)
+
+The owner's note: *"there are few advantages to staying away, I just press
+forward and keep punching."* This pass makes spacing, defence and timing
+matter. Full rules and every move's frame data: `docs/FRAMES.md`.
+
+- **E blocks.** Holding back only walks away now. E standing blocks high
+  and mid, S+E low and mid; overheads (jump-ins, the dive slam, Sky Neck,
+  the Royal Squash) need a standing block. Guarding holds you in place
+  (act `guard`: no walk, jump or dash). A blocked hit pushes both apart
+  (blocker 1.5× the push, attacker ½, all of it in the corner). Only
+  signatures, specials and shots chip. The input mask gains an eighth bit
+  (`BLOCK = 128`); masks 0–127 mean what they did, so replays and the
+  online protocol (which sends masks as numbers) are unchanged in shape.
+- **Frame advantage:** lights −1 on block (safe), heavies −9 to −11 and
+  every signature, the Bamboo Headbutt now included, −10 or worse
+  (punishable: the blocker is out first and a light or a throw gets in);
+  a blocked dive slam gets the whole 30-tick landing lag. A whiffed heavy
+  adds 6 ticks.
+- **Throw:** O+P within 2 real ticks of each other (hit-pause doesn't
+  stretch it), close (touching + 520); beats a blocker, can't grab anyone
+  in the air, knocked down or in hit/block stun. **Tech** with O+P in the
+  first 12 ticks of the hold. Animations: Kevalanche clinch-and-shove,
+  Rubberta tentacle wrap-and-fling, Johnny racquet hook, Sumaura push-out,
+  K8-E neck swing (`render/puppets.js`, moves `throw` / `throwHold`).
+- **Counter-hit:** a hit in the other one's startup: 125%, +8 hitstun, a
+  COUNTER pop.
+- **Anti-mash:** three lights in a string lock lights out for 26 ticks; the
+  same light landing again within 2 s does 85 / 70 / 55%.
+- **Chains and the amplified finisher:** on contact, inside 9 ticks of the
+  last active frame: light → light / heavy / S+P / special, low → the same,
+  heavy → S+P or the special on a full meter. A heavy / signature / special
+  that finishes a true combo is amplified (132% after one link, 144% after
+  two, a hard knockdown, +90 / +130 meter, a bigger spark): the HUD shows
+  `N HIT COMBO` on the attacker's side and `AMPLIFIED!`. Hits after the
+  third scale down 15% each. Every fighter's O → O → P is a true combo on
+  every opponent (tested); bread-and-butters are in `docs/FRAMES.md`.
+- **The slow-motion K.O.** (every round-ending K.O.; not a time-out): a
+  6-tick hit-freeze with a white flash and a stuffing burst, then the loser
+  launched up and back at 25% speed (90 ticks; 120 and higher for the
+  match-winning K.O.), the time scale ramping back as he comes down, one
+  bounce with a squash and a puff, flat, then the K.O. banner. It's a phase
+  of the sim (`koStep`): a fixed tick count, inputs ignored, the launch in
+  hundredths of a unit advanced by the scheduled scale `st.ks` each tick —
+  not a render trick — so online peers see the same frames and a rollback
+  across the K.O. resimulates it exactly. The renderer only reads it: the
+  camera eases in and tracks the plush, the soft bodies and particles run
+  at `st.ks`, the tumble is the sim's `kr`. A Fluffatality bursts at the
+  top of the arc (`koapex`). `kobanner` is a flow event (fires once
+  confirmed online).
+- **AI:** blocks with E (Easy rarely, Hard well), guards on a guess when
+  someone's in range (more against someone who never stops swinging),
+  leans its guard low against a low-heavy opponent and never crouches under
+  an overhead, punishes unsafe moves it blocked (a light, sometimes a
+  throw), throws turtles, techs throws (Easy 10%, Hard 75%), chains O → O
+  → P on contact (Hard confirms the hit first).
+- **Bug fixed on the way:** a projectile carried no hit-pause, so the first
+  shot to connect left `st.pause` NaN for the rest of the match — no more
+  hit-pause, and buffered presses never expired (which is how mashing O and
+  P apart could throw). Every shot now has its own pause.
+
+`test/combat.test.mjs` covers all of it, including the **anti-mash test**:
+a bot that walks forward mashing lights and heavies (`src/ai/masher.js`)
+loses at least 70% of seeded matches to the Normal CPU (it lost 18 of 20 and 34 of 40 in
+the wider run).
 
 ## Online (stage 2: bolster-online)
 
@@ -150,7 +218,7 @@ src/
                     Integers only (1000 = one world unit), the PRNG in the
                     state, no clock, no renderer. clone() / hash() for rollback.
   sim/rng.js        mulberry32 on a uint32 in the state
-  sim/input.js      the 7-bit input mask (← → ↑ ↓ O P Space)
+  sim/input.js      the 8-bit input mask (← → ↑ ↓ O P Space E)
   fighters/         per-fighter numbers: walk/jump, push and hurt boxes, every
                     move's hits (window, box, damage, level, stun, push),
                     motion, projectiles, grab; names, flags, lines
@@ -194,10 +262,11 @@ the input mask per tick, `clone`, `stepInPlace`, `hash` — see *Online* above.
 
 Rules: double-tap forward dashes in, double-tap back backdashes (a tap is
 a press let go within 12 ticks; a held walk that stops and starts again is
-not one); holding away blocks; standing blocks high and mid, crouching blocks
-low and mid; jumping attacks and Sky Neck are high (overheads); the Abraço is
-unblockable. Light (O) is quick, short and weak with a fast recovery, and cancels into
-heavy, the signature or the special on contact. Heavy (P) winds up (13–15
+not one); E blocks (holding back only walks; see *Combat pass*); standing
+blocks high and mid, crouching blocks low and mid; jumping attacks and Sky
+Neck are high (overheads); the Abraço is unblockable. Light (O) is quick,
+short and weak with a fast recovery, and chains into another light, heavy,
+the signature or the special on contact. Heavy (P) winds up (13–15
 ticks: he rears back and loads it), then lunges — the body steps in and the
 limb goes well past the jab — for more damage and a long recovery; while
 the limb is out it has its own hurt box at its height, so a whiffed heavy
@@ -210,7 +279,8 @@ more. Match Point's volley is a special and may have five out. Frame data
 for every move: `docs/FRAMES.md`. Meter fills from hits landed (90% of damage) and taken (35%), a
 little on block, none from a special's own hits; tuned for about one full
 meter a round. Combos scale down (a special much less). 99-second rounds, best
-of three; a draw on time gives both a round.
+of three; a draw on time gives both a round. (Combo scaling, chains and the
+amplified finisher are the combat pass's: see above.)
 
 ### The plush (cosmetic only)
 
