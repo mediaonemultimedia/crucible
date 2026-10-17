@@ -201,9 +201,10 @@ float flux(vec4 a, vec4 b, vec4 pa, vec4 pb, float da, float db) {
   float d = a.a - b.a;
   bool fw = d > 0.;
   float ws = fw ? a.a : b.a, wd = fw ? b.a : a.a, dd = fw ? db : da, th = fw ? pb.g : pa.g;
-  th *= 1. - .75 * dd;                                       // damp paper wicks more readily, but still unevenly: cauliflowers
+  th *= 1. - .45 * dd;                                       // damp paper wicks more readily, but still unevenly: cauliflowers
   float gate = max(smoothstep(0., .015, wd), smoothstep(th, th + .05, ws));
-  float mob = pow(.5 * (a.a + b.a), 1.6) * min(pa.r, pb.r) * gate;
+  float ab = min(pa.r, pb.r);
+  float mob = pow(.5 * (a.a + b.a), 1.6) * ab * ab * gate;
   return min(uK * mob, .2) * d;
 }
 // pigment and metal carried with that water (metal is heavy and travels less)
@@ -240,10 +241,10 @@ void main() {
   float st = w < .01 ? clamp(uSlow * 14., 0., 1.) : clamp(uSlow * (.06 + .9 * (1. - smoothstep(0., .2, w))) * (.75 + .5 * tooth) * (.1 + 1.8 * pp.r * pp.r), 0., 1.);
   vec4 settled = sus * vec4(st, st, st, min(1., st * 3. + uSlow * .3));
   sus -= settled;
-  damp = w > .015 ? 1. : max(0., damp - uSlow * .2 * (1. + 14. * uDry));
+  damp = w > .015 ? 1. : max(0., damp - uSlow * .12 * (1. + 20. * uDry));
   vec4 L2 = l - lifted + settled;
   // the loose deposit fixes into the paper once the paper has dried out
-  vec4 fixd = L2 * clamp(uSlow * (.015 + 4. * (1. - damp)), 0., 1.);
+  vec4 fixd = L2 * clamp(uSlow * (.01 + 4. * smoothstep(.65, 1., 1. - damp)), 0., 1.);
   oS = vec4(sus.rgb, w);
   oX = vec4(sus.a, damp, 0, 0);
   oL = L2 - fixd;
@@ -334,11 +335,12 @@ void main() {
   vec2 uv = vec2(css.x / uSimPx, uSim.y - css.y / uSimPx) * tx;
   uv += vec2(pc.r - .5, (pc.r + pc.g) * .5 - .5) * tx * .8;                     // fibre jitter hides the sim's cells in the edges
   vec4 d0 = cubic(uD0, uv, uSim), d1 = cubic(uD1, uv, uSim);
+  vec4 n1 = .25 * (texture(uD0, uv + vec2(tx.x, 0)) + texture(uD0, uv - vec2(tx.x, 0)) + texture(uD0, uv + vec2(0, tx.y)) + texture(uD0, uv - vec2(0, tx.y)));
   vec4 nb = .125 * (texture(uD0, uv + vec2(tx.x * 2.2, 0)) + texture(uD0, uv - vec2(tx.x * 2.2, 0)) + texture(uD0, uv + vec2(0, tx.y * 2.2)) + texture(uD0, uv - vec2(0, tx.y * 2.2))
     + texture(uD0, uv + tx * 1.6) + texture(uD0, uv - tx * 1.6) + texture(uD0, uv + vec2(tx.x, -tx.y) * 1.6) + texture(uD0, uv - vec2(tx.x, -tx.y) * 1.6));
   float wet = smoothstep(.0, .25, d1.a);
   // dried deposits: crisp rims where a deposit stands above its surroundings, granulation in the paper's valleys
-  vec3 dep = d0.rgb + max(vec3(0), d0.rgb - nb.rgb) * 1.1 * (1. - .8 * wet);   // dried edges stand out as a crisp line
+  vec3 dep = d0.rgb + max(vec3(0), n1.rgb - nb.rgb) * 1.5 * (1. - .8 * wet);   // dried edges stand out as a crisp line
   float thin = 1. - smoothstep(.2, 2.2, dot(dep, vec3(.33)));
   dep *= mix(1., .45 + 1.1 * tooth, .55 * thin);
   vec3 Ab = dep + d1.rgb * .8;
@@ -448,7 +450,7 @@ let simPx = +Q.get('scale') || 2;                   // css px per sim cell: 2, o
 let cssW = 0, cssH = 0, dpr = 1, SW = 0, SH = 0;
 let S, X, L, T, D0, D1, P, PC, pcW = 0, pcH = 0;
 const RATE = { 2: 720, 3: 320 };                    // substeps per second (diffusion length per second matches across cell sizes)
-const KFLUX = .3;
+const KFLUX = .5;
 const PARAMS = { evap: 1, diff: .02, liftIn: 4, k: KFLUX };
 function mkSim(w, h) { const m = () => tex(w, h, SIMF); return [m(), m()]; }
 function allocSim(w, h, px) {

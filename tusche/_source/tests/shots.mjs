@@ -57,10 +57,11 @@ try {
     // wet-in-wet: a vermilion wash, black dropped and dragged into it while it is still wet
     const { page, errors } = await open(b, '?fixed&nodemo');
     await playAndWait(page, [
-      { kind: 'stroke', ink: 'vermilion', size: 120, pts: [[.2, .45], [.5, .42], [.8, .48]], dur: 1.2, ease: 'inout', wMul: 2 },
-      { kind: 'hold', ink: 'vermilion', size: 90, pts: [[.5, .45]], dur: 1 },
-      { kind: 'hold', ink: 'sumi', size: 30, pts: [[.42, .44]], dur: .6 },
-      { kind: 'stroke', ink: 'sumi', size: 24, pts: [[.55, .4], [.65, .47], [.75, .45]], dur: .5, ease: 'inout' },
+      { kind: 'stroke', ink: 'vermilion', size: 120, pts: [[.15, .45], [.5, .42], [.85, .48]], dur: 1.2, ease: 'inout', wMul: 2.2, kMul: .45 },
+      { kind: 'hold', ink: 'vermilion', size: 80, pts: [[.5, .45]], dur: .6, kMul: .6 },
+      { kind: 'hold', ink: 'sumi', size: 26, pts: [[.38, .44]], dur: .35, kMul: 2.5 },
+      { kind: 'stroke', ink: 'sumi', size: 22, pts: [[.52, .38], [.62, .47], [.74, .44]], dur: .7, ease: 'inout', kMul: 2.5 },
+      { kind: 'hold', ink: 'sumi', size: 14, pts: [[.27, .47]], dur: .2, kMul: 3 },
     ], 0);
     await frames(page, 240); await dryOut(page); await hideHud(page); await frames(page, 2);
     await page.screenshot({ path: path.join(OUT, '07-wet-in-wet-red-into-black.png') });
@@ -86,7 +87,7 @@ try {
     await playAndWait(page, [
       { kind: 'stroke', ink: 'sumi', size: 150, pts: [[.15, .5], [.5, .47], [.85, .52]], dur: 1.4, ease: 'inout', kMul: .45, wMul: 1.3 },
     ], 0);
-    await frames(page, 200);
+    await frames(page, 260);
     const wet = await page.evaluate(() => window.__tusche.wetCells());
     await playAndWait(page, [
       { kind: 'hold', ink: 'water', size: 40, pts: [[.35, .49]], dur: .35 },
