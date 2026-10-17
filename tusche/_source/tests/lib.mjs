@@ -29,8 +29,8 @@ export async function frames(page, n) {
   const f0 = await page.evaluate(() => window.__tusche.frame);
   await page.waitForFunction(t => window.__tusche.frame >= t, f0 + n, { timeout: 600000, polling: 50 });
 }
-export async function playAndWait(page, actions, extra = 10) {
-  await page.evaluate(a => window.__tusche.play(a), actions);
+export async function playAndWait(page, actions, extra = 10, opts = {}) {
+  await page.evaluate(([a, o]) => window.__tusche.play(a, o), [actions, opts]);
   await page.waitForFunction(() => !window.__tusche.demo, null, { timeout: 600000, polling: 50 });
   if (extra) await frames(page, extra);
 }

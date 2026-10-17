@@ -228,14 +228,16 @@ void main() {
   vec4 sus = max(vec4(0), vec4(s.rgb, x.r) + dq);
   float damp = x.g, tooth = pp.b;
   // fresh water arriving over loose paint lifts it back up and carries it to the new front: backruns
-  float lift = clamp(uLiftIn * max(0., dw) + uSlow * .5 * smoothstep(.04, .5, w) * damp, 0., .6);
+  // only dilute water does it: water already carrying ink (the rest of the same stroke) just mixes in
+  float inflow = max(0., dw), cin = dot(max(dq.rgb, 0.), vec3(.33)) / max(inflow, 1e-4);
+  float lift = clamp(uLiftIn * inflow * exp(-cin * 2.5) + uSlow * .5 * smoothstep(.04, .5, w) * damp, 0., .6);
   vec4 lifted = l * lift * vec4(1, 1, 1, .35);
   sus += lifted;
   // evaporation, fastest where the water is thin, so pigment strands at the edges; D is a hair dryer
   float ev = uSlow * uEvap * (.045 + .3 * (1. - smoothstep(0., .2, w))) * (1. + 14. * uDry);
   w = max(0., w - ev);
   // settling: more where the water is thin and in the paper's valleys (granulation); everything once dry
-  float st = w < .01 ? 1. : clamp(uSlow * (.06 + .9 * (1. - smoothstep(0., .2, w))) * (.75 + .5 * tooth) * (.1 + 1.8 * pp.r * pp.r), 0., 1.);
+  float st = w < .01 ? clamp(uSlow * 14., 0., 1.) : clamp(uSlow * (.06 + .9 * (1. - smoothstep(0., .2, w))) * (.75 + .5 * tooth) * (.1 + 1.8 * pp.r * pp.r), 0., 1.);
   vec4 settled = sus * vec4(st, st, st, min(1., st * 3. + uSlow * .3));
   sus -= settled;
   damp = w > .015 ? 1. : max(0., damp - uSlow * .2 * (1. + 14. * uDry));
@@ -285,8 +287,9 @@ void main() {
     vec2 q = (p - uSeal.xy) / uSeal.z;
     float rough = (vn(p * .9) - .5) * .12;
     float sq = step(max(abs(q.x), abs(q.y)) + rough, .92);
-    float mk = min(min(seg(q, vec2(-.55, .45), vec2(.5, .45)), seg(q, vec2(-.05, .5), vec2(-.1, -.6))), seg(q, vec2(-.6, -.15), vec2(.55, -.45)));
-    sq *= smoothstep(.09, .15, mk) * step(.25, h21(floor(p * .8)) + .5);
+    float frame = abs(max(abs(q.x), abs(q.y)) - .66);                  // an inner frame left as paper, and a dot
+    float mk = min(frame + step(.0, q.x - .2) * step(.0, -.2 - q.y) * 9., length(q - vec2(.22, -.24)) - .12);
+    sq *= smoothstep(.05, .11, mk) * step(.25, h21(floor(p * .8)) + .5);
     ci += sq * uSeal.w; cw += sq * .03;
   }
   oS = vec4(s.rgb + uPig * ci, s.a + cw);
@@ -361,7 +364,7 @@ void main() {
   // the dwell ring
   if (uRing.w > 0.) {
     float d = abs(length(gl_FragCoord.xy - uRing.xy) - uRing.z);
-    col = mix(col, uRingCol, uRing.w * (1. - smoothstep(.4, 1.4, d)));
+    col = mix(col, uRingCol, uRing.w * (1. - smoothstep(.6, 1.8, d)));
   }
   o = vec4(col, 1);
 }`);
@@ -540,7 +543,7 @@ function brushFrame(dt) {
   const still = ptr.speed < 40 && tail === false;
   if (still) ptr.hold += dt; else ptr.hold = Math.max(0, ptr.hold - dt * 3);
   const I = INKS[ptr.water ? 'water' : ink], water = ptr.water;
-  const cap = 1500 + 32 * size;                         // a bigger brush holds more
+  const cap = 900 + 14 * size;                         // a bigger brush holds more
   const hold = Math.min(ptr.hold, 6);
   const tl = tail === false ? 1 : tail;
   let n = 0, x0 = ptr.bx, y0 = ptr.by, box = [1e9, 1e9, -1e9, -1e9];
@@ -550,20 +553,21 @@ function brushFrame(dt) {
     // pressure: slow and pressed is wide, fast is lifted and narrow; pen pressure when there is one
     let press = 1.1 - .25 * fast;
     if (ptr.pen || ptr.demoPen) press *= .3 + 1.15 * prs;
-    const tin = .35 + .65 * Math.max(smooth(0, size * 1.4, ptr.travel), smooth(0, .25, ptr.hold));   // taper in, unless pressed
-    let r = size * .5 * press * tin * (.55 + .45 * load) * (1 + .38 * Math.sqrt(hold)) * (tail !== false ? .25 + .75 * tl : 1);
+    const tin = .5 + .5 * Math.max(smooth(0, size * 1.2, ptr.travel), smooth(0, .25, ptr.hold));   // taper in, unless pressed
+    const wob = 1 + .14 * (vnoise(ptr.seed * 7, along / (size * 1.6 + 20)) - .5) * 2;   // a hand never holds an exact pressure
+    let r = size * .5 * press * tin * wob * (.55 + .45 * load) * (1 + .38 * Math.sqrt(hold)) * (tail !== false ? .25 + .75 * tl : 1);
     r = Math.max(.9, r);
     const rs = r / simPx;
     const dryness = water ? 0 : clamp(.6 * smooth(500, 2500, spd) + 1.3 * (1 - load) - .1 + (tail !== false ? .7 * (1 - tl) : 0) + (ptr.pen || ptr.demoPen ? .35 * (1 - prs) : 0), 0, 1);
     let w, k;
     if (still) {
       // a held brush keeps releasing water (more the longer it rests) and a little ink: the bloom grows
-      w = (water ? .55 : .34) * (1 + .9 * hold) * 6; k = I.load * (.5 + .35 * load) * 4 * (1 + .25 * hold) / (1 + .5 * hold);
+      w = (water ? .55 : .34) * (1 + .9 * hold) * 6; k = I.load * (.5 + .35 * load) * 2.6 / (1 + 1.1 * hold);   // the longer it rests, the more the ink is thinned
     } else {
-      w = (water ? .62 : .36 * (.35 + .65 * load)) * (1 - .75 * fast);
+      w = (water ? .7 : .5 * (.35 + .65 * load)) * (1 - .8 * fast);
       k = I.load * (.3 + .7 * load) * (.85 + .25 * fast) * 1.5;
     }
-    w *= Math.min(1.4, Math.max(.45, 30 / size)) * ptr.wMul;
+    w *= Math.min(1.3, Math.max(.8, 30 / size)) * ptr.wMul;
     k *= ptr.kMul;
     const sx = x / simPx, sy = SH - y / simPx, i4 = n * 4;
     DA[i4] = sx; DA[i4 + 1] = sy; DA[i4 + 2] = rs; DA[i4 + 3] = weight;
@@ -577,7 +581,7 @@ function brushFrame(dt) {
   else {
     // evenly spaced dabs along the path; each covers its share of the brush width, so the deposit per unit
     // length does not depend on frame rate or speed
-    const spacing = Math.max(.6, Math.min(size * .12, dist / (MAXD - 1)));
+    const spacing = Math.max(.8, Math.min(size * .1, 4), dist / (MAXD - 1));
     let carryD = ptr.carry || 0;
     for (const p of pts) {
       const sl = Math.hypot(p[0] - x0, p[1] - y0);
@@ -668,32 +672,44 @@ function buildDemo() {
   const q = [];
   const H = (ink, size, x, y, dur, o = {}) => q.push(Object.assign({ kind: 'hold', ink, size, pts: [[x, y]], dur }, o));
   const St = (ink, size, pts, dur, o = {}) => q.push(Object.assign({ kind: 'stroke', ink, size, pts, dur }, o));
-  const W = dur => q.push({ kind: 'wait', dur });
+  const W = dur => q.push({ kind: 'wait', dur }), D = dur => q.push({ kind: 'dry', dur });
+  let r = 5; const R = () => (r = (r * 16807) % 2147483647) / 2147483647;
+  // the sun, then a mist: clear water laid wide, pale sumi dropped into it, a thread of gold through the wet
   H('gold', 84, .80, .22, 1.5);
-  W(.15);
-  St('water', 64, [[.40, .84], [.62, .81], [.82, .84], [1.0, .80]], .8, { ease: 'inout' });
-  St('sumi', 46, [[.42, .86], [.60, .835], [.80, .86], [.99, .82]], .7, { ease: 'inout', kMul: .2, wMul: .7 });
-  St('gold', 7, [[.45, .80], [.56, .79], [.67, .815], [.78, .795], [.9, .81], [.99, .79]], .4, { ease: 'lin' });
-  W(.2);
-  St('sumi', 44, [[.02, .05], [.10, .12], [.19, .2], [.27, .28], [.36, .37], [.46, .43], [.56, .47], [.66, .55]], 1.25, { ease: 'in', pen: [1, .25] });
-  St('sumi', 16, [[.29, .31], [.32, .22], [.37, .13]], .22, { ease: 'in', pen: [.9, .2] });
-  St('sumi', 13, [[.47, .44], [.51, .53], [.54, .6]], .2, { ease: 'in', pen: [.9, .2] });
-  St('sumi', 11, [[.13, .15], [.15, .07]], .14, { ease: 'in', pen: [.8, .2] });
-  const blos = [[.19, .14, .9, 26], [.25, .27, .45, 22], [.335, .18, .6, 22], [.41, .37, 1.3, 28], [.53, .41, .5, 22], [.62, .5, .9, 26], [.08, .1, .35, 18]];
-  for (const [x, y, d, s] of blos) { H('water', s, x, y, d * .35); H('vermilion', s, x, y, d, { kMul: .8 }); }
-  W(.3);
+  St('water', 120, [[.40, .83], [.62, .80], [.82, .84], [1.02, .80]], .9, { ease: 'inout', wMul: 2.6 });
+  St('sumi', 60, [[.44, .85], [.60, .83], [.80, .86], [1.0, .82]], .8, { ease: 'inout', kMul: .12, wMul: 1.4 });
+  St('sumi', 40, [[.55, .9], [.75, .88], [.95, .91]], .5, { ease: 'inout', kMul: .08, wMul: 1.4 });
+  St('gold', 3.5, [[.47, .83], [.57, .815], [.67, .835], [.78, .815], [.9, .83], [1.0, .81]], .55, { ease: 'lin', kMul: .7, wMul: .5 });
+  // the branch: one pressed stroke that lifts as it goes, then quick twigs off it
+  St('sumi', 44, [[.03, .13], [.11, .18], [.19, .24], [.27, .3], [.36, .37], [.46, .43], [.56, .47], [.66, .55]], 1.25, { ease: 'in', pen: [1, .25] });
+  St('sumi', 10, [[.29, .32], [.32, .23], [.36, .15]], .2, { ease: 'in', pen: [.75, .15] });
+  St('sumi', 9, [[.47, .44], [.51, .53], [.54, .6]], .18, { ease: 'in', pen: [.75, .15] });
+  St('sumi', 8, [[.14, .2], [.155, .13]], .12, { ease: 'in', pen: [.7, .15] });
+  // blossoms: five pale petals bleeding into each other, a vermilion heart dropped into the wet
+  const blos = [[.2, .17, 1, 30], [.255, .3, .6, 24], [.335, .2, .7, 24], [.42, .38, 1.2, 32], [.535, .42, .6, 24], [.625, .51, .9, 30], [.09, .12, .5, 20]];
+  for (const [x, y, d, s] of blos) {
+    const a0 = R() * 6.3, ar = 1280 / 800;
+    for (let i = 0; i < 5; i++) {
+      const a = a0 + i * 1.2566, rr = s * .5 / 1280;
+      H('vermilion', s * .62, x + Math.cos(a) * rr, y + Math.sin(a) * rr * ar, .16 + .16 * d, { kMul: .28 + .2 * R() });
+    }
+    H('vermilion', s * .5, x, y, .3 + .35 * d, { kMul: 1.2 });
+  }
+  D(1.1);
+  // stamens: quick black flicks out of each heart, then a light red splatter from the loaded brush
   for (const [x, y, , s] of blos.slice(0, 6)) {
-    for (let i = 0; i < 4; i++) {
-      const a = i * 1.7 + x * 9, l = s / 1000 * 1.2;
-      St('sumi', 4, [[x, y], [x + Math.cos(a) * l, y + Math.sin(a) * l * 1.6]], .07, { ease: 'in', kMul: 1.2 });
+    const a0 = R() * 6.3;
+    for (let i = 0; i < 5; i++) {
+      const a = a0 + i * 1.25 + R() * .3, l = s * (.55 + .35 * R()) / 1280, b = a + .35;
+      St('sumi', 2.5, [[x, y], [x + Math.cos(b) * l * .5, y + Math.sin(b) * l * .8], [x + Math.cos(a) * l, y + Math.sin(a) * l * 1.6]], .06, { ease: 'in', kMul: 1.6, wMul: .15 });
+      H('sumi', 4.5, x + Math.cos(a) * l * 1.1, y + Math.sin(a) * l * 1.76, .03, { kMul: 2.5, wMul: .3 });
     }
   }
-  let r = 3;
-  for (let i = 0; i < 14; i++) {
-    r = (r * 16807) % 2147483647; const u = r / 2147483647; r = (r * 16807) % 2147483647; const v = r / 2147483647;
-    H('vermilion', 3 + 5 * u, .3 + .38 * u + .04 * v, .25 + .35 * v, .04, { kMul: 1.5 });
+  for (let i = 0; i < 18; i++) {
+    const [bx, by] = blos[i % 6], a = R() * 6.3, d = .03 + .07 * R();
+    H('vermilion', 4 + 7 * R() * R(), bx + Math.cos(a) * d, by + Math.sin(a) * d * 1.6, .04, { kMul: 1.8, wMul: .5 });
   }
-  q.push({ kind: 'seal', pts: [[.93, .88]], size: 30, dur: .1 });
+  q.push({ kind: 'seal', pts: [[.93, .9]], size: 30, dur: .1 });
   W(.3);
   return q;
 }
@@ -723,10 +739,11 @@ function demoStep(dt) {
   while (a && demo.t > a.dur) {
     demo.t -= a.dur;
     if (ptr.down) endStroke();
-    ptr.demo = false; demo.k++; a = demo.q[demo.k];
+    ptr.demo = false; dryBtn = false; demo.k++; a = demo.q[demo.k];
   }
   if (!a) { stopDemo(); return; }
-  if (a.kind === 'wait') return;
+  dryBtn = a.kind === 'dry';
+  if (a.kind === 'wait' || a.kind === 'dry') return;
   const B = demo.box, P2 = p => [B.x + p[0] * B.w, B.y + p[1] * B.h];
   if (a.kind === 'seal') { if (!a.done) { a.done = true; const p = P2(a.pts[0]); seal(p[0], p[1], a.size * B.w / 1280); } return; }
   const f = a.kind === 'hold' ? 0 : (ease[a.ease || 'inout'])(Math.min(1, demo.t / a.dur));
@@ -808,7 +825,7 @@ function frame(now) {
   // the dwell ring: grows while the brush rests, so you can feel how far the bloom will travel
   const tR = ptr.down && !ptr.demo ? size * .5 * (1 + 1.1 * Math.sqrt(Math.min(ptr.hold, 6))) : 0;
   ringState.r += (Math.max(tR, size * .5) - ringState.r) * (1 - Math.exp(-dt * 10));
-  const tA = ptr.down && !ptr.demo ? .1 + .25 * smooth(.1, 1.5, ptr.hold) : (demo ? 0 : .12);
+  const tA = ptr.down && !ptr.demo ? .22 + .4 * smooth(.1, 1.5, ptr.hold) : (demo ? 0 : .14);
   ringState.a += (tA - ringState.a) * (1 - Math.exp(-dt * 8));
   const lx = ptr.hx != null ? (ptr.hx / cssW - .5) : 0, ly = ptr.hy != null ? (.5 - ptr.hy / cssH) : 0;
   lightX += (-.45 + lx * .9 - lightX) * (1 - Math.exp(-dt * 3)); lightY += (.55 + ly * .7 - lightY) * (1 - Math.exp(-dt * 3));
