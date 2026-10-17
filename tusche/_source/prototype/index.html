@@ -232,7 +232,7 @@ function brush(dt) {
 // ---------- loop ----------
 let last = performance.now();
 function frame(now) {
-  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  const dt = Math.max(0, Math.min(.05, (now - last) / 1000)); last = now;
   demoStep(dt);
   if (ptr.down) brush(dt);
   gl.useProgram(SIM.p); gl.viewport(0, 0, SW, SH);
