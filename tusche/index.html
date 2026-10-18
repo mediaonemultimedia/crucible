@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f3eee5">
+<title>Tusche — a sumi-e watercolour study</title>
+<meta name="description" content="A real-time sumi-e watercolour: ink and water soak through simulated paper fibre, bloom, back-run and dry to crisp rims. Hold the brush still to bloom; drag to stroke. Sumi, vermilion and gold.">
+<style>
+:root{
+  --paper:#f3eee5;
+  --ink-s:#2b2622;
+  --dim-s:#7a7068;
+  --faint-s:#a89e94;
+  --rule:rgba(43,38,34,.14);
+  --accent:#9a7a48;
+  --sumi:#1e1b1a;
+  --verm:#c43a2a;
+  --gold:#c9a24a;
+  --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",Arial,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--paper);color:var(--ink-s);font-family:var(--sans);overflow:hidden;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;-webkit-user-select:none;user-select:none}
+canvas#stage{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+
+#ui{position:fixed;inset:0;z-index:5;pointer-events:none;opacity:1;transition:opacity .9s cubic-bezier(.4,0,.2,1)}
+#ui > *{pointer-events:auto}
+body.idle #ui,body.painting #ui{opacity:0}
+body.idle #ui > *,body.painting #ui > *{pointer-events:none}
+body.nohud #ui{opacity:0!important}
+body.nohud #ui > *{pointer-events:none}
+
+.eyebrow{font-family:var(--mono);font-size:9.5px;letter-spacing:.20em;text-transform:uppercase;color:var(--faint-s)}
+
+#mark{position:absolute;top:26px;left:30px;display:flex;align-items:flex-start;gap:12px}
+#mark .w{font-size:15px;font-weight:300;letter-spacing:.52em;text-transform:uppercase;line-height:1;padding-top:1px;white-space:nowrap}
+#mark .ix{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--accent);text-decoration:none;
+  border:1px solid rgba(154,122,72,.38);padding:2px 4px 1px;line-height:1;white-space:nowrap}
+#mark .ix:hover{border-color:var(--accent)}
+#mark .sub{margin-top:9px;display:block}
+#mark .col{display:flex;flex-direction:column}
+
+#hint{position:absolute;left:30px;bottom:30px;max-width:300px;margin:0;pointer-events:none;
+  font-family:var(--serif);font-style:italic;font-size:13px;line-height:1.5;color:var(--dim-s)}
+#hint b{font-family:var(--mono);font-style:normal;font-weight:400;font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-s);margin-right:5px}
+
+#tools{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);display:flex;align-items:stretch;
+  background:rgba(243,238,229,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border:1px solid var(--rule);border-radius:2px}
+#tools .grp{display:flex;align-items:center;padding:0 6px;border-left:1px solid var(--rule)}
+#tools .grp:first-child{border-left:0}
+#tools button{appearance:none;border:0;background:none;margin:0;padding:10px 9px 8px;cursor:pointer;color:var(--dim-s);
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:44px}
+#tools button:hover{color:var(--ink-s)}
+#tools button:focus-visible{outline:1px solid var(--accent);outline-offset:-3px}
+#tools .sw{width:16px;height:16px;border-radius:50%;display:block;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+#tools button[data-ink].on{color:var(--ink-s)}
+#tools button[data-ink].on .sw{box-shadow:0 0 0 2px var(--paper),0 0 0 3px var(--ink-s)}
+#tools .sw.water{background:transparent;box-shadow:inset 0 0 0 1px var(--dim-s)}
+#tools button[data-ink].on .sw.water{box-shadow:inset 0 0 0 1px var(--dim-s),0 0 0 2px var(--paper),0 0 0 3px var(--ink-s)}
+#tools .ic{width:16px;height:16px;display:block}
+#tools .ic svg{width:16px;height:16px;display:block;stroke:currentColor;fill:none;stroke-width:1.2}
+#size{display:flex;align-items:center;gap:2px;padding:0 4px}
+#size button{min-width:28px;padding:10px 6px}
+#size output{font-family:var(--mono);font-size:11px;font-variant-numeric:tabular-nums;color:var(--ink-s);min-width:24px;text-align:center}
+#dry.on{color:var(--ink-s)}
+
+#nogl{display:none;position:fixed;inset:0;align-items:center;justify-content:center;padding:40px;text-align:center;
+  font-family:var(--serif);font-style:italic;font-size:16px;color:var(--dim-s)}
+body.nogl #nogl{display:flex}
+body.nogl #ui,body.nogl canvas{display:none}
+
+@media (max-width:720px){
+  #mark{top:16px;left:16px}
+  #hint{display:none}
+  #tools{left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));transform:none;justify-content:space-between}
+  #tools .grp{padding:0 2px}
+  #tools button{min-width:38px;padding:11px 5px 9px;font-size:7.5px;letter-spacing:.12em}
+  #tools button .lb{display:none}
+  #size button{min-width:26px}
+}
+@media (prefers-reduced-motion:reduce){#ui{transition:none}}
+</style>
+</head>
+<body>
+<canvas id="stage" aria-label="A sheet of paper to paint on with ink and water"></canvas>
+<div id="nogl"></div>
+
+<div id="ui">
+  <div id="mark">
+    <div class="col">
+      <span class="w">Tusche</span>
+      <span class="eyebrow sub">a sumi-e watercolour study</span>
+    </div>
+    <a class="ix" href="../" aria-label="Study 24 — open series index">No. 24</a>
+  </div>
+
+  <p id="hint"><b>Hold</b>to bloom — the longer, the wider.<br><b>Drag</b>to stroke — quick for dry brush.</p>
+
+  <div id="tools" role="toolbar" aria-label="Brush">
+    <div class="grp">
+      <button data-ink="sumi" title="Sumi (1)"><span class="sw" style="background:var(--sumi)"></span><span class="lb">Sumi</span></button>
+      <button data-ink="vermilion" title="Vermilion (2)"><span class="sw" style="background:var(--verm)"></span><span class="lb">Shu</span></button>
+      <button data-ink="gold" title="Gold (3)"><span class="sw" style="background:var(--gold)"></span><span class="lb">Gold</span></button>
+      <button data-ink="water" title="Clear water (4, or shift-drag)"><span class="sw water"></span><span class="lb">Water</span></button>
+    </div>
+    <div class="grp" id="size">
+      <button id="sizeDn" title="Smaller ( [ )" aria-label="Smaller brush">−</button>
+      <output id="sizeV">36</output>
+      <button id="sizeUp" title="Larger ( ] )" aria-label="Larger brush">+</button>
+    </div>
+    <div class="grp">
+      <button id="dry" title="Hold to dry (D)"><span class="ic"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.6"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg></span><span class="lb">Dry</span></button>
+      <button id="clear" title="Clear (C)"><span class="ic"><svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11"/></svg></span><span class="lb">Clear</span></button>
+      <button id="save" title="Save PNG (S)"><span class="ic"><svg viewBox="0 0 16 16"><path d="M8 2v8M4.8 7l3.2 3.2L11.2 7M2.5 13.5h11"/></svg></span><span class="lb">Save</span></button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+// Tusche — a real-time watercolour. A wet layer (water + suspended pigment) moves through the paper as a porous medium:
+// pooled water travels, thin water stalls into a front, and that front only breaks into dry paper where a fibre will
+// carry it, so edges wander. Pigment rides the water, piles up where it evaporates at the thin edges, settles into a
+// loose deposit that fresh water can lift again (backruns), and fixes into the paper once it has dried.
+(() => {
+const Q = new URLSearchParams(location.search);
+const FIXED = Q.has('fixed');                       // tests: a fixed 1/60 s per frame, no adaptive resolution
+const cv = document.getElementById('stage');
+const fail = msg => { document.getElementById('nogl').textContent = msg; document.body.classList.add('nogl'); };
+const gl = cv.getContext('webgl2', { antialias: false, alpha: false, depth: false, stencil: false, premultipliedAlpha: false, powerPreference: 'high-performance' });
+if (!gl) { fail('Tusche needs WebGL2, which this browser does not offer.'); return; }
+const CBF = gl.getExtension('EXT_color_buffer_float'), CBH = gl.getExtension('EXT_color_buffer_half_float');
+const HALF = Q.has('half') || !CBF;
+if (!CBF && !CBH) { fail('Tusche needs WebGL2 with floating-point render targets.'); return; }
+const SIMF = HALF ? gl.RGBA16F : gl.RGBA32F;
+
+// ---------- inks ----------
+// abs: absorbance per unit pigment (paper × exp(−abs)); metal: gold body colour laid over the paper
+const INKS = {
+  sumi:      { abs: [1.00, 1.02, 1.08], load: 2.4, metal: 0, css: '#1e1b1a' },
+  vermilion: { abs: [0.08, 0.95, 1.15], load: 2.1, metal: 0, css: '#c43a2a' },
+  gold:      { abs: [0.02, 0.05, 0.15], load: 1.0, metal: 3.0, css: '#c9a24a' },
+  water:     { abs: [0, 0, 0], load: 0, metal: 0, css: 'transparent' },
+};
+let ink = 'sumi', size = 36, dry = false, dryBtn = false;
+
+// ---------- GL helpers ----------
+const VS = `#version 300 es
+in vec2 p; out vec2 vUv; void main(){ vUv = p * .5 + .5; gl_Position = vec4(p, 0, 1); }`;
+function prog(fs) {
+  const mk = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
+  const p = gl.createProgram(); gl.attachShader(p, mk(gl.VERTEX_SHADER, VS)); gl.attachShader(p, mk(gl.FRAGMENT_SHADER, fs));
+  gl.bindAttribLocation(p, 0, 'p'); gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++) { const a = gl.getActiveUniform(p, i); u[a.name.replace(/\[0\]$/, '')] = gl.getUniformLocation(p, a.name); }
+  return { p, u };
+}
+const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+let _tid = 0;
+function tex(w, h, ifmt, data = null, filter = gl.NEAREST) {
+  const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+  const u8 = ifmt === gl.RGBA8;
+  gl.texImage2D(gl.TEXTURE_2D, 0, ifmt, w, h, 0, gl.RGBA, u8 ? gl.UNSIGNED_BYTE : ifmt === gl.RGBA16F ? gl.HALF_FLOAT : gl.FLOAT, data);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  t.__id = ++_tid; t.w = w; t.h = h; return t;
+}
+let FB = new Map();
+function target(...ts) {
+  const k = ts.map(t => t.__id).join(',');
+  if (!FB.has(k)) {
+    const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+    ts.forEach((t, i) => gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, t, 0));
+    gl.drawBuffers(ts.map((_, i) => gl.COLOR_ATTACHMENT0 + i)); FB.set(k, f);
+  }
+  return FB.get(k);
+}
+const bind = (unit, t) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t); return unit; };
+const draw = () => gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+// ---------- shaders ----------
+// S: suspended pigment absorbance (rgb) + water (a) · X: suspended metal (r), paper dampness (g)
+// L: loose deposit, pigment (rgb) + metal (a) — fresh water can lift it · T: fixed stain, same layout
+// P (paper, rgba8): r absorbency, g the water a dry fibre needs before it wicks, b tooth
+const SIM = prog(`#version 300 es
+precision highp float;
+uniform sampler2D uS, uX, uL, uT, uP;
+uniform float uK, uSlow, uEvap, uDry, uDiff, uLiftIn;
+layout(location=0) out vec4 oS; layout(location=1) out vec4 oX; layout(location=2) out vec4 oL; layout(location=3) out vec4 oT;
+// water flux from a to b (positive = a loses). Porous-medium mobility: pooled water moves, thin water stalls; and a
+// front only advances into dry paper once the water behind it beats that fibre's threshold. Exactly antisymmetric,
+// so what one cell loses its neighbour gains.
+float flux(vec4 a, vec4 b, vec4 pa, vec4 pb, float da, float db) {
+  float d = a.a - b.a;
+  bool fw = d > 0.;
+  float ws = fw ? a.a : b.a, wd = fw ? b.a : a.a, dd = fw ? db : da, th = fw ? pb.g : pa.g;
+  th *= 1. - .45 * dd;                                       // damp paper wicks more readily, but still unevenly: cauliflowers
+  float gate = max(smoothstep(0., .015, wd), smoothstep(th, th + .05, ws));
+  float ab = min(pa.r, pb.r);
+  float mob = pow(.5 * (a.a + b.a), 1.6) * ab * ab * gate;
+  return min(uK * mob, .2) * d;
+}
+// pigment and metal carried with that water (metal is heavy and travels less)
+vec4 carry(vec4 from, float m, float f) { return vec4(from.rgb, m * .5) / max(from.a, 1e-4) * f; }
+void main() {
+  ivec2 SZ = textureSize(uS, 0), p = ivec2(gl_FragCoord.xy);
+  vec4 s = texelFetch(uS, p, 0), x = texelFetch(uX, p, 0), l = texelFetch(uL, p, 0), t = texelFetch(uT, p, 0), pp = texelFetch(uP, p, 0);
+  pp.r *= 1.25;
+  ivec2 O[4] = ivec2[4](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1));
+  float dw = 0.; vec4 dq = vec4(0);
+  for (int i = 0; i < 4; i++) {
+    ivec2 q = clamp(p + O[i], ivec2(0), SZ - 1);
+    vec4 n = texelFetch(uS, q, 0), xn = texelFetch(uX, q, 0), pn = texelFetch(uP, q, 0); pn.r *= 1.25;
+    float f = flux(s, n, pp, pn, x.g, xn.g);
+    dw -= f;
+    if (f > 0.) dq -= carry(s, x.r, f); else dq += carry(n, xn.r, -f);
+    // wet-in-wet: pigments diffuse through the water two neighbours share, so inks feather into each other
+    float wm = min(s.a, n.a);
+    if (wm > 1e-3) dq += uDiff * wm * (vec4(n.rgb, xn.r * .3) / n.a - vec4(s.rgb, x.r * .3) / s.a);
+  }
+  float w = max(0., s.a + dw);
+  vec4 sus = max(vec4(0), vec4(s.rgb, x.r) + dq);
+  float damp = x.g, tooth = pp.b;
+  // fresh water arriving over loose paint lifts it back up and carries it to the new front: backruns
+  // only dilute water does it: water already carrying ink (the rest of the same stroke) just mixes in
+  float inflow = max(0., dw), cin = dot(max(dq.rgb, 0.), vec3(.33)) / max(inflow, 1e-4);
+  float lift = clamp(uLiftIn * inflow * exp(-cin * 2.5) + uSlow * .5 * smoothstep(.04, .5, w) * damp, 0., .6);
+  vec4 lifted = l * lift * vec4(1, 1, 1, .35);
+  sus += lifted;
+  // evaporation, fastest where the water is thin, so pigment strands at the edges; D is a hair dryer
+  float ev = uSlow * uEvap * (.045 + .3 * (1. - smoothstep(0., .2, w))) * (1. + 14. * uDry);
+  w = max(0., w - ev);
+  // settling: more where the water is thin and in the paper's valleys (granulation); everything once dry
+  float st = w < .01 ? clamp(uSlow * 14., 0., 1.) : clamp(uSlow * (.06 + .9 * (1. - smoothstep(0., .2, w))) * (.75 + .5 * tooth) * (.1 + 1.8 * pp.r * pp.r), 0., 1.);
+  vec4 settled = sus * vec4(st, st, st, min(1., st * 3. + uSlow * .3));
+  sus -= settled;
+  damp = w > .015 ? 1. : max(0., damp - uSlow * .12 * (1. + 20. * uDry));
+  vec4 L2 = l - lifted + settled;
+  // the loose deposit fixes into the paper once the paper has dried out
+  vec4 fixd = L2 * clamp(uSlow * (.01 + 4. * smoothstep(.65, 1., 1. - damp)), 0., 1.);
+  oS = vec4(sus.rgb, w);
+  oX = vec4(sus.a, damp, 0, 0);
+  oL = L2 - fixd;
+  oT = t + fixd;
+}`);
+
+// one pass per frame lays every dab along the frame's path: radius, water, ink and dryness per dab
+const BRUSH = prog(`#version 300 es
+precision highp float;
+uniform sampler2D uS, uX, uP;
+uniform vec4 uA[40], uB[40], uC[40]; uniform int uN; uniform vec4 uBox;
+uniform vec3 uPig; uniform float uMetal, uSeed, uTopUp; uniform vec4 uSeal;
+layout(location=0) out vec4 oS; layout(location=1) out vec4 oX;
+float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
+  return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + 1.), f.x), f.y); }
+float seg(vec2 p, vec2 a, vec2 b) { vec2 ab = b - a; return length(p - a - ab * clamp(dot(p - a, ab) / dot(ab, ab), 0., 1.)); }
+void main() {
+  ivec2 ip = ivec2(gl_FragCoord.xy); vec2 p = gl_FragCoord.xy;
+  vec4 s = texelFetch(uS, ip, 0), x = texelFetch(uX, ip, 0);
+  oS = s; oX = x;
+  if (p.x < uBox.x || p.y < uBox.y || p.x > uBox.z || p.y > uBox.w) return;
+  float tooth = texelFetch(uP, ip, 0).b;
+  float cw = 0., ci = 0., mw = 0.;
+  for (int i = 0; i < 40; i++) {
+    if (i >= uN) break;
+    vec4 A = uA[i], B = uB[i], C = uC[i];
+    vec2 d = p - A.xy; float r = A.z, dist = length(d);
+    if (dist > r) continue;
+    float across = dot(d, vec2(-B.y, B.x)), u = abs(across) / r;
+    float m = 1. - smoothstep(r * .72, r, dist);
+    // bristles: a pattern across the brush, drawn along the stroke, that opens into streaks as the brush runs dry or
+    // moves fast, the edges first, catching only the paper's tooth
+    float bn = .65 * vn(vec2(across * .4 + uSeed, C.x * .008)) + .35 * vn(vec2(across * .9 + uSeed * 3.1, C.x * .025));
+    float thr = C.z * mix(.5, .72, smoothstep(.2, .95, u)) - .3 * (tooth - .5) - .02;
+    m *= smoothstep(thr - .04, thr + .04, bn);
+    cw += m * A.w * B.z; ci += m * A.w * B.w; mw = max(mw, m * B.z);
+  }
+  if (uSeal.w > 0.) {
+    // a seal: a rough square of concentrated vermilion with abstract marks left as paper (no characters)
+    vec2 q = (p - uSeal.xy) / uSeal.z;
+    float rough = (vn(p * .9) - .5) * .12;
+    float sq = step(max(abs(q.x), abs(q.y)) + rough, .92);
+    float frame = abs(max(abs(q.x), abs(q.y)) - .66);                  // an inner frame left as paper, and a dot
+    float mk = min(frame + step(.0, q.x - .2) * step(.0, -.2 - q.y) * 9., length(q - vec2(.22, -.24)) - .12);
+    sq *= smoothstep(.05, .11, mk) * step(.25, h21(floor(p * .8)) + .5);
+    ci += sq * uSeal.w; cw += sq * .03;
+  }
+  // a moving brush wets the paper up to its own wetness at once (so a frame's leading edge is never a thin,
+  // drying cap that would rim before the next frame arrives); a resting brush keeps adding water
+  float wa = uTopUp > 0. ? max(0., mw * .8 - s.a) + cw * .2 : cw;
+  oS = vec4(s.rgb + uPig * ci, s.a + wa);
+  oX = vec4(x.r + uMetal * ci, x.gba);
+}`);
+
+// sim-resolution summary for the render pass, in half floats so it can be filtered anywhere
+const COMPOSE = prog(`#version 300 es
+precision highp float;
+uniform sampler2D uS, uX, uL, uT;
+layout(location=0) out vec4 o0; layout(location=1) out vec4 o1;
+void main() {
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  vec4 s = texelFetch(uS, p, 0), x = texelFetch(uX, p, 0), l = texelFetch(uL, p, 0), t = texelFetch(uT, p, 0);
+  o0 = vec4(l.rgb + t.rgb, l.a + t.a + x.r);
+  o1 = vec4(s.rgb, s.a);
+}`);
+
+const RENDER = prog(`#version 300 es
+precision highp float;
+uniform sampler2D uD0, uD1, uPC;
+uniform vec2 uView, uPCSize, uSim; uniform float uSimPx; uniform vec2 uLight; uniform vec4 uRing; uniform vec3 uRingCol;
+in vec2 vUv; out vec4 o;
+float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+// cubic B-spline filtering from four bilinear taps: the sim's cells turn into smooth wandering edges, not stair steps
+vec4 cubic(sampler2D t, vec2 uv, vec2 sz) {
+  vec2 c = uv * sz - .5, f = fract(c); c -= f;
+  vec2 f2 = f * f, f3 = f2 * f;
+  vec2 w0 = (1. - 3. * f + 3. * f2 - f3) / 6., w1 = (4. - 6. * f2 + 3. * f3) / 6., w2 = (1. + 3. * f + 3. * f2 - 3. * f3) / 6., w3 = f3 / 6.;
+  vec2 s0 = w0 + w1, s1 = w2 + w3, o0 = c - .5 + w1 / s0, o1 = c + 1.5 + w3 / s1;
+  o0 /= sz; o1 /= sz;
+  float sx = s0.x / (s0.x + s1.x), sy = s0.y / (s0.y + s1.y);
+  return mix(mix(texture(t, vec2(o1.x, o1.y)), texture(t, vec2(o0.x, o1.y)), sx), mix(texture(t, vec2(o1.x, o0.y)), texture(t, vec2(o0.x, o0.y)), sx), sy);
+}
+void main() {
+  vec2 css = vec2(vUv.x, 1. - vUv.y) * uView;                    // css px from the top left
+  vec4 pc = texture(uPC, css / uPCSize);                        // r fibre, g mottling, b tooth
+  vec3 paper = vec3(.953, .934, .899) * (1. + (pc.g - .5) * .05) + (pc.r - .5) * vec3(.07, .064, .05);
+  paper += (h21(gl_FragCoord.xy) - .5) * .014;
+  float tooth = pc.b;
+  vec2 tx = 1. / uSim;
+  vec2 uv = vec2(css.x / uSimPx, uSim.y - css.y / uSimPx) * tx;
+  uv += vec2(pc.r - .5, (pc.r + pc.g) * .5 - .5) * tx * .8;                     // fibre jitter hides the sim's cells in the edges
+  vec4 d0 = cubic(uD0, uv, uSim), d1 = cubic(uD1, uv, uSim);
+  vec4 n1 = .25 * (texture(uD0, uv + vec2(tx.x, 0)) + texture(uD0, uv - vec2(tx.x, 0)) + texture(uD0, uv + vec2(0, tx.y)) + texture(uD0, uv - vec2(0, tx.y)));
+  vec4 nb = .125 * (texture(uD0, uv + vec2(tx.x * 2.2, 0)) + texture(uD0, uv - vec2(tx.x * 2.2, 0)) + texture(uD0, uv + vec2(0, tx.y * 2.2)) + texture(uD0, uv - vec2(0, tx.y * 2.2))
+    + texture(uD0, uv + tx * 1.6) + texture(uD0, uv - tx * 1.6) + texture(uD0, uv + vec2(tx.x, -tx.y) * 1.6) + texture(uD0, uv - vec2(tx.x, -tx.y) * 1.6));
+  float wet = smoothstep(.0, .25, d1.a);
+  // dried deposits: crisp rims where a deposit stands above its surroundings, granulation in the paper's valleys
+  vec3 dep = d0.rgb + max(vec3(0), n1.rgb - nb.rgb) * 1.5 * (1. - .8 * wet);   // dried edges stand out as a crisp line
+  float thin = 1. - smoothstep(.2, 2.2, dot(dep, vec3(.33)));
+  dep *= mix(1., .45 + 1.1 * tooth, .55 * thin);
+  vec3 Ab = dep + d1.rgb * .8;
+  Ab = Ab / (1. + .22 * Ab);                                    // pigment saturates rather than going muddy
+  vec3 col = paper * exp(-Ab * 1.25);
+  col *= 1. - .06 * wet;                                        // wet paper reads a touch darker
+  // gold: an opaque ochre/leaf body colour with a soft sheen once dry, lit from a light that drifts with the cursor
+  float metal = d0.a;
+  float cov = (1. - exp(-metal * 2.)) * mix(1., .55 + .8 * tooth, .55 * (1. - smoothstep(.4, 2.5, metal)));
+  if (cov > .002) {
+    float mg = metal + .35 * tooth;
+    vec3 N = normalize(vec3(-dFdx(mg) * 2.2, dFdy(mg) * 2.2, 1.));
+    vec3 L = normalize(vec3(uLight, .75));
+    float diff = dot(N, L);
+    float spec = pow(max(0., reflect(-L, N).z), 22.) * (1. - wet);
+    float flake = smoothstep(.55, .95, h21(floor(gl_FragCoord.xy * .5)));
+    vec3 g = mix(vec3(.64, .44, .13), vec3(.89, .71, .30), smoothstep(.2, 1.6, metal) * (.6 + .4 * tooth));
+    g *= .82 + .22 * diff;
+    g += vec3(1., .88, .6) * (spec * .45 + flake * spec * .35 + .05 * (1. - wet) * smoothstep(.3, 1.2, metal) * (diff - .6));
+    g *= exp(-d1.rgb * .5);
+    col = mix(col, g * (1. - .12 * wet), cov * (.97 - .15 * wet));
+  }
+  // the dwell ring
+  if (uRing.w > 0.) {
+    float d = abs(length(gl_FragCoord.xy - uRing.xy) - uRing.z);
+    col = mix(col, uRingCol, uRing.w * (1. - smoothstep(.6, 1.8, d)));
+  }
+  o = vec4(col, 1);
+}`);
+
+// re-sample the layers into larger buffers (or a new cell size) without moving the painting
+const RESAMPLE = prog(`#version 300 es
+precision highp float;
+uniform sampler2D uS, uX, uL, uT; uniform float uOldPx, uNewPx; uniform vec2 uOld, uNew;
+layout(location=0) out vec4 oS; layout(location=1) out vec4 oX; layout(location=2) out vec4 oL; layout(location=3) out vec4 oT;
+vec4 bil(sampler2D t, vec2 c) {
+  c -= .5; ivec2 i = ivec2(floor(c)); vec2 f = c - floor(c); ivec2 S = ivec2(uOld);
+  vec4 r = vec4(0);
+  for (int k = 0; k < 4; k++) {
+    ivec2 o = ivec2(k & 1, k >> 1), q = i + o;
+    float wt = (o.x == 1 ? f.x : 1. - f.x) * (o.y == 1 ? f.y : 1. - f.y);
+    if (q.x >= 0 && q.y >= 0 && q.x < S.x && q.y < S.y) r += wt * texelFetch(t, q, 0);
+  }
+  return r;
+}
+void main() {
+  vec2 css = vec2(gl_FragCoord.x, uNew.y - gl_FragCoord.y) * uNewPx;
+  vec2 c = vec2(css.x / uOldPx, uOld.y - css.y / uOldPx);
+  float k = uNewPx * uNewPx / (uOldPx * uOldPx);                // amounts are per cell: keep totals when cells change size
+  oS = bil(uS, c) * vec4(k, k, k, 1); oX = bil(uX, c) * vec4(k, 1, 1, 1); oL = bil(uL, c) * k; oT = bil(uT, c) * k;
+}`);
+
+// ---------- paper ----------
+const SEED = 24;
+function hash(x, y) { let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(SEED, 1442695041)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+function vnoise(x, y) { const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  return (hash(xi, yi) * (1 - sx) + hash(xi + 1, yi) * sx) * (1 - sy) + (hash(xi, yi + 1) * (1 - sx) + hash(xi + 1, yi + 1) * sx) * sy; }
+// fibres seeded per 64 px cell, so the same paper comes back at any size
+function fibres(g, w, h, k, bright, dark) {
+  const G = 64;
+  for (let gy = -1; gy <= Math.ceil(h / G); gy++) for (let gx = -1; gx <= Math.ceil(w / G); gx++) {
+    let s = (Math.imul(gx + 977, 7919) ^ Math.imul(gy + 331, 104729) ^ SEED) >>> 0 || 1;
+    const R = () => (s = Math.imul(s, 48271) % 2147483647 >>> 0) / 2147483647;
+    for (let i = 0; i < 30; i++) {
+      const x = (gx + R()) * G, y = (gy + R()) * G, a = R() * Math.PI * 2, l = 6 + R() * R() * 60, b = R() < .45;
+      g.strokeStyle = b ? bright : dark; g.lineWidth = Math.max(.6, (.4 + R() * .8) * k);
+      g.beginPath(); g.moveTo(x * k, y * k);
+      g.quadraticCurveTo((x + Math.cos(a + .6) * l * .5) * k, (y + Math.sin(a + .6) * l * .5) * k, (x + Math.cos(a) * l) * k, (y + Math.sin(a) * l) * k); g.stroke();
+    }
+  }
+}
+function makePaperColour(w, h) {   // css resolution: r fibre, g mottling, b tooth
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d', { willReadFrequently: true });
+  g.fillStyle = 'rgb(128,0,0)'; g.fillRect(0, 0, w, h);
+  fibres(g, w, h, 1, 'rgba(255,0,0,.5)', 'rgba(40,0,0,.35)');
+  const d = g.getImageData(0, 0, w, h).data;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4;
+    d[i + 1] = 255 * (.6 * vnoise(x / 140, y / 140) + .4 * vnoise(x / 37 + 50, y / 37));
+    d[i + 2] = 255 * Math.min(1, .62 * vnoise(x / 2.3, y / 2.3) + .25 * vnoise(x / 9 + 9, y / 9) + .13 * hash(x, y) + (d[i] - 128) / 400);
+    d[i + 3] = 255;
+  }
+  return tex(w, h, gl.RGBA8, new Uint8Array(d.buffer), gl.LINEAR);
+}
+function makePaperSim(sw, sh, px) {
+  const c = document.createElement('canvas'); c.width = sw; c.height = sh; const g = c.getContext('2d', { willReadFrequently: true });
+  g.fillStyle = '#000'; g.fillRect(0, 0, sw, sh);
+  fibres(g, sw * px, sh * px, 1 / px, 'rgba(255,255,255,.55)', 'rgba(255,255,255,.18)');
+  const f = g.getImageData(0, 0, sw, sh).data, out = new Uint8Array(sw * sh * 4);
+  for (let j = 0; j < sh; j++) for (let i = 0; i < sw; i++) {
+    const row = sh - 1 - j, x = (i + .5) * px, y = (row + .5) * px, fib = f[(row * sw + i) * 4] / 255;
+    // absorbency varies at the scale of a bloom's lobes, so fronts travel faster one way than another; the wicking
+    // threshold varies finer, and fibres are channels that carry water out ahead of the front
+    const u = .8 * x + .6 * y, v = .6 * x - .8 * y, u2 = .28 * x - .96 * y, v2 = .96 * x + .28 * y;   // rotated octaves hide the lattice
+    const cloud = .5 * vnoise(x / 70, y / 70) + .32 * vnoise(u / 23 + 7, v / 23) + .18 * vnoise(u2 / 8, v2 / 8 + 3);
+    const lump = .6 * vnoise(v / 16 + 31, u / 16) + .4 * vnoise(v2 / 9 + 5, u2 / 9 + 17), o = (j * sw + i) * 4;
+    out[o] = 255 * Math.min(1, (.1 + .95 * smooth(.28, .72, cloud) + .45 * fib) / 1.25);
+    out[o + 1] = 255 * Math.min(1, Math.max(.01, .04 + .6 * Math.pow(1 - lump, 2) * (.25 + 1.5 * Math.pow(1 - cloud, 2)) - .4 * fib));
+    out[o + 2] = 255 * Math.min(1, .7 * vnoise(x / 3.2, y / 3.2) + .3 * hash(i, j));
+  }
+  return tex(sw, sh, gl.RGBA8, out);
+}
+
+// ---------- state ----------
+let simPx = +Q.get('scale') || 2;                   // css px per sim cell: 2, or 3 if the GPU can't keep up
+let cssW = 0, cssH = 0, dpr = 1, SW = 0, SH = 0;
+let S, X, L, T, D0, D1, P, PC, pcW = 0, pcH = 0;
+const RATE = { 2: 720, 3: 320 };                    // substeps per second (diffusion length per second matches across cell sizes)
+const KFLUX = .5;
+const PARAMS = { evap: 1, diff: .02, liftIn: 4, k: KFLUX };
+function mkSim(w, h) { const m = () => tex(w, h, SIMF); return [m(), m()]; }
+function allocSim(w, h, px) {
+  const old = S && { S, X, L, T, w: SW, h: SH, px: simPx };
+  const nS = mkSim(w, h), nX = mkSim(w, h), nL = mkSim(w, h), nT = mkSim(w, h);
+  for (const t of [nS, nX, nL, nT].flat()) { gl.bindFramebuffer(gl.FRAMEBUFFER, target(t)); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
+  if (old) {
+    gl.useProgram(RESAMPLE.p); gl.viewport(0, 0, w, h);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target(nS[0], nX[0], nL[0], nT[0]));
+    const u = RESAMPLE.u;
+    gl.uniform1i(u.uS, bind(0, old.S[0])); gl.uniform1i(u.uX, bind(1, old.X[0])); gl.uniform1i(u.uL, bind(2, old.L[0])); gl.uniform1i(u.uT, bind(3, old.T[0]));
+    gl.uniform1f(u.uOldPx, old.px); gl.uniform1f(u.uNewPx, px); gl.uniform2f(u.uOld, old.w, old.h); gl.uniform2f(u.uNew, w, h);
+    draw();
+    for (const t of [old.S, old.X, old.L, old.T, D0, D1].flat()) gl.deleteTexture(t);
+    gl.deleteTexture(P);
+    for (const f of FB.values()) gl.deleteFramebuffer(f); FB = new Map();
+  }
+  S = nS; X = nX; L = nL; T = nT; SW = w; SH = h; simPx = px;
+  D0 = tex(w, h, gl.RGBA16F, null, gl.LINEAR); D1 = tex(w, h, gl.RGBA16F, null, gl.LINEAR);
+  P = makePaperSim(w, h, px);
+}
+// the sim never shrinks: a smaller window shows part of the sheet, and growing it back shows the rest unharmed
+function layout() {
+  cssW = Math.max(1, innerWidth); cssH = Math.max(1, innerHeight);
+  dpr = Math.min(devicePixelRatio || 1, 2, Math.sqrt(4.2e6 / (cssW * cssH)));
+  cv.width = Math.round(cssW * dpr); cv.height = Math.round(cssH * dpr);
+  const nw = Math.max(SW, Math.ceil(cssW / simPx)), nh = Math.max(SH, Math.ceil(cssH / simPx));
+  if (nw !== SW || nh !== SH) allocSim(nw, nh, simPx);
+  if (cssW > pcW || cssH > pcH) { if (PC) gl.deleteTexture(PC); pcW = Math.max(pcW, cssW); pcH = Math.max(pcH, cssH); PC = makePaperColour(pcW, pcH); }
+}
+function setScale(px) {
+  if (px === simPx) return;
+  allocSim(Math.ceil(SW * simPx / px), Math.ceil(SH * simPx / px), px);
+}
+function clearAll() {
+  for (const t of [S, X, L, T].flat()) { gl.bindFramebuffer(gl.FRAMEBUFFER, target(t)); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
+}
+
+// ---------- input ----------
+const ptr = { down: false, x: 0, y: 0, bx: 0, by: 0, q: [], speed: 0, hold: 0, travel: 0, water: false, pressure: .5, pen: false,
+  seed: 0, tail: null, vx: 0, vy: 0, demo: false, along: 0 };
+const ringState = { r: 0, a: 0 };
+function startStroke(x, y, water, pen, pressure) {
+  Object.assign(ptr, { down: true, x, y, bx: x, by: y, q: [], speed: 0, hold: 0, travel: 0, water, pen, pressure, seed: Math.random() * 97, tail: null, vx: 0, vy: 0, along: 0 });
+}
+function endStroke() {
+  if (!ptr.down) return;
+  ptr.down = false;
+  // a quick release flicks a tapering, drying tail along the last direction of travel
+  const v = Math.hypot(ptr.vx, ptr.vy);
+  if (v > 350 && !ptr.water) ptr.tail = { t: 0, dur: Math.min(.16, .06 + v / 9000), vx: ptr.vx, vy: ptr.vy, r0: ptr.lastR || size / 2 };
+}
+let skipArmed = false;
+cv.addEventListener('pointerdown', e => {
+  if (demo) { stopDemo(); skipArmed = true; return; }       // the first click only takes the brush from the demo
+  if (e.button > 0) return;
+  cv.setPointerCapture(e.pointerId);
+  const pen = e.pointerType === 'pen' && e.pressure > 0;
+  startStroke(e.clientX, e.clientY, e.shiftKey || ink === 'water', pen, pen ? e.pressure : .5);
+  document.body.classList.add('painting');
+});
+cv.addEventListener('pointermove', e => {
+  ptr.hx = e.clientX; ptr.hy = e.clientY; ptr.hover = e.pointerType !== 'touch';
+  if (!ptr.down || ptr.demo) return;
+  const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+  for (const c of (evs.length ? evs : [e])) ptr.q.push([c.clientX, c.clientY, ptr.pen ? c.pressure : .5]);
+  ptr.x = e.clientX; ptr.y = e.clientY; if (ptr.pen && e.pressure > 0) ptr.pressure = e.pressure;
+  ptr.water = e.shiftKey || ink === 'water';
+});
+const up = () => { skipArmed = false; if (!ptr.demo) endStroke(); document.body.classList.remove('painting'); };
+addEventListener('pointerup', up); addEventListener('pointercancel', up);
+cv.addEventListener('pointerleave', () => { ptr.hover = false; });
+
+// brush state per frame → dabs
+const MAXD = 40, DA = new Float32Array(MAXD * 4), DB = new Float32Array(MAXD * 4), DC = new Float32Array(MAXD * 4);
+function brushFrame(dt) {
+  let pts = [], tail = false;   // tail: false, or how much of the flick is left (1 → 0)
+  if (ptr.down) {
+    pts = ptr.q.splice(0);
+    if (!pts.length || pts[pts.length - 1][0] !== ptr.x || pts[pts.length - 1][1] !== ptr.y) pts.push([ptr.x, ptr.y, ptr.pressure]);
+  } else if (ptr.tail) {
+    const tl = ptr.tail; tl.t += dt;
+    const k = Math.max(0, 1 - tl.t / tl.dur);
+    ptr.x = ptr.bx + tl.vx * dt * k; ptr.y = ptr.by + tl.vy * dt * k;
+    pts = [[ptr.x, ptr.y, ptr.pressure]]; tail = k;
+    if (tl.t >= tl.dur) ptr.tail = null;
+  } else return;
+  let dist = 0, px = ptr.bx, py = ptr.by;
+  for (const p of pts) { dist += Math.hypot(p[0] - px, p[1] - py); px = p[0]; py = p[1]; }
+  const raw = dist / Math.max(dt, 1e-3);
+  ptr.speed += (raw - ptr.speed) * (1 - Math.exp(-dt * 14));
+  if (dist > 1e-3) { const a = 1 - Math.exp(-dt * 20); ptr.vx += ((px - ptr.bx) / dt - ptr.vx) * a; ptr.vy += ((py - ptr.by) / dt - ptr.vy) * a; }
+  const still = ptr.speed < 40 && tail === false;
+  if (still) ptr.hold += dt; else ptr.hold = Math.max(0, ptr.hold - dt * 3);
+  const I = INKS[ptr.water ? 'water' : ink], water = ptr.water;
+  const cap = 900 + 14 * size;                         // a bigger brush holds more
+  const hold = Math.min(ptr.hold, 6);
+  const tl = tail === false ? 1 : tail;
+  let n = 0, x0 = ptr.bx, y0 = ptr.by, box = [1e9, 1e9, -1e9, -1e9];
+  const spd = ptr.speed, fast = smooth(150, 1800, spd);
+  const push = (x, y, prs, weight, along) => {
+    const load = Math.exp(-ptr.travel / cap);
+    // pressure: slow and pressed is wide, fast is lifted and narrow; pen pressure when there is one
+    let press = 1.1 - .25 * fast;
+    if (ptr.pen || ptr.demoPen) press *= .3 + 1.15 * prs;
+    const tin = .5 + .5 * Math.max(smooth(0, size * 1.2, ptr.travel), smooth(0, .25, ptr.hold));   // taper in, unless pressed
+    const wob = 1 + .14 * (vnoise(ptr.seed * 7, along / (size * 1.6 + 20)) - .5) * 2;   // a hand never holds an exact pressure
+    let r = size * .5 * press * tin * wob * (.55 + .45 * load) * (1 + .38 * Math.sqrt(hold)) * (tail !== false ? .25 + .75 * tl : 1);
+    r = Math.max(.9, r);
+    const rs = r / simPx;
+    const dryness = water ? 0 : clamp(.6 * smooth(500, 2500, spd) + 1.3 * (1 - load) - .1 + (tail !== false ? .7 * (1 - tl) : 0) + (ptr.pen || ptr.demoPen ? .35 * (1 - prs) : 0), 0, 1);
+    let w, k;
+    if (still) {
+      // a held brush keeps releasing water (more the longer it rests) and a little ink: the bloom grows
+      w = (water ? .55 : .34) * (1 + .9 * hold) * 6; k = I.load * (.5 + .35 * load) * 2.6 / (1 + 1.1 * hold);   // the longer it rests, the more the ink is thinned
+    } else {
+      w = (water ? .7 : .5 * (.35 + .65 * load)) * (1 - .8 * fast);
+      k = I.load * (.3 + .7 * load) * (.85 + .25 * fast) * 1.5;
+    }
+    w *= Math.min(1.3, Math.max(.8, 30 / size)) * ptr.wMul;
+    k *= ptr.kMul;
+    const sx = x / simPx, sy = SH - y / simPx, i4 = n * 4;
+    DA[i4] = sx; DA[i4 + 1] = sy; DA[i4 + 2] = rs; DA[i4 + 3] = weight;
+    const dl = Math.hypot(ptr.vx, ptr.vy) || 1;
+    DB[i4] = ptr.vx / dl; DB[i4 + 1] = -ptr.vy / dl; DB[i4 + 2] = w; DB[i4 + 3] = k;
+    DC[i4] = along / simPx; DC[i4 + 1] = load; DC[i4 + 2] = dryness; DC[i4 + 3] = 0;
+    box[0] = Math.min(box[0], sx - rs - 1); box[1] = Math.min(box[1], sy - rs - 1); box[2] = Math.max(box[2], sx + rs + 1); box[3] = Math.max(box[3], sy + rs + 1);
+    ptr.lastR = r; n++;
+  };
+  if (still) push(ptr.x, ptr.y, ptr.pressure, dt * 2.2, ptr.along);
+  else {
+    // evenly spaced dabs along the path; each covers its share of the brush width, so the deposit per unit
+    // length does not depend on frame rate or speed
+    const spacing = Math.max(.8, Math.min(size * .1, 4), dist / (MAXD - 1));
+    let carryD = ptr.carry || 0;
+    for (const p of pts) {
+      const sl = Math.hypot(p[0] - x0, p[1] - y0);
+      let s = spacing - carryD;
+      while (s <= sl && n < MAXD) {
+        const k = s / sl; ptr.along += spacing; ptr.travel += spacing;
+        push(x0 + (p[0] - x0) * k, y0 + (p[1] - y0) * k, p[2], spacing / Math.max(1, size * .5 * 2) * 1.0, ptr.along);
+        s += spacing;
+      }
+      carryD = sl - (s - spacing); x0 = p[0]; y0 = p[1];
+    }
+    ptr.carry = carryD;
+  }
+  ptr.bx = px; ptr.by = py;
+  if (!n) return;
+  gl.useProgram(BRUSH.p); gl.viewport(0, 0, SW, SH);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, target(S[1], X[1]));
+  const u = BRUSH.u;
+  gl.uniform1i(u.uS, bind(0, S[0])); gl.uniform1i(u.uX, bind(1, X[0])); gl.uniform1i(u.uP, bind(2, P));
+  gl.uniform4fv(u.uA, DA); gl.uniform4fv(u.uB, DB); gl.uniform4fv(u.uC, DC); gl.uniform1i(u.uN, n);
+  gl.uniform4f(u.uBox, box[0], box[1], box[2], box[3]);
+  gl.uniform3fv(u.uPig, I.abs); gl.uniform1f(u.uMetal, I.metal); gl.uniform1f(u.uSeed, ptr.seed); gl.uniform4f(u.uSeal, 0, 0, 1, 0);
+  gl.uniform1f(u.uTopUp, still ? 0 : 1);
+  draw(); S.reverse(); X.reverse();
+}
+function seal(x, y, s) {
+  const sx = x / simPx, sy = SH - y / simPx, r = s / simPx;
+  gl.useProgram(BRUSH.p); gl.viewport(0, 0, SW, SH);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, target(S[1], X[1]));
+  const u = BRUSH.u;
+  gl.uniform1i(u.uS, bind(0, S[0])); gl.uniform1i(u.uX, bind(1, X[0])); gl.uniform1i(u.uP, bind(2, P));
+  gl.uniform1i(u.uN, 0); gl.uniform1f(u.uTopUp, 0); gl.uniform4f(u.uBox, sx - r - 2, sy - r - 2, sx + r + 2, sy + r + 2);
+  gl.uniform3fv(u.uPig, INKS.vermilion.abs); gl.uniform1f(u.uMetal, 0); gl.uniform1f(u.uSeed, 0); gl.uniform4f(u.uSeal, sx, sy, r, 2.2);
+  draw(); S.reverse(); X.reverse();
+}
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+ptr.wMul = 1; ptr.kMul = 1;
+
+// ---------- sim ----------
+let simTime = 0;
+function simulate(dt) {
+  const rate = RATE[simPx] || 720 * 4 / (simPx * simPx);
+  const n = clamp(Math.round(dt * rate), 1, Math.round(rate / 30));
+  gl.useProgram(SIM.p); gl.viewport(0, 0, SW, SH);
+  const u = SIM.u;
+  gl.uniform1f(u.uK, PARAMS.k); gl.uniform1f(u.uEvap, PARAMS.evap * (HALF ? 1.1 : 1)); gl.uniform1f(u.uDry, dry || dryBtn ? 1 : 0);
+  gl.uniform1f(u.uDiff, PARAMS.diff); gl.uniform1f(u.uLiftIn, PARAMS.liftIn);
+  gl.uniform1i(u.uP, bind(4, P));
+  for (let i = 0; i < n; i++) {
+    // half floats can't hold the tiny per-substep evaporation and settling: there the slow terms run once a frame
+    gl.uniform1f(u.uSlow, HALF ? (i === n - 1 ? dt : 0) : dt / n);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target(S[1], X[1], L[1], T[1]));
+    gl.uniform1i(u.uS, bind(0, S[0])); gl.uniform1i(u.uX, bind(1, X[0])); gl.uniform1i(u.uL, bind(2, L[0])); gl.uniform1i(u.uT, bind(3, T[0]));
+    draw(); S.reverse(); X.reverse(); L.reverse(); T.reverse();
+  }
+  simTime += dt;
+}
+let lightX = -.45, lightY = .55;
+function render(forSave) {
+  gl.useProgram(COMPOSE.p); gl.viewport(0, 0, SW, SH);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, target(D0, D1));
+  gl.uniform1i(COMPOSE.u.uS, bind(0, S[0])); gl.uniform1i(COMPOSE.u.uX, bind(1, X[0])); gl.uniform1i(COMPOSE.u.uL, bind(2, L[0])); gl.uniform1i(COMPOSE.u.uT, bind(3, T[0]));
+  draw();
+  gl.useProgram(RENDER.p); gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, cv.width, cv.height);
+  const u = RENDER.u;
+  gl.uniform1i(u.uD0, bind(0, D0)); gl.uniform1i(u.uD1, bind(1, D1)); gl.uniform1i(u.uPC, bind(2, PC));
+  gl.uniform2f(u.uView, cssW, cssH); gl.uniform2f(u.uPCSize, pcW, pcH); gl.uniform2f(u.uSim, SW, SH); gl.uniform1f(u.uSimPx, simPx);
+  gl.uniform2f(u.uLight, lightX, lightY);
+  const rx = (ptr.down ? ptr.x : ptr.hx || 0) * dpr, ry = cv.height - (ptr.down ? ptr.y : ptr.hy || 0) * dpr;
+  gl.uniform4f(u.uRing, rx, ry, ringState.r * dpr, forSave ? 0 : ringState.a);
+  const rc = ink === 'gold' ? [.55, .42, .18] : ink === 'vermilion' ? [.6, .22, .16] : [.25, .22, .2];
+  gl.uniform3f(u.uRingCol, rc[0], rc[1], rc[2]);
+  draw();
+}
+
+// ---------- demo ----------
+// the opening: a plum branch — one pressed, lifting stroke with dry-brush twigs — blossoms held into blooms, stamen
+// flicks, a light red splatter, a gold sun, a mist wash with a vein of gold, and a seal. Driven by the frame clock.
+let demo = null;
+function compositionBox() {
+  const a = 16 / 10; let w = cssW, h = cssW / a;
+  if (h > cssH) { h = cssH; w = h * a; }
+  if (cssW < 720) { w = cssW * .97; h = Math.min(cssH * .8, w / .8); }
+  return { x: (cssW - w) / 2, y: (cssH - h) / 2 - (cssW < 720 ? cssH * .04 : 0), w, h };
+}
+function buildDemo() {
+  const q = [];
+  const H = (ink, size, x, y, dur, o = {}) => q.push(Object.assign({ kind: 'hold', ink, size, pts: [[x, y]], dur }, o));
+  const St = (ink, size, pts, dur, o = {}) => q.push(Object.assign({ kind: 'stroke', ink, size, pts, dur }, o));
+  const W = dur => q.push({ kind: 'wait', dur }), D = dur => q.push({ kind: 'dry', dur });
+  let r = 5; const R = () => (r = (r * 16807) % 2147483647) / 2147483647;
+  // the sun, then a mist: clear water laid wide, pale sumi dropped into it, a thread of gold through the wet
+  H('gold', 84, .80, .22, 1.5);
+  St('water', 120, [[.40, .83], [.62, .80], [.82, .84], [1.02, .80]], .9, { ease: 'inout', wMul: 2.6 });
+  St('sumi', 60, [[.44, .85], [.60, .83], [.80, .86], [1.0, .82]], .8, { ease: 'inout', kMul: .12, wMul: 1.4 });
+  St('sumi', 40, [[.55, .9], [.75, .88], [.95, .91]], .5, { ease: 'inout', kMul: .08, wMul: 1.4 });
+  St('gold', 3.5, [[.47, .83], [.57, .815], [.67, .835], [.78, .815], [.9, .83], [1.0, .81]], .55, { ease: 'lin', kMul: .7, wMul: .5 });
+  // the branch: one pressed stroke that lifts as it goes, then quick twigs off it
+  St('sumi', 44, [[.03, .13], [.11, .18], [.19, .24], [.27, .3], [.36, .37], [.46, .43], [.56, .47], [.66, .55]], 1.25, { ease: 'in', pen: [1, .25] });
+  St('sumi', 10, [[.29, .32], [.32, .23], [.36, .15]], .2, { ease: 'in', pen: [.75, .15] });
+  St('sumi', 9, [[.47, .44], [.51, .53], [.54, .6]], .18, { ease: 'in', pen: [.75, .15] });
+  St('sumi', 8, [[.14, .2], [.155, .13]], .12, { ease: 'in', pen: [.7, .15] });
+  // blossoms: five pale petals bleeding into each other, a vermilion heart dropped into the wet
+  const blos = [[.2, .17, 1, 30], [.255, .3, .6, 24], [.335, .2, .7, 24], [.42, .38, 1.2, 32], [.535, .42, .6, 24], [.625, .51, .9, 30], [.09, .12, .5, 20]];
+  for (const [x, y, d, s] of blos) {
+    const a0 = R() * 6.3, ar = 1280 / 800;
+    for (let i = 0; i < 5; i++) {
+      const a = a0 + i * 1.2566, rr = s * .5 / 1280;
+      H('vermilion', s * .62, x + Math.cos(a) * rr, y + Math.sin(a) * rr * ar, .16 + .16 * d, { kMul: .28 + .2 * R() });
+    }
+    H('vermilion', s * .5, x, y, .3 + .35 * d, { kMul: 1.2 });
+  }
+  D(1.1);
+  // stamens: quick black flicks out of each heart, then a light red splatter from the loaded brush
+  for (const [x, y, , s] of blos.slice(0, 6)) {
+    const a0 = R() * 6.3;
+    for (let i = 0; i < 5; i++) {
+      const a = a0 + i * 1.25 + R() * .3, l = s * (.55 + .35 * R()) / 1280, b = a + .35;
+      St('sumi', 2.5, [[x, y], [x + Math.cos(b) * l * .5, y + Math.sin(b) * l * .8], [x + Math.cos(a) * l, y + Math.sin(a) * l * 1.6]], .06, { ease: 'in', kMul: 1.6, wMul: .15 });
+      H('sumi', 4.5, x + Math.cos(a) * l * 1.1, y + Math.sin(a) * l * 1.76, .03, { kMul: 2.5, wMul: .3 });
+    }
+  }
+  for (let i = 0; i < 18; i++) {
+    const [bx, by] = blos[i % 6], a = R() * 6.3, d = .03 + .07 * R();
+    H('vermilion', 4 + 7 * R() * R(), bx + Math.cos(a) * d, by + Math.sin(a) * d * 1.6, .04, { kMul: 1.8, wMul: .5 });
+  }
+  q.push({ kind: 'seal', pts: [[.93, .9]], size: 30, dur: .1 });
+  W(.3);
+  return q;
+}
+function startDemo() {
+  clearAll(); stopDemo();
+  demo = { q: buildDemo(), k: 0, t: 0, box: compositionBox(), prevInk: ink, prevSize: size };
+  document.body.classList.add('demo');
+}
+function stopDemo() {
+  if (!demo) return;
+  ptr.down = false; ptr.demo = false; ptr.demoPen = false; ptr.tail = null; ptr.wMul = 1; ptr.kMul = 1;
+  ink = demo.prevInk; size = demo.prevSize; demo = null; dryBtn = false;
+  document.body.classList.remove('demo'); updUI();
+}
+const ease = { in: t => t * t * (1.6 - .6 * t), inout: t => t * t * (3 - 2 * t), lin: t => t };
+function catmull(pts, f) {
+  const n = pts.length - 1; if (!n) return pts[0];
+  const s = f * n, i = Math.min(n - 1, Math.floor(s)), t = s - i;
+  const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(n, i + 2)];
+  const c = (a, b, c2, d) => .5 * (2 * b + (-a + c2) * t + (2 * a - 5 * b + 4 * c2 - d) * t * t + (-a + 3 * b - 3 * c2 + d) * t * t * t);
+  return [c(p0[0], p1[0], p2[0], p3[0]), c(p0[1], p1[1], p2[1], p3[1])];
+}
+function demoStep(dt) {
+  if (!demo) return;
+  demo.t += dt;
+  let a = demo.q[demo.k];
+  while (a && demo.t > a.dur) {
+    demo.t -= a.dur;
+    if (ptr.down) endStroke();
+    ptr.demo = false; dryBtn = false; demo.k++; a = demo.q[demo.k];
+  }
+  if (!a) { stopDemo(); return; }
+  dryBtn = a.kind === 'dry';
+  if (a.kind === 'wait' || a.kind === 'dry') return;
+  const B = demo.box, P2 = p => [B.x + p[0] * B.w, B.y + p[1] * B.h];
+  if (a.kind === 'seal') { if (!a.done) { a.done = true; const p = P2(a.pts[0]); seal(p[0], p[1], a.size * Math.max(B.w / 1280, .6)); } return; }
+  const f = a.kind === 'hold' ? 0 : (ease[a.ease || 'inout'])(Math.min(1, demo.t / a.dur));
+  const [x, y] = P2(catmull(a.pts, f));
+  const prs = a.pen ? a.pen[0] + (a.pen[1] - a.pen[0]) * f : .5;
+  if (!ptr.demo) {
+    ink = a.ink; size = Math.max(3, a.size * Math.max(B.w / 1280, .6)); updUI();   // phones: keep marks painterly
+    startStroke(x, y, a.ink === 'water', false, prs);
+    ptr.demo = true; ptr.demoPen = !!a.pen; ptr.wMul = a.wMul || 1; ptr.kMul = a.kMul || 1;
+  } else { ptr.q.push([x, y, prs]); ptr.x = x; ptr.y = y; ptr.pressure = prs; }
+}
+
+// ---------- UI ----------
+const body = document.body, sizeV = document.getElementById('sizeV');
+function updUI() {
+  for (const b of document.querySelectorAll('[data-ink]')) b.classList.toggle('on', b.dataset.ink === ink);
+  sizeV.textContent = Math.round(size);
+  document.getElementById('dry').classList.toggle('on', dry || dryBtn);
+}
+let idleT = 0;
+function wake() { idleT = 0; body.classList.remove('idle'); }
+addEventListener('pointermove', wake); addEventListener('keydown', wake);
+for (const b of document.querySelectorAll('[data-ink]')) b.addEventListener('click', () => { ink = b.dataset.ink; updUI(); });
+const setSize = s => { size = clamp(Math.round(s), 4, 160); updUI(); };
+document.getElementById('sizeDn').addEventListener('click', () => setSize(size / 1.2));
+document.getElementById('sizeUp').addEventListener('click', () => setSize(size * 1.2));
+const dryEl = document.getElementById('dry');
+dryEl.addEventListener('pointerdown', e => { e.preventDefault(); dryBtn = true; updUI(); });
+for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) dryEl.addEventListener(ev, () => { dryBtn = false; updUI(); });
+document.getElementById('clear').addEventListener('click', () => { stopDemo(); clearAll(); });
+document.getElementById('save').addEventListener('click', () => saveReq = true);
+let saveReq = false;
+function savePNG() {
+  render(true);
+  cv.toBlob(b => {
+    if (!b) return;
+    const a = document.createElement('a'), d = new Date(), z = n => String(n).padStart(2, '0');
+    a.download = `tusche-${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}.png`;
+    a.href = URL.createObjectURL(b); a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }, 'image/png');
+}
+addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === '1') ink = 'sumi'; else if (k === '2') ink = 'vermilion'; else if (k === '3') ink = 'gold'; else if (k === '4' || k === 'w') ink = 'water';
+  else if (k === '[') setSize(size / 1.2); else if (k === ']') setSize(size * 1.2);
+  else if (k === 'c') { stopDemo(); clearAll(); }
+  else if (k === 'd') dry = true;
+  else if (k === 'p') startDemo();
+  else if (k === 'h') body.classList.toggle('nohud');
+  else if (k === 's') saveReq = true;
+  else return;
+  updUI();
+});
+addEventListener('keyup', e => { if (e.key.toLowerCase() === 'd') { dry = false; updUI(); } });
+addEventListener('blur', () => { dry = false; dryBtn = false; updUI(); });
+
+// ---------- loop ----------
+let last = -1, frameNo = 0, hidden = document.hidden, ftimes = [], adaptDone = FIXED || Q.has('scale');
+document.addEventListener('visibilitychange', () => { hidden = document.hidden; last = -1; });
+addEventListener('resize', () => { layout(); if (demo) demo.box = compositionBox(); });
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (hidden) return;                                   // the paper waits while the tab is hidden
+  let dt = last < 0 ? 1 / 60 : clamp((now - last) / 1000, 0, .05);
+  if (!FIXED && last >= 0 && frameNo > 30 && !adaptDone) {
+    ftimes.push(now - last);
+    if (ftimes.length >= 120) {
+      ftimes.sort((a, b) => a - b);
+      if (ftimes[60] > 21 && simPx < 3) setScale(3);  // can't hold ~50 fps at half resolution: drop to a third
+      adaptDone = true;
+    }
+  }
+  last = now; if (FIXED) dt = 1 / 60;
+  frameNo++;
+  demoStep(dt);
+  brushFrame(dt);
+  simulate(dt);
+  // the dwell ring: grows while the brush rests, so you can feel how far the bloom will travel
+  const tR = ptr.down && !ptr.demo ? size * .5 * (1 + 1.1 * Math.sqrt(Math.min(ptr.hold, 6))) : 0;
+  ringState.r += (Math.max(tR, size * .5) - ringState.r) * (1 - Math.exp(-dt * 10));
+  const tA = ptr.down && !ptr.demo ? .22 + .4 * smooth(.1, 1.5, ptr.hold) : (demo || !ptr.hover ? 0 : .14);
+  ringState.a += (tA - ringState.a) * (1 - Math.exp(-dt * 8));
+  const lx = ptr.hx != null ? (ptr.hx / cssW - .5) : 0, ly = ptr.hy != null ? (.5 - ptr.hy / cssH) : 0;
+  lightX += (-.45 + lx * .9 - lightX) * (1 - Math.exp(-dt * 3)); lightY += (.55 + ly * .7 - lightY) * (1 - Math.exp(-dt * 3));
+  if (!ptr.down && !demo) { idleT += dt; if (idleT > 3.5) body.classList.add('idle'); }
+  render(false);
+  if (saveReq) { saveReq = false; savePNG(); }
+}
+
+cv.addEventListener('webglcontextlost', e => { e.preventDefault(); fail('The graphics context was lost. Reload to paint again.'); });
+
+layout(); updUI();
+if (!Q.has('nodemo')) startDemo();
+requestAnimationFrame(frame);
+
+// ---------- test hooks ----------
+function readTex(t) { gl.bindFramebuffer(gl.FRAMEBUFFER, target(t)); const a = new Float32Array(SW * SH * 4); gl.readPixels(0, 0, SW, SH, gl.RGBA, gl.FLOAT, a); return a; }
+window.__tusche = {
+  get frame() { return frameNo; }, get demo() { return !!demo; }, get simPx() { return simPx; }, get half() { return HALF; },
+  get size() { return [SW, SH]; }, params: PARAMS,
+  totals() {
+    const s = readTex(S[0]), x = readTex(X[0]), l = readTex(L[0]), t = readTex(T[0]);
+    let w = 0, p = 0, m = 0, bad = 0;
+    for (let i = 0; i < s.length; i += 4) {
+      w += s[i + 3]; p += s[i] + s[i + 1] + s[i + 2] + l[i] + l[i + 1] + l[i + 2] + t[i] + t[i + 1] + t[i + 2]; m += x[i] + l[i + 3] + t[i + 3];
+      for (let k = 0; k < 4; k++) if (!isFinite(s[i + k]) || !isFinite(x[i + k]) || !isFinite(l[i + k]) || !isFinite(t[i + k])) bad++;
+    }
+    return { water: w, pigment: p, metal: m, nonFinite: bad };
+  },
+  // cells (as css px²) carrying pigment above a threshold, inside a box (css px)
+  area(x0, y0, x1, y1, thr = .05) {
+    const s = readTex(S[0]), l = readTex(L[0]), t = readTex(T[0]); let c = 0;
+    for (let j = 0; j < SH; j++) for (let i = 0; i < SW; i++) {
+      const cx = (i + .5) * simPx, cy = (SH - j - .5) * simPx; if (cx < x0 || cx > x1 || cy < y0 || cy > y1) continue;
+      const o = (j * SW + i) * 4; if (s[o + 1] + l[o + 1] + t[o + 1] > thr) c++;
+    }
+    return c * simPx * simPx;
+  },
+  wetCells() { const s = readTex(S[0]); let c = 0; for (let i = 3; i < s.length; i += 4) if (s[i] > .01) c++; return c; },
+  play(actions, opts = {}) {                      // actions in box-relative coords, like the demo
+    if (opts.clear !== false) clearAll();
+    stopDemo(); demo = { q: actions, k: 0, t: 0, box: opts.box || { x: 0, y: 0, w: cssW, h: cssH }, prevInk: ink, prevSize: size };
+  },
+  read(name) { return Array.from(readTex({ S, X, L, T }[name][0])); },
+  setDry(v) { dry = !!v; }, clear: clearAll, startDemo, stopDemo, setScale,
+};
+})();
+</script>
+</body>
+</html>
