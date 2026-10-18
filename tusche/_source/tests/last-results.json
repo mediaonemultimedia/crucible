@@ -1,0 +1,17 @@
+[
+  {
+    "name": "static: no external resources referenced",
+    "pass": true,
+    "detail": {
+      "ext": [],
+      "http": []
+    }
+  },
+  {
+    "name": "suite ran to completion",
+    "pass": false,
+    "detail": {
+      "error": "page.waitForFunction: Target page, context or browser has been closed\n    at /home/user/crucible/tusche/_source/tests/run-tests.mjs:22:16"
+    }
+  }
+]

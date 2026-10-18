@@ -256,7 +256,7 @@ const BRUSH = prog(`#version 300 es
 precision highp float;
 uniform sampler2D uS, uX, uP;
 uniform vec4 uA[40], uB[40], uC[40]; uniform int uN; uniform vec4 uBox;
-uniform vec3 uPig; uniform float uMetal, uSeed; uniform vec4 uSeal;
+uniform vec3 uPig; uniform float uMetal, uSeed, uTopUp; uniform vec4 uSeal;
 layout(location=0) out vec4 oS; layout(location=1) out vec4 oX;
 float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
@@ -268,7 +268,7 @@ void main() {
   oS = s; oX = x;
   if (p.x < uBox.x || p.y < uBox.y || p.x > uBox.z || p.y > uBox.w) return;
   float tooth = texelFetch(uP, ip, 0).b;
-  float cw = 0., ci = 0.;
+  float cw = 0., ci = 0., mw = 0.;
   for (int i = 0; i < 40; i++) {
     if (i >= uN) break;
     vec4 A = uA[i], B = uB[i], C = uC[i];
@@ -281,7 +281,7 @@ void main() {
     float bn = .65 * vn(vec2(across * .4 + uSeed, C.x * .008)) + .35 * vn(vec2(across * .9 + uSeed * 3.1, C.x * .025));
     float thr = C.z * mix(.5, .72, smoothstep(.2, .95, u)) - .3 * (tooth - .5) - .02;
     m *= smoothstep(thr - .04, thr + .04, bn);
-    cw += m * A.w * B.z; ci += m * A.w * B.w;
+    cw += m * A.w * B.z; ci += m * A.w * B.w; mw = max(mw, m * B.z);
   }
   if (uSeal.w > 0.) {
     // a seal: a rough square of concentrated vermilion with abstract marks left as paper (no characters)
@@ -293,7 +293,10 @@ void main() {
     sq *= smoothstep(.05, .11, mk) * step(.25, h21(floor(p * .8)) + .5);
     ci += sq * uSeal.w; cw += sq * .03;
   }
-  oS = vec4(s.rgb + uPig * ci, s.a + cw);
+  // a moving brush wets the paper up to its own wetness at once (so a frame's leading edge is never a thin,
+  // drying cap that would rim before the next frame arrives); a resting brush keeps adding water
+  float wa = uTopUp > 0. ? max(0., mw * .8 - s.a) + cw * .2 : cw;
+  oS = vec4(s.rgb + uPig * ci, s.a + wa);
   oX = vec4(x.r + uMetal * ci, x.gba);
 }`);
 
@@ -513,7 +516,7 @@ cv.addEventListener('pointerdown', e => {
   document.body.classList.add('painting');
 });
 cv.addEventListener('pointermove', e => {
-  ptr.hx = e.clientX; ptr.hy = e.clientY;
+  ptr.hx = e.clientX; ptr.hy = e.clientY; ptr.hover = e.pointerType !== 'touch';
   if (!ptr.down || ptr.demo) return;
   const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
   for (const c of (evs.length ? evs : [e])) ptr.q.push([c.clientX, c.clientY, ptr.pen ? c.pressure : .5]);
@@ -522,6 +525,7 @@ cv.addEventListener('pointermove', e => {
 });
 const up = () => { skipArmed = false; if (!ptr.demo) endStroke(); document.body.classList.remove('painting'); };
 addEventListener('pointerup', up); addEventListener('pointercancel', up);
+cv.addEventListener('pointerleave', () => { ptr.hover = false; });
 
 // brush state per frame → dabs
 const MAXD = 40, DA = new Float32Array(MAXD * 4), DB = new Float32Array(MAXD * 4), DC = new Float32Array(MAXD * 4);
@@ -596,7 +600,6 @@ function brushFrame(dt) {
       carryD = sl - (s - spacing); x0 = p[0]; y0 = p[1];
     }
     ptr.carry = carryD;
-    if (!n) push(ptr.x, ptr.y, ptr.pressure, 0, ptr.along);
   }
   ptr.bx = px; ptr.by = py;
   if (!n) return;
@@ -607,6 +610,7 @@ function brushFrame(dt) {
   gl.uniform4fv(u.uA, DA); gl.uniform4fv(u.uB, DB); gl.uniform4fv(u.uC, DC); gl.uniform1i(u.uN, n);
   gl.uniform4f(u.uBox, box[0], box[1], box[2], box[3]);
   gl.uniform3fv(u.uPig, I.abs); gl.uniform1f(u.uMetal, I.metal); gl.uniform1f(u.uSeed, ptr.seed); gl.uniform4f(u.uSeal, 0, 0, 1, 0);
+  gl.uniform1f(u.uTopUp, still ? 0 : 1);
   draw(); S.reverse(); X.reverse();
 }
 function seal(x, y, s) {
@@ -615,7 +619,7 @@ function seal(x, y, s) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, target(S[1], X[1]));
   const u = BRUSH.u;
   gl.uniform1i(u.uS, bind(0, S[0])); gl.uniform1i(u.uX, bind(1, X[0])); gl.uniform1i(u.uP, bind(2, P));
-  gl.uniform1i(u.uN, 0); gl.uniform4f(u.uBox, sx - r - 2, sy - r - 2, sx + r + 2, sy + r + 2);
+  gl.uniform1i(u.uN, 0); gl.uniform1f(u.uTopUp, 0); gl.uniform4f(u.uBox, sx - r - 2, sy - r - 2, sx + r + 2, sy + r + 2);
   gl.uniform3fv(u.uPig, INKS.vermilion.abs); gl.uniform1f(u.uMetal, 0); gl.uniform1f(u.uSeed, 0); gl.uniform4f(u.uSeal, sx, sy, r, 2.2);
   draw(); S.reverse(); X.reverse();
 }
@@ -827,7 +831,7 @@ function frame(now) {
   // the dwell ring: grows while the brush rests, so you can feel how far the bloom will travel
   const tR = ptr.down && !ptr.demo ? size * .5 * (1 + 1.1 * Math.sqrt(Math.min(ptr.hold, 6))) : 0;
   ringState.r += (Math.max(tR, size * .5) - ringState.r) * (1 - Math.exp(-dt * 10));
-  const tA = ptr.down && !ptr.demo ? .22 + .4 * smooth(.1, 1.5, ptr.hold) : (demo ? 0 : .14);
+  const tA = ptr.down && !ptr.demo ? .22 + .4 * smooth(.1, 1.5, ptr.hold) : (demo || !ptr.hover ? 0 : .14);
   ringState.a += (tA - ringState.a) * (1 - Math.exp(-dt * 8));
   const lx = ptr.hx != null ? (ptr.hx / cssW - .5) : 0, ly = ptr.hy != null ? (.5 - ptr.hy / cssH) : 0;
   lightX += (-.45 + lx * .9 - lightX) * (1 - Math.exp(-dt * 3)); lightY += (.55 + ly * .7 - lightY) * (1 - Math.exp(-dt * 3));
