@@ -671,7 +671,7 @@ let demo = null;
 function compositionBox() {
   const a = 16 / 10; let w = cssW, h = cssW / a;
   if (h > cssH) { h = cssH; w = h * a; }
-  if (cssW < 720) { w = cssW * 1.05; h = Math.min(cssH * .8, w / .8); }
+  if (cssW < 720) { w = cssW * .97; h = Math.min(cssH * .8, w / .8); }
   return { x: (cssW - w) / 2, y: (cssH - h) / 2 - (cssW < 720 ? cssH * .04 : 0), w, h };
 }
 function buildDemo() {
@@ -751,12 +751,12 @@ function demoStep(dt) {
   dryBtn = a.kind === 'dry';
   if (a.kind === 'wait' || a.kind === 'dry') return;
   const B = demo.box, P2 = p => [B.x + p[0] * B.w, B.y + p[1] * B.h];
-  if (a.kind === 'seal') { if (!a.done) { a.done = true; const p = P2(a.pts[0]); seal(p[0], p[1], a.size * B.w / 1280); } return; }
+  if (a.kind === 'seal') { if (!a.done) { a.done = true; const p = P2(a.pts[0]); seal(p[0], p[1], a.size * Math.max(B.w / 1280, .6)); } return; }
   const f = a.kind === 'hold' ? 0 : (ease[a.ease || 'inout'])(Math.min(1, demo.t / a.dur));
   const [x, y] = P2(catmull(a.pts, f));
   const prs = a.pen ? a.pen[0] + (a.pen[1] - a.pen[0]) * f : .5;
   if (!ptr.demo) {
-    ink = a.ink; size = Math.max(3, a.size * B.w / 1280); updUI();
+    ink = a.ink; size = Math.max(3, a.size * Math.max(B.w / 1280, .6)); updUI();   // phones: keep marks painterly
     startStroke(x, y, a.ink === 'water', false, prs);
     ptr.demo = true; ptr.demoPen = !!a.pen; ptr.wMul = a.wMul || 1; ptr.kMul = a.kMul || 1;
   } else { ptr.q.push([x, y, prs]); ptr.x = x; ptr.y = y; ptr.pressure = prs; }

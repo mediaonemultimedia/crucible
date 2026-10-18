@@ -8,10 +8,102 @@
     }
   },
   {
-    "name": "suite ran to completion",
-    "pass": false,
+    "name": "runtime: zero network requests, zero console errors through the opening demo",
+    "pass": true,
     "detail": {
-      "error": "page.waitForFunction: Target page, context or browser has been closed\n    at /home/user/crucible/tusche/_source/tests/run-tests.mjs:22:16"
+      "requests": [],
+      "errors": []
+    }
+  },
+  {
+    "name": "conservation: water, pigment and metal within 0.5% over 240 frames (evaporation off)",
+    "pass": true,
+    "detail": {
+      "before": {
+        "water": 3188.29584527939,
+        "pigment": 8842.45202417994,
+        "metal": 1392.7646514274113,
+        "nonFinite": 0
+      },
+      "after": {
+        "water": 3188.2960512815152,
+        "pigment": 8842.451536687713,
+        "metal": 1392.7639090714647,
+        "nonFinite": 0
+      },
+      "rel": {
+        "water": 6.461198558515193e-8,
+        "pigment": 5.51308874092121e-8,
+        "metal": 5.330088941103529e-7
+      },
+      "errors": []
+    }
+  },
+  {
+    "name": "conservation: pigment kept and water gone after drying",
+    "pass": true,
+    "detail": {
+      "after": {
+        "water": 0,
+        "pigment": 8842.409354075831,
+        "metal": 1392.757890427486,
+        "nonFinite": 0
+      }
+    }
+  },
+  {
+    "name": "dwell: 2 s hold blooms ≥ 1.6× the area of a 0.5 s hold",
+    "pass": true,
+    "detail": {
+      "short": {
+        "area": 4124,
+        "wet": 0
+      },
+      "long": {
+        "area": 21136,
+        "wet": 0
+      },
+      "ratio": 5.13
+    }
+  },
+  {
+    "name": "stability: no NaN/Inf after a long scripted session",
+    "pass": true,
+    "detail": {
+      "totals": {
+        "water": 9030.66608617027,
+        "pigment": 46748.06395136265,
+        "metal": 14765.565991278589,
+        "nonFinite": 0
+      },
+      "frame": 4370,
+      "errors": []
+    }
+  },
+  {
+    "name": "half floats: paper dries unaided within 25 s of sim time, values finite",
+    "pass": true,
+    "detail": {
+      "half": true,
+      "wetBefore": 3819,
+      "wet": 0,
+      "tot": {
+        "water": 0,
+        "pigment": 4222.051890432835,
+        "metal": 2281.6975405216217,
+        "nonFinite": 0
+      },
+      "errors": []
+    }
+  },
+  {
+    "name": "resize: painting survives shrink/grow exactly and a resolution change within 3%",
+    "pass": true,
+    "detail": {
+      "before": 7480.642035244722,
+      "afterResize": 7480.615643974845,
+      "afterScale3": 7481.592740471755,
+      "errors": []
     }
   }
 ]
