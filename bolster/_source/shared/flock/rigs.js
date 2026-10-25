@@ -246,16 +246,16 @@ function sittingTorso(b, { w = 0.8, h = 0.98, d = 0.74 } = {}) {
 }
 
 /* front legs: straight stuffed columns from chest to paw, part of the torso */
-function frontLegs(b, { x = 0.3, top = 1.05, z0 = 0.34, z1 = 0.6, r = 0.17, accent = zero, under = zero } = {}) {
+function frontLegs(b, { x = 0.3, top = 1.05, z0 = 0.34, z1 = 0.6, r = 0.17, accent = zero, under = zero, inCloud = true, bend = 2, mem = 2, stretch } = {}) {
   const legs = [];
   for (const s of [-1, 1]) {
     const radius = (u) => r + 0.04 * smooth(0.65, 1, u);
     const end = r + 0.04;
     legs.push(b.chain({
-      name: s < 0 ? 'left leg' : 'right leg', kind: 'leg', cloud: 0, n: 5, inCloud: true,
+      name: s < 0 ? 'left leg' : 'right leg', kind: 'leg', cloud: 0, n: 5, inCloud,
       anchor: [s * x * 0.8, top + 0.15, z0 - 0.2],
       path: (u) => [s * (x + 0.03 * u), top + (end * 0.98 - top) * u, z0 + (z1 - z0) * u * u],
-      radius, ref: [0, 0, 1], bend: 2, mem: 2, AS: 18, AA: 18, CAP: 7, accent, under,
+      radius, ref: [0, 0, 1], bend, mem, stretch, AS: 18, AA: 18, CAP: 7, accent, under,
     }));
   }
   return legs;
@@ -363,7 +363,10 @@ export function buildFox() {
 
 /* ── wolf ───────────────────────────────────────────────────────────────────── */
 
-export function buildWolf() {
+/* Bolster: `fighter` frees the front legs from the torso's cloud (free
+   chains, like a biped's arms: they swing, punch and grab) and names them
+   as the toy's arms. Without it this is Flock's wolf exactly. */
+export function buildWolf({ fighter = false } = {}) {
   const b = new RigBuilder('wolf');
   const torso = sittingTorso(b);
   const HEAD = { c: [0, 2.22, 0.1], r: [0.8, 0.7, 0.72], B: null, bulge: (phi) => 1 + 0.06 * Math.sin(phi * 1.3) };
@@ -386,7 +389,7 @@ export function buildWolf() {
   });
   b.grid({ name: 'snout', cloud: head, c: [0, 2.03, 0.7], r: [0.31, 0.24, 0.34], B: rotX(0.1), U: 32, V: 22, under: () => 1, pile: () => 0.7 });
   haunches(b, { under: (u, v, l) => smooth(0.4, 0.9, l[2]) * 0.4, accent: (u, v, l) => smooth(0.0, -0.8, l[2]) * 0.4 });
-  frontLegs(b, { under: (s, c) => 0.25 + 0.6 * smooth(0.75, 1, s) });
+  const legs = frontLegs(b, { under: (s, c) => 0.25 + 0.6 * smooth(0.75, 1, s), ...(fighter ? { inCloud: false, bend: 2.6, mem: 5, stretch: 1.14 } : {}) });
 
   // pointed upright ears: stiff, flattened front-to-back, cream inside
   for (const s of [-1, 1]) {
@@ -412,7 +415,9 @@ export function buildWolf() {
     groom: { ruf: 0.12 },
   });
 
-  return b.finish({ camY: 0.15, toy: sittingToy(b, h0, h1, { pivot: [0, 1.86, 0.02], chest: [0, 1.25, 0.62] }) });
+  const toy = sittingToy(b, h0, h1, { pivot: [0, 1.86, 0.02], chest: [0, 1.25, 0.62] });
+  if (fighter) { toy.armR = legs[0].k; toy.armL = legs[1].k; }
+  return b.finish({ camY: 0.15, toy });
 }
 
 /* ── lion ───────────────────────────────────────────────────────────────────── */

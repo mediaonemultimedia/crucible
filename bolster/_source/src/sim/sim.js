@@ -320,7 +320,7 @@ function attackTick(st, k, f, o, D) {
   if (m.dive) {
     // hang in the air, then straight down hard
     if (t < DIVE_HANG) { f.vx = 0; f.vy = 0; }
-    else if (t === DIVE_HANG) { f.vy = -m.dive; f.vx = 12 * f.face; }
+    else if (t === DIVE_HANG) { f.vy = -m.dive; f.vx = (m.diveX ?? 12) * f.face; }
   }
   // the dive's landing: shorter if the drop connected, the whole lag on a whiff
   if (m.impact && f.dl && t >= m.impact) { f.act = 'idle'; f.t = 0; f.mv = ''; f.dl = 0; return; }

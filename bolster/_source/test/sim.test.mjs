@@ -165,7 +165,7 @@ test('best of three: two round wins take the match', () => {
 });
 
 /* where each fighter has to stand for his signature / special to reach */
-const RANGE = { kevalanche: [1400, 1800], rubberta: [2200, 2000], johnny: [4000, 4000], sumaura: [3500, 1500], k8e: [4000, 5000] };
+const RANGE = { kevalanche: [1400, 1800], rubberta: [2200, 2000], johnny: [4000, 4000], sumaura: [3500, 1500], k8e: [4000, 5000], sebas: [2600, 1800], zach: [4000, 3000] };
 
 test('every signature connects and deals damage', () => {
   for (const id of ROSTER) {
@@ -303,7 +303,8 @@ test('jumps: a short crouch first, then 40–52 ticks in the air, high and fast 
   for (const id of ROSTER) {
     const r = leap(id, 'k8e', 9000);
     assert.ok(r.squat >= 2 && r.squat <= SQUAT + 1, `${id} squat ${r.squat}`);
-    assert.ok(r.air >= 40 && r.air <= 52, `${id} airtime ${r.air}`);
+    // (Zach Sparrow, a crow, is a little floatier than the rest)
+    assert.ok(r.air >= 40 && r.air <= (id === 'zach' ? 56 : 52), `${id} airtime ${r.air}`);
     // the first quarter of the rise covers well over a third of the height
     const st = fight(id, 'k8e', { x1: -4000, x2: 4000 });
     const ys = [];

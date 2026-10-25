@@ -86,7 +86,7 @@ export const FIGHTERS = {
           .concat([hit(48, 52, { x: 200, y: 1300, w: 1500, h: 1600 }, 95, { kd: 1, push: 70, pause: 16, chip: 12 })]),
       }),
     },
-    signatureName: 'Glacier Uppercut', specialName: 'Avalanche Rush',
+    signatureName: 'Glacier Uppercut', specialName: 'Avalanche Rush', diveName: 'Double-Fist Hammer', throwName: 'Clinch & Shove',
     catchphrase: { main: 'Knocked out cold.', egg: 'You just lost to a pillow.' },
     impatient: 'Not yet, bud.',
   },
@@ -112,7 +112,7 @@ export const FIGHTERS = {
           .concat([hit(64, 64, null, 90, { auto: 1, level: 'unblockable', kd: 1, push: 80, pause: 16 })]),
       }),
     },
-    signatureName: 'Tentacle Sweep', specialName: 'Abraço',
+    signatureName: 'Tentacle Sweep', specialName: 'Abraço', diveName: 'Tentacle Splat', throwName: 'Wrap & Fling',
     catchphrase: { main: 'Eight arms, zero chances.', egg: 'Tentacle-ly speaking… you lost.' },
     impatient: 'Calma!',
   },
@@ -133,7 +133,7 @@ export const FIGHTERS = {
         spawn: [10, 19, 28, 37, 46].map((at, k) => ({ at, proj: { kind: 'ball', dx: 900, y: 1500 + (k % 2) * 900, vx: 160, vy: 0, box: { w: 420, h: 420 }, dmg: 52, level: 'mid', life: 130, hitstun: 22, blockstun: 12, push: 20, chip: 4, kd: k === 4 ? 1 : 0, special: 1 } })),
       }),
     },
-    signatureName: 'Serve', specialName: 'Match Point',
+    signatureName: 'Serve', specialName: 'Match Point', diveName: 'Overhead Smash', throwName: 'Racquet Hook',
     catchphrase: { main: 'Game, set, match… sorry \'bout that.', egg: 'My mom has a better backhand, and she\'s a house cat.' },
     impatient: 'Nog niet!',
   },
@@ -157,7 +157,7 @@ export const FIGHTERS = {
           .concat([hit(58, 76, { x: -400, y: -600, w: 1700, h: 1500 }, 125, { level: 'high', kd: 1, push: 60, pause: 18, chip: 14, landing: 1 })]),
       }),
     },
-    signatureName: 'Bamboo Headbutt', specialName: 'Hundred Paw Slap → Royal Squash',
+    signatureName: 'Bamboo Headbutt', specialName: 'Hundred Paw Slap → Royal Squash', diveName: 'Belly-Flop', throwName: 'Push-Out',
     catchphrase: { main: 'Right. That\'s you squashed.', egg: 'Blimey, you look absolutely cream crackered.' },
     impatient: 'Patience, love.',
   },
@@ -178,15 +178,80 @@ export const FIGHTERS = {
         hits: [hit(30, 40, { abs: 1, x: -800, y: 0, w: 1600, h: 4200 }, 230, { level: 'high', kd: 1, hitstun: 30, blockstun: 20, push: 40, pause: 18, chip: 24 })],
       }),
     },
-    signatureName: 'Ring Toss', specialName: 'Sky Neck',
+    signatureName: 'Ring Toss', specialName: 'Sky Neck', diveName: 'Neck Chop', throwName: 'Neck Swing',
     catchphrase: { main: 'Heads up next time, eh.', egg: 'I can see your house from up here. It\'s sad, eh.' },
+    impatient: 'Not yet, bud.',
+  },
+
+  sebas: {
+    id: 'sebas', name: 'Sebas Perra', animal: 'Wolf', flag: '🇲🇽', nation: 'mx', style: 'Luchador — flips, slides and flying moves',
+    health: 1000, walkF: 58, walkB: 46, jumpV: 460, jumpX: 150, jumpB: 118, jumpG: 22, fallG: 30, grav: 12,
+    push: { w: 1600, h: 2800 },
+    hurt: { stand: { x: -850, y: 0, w: 1700, h: 3000 }, crouch: { x: -850, y: 0, w: 1700, h: 2100 }, air: { x: -800, y: 300, w: 1600, h: 2500 } },
+    moves: {
+      ...normals({ tDmg: 105, lReach: 2000, hReach: 2600, cReach: 2050, lDmg: 38, hDmg: 88, cDmg: 36, lY: 1500, hY: 1400, hStart: 13, hTotal: 41, lW: 1000, hW: 1300, lungeV: 62, lunge: 8 }),
+      // the moonsault: a backflip off the top of the jump into a body
+      // splash — a wider box than the others' dive (the whole body comes down)
+      dive: move({ total: 200, air: 1, dive: 520, hits: [hit(7, 199, { x: -500, y: -1000, w: 2000, h: 1800 }, 74, { level: 'high', hitstun: 20, blockstun: 16, push: 36, pause: 10 })] }),
+      // Lobo Slide: a baseball slide along the mat, feet first — low, a knockdown
+      signature: move({
+        kind: 'signature', total: 50, low: 1, stopOnHit: 1,
+        motion: [{ from: 7, to: 22, vx: 120 }],
+        hits: [hit(9, 20, { x: 300, y: 0, w: 1300, h: 700 }, 82, { level: 'low', kd: 1, hitstun: 24, blockstun: 12, push: 30, bpush: 20, pause: 11, chip: 8 })],
+      }),
+      // Aullido de la Luna: the full moon behind him, a howl that blasts
+      // whoever's close (mid), then a shockwave that rolls along the mat
+      // (low: crouch-block it, or jump it)
+      special: move({
+        kind: 'special', total: 70, invuln: { from: 1, to: 8, vs: 'all' },
+        hits: [hit(16, 20, { x: 0, y: 600, w: 2200, h: 2200 }, 55, { hitstun: 34, blockstun: 16, push: 20, pause: 10, chip: 6 })],
+        spawn: [{ at: 20, proj: { kind: 'howl', dx: 700, y: 500, vx: 150, vy: 0, box: { w: 900, h: 1000 }, dmg: 165, level: 'low', life: 120, hitstun: 30, blockstun: 16, push: 50, chip: 14, kd: 1, special: 1, pause: 14 } }],
+      }),
+    },
+    signatureName: 'Lobo Slide', specialName: 'Aullido de la Luna', diveName: 'Moonsault', throwName: 'Huracanrana',
+    catchphrase: { main: 'Rápido next time, bitch!', egg: 'Who\'s the perra now, huh?' },
+    impatient: 'Espérate! Not yet!',
+  },
+
+  zach: {
+    id: 'zach', name: 'Zach Sparrow', animal: 'Crow', flag: '🇨🇦', nation: 'ca', style: 'Sneaky thief — quick, floaty, loves shiny things',
+    // a lighter, floatier jump than the rest (the same rules: a crouch, a
+    // ballistic arc, a hang at the top), a quick walk, less STUFFING
+    health: 920, walkF: 64, walkB: 52, jumpV: 435, jumpX: 155, jumpB: 120, jumpG: 20, fallG: 27, grav: 12,
+    push: { w: 1300, h: 2400 },
+    hurt: { stand: { x: -700, y: 0, w: 1400, h: 2600 }, crouch: { x: -700, y: 0, w: 1400, h: 1800 }, air: { x: -650, y: 250, w: 1300, h: 2200 } },
+    moves: {
+      ...normals({ tDmg: 95, lReach: 1900, hReach: 2550, cReach: 2000, lDmg: 32, hDmg: 80, cDmg: 32, aDmg: 52, ahDmg: 76, lY: 1500, hY: 1500, hStart: 13, hTotal: 40, lW: 1000, hW: 1300, lungeV: 58, lunge: 8 }),
+      // the dive bomb: beak first, on a slant forward
+      dive: move({ total: 200, air: 1, dive: 520, diveX: 90, hits: [hit(7, 199, { x: 0, y: -900, w: 1500, h: 1600 }, 70, { level: 'high', hitstun: 20, blockstun: 16, push: 36, pause: 10 })] }),
+      // Bottle Cap Flick: a shiny cap flicked off the wingtip (one on screen at a time)
+      signature: move({
+        kind: 'signature', total: 60,
+        spawn: [{ at: 16, proj: { kind: 'cap', dx: 900, y: 1300, vx: 120, vy: 0, box: { w: 380, h: 380 }, dmg: 55, level: 'mid', life: 160, hitstun: 20, blockstun: 13, push: 34, chip: 4 } }],
+      }),
+      // Murder Most Fowl: a murder of crows sweeps across from behind him,
+      // high and low
+      special: move({
+        kind: 'special', total: 70,
+        spawn: [600, 1700, 2500, 1100, 2100, 800, 1500].map((y, k) => ({ at: 10 + k * 4, proj: { kind: 'crow', dx: -1200, y, vx: 210, vy: 0, box: { w: 700, h: 600 }, dmg: 34, level: 'mid', life: 140, hitstun: 22, blockstun: 10, push: 14, chip: 4, kd: k === 6 ? 1 : 0, special: 1, pause: 6 } })),
+      }),
+    },
+    signatureName: 'Bottle Cap Flick', specialName: 'Murder Most Fowl', diveName: 'Dive Bomb', throwName: 'Peck & Toss',
+    catchphrase: { main: 'Finders keepers, loser.', egg: 'Arre yaar, my mother-in-law hits harder than you.' },
     impatient: 'Not yet, bud.',
   },
 };
 
 export const dashOf = () => DASH;
 
-export const ROSTER = ['kevalanche', 'rubberta', 'johnny', 'sumaura', 'k8e'];
+export const ROSTER = ['kevalanche', 'rubberta', 'johnny', 'sumaura', 'k8e', 'sebas', 'zach'];
+
+/* deep-link names: ?p1=sebas&p2=zach (or the full names) */
+export const ALIASES = { sebasperra: 'sebas', zachsparrow: 'zach', johnnydeuce: 'johnny', 'k8-e': 'k8e', kate: 'k8e' };
+export const fighterId = (s) => {
+  const k = String(s || '').toLowerCase().replace(/[\s_]/g, '');
+  return FIGHTERS[k] ? k : ALIASES[k] || null;
+};
 
 /* the move a fighter's state names */
 export const moveOf = (id, name) => FIGHTERS[id].moves[name];
