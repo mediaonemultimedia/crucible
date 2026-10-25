@@ -20,7 +20,7 @@ function go(st, n, inp = () => [0, 0]) {
 /* ── projectiles ──────────────────────────────────────────────────────── */
 
 test('one shot on screen: no second throw while the first is out', () => {
-  for (const id of ['k8e', 'johnny']) {
+  for (const id of ['k8e', 'johnny', 'zach']) {
     // far apart, the other side walking away: the first shot is a long time gone
     const st = fight(id, 'sumaura', { x1: -5500, x2: 5500 });
     let evs = go(st, 3, (i) => [i === 1 ? DOWN : i === 2 ? DOWN | HEAVY : 0, 0]);
@@ -41,7 +41,7 @@ test('one shot on screen: no second throw while the first is out', () => {
 });
 
 test('at most one of your own shots on screen, every tick of a random match (the volley aside)', () => {
-  for (const id of ['k8e', 'johnny']) {
+  for (const id of ['k8e', 'johnny', 'zach']) {
     const st = createMatch({ p1: id, p2: id, seed: 5 });
     const a = new CPU(0, 'hard', 5), b = new CPU(1, 'hard', 6);
     for (let i = 0; i < 60 * 60 * 3 && st.phase !== 'end'; i++) {
@@ -52,7 +52,7 @@ test('at most one of your own shots on screen, every tick of a random match (the
 });
 
 test('projectiles: long startup and recovery, slower, small chip on block only', () => {
-  for (const id of ['k8e', 'johnny']) {
+  for (const id of ['k8e', 'johnny', 'zach']) {
     const m = FIGHTERS[id].moves.signature, P = m.spawn[0].proj;
     assert.ok(isShot(m));
     assert.ok(m.spawn[0].at >= 16, `${id} startup ${m.spawn[0].at}`);
@@ -69,7 +69,7 @@ test('projectiles: long startup and recovery, slower, small chip on block only',
 });
 
 test('a shot can be jumped over cleanly', () => {
-  for (const [thrower, jumper] of [['k8e', 'kevalanche'], ['johnny', 'sumaura'], ['k8e', 'rubberta'], ['johnny', 'k8e']]) {
+  for (const [thrower, jumper] of [['k8e', 'kevalanche'], ['johnny', 'sumaura'], ['k8e', 'rubberta'], ['johnny', 'k8e'], ['zach', 'sebas'], ['zach', 'kevalanche'], ['johnny', 'zach']]) {
     const st = fight(thrower, jumper, { x1: -2300, x2: 2300 });
     let jumped = -1;
     const evs = go(st, 140, (i, s) => {

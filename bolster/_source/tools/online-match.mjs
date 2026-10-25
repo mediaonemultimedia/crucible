@@ -16,6 +16,9 @@ import { fileURLToPath } from 'url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };
 const broker = arg('broker', null), lag = arg('lag', null);
+// who each side plays (the cursor's moved there on the shared select)
+const P1 = arg('p1', 'sumaura'), P2 = arg('p2', 'johnny');
+const ROSTER = ['kevalanche', 'rubberta', 'johnny', 'sumaura', 'k8e', 'sebas', 'zach'];
 const out = path.join(root, 'shots', arg('out', broker ? 'online-peerjs' : 'online'));
 fs.mkdirSync(out, { recursive: true });
 
@@ -44,15 +47,26 @@ const shot = async (name) => {
   await B.screenshot({ path: path.join(out, `${name}-guest.png`), timeout: 240000 });
 };
 
-// host: title → mode → Online → Host a match
+// host: title → mode → Online (Vs Computer, Practice, Online) → Host a match
 await A.keyboard.press('Enter'); await step(A, 0.1);
-await A.keyboard.press('KeyS'); await A.keyboard.press('Enter'); await step(A, 0.1);
+await A.keyboard.press('KeyS'); await A.keyboard.press('KeyS'); await A.keyboard.press('Enter'); await step(A, 0.1);
+const seed0 = await A.evaluate(() => window.__bolster.seed);
 if (await A.evaluate(() => window.__bolster.screen) !== 'online') throw new Error('Online did not open');
 await A.keyboard.press('Enter');        // Host a match
 await A.waitForFunction(() => /room=/.test(document.querySelector('#ol-link').value), null, { timeout: 30000 });
 const link = await A.evaluate(() => document.querySelector('#ol-link').value);
 const code = await A.evaluate(() => document.querySelector('#ol-code').textContent);
 console.log('share link', link, 'code', code);
+// waiting for the friend: the host practises (local only) — a jab, a jab, a heavy at the dummy
+const lobbyA = await A.evaluate(() => ({ practice: window.__bolster.practice, fight: !!window.__bolster.fight?.practice, cls: document.body.className }));
+console.log('host lobby', JSON.stringify(lobbyA));
+if (!lobbyA.practice?.lobby || !lobbyA.fight) errs.push('the host is not practising in the lobby');
+await A.evaluate(() => { const f = window.__bolster.fight; const s = f.st; s.f[0].x = -1200; s.f[1].x = 1200; f.prev = s.f.map((g) => ({ x: g.x, y: g.y })); });
+for (const k of ['KeyO', 'KeyO', 'KeyP']) { await A.keyboard.down(k); await step(A, 1 / 30); await A.keyboard.up(k); await step(A, 0.1); }
+await step(A, 0.5);
+const prA = await A.evaluate(() => ({ combo: window.__bolster.fight.combos.last, inputs: window.__bolster.fight.inputs.rows.length }));
+console.log('host practised', JSON.stringify(prA));
+if (!prA.combo) errs.push('host practice: no hit landed on the dummy');
 await step(A, 0, true);
 await A.screenshot({ path: path.join(out, '1-share-link-host.png') });
 
@@ -63,15 +77,21 @@ await B.goto(gurl);
 await B.waitForFunction(() => document.body.classList.contains('is-live'), null, { timeout: 240000 });
 await step(B, 0, true);
 const joinText = await B.evaluate(() => document.querySelector('#ol-joinmsg').textContent);
+console.log('guest lobby', JSON.stringify(await B.evaluate(() => ({ screen: window.__bolster.screen, practice: window.__bolster.practice }))));
 await B.screenshot({ path: path.join(out, '2-joining-guest.png') });
 console.log('guest sees:', joinText, '/', await B.evaluate(() => window.__bolster.screen));
 await B.waitForFunction(() => window.__bolster.screen === 'select', null, { timeout: 30000 }).catch(() => {});
 await A.waitForFunction(() => window.__bolster.screen === 'select', null, { timeout: 30000 });
 await both(0.2, 2);
 
-// shared select: host moves to Sumaura, guest to Johnny; each sees the other's cursor
-await A.keyboard.press('KeyD'); await A.keyboard.press('KeyD'); await A.keyboard.press('KeyD');
-await B.keyboard.press('KeyD');
+// practice is over the moment they meet
+const ended = await Promise.all([A, B].map((p) => p.evaluate(() => ({ practice: window.__bolster.practice, fight: !!window.__bolster.fight, cls: document.body.classList.contains('practicing') }))));
+console.log('after joining', JSON.stringify(ended));
+if (ended.some((e) => e.practice || e.fight || e.cls)) errs.push('practice still running on the shared select');
+// shared select: each moves its own cursor to its fighter; each sees the other's
+const curs = await Promise.all([A, B].map((p) => p.evaluate(() => window.__bolster.pick)));
+for (let i = curs[0][0]; i !== ROSTER.indexOf(P1); i = (i + 1) % ROSTER.length) await A.keyboard.press('KeyD');
+for (let i = curs[1][1]; i !== ROSTER.indexOf(P2); i = (i + 1) % ROSTER.length) await B.keyboard.press('KeyD');
 await both(0.2, 3);
 const sel = await Promise.all([A, B].map((p) => p.evaluate(() => ({ pick: window.__bolster.pick, step: document.querySelector('#select-step').textContent, p2: document.querySelector('.plate.p2 .nm').textContent, p1: document.querySelector('.plate.p1 .nm').textContent }))));
 console.log('select', JSON.stringify(sel));
@@ -82,6 +102,13 @@ await B.keyboard.press('KeyO'); await both(0.3, 4);
 
 await A.waitForFunction(() => window.__bolster.fight?.session, null, { timeout: 30000 });
 await B.waitForFunction(() => window.__bolster.fight?.session, null, { timeout: 30000 });
+// the match starts from the fresh state for its seed and fighters: the
+// lobby's practice left nothing behind (and never touched the app's seed)
+const starts = await Promise.all([A, B].map((p) => p.evaluate(() => { const B = window.__bolster, m = B.matchStart; return { ...m, fresh: B.freshHash(m.p1, m.p2, m.seed) }; })));
+console.log('match start', JSON.stringify(starts));
+if (starts[0].p1 !== P1 || starts[0].p2 !== P2) errs.push(`picked ${starts[0].p1} v ${starts[0].p2}, wanted ${P1} v ${P2}`);
+if (starts.some((m) => m.hash !== m.fresh) || starts[0].hash !== starts[1].hash || starts[0].seed !== starts[1].seed) errs.push('the online match did not start from the fresh state on both');
+if (seed0 === undefined) errs.push('no seed');
 // scripted inputs: a hard CPU on each side, each playing only its own fighter
 for (const [p, k] of [[A, 0], [B, 1]]) {
   await p.evaluate((k) => {

@@ -72,6 +72,7 @@ const MOVES = {
   signature: { x: [-1500, 1500], s: `(i) => [i >= 1 && i < 8 ? ${D} | (i === 2 ? ${P} : 0) : 0, 0]`, at: `f.mv === 'signature' && f.t >= 13` },
   special: { x: [-1300, 1300], s: `(i, st) => { if (i === 0) st.f[0].meter = 1000; return [i === 1 ? ${SP} : 0, 0]; }`, at: `f.mv === 'special' && f.t >= 18` },
   'special-late': { x: [-2600, 2600], s: `(i, st) => { if (i === 0) st.f[0].meter = 1000; return [i === 1 ? ${SP} : 0, 0]; }`, at: `f.mv === 'special' && f.t >= 32` },
+  cap: { x: [-1800, 3600], s: `(i) => [i >= 1 && i < 8 ? ${D} | (i === 2 ? ${P} : 0) : 0, 0]`, at: `f.mv === 'signature' && f.t >= 30` },
   throw: { x: [-800, 800], s: `(i) => [i === 1 ? ${O | P} : 0, 0]`, at: `f.mv === 'throwHold' && f.t >= 8` },
   toss: { x: [-800, 800], s: `(i) => [i === 1 ? ${O | P} : 0, 0]`, at: `f.mv === 'throwHold' && f.t >= 19` },
 };
@@ -105,10 +106,10 @@ for (const name of names) {
     await page.close();
   } else if (kind === 'moves') {
     const { page, errs } = await open(`?p1=${id}&p2=${opp}&cpu=normal&seed=7&hold&webgl&noportraits`, { width: 1280, height: 720 });
-    for (const [mv, label] of [['signature', 'signature'], ['special', 'special'], ['special-late', 'special-2'], ['dive', 'dive'], ['dive-drop', 'dive-2'], ['throw', 'throw'], ['toss', 'throw-2']]) {
+    for (const [mv, label] of [[id === 'zach' ? 'cap' : 'signature', 'signature'], ['special', 'special'], ['special-late', 'special-2'], ['dive', 'dive'], ['dive-drop', 'dive-2'], ['throw', 'throw'], ['toss', 'throw-2']]) {
       await pose(page, MOVES[mv]);
       // wider, with the HUD over it
-      await page.evaluate(`cam(mid(), 15, Math.max(2.2, Math.max(...F().plush.map((p) => p.group.position.y)) + 1.2))`);
+      await page.evaluate(`cam(mid(), 17, Math.max(2.4, Math.max(...F().plush.map((p) => p.group.position.y)) + 0.6))`);
       await page.screenshot({ path: path.join(out, `${id}-${label}.png`) });
     }
     console.log(`${name}: ${((Date.now() - t0) / 1000).toFixed(1)} s${errs.length ? '  ERRORS:\n    ' + errs.join('\n    ') : ''}`);

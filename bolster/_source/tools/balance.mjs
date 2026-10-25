@@ -7,7 +7,7 @@
 import fs from 'fs';
 import { createMatch, stepInPlace } from '../src/sim/sim.js';
 import { CPU } from '../src/ai/cpu.js';
-import { ROSTER } from '../src/fighters/index.js';
+import { ROSTER, FIGHTERS, isShot } from '../src/fighters/index.js';
 
 const args = process.argv.slice(2);
 const ji = args.indexOf('--json');
@@ -40,7 +40,7 @@ for (const [A, B] of pairs) {
     const { st, n, ev } = cpuMatch(p1, p2, level, level, 1000 + s * 17);
     const w = st.winner === 2 ? null : st.f[st.winner].id;
     if (w === null) draw++; else if (w === A) wa++; else wb++;
-    for (let k = 0; k < 2; k++) { const id = st.f[k].id; total[id].throws += st.f[k].id === "johnny" || st.f[k].id === "k8e" ? ev[k].signature || 0 : 0; total[id].ticks += n; }
+    for (let k = 0; k < 2; k++) { const id = st.f[k].id; total[id].throws += isShot(FIGHTERS[id].moves.signature) ? ev[k].signature || 0 : 0; total[id].ticks += n; }
   }
   total[A].w += wa; total[B].w += wb; total[A].n += N * 2; total[B].n += N * 2;
   const share = wa / Math.max(1, wa + wb);

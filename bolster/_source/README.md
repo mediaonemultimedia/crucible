@@ -25,13 +25,100 @@ node tools/polish-shots.mjs [--html F] [--out D] [--q '&boxes'] [scene …]
                                  # shoulder sheets and light/heavy strips, any build
 node tools/combat-shots.mjs [block|throws|counter|combo|controls|ko|ko-final]
                                  # the combat pass's evidence → shots/combat/
+node tools/roster2-shots.mjs [sheet-<id>|moves-<id>]
+                                 # roster 2's move sheets and move shots → shots/roster2/
+node tools/online-match.mjs --p1 sebas --p2 zach --out online-roster2
+                                 # two pages: lobby practice, then a match with the new two
 ```
 
+Headless tools use `CHROMIUM` (default `/opt/pw-browsers/chromium`) as the browser.
+
 Open `final.html`, or deep-link straight into a fight:
-`final.html?p1=kevalanche&p2=sumaura&cpu=hard` (`p1cpu=normal` hands player 1
+`final.html?p1=kevalanche&p2=sumaura&cpu=hard` (fighter ids, or `sebasperra` /
+`zachsparrow` / `johnnydeuce`; `practice=sebas&dummy=zach` opens practice; `p1cpu=normal` hands player 1
 to the computer too; `seed=N` fixes the match seed; `toques=1`; `webgl` forces
 the WebGL 2 path; `hold` stops the free-running loop for scripted stepping;
 `boxes` draws the sim's hurt, limb, hit and shot boxes over the picture).
+
+## Roster 2 and practice (bolster-roster2)
+
+Two new fighters, seven in all, and a practice mode.
+
+| Fighter | Animal | From | Signature (S+P) | Special (Space) | Dive slam | Throw |
+|---|---|---|---|---|---|---|
+| Sebas Perra 🇲🇽 | wolf | Flock's wolf, front legs freed as arms; a luchador's mask | Lobo Slide — a low baseball-slide kick, a knockdown | Aullido de la Luna — the full moon behind him, a howl that blasts up close (mid) and a shockwave that rolls along the mat (low) | Moonsault (a backflip, a body splash) | Huracanrana (a hop, a flip, the toss) |
+| Zach Sparrow 🇨🇦 | crow | Grommet's crow, felt beak and all (the fixed beak and wings of #20/#24/#25) | Bottle Cap Flick — a shiny cap, one on screen at a time, with #27's limits (16 startup, 44 recovery, 120/tick, chip 4) | Murder Most Fowl — seven crows sweep across from behind him, high and low | Dive Bomb (beak first, on a slant: `diveX`) | Peck & Toss |
+
+- **Sebas**: an agile middleweight (1030 STUFFING, walk 58/46, a high jump he
+  somersaults through). His lines are Spanglish trash talk — *"Rápido next
+  time, bitch!"* (4 in 5) / *"Who's the perra now, huh?"*; impatient:
+  *"Espérate! Not yet!"*. Evil twin: a darker wolf in the rudo's black-and-red
+  mask, the flames sharpened into horns.
+- **Zach**: a light, quick thief (960, walk 64/52) with a floatier jump (a
+  little more hang: 54 ticks in the air, the others 48–51; the same rules).
+  *"Finders keepers, loser."* / *"Arre yaar, my mother-in-law hits harder
+  than you."*; impatient: *"Not yet, bud."*. Evil twin: an ash-grey crow in a
+  black bandit's mask and a stolen gold chain.
+- Both: a full set (light/heavy/low/air, signature, special, dive slam,
+  throw, E-block, chains; O → O → P a 3-hit true combo on everyone, amplified),
+  AI at every level (the generic CPU; Zach zones as a shooter, Sebas slides
+  from range), card portraits, the slow-motion K.O. launch and Fluffatality,
+  toques (the wolf's ears splay out under the brim), nap time, mirror
+  matches. Frame data: `docs/FRAMES.md`; balance: `docs/BALANCE.md` (Normal,
+  every pairing within 65/35).
+- **How they're built** (`render/puppets.js`): `WolfPuppet` and `CrowPuppet`
+  are bipeds on Grommet's Athlete like Kevalanche. The wolf is Flock's rig
+  with `buildWolf({ fighter: true })` (front legs out of the torso's cloud,
+  named as the arms — Flock's wolf is unchanged without it); the crow's beak
+  is `crowprops.js`'s two mandibles riding the head's shape-matched frame,
+  opening for pecks, caws and wins. `acro(F)` turns the whole plush in the
+  screen's plane for the flips (render only; the sim's boxes don't turn).
+  The masks are painted into the fur's pattern atlas (`render/masks.js`),
+  the pile cut short under them so they read as satin.
+- Select: seven cards (`clamp(84px, 9.6vw, 136px)`), names in full at 1280×720;
+  the plates sit below the controls strip.
+
+### Practice
+
+**Practice** on the mode menu: pick any fighter, then any dummy (the same
+one is the evil twin). Also in the **online lobby**: while the host waits for
+a friend (and while a guest connects), they practise with their last-played
+(or selected) fighter; the room card moves to the corner (C copies the link,
+Esc leaves). When the other player connects, practice ends and both go to
+the shared select.
+
+- Dummy panel (`1`–`6`): Stand, Crouch, Jump, Block (E), Block low, Random
+  block (a fresh guess — stand, crouch or none — at each attack); `R` refill
+  after each combo, `M` meter held full, `X` reset positions, `H` hide the
+  panels. Clickable too.
+- Helpers: the input display (recent masks as icons, run-length frame
+  counts), the combo readout (hits, damage, AMPLIFIED!, COUNTER, best), a move
+  list for the fighter (light, heavy, low, signature, special, dive slam,
+  throw, block, dash, the bread-and-butter).
+- `src/practice.js` is pure (the dummy, `practiceAfter`, the readouts): an
+  ordinary sim match with the intro skipped, the clock held, STUFFING never
+  below 450 (no K.O.), tended between ticks — never inside the sim. Local
+  only: its own seed from `Math.random`, nothing sent, nothing kept; the
+  online match's seed comes from the host's `crypto` as before.
+  `test/practice.test.mjs` covers the dummy modes, refill/floor/meter, the
+  readouts, and isolation (a match played after any amount of practice is
+  identical); `tools/online-match.mjs` checks in two pages that the lobby
+  practice ran, ended on join, and that both peers' match starts from the
+  fresh state for its seed (`matchStart.hash === freshHash`).
+
+Tests: `test/roster2.test.mjs` (every new move connects; Lobo Slide is low;
+the howl's wave crosses the stage and can be jumped; the cap's limits; the
+murder's seven crows; dive slams as overheads; both throws and techs on
+everyone; O → O → P on everyone; determinism and rollback; the CPU at every
+level; a balance sample), `test/net.test.mjs` (two peers with the new two over
+a lossy link), and the existing suites with seven fighters.
+
+Evidence: `shots/roster2/` (move sheets and shots), `shots/online-roster2/`
+(the lobby practice and a Sebas v Zach match over two pages), `shots/`
+(`select-roster2`, `select-laptop`, `fight-sebas`, `fight-zach`,
+`mirror-sebas`, `mirror-zach`, `winner-sebas[-egg]`, `winner-zach[-egg]`,
+`practice-menu`, `toques-roster2`, `ko-sebas`, `ko-zach`, `fluffatality-*`,
+`impatient-sebas`).
 
 ## Combat pass (bolster-combat)
 
@@ -209,6 +296,8 @@ Evidence: `shots/online/` (loopback) and `shots/online-peerjs/` (real PeerJS).
 | Johnny Deuce 🇳🇱 | leopard | Grommet's tennis leopard, racquet in hand | Serve (a tennis-ball projectile) | Match Point — a volley of five serves |
 | Sumaura 🇬🇧 | panda | one of Grommet's sumo pandas (the champion) | Bamboo Headbutt (a flying charge) | Hundred Paw Slap ending in the Royal Squash |
 | K8-E 🇨🇦 | giraffe | Grommet's ring-toss giraffe | Ring Toss (a felt-ring projectile) | Sky Neck — the neck goes up out of shot and comes down on them |
+| Sebas Perra 🇲🇽 | wolf | Flock's wolf, a luchador | Lobo Slide (low) | Aullido de la Luna — the moon, the howl, a rolling shockwave |
+| Zach Sparrow 🇨🇦 | crow | Grommet's crow, a thief | Bottle Cap Flick (a projectile) | Murder Most Fowl — a swarm of crows |
 
 ## How it's put together
 

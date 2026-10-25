@@ -68,7 +68,7 @@ export const LOOKS = {
   sebas: {
     build: () => buildWolf({ fighter: true }), info: () => ({ ...F_INFO.wolf, pile: 9 }), paint: 'wolf', Puppet: (s) => new WolfPuppet(s), yaw: 0.8,
     colors: { ...F_INFO.wolf.colors.grey, spot: '#14915a', nose: '#f4f1ea', cloth: '#ffffff', trim: '#ffffff' },
-    evil: { ...F_INFO.wolf.colors.dusk, spot: '#151318', nose: '#d4102c', cloth: '#ffffff', trim: '#ffffff' },
+    evil: { ...F_INFO.wolf.colors.dusk, fur: '#4f515d', accent: '#2c2d36', under: '#b9b1a6', spot: '#151318', nose: '#d4102c', cloth: '#ffffff', trim: '#ffffff' },
     mask: (m, p, rig, evil) => paintLuchaMask(m, p, rig, { evil }), noMonocle: true,
   },
   // Grommet's crow with his felt beak; his evil twin an ash-grey crow in a
@@ -204,7 +204,7 @@ export class Plush {
       this.beakScale = c.beak || 1;
       group.add(this.beak);
     }
-    if (L.chain && evil) { this.chain = makeGoldChain({ c: [0, 1.6, 0.06], rx: 0.53, rz: 0.52 }); this.chain.visible = true; group.add(this.chain); }
+    if (L.chain && evil) { this.chain = makeGoldChain({ c: [0, 1.56, 0.06], rx: 0.64, rz: 0.62, link: 0.1, tip: 0.42 }); this.chain.visible = true; group.add(this.chain); }
     this.monocleOK = !L.noMonocle;
     this.stars = makeStars();
     group.add(this.stars);

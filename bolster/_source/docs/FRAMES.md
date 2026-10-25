@@ -24,8 +24,8 @@ Every fighter: forward dash (double-tap forward) 16 ticks, 2040 units; backdash 
 | Low (S+O) | 5 | 3 | 10 | 35 | 1950 | +7 | -1 safe | chains into light / heavy / signature / special on contact; low |
 | Jump light | 4 | 15 | 8 | 55 | 1200 | — | — | overhead |
 | Jump heavy | 7 | 18 | 8 | 80 | 1400 | — | — | overhead |
-| Dive slam (air S+P) | 7 | to the floor | landing | 70 (+45 shockwave) | below | +10 | 30 lag on landing: punishable | overhead |
-| Throw (O+P) | 4 | 3 | 24 | 100 | grab touch+520 | KD | unblockable | 100 damage; tech window 12 |
+| Dive slam (air S+P) — Double-Fist Hammer | 7 | to the floor | landing | 70 (+45 shockwave) | below | +10 | 30 lag on landing: punishable | overhead |
+| Throw (O+P) — Clinch & Shove | 4 | 3 | 24 | 100 | grab touch+520 | KD | unblockable | 100 damage; tech window 12 |
 | Signature (S+P) — Glacier Uppercut | 5 | 9 | 33 | 115 | 2060 | KD | -17 punishable | lunge 40×10; invulnerable vs air 1–9 |
 | Special (Space) — Avalanche Rush | 6 | 47 | 20 | 305 | 4734 | KD | -9 punishable | lunge 74×41; invulnerable vs all 1–5; needs a full meter (1000) |
 
@@ -44,8 +44,8 @@ Every fighter: forward dash (double-tap forward) 16 ticks, 2040 units; backdash 
 | Low (S+O) | 5 | 3 | 10 | 35 | 2150 | +7 | -1 safe | chains into light / heavy / signature / special on contact; low |
 | Jump light | 4 | 15 | 8 | 55 | 1200 | — | — | overhead |
 | Jump heavy | 7 | 18 | 8 | 80 | 1400 | — | — | overhead |
-| Dive slam (air S+P) | 7 | to the floor | landing | 70 (+45 shockwave) | below | +10 | 30 lag on landing: punishable | overhead |
-| Throw (O+P) | 4 | 3 | 24 | 100 | grab touch+520 | KD | unblockable | 100 damage; tech window 12 |
+| Dive slam (air S+P) — Tentacle Splat | 7 | to the floor | landing | 70 (+45 shockwave) | below | +10 | 30 lag on landing: punishable | overhead |
+| Throw (O+P) — Wrap & Fling | 4 | 3 | 24 | 100 | grab touch+520 | KD | unblockable | 100 damage; tech window 12 |
 | Signature (S+P) — Tentacle Sweep | 11 | 5 | 31 | 80 | 2900 | KD | -17 punishable | low |
 | Special (Space) — Abraço | 8 | 7 | 36 | 0 | grab 3000 | — | — | needs a full meter (1000) |
 
@@ -64,10 +64,10 @@ Every fighter: forward dash (double-tap forward) 16 ticks, 2040 units; backdash 
 | Low (S+O) | 5 | 3 | 10 | 35 | 2150 | +7 | -1 safe | chains into light / heavy / signature / special on contact; low |
 | Jump light | 4 | 15 | 8 | 55 | 1200 | — | — | overhead |
 | Jump heavy | 7 | 18 | 8 | 80 | 1400 | — | — | overhead |
-| Dive slam (air S+P) | 7 | to the floor | landing | 70 (+45 shockwave) | below | +10 | 30 lag on landing: punishable | overhead |
-| Throw (O+P) | 4 | 3 | 24 | 100 | grab touch+520 | KD | unblockable | 100 damage; tech window 12 |
+| Dive slam (air S+P) — Overhead Smash | 7 | to the floor | landing | 70 (+45 shockwave) | below | +10 | 30 lag on landing: punishable | overhead |
+| Throw (O+P) — Racquet Hook | 4 | 3 | 24 | 100 | grab touch+520 | KD | unblockable | 100 damage; tech window 12 |
 | Signature (S+P) — Serve | 16 | 1 | 44 | 58 | shot | — | — | one on screen at a time; speed 128/tick, at height 1400, 58 dmg, chip 4 on block |
-| Special (Space) — Match Point | 10 | 1 | 56 | 260 | shot | — | — | needs a full meter (1000); 5 shots; speed 160/tick, at height 1500, 52 dmg, chip 4 on block |
+| Special (Space) — Match Point | 10 | 1 | 56 | 260 | shot | — | — | needs a full meter (1000); 5 shots (ball, mid); speed 160/tick, at height 1500, 52 dmg, chip 4 on block |
 
 **Bread and butter** (run in the sim on Kevalanche, from just inside the light's reach; every one a true combo):
 
@@ -83,8 +83,8 @@ Every fighter: forward dash (double-tap forward) 16 ticks, 2040 units; backdash 
 | Low (S+O) | 5 | 3 | 10 | 40 | 1950 | +7 | -1 safe | chains into light / heavy / signature / special on contact; low |
 | Jump light | 4 | 15 | 8 | 60 | 1200 | — | — | overhead |
 | Jump heavy | 7 | 18 | 8 | 92 | 1400 | — | — | overhead |
-| Dive slam (air S+P) | 7 | to the floor | landing | 70 (+45 shockwave) | below | +10 | 30 lag on landing: punishable | overhead |
-| Throw (O+P) | 4 | 3 | 24 | 115 | grab touch+520 | KD | unblockable | 115 damage; tech window 12 |
+| Dive slam (air S+P) — Belly-Flop | 7 | to the floor | landing | 70 (+45 shockwave) | below | +10 | 30 lag on landing: punishable | overhead |
+| Throw (O+P) — Push-Out | 4 | 3 | 24 | 115 | grab touch+520 | KD | unblockable | 115 damage; tech window 12 |
 | Signature (S+P) — Bamboo Headbutt | 12 | 21 | 20 | 86 | 5030 | KD | -12 punishable | lunge 165×22 |
 | Special (Space) — Hundred Paw Slap → Royal Squash | 6 | 71 | 16 | 296 | 2870 | KD | -5 unsafe (close) | lunge 16×39, 34×19; overhead; needs a full meter (1000) |
 
@@ -103,8 +103,8 @@ Every fighter: forward dash (double-tap forward) 16 ticks, 2040 units; backdash 
 | Low (S+O) | 5 | 3 | 10 | 32 | 2400 | +7 | -1 safe | chains into light / heavy / signature / special on contact; low |
 | Jump light | 4 | 15 | 8 | 55 | 1200 | — | — | overhead |
 | Jump heavy | 7 | 18 | 8 | 80 | 1400 | — | — | overhead |
-| Dive slam (air S+P) | 7 | to the floor | landing | 70 (+45 shockwave) | below | +10 | 30 lag on landing: punishable | overhead |
-| Throw (O+P) | 4 | 3 | 24 | 90 | grab touch+520 | KD | unblockable | 90 damage; tech window 12 |
+| Dive slam (air S+P) — Neck Chop | 7 | to the floor | landing | 70 (+45 shockwave) | below | +10 | 30 lag on landing: punishable | overhead |
+| Throw (O+P) — Neck Swing | 4 | 3 | 24 | 90 | grab touch+520 | KD | unblockable | 90 damage; tech window 12 |
 | Signature (S+P) — Ring Toss | 18 | 1 | 46 | 60 | shot | — | — | one on screen at a time; speed 100/tick, at height 1450, 60 dmg, chip 4 on block |
 | Special (Space) — Sky Neck | 30 | 11 | 24 | 230 | tracks | KD | -4 unsafe (close) | overhead; needs a full meter (1000) |
 
@@ -112,4 +112,43 @@ Every fighter: forward dash (double-tap forward) 16 ticks, 2040 units; backdash 
 
 - O → O → P: 3 hits, 171 damage, amplified finisher, 282 meter
 - O → P: 2 hits, 134 damage, amplified finisher, 209 meter
+
+## Sebas Perra — Wolf (STUFFING 1030, walk 58/46)
+
+| Move | Startup | Active | Recovery | Damage | Reach | On hit | On block | Notes |
+|---|---|---|---|---|---|---|---|---|
+| Light (O) | 4 | 2 | 9 | 40 | 2050 | +12 | -1 safe | chains into light / heavy / signature / special on contact |
+| Heavy (P) | 13 | 4 | 25 | 95 | 3228 | -4 | -10 punishable | lunge 66×8; limb hurt box out to 2200, frames 12–29; cancels into signature (or special) on contact; +6 recovery on a whiff |
+| Low (S+O) | 5 | 3 | 10 | 38 | 2100 | +7 | -1 safe | chains into light / heavy / signature / special on contact; low |
+| Jump light | 4 | 15 | 8 | 55 | 1200 | — | — | overhead |
+| Jump heavy | 7 | 18 | 8 | 80 | 1400 | — | — | overhead |
+| Dive slam (air S+P) — Moonsault | 7 | to the floor | landing | 74 (+45 shockwave) | below | +10 | 30 lag on landing: punishable | overhead |
+| Throw (O+P) — Huracanrana | 4 | 3 | 24 | 105 | grab touch+520 | KD | unblockable | 105 damage; tech window 12 |
+| Signature (S+P) — Lobo Slide | 9 | 12 | 30 | 82 | 3280 | KD | -18 punishable | lunge 120×16; low |
+| Special (Space) — Aullido de la Luna | 16 | 5 | 50 | 220 | shot | -16 | -34 punishable | invulnerable vs all 1–8; needs a full meter (1000); 1 shot (howl, low); speed 150/tick, at height 500, 165 dmg, chip 14 on block |
+
+**Bread and butter** (run in the sim on Kevalanche, from just inside the light's reach; every one a true combo):
+
+- O → O → P: 3 hits, 210 damage, amplified finisher, 318 meter
+- S+O → S+P: 2 hits, 146 damage, amplified finisher, 221 meter
+- O → P: 2 hits, 165 damage, amplified finisher, 238 meter
+
+## Zach Sparrow — Crow (STUFFING 960, walk 64/52)
+
+| Move | Startup | Active | Recovery | Damage | Reach | On hit | On block | Notes |
+|---|---|---|---|---|---|---|---|---|
+| Light (O) | 4 | 2 | 9 | 37 | 2000 | +12 | -1 safe | chains into light / heavy / signature / special on contact |
+| Heavy (P) | 13 | 4 | 24 | 90 | 3114 | -3 | -9 punishable | lunge 58×8; limb hurt box out to 2150, frames 12–28; cancels into signature (or special) on contact; +6 recovery on a whiff |
+| Low (S+O) | 5 | 3 | 10 | 35 | 2050 | +7 | -1 safe | chains into light / heavy / signature / special on contact; low |
+| Jump light | 4 | 15 | 8 | 56 | 1200 | — | — | overhead |
+| Jump heavy | 7 | 18 | 8 | 82 | 1400 | — | — | overhead |
+| Dive slam (air S+P) — Dive Bomb | 7 | to the floor | landing | 70 (+45 shockwave) | below | +10 | 30 lag on landing: punishable | overhead |
+| Throw (O+P) — Peck & Toss | 4 | 3 | 24 | 100 | grab touch+520 | KD | unblockable | 100 damage; tech window 12 |
+| Signature (S+P) — Bottle Cap Flick | 16 | 1 | 44 | 55 | shot | — | — | one on screen at a time; speed 120/tick, at height 1300, 55 dmg, chip 4 on block |
+| Special (Space) — Murder Most Fowl | 10 | 1 | 60 | 238 | shot | — | — | needs a full meter (1000); 7 shots (crow, mid); speed 210/tick, at height 600, 34 dmg, chip 4 on block |
+
+**Bread and butter** (run in the sim on Kevalanche, from just inside the light's reach; every one a true combo):
+
+- O → O → P: 3 hits, 197 damage, amplified finisher, 306 meter
+- O → P: 2 hits, 155 damage, amplified finisher, 229 meter
 

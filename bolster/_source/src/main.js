@@ -19,7 +19,7 @@ import { SAYINGS } from './ui/sayings.js';
 import { Online } from './online.js';
 import { CPU } from './ai/cpu.js';
 import { DUMMY_MODES, defaultSettings } from './practice.js';
-import { hash } from './sim/sim.js';
+import { hash, createMatch } from './sim/sim.js';
 import { LEFT as K_L, RIGHT as K_R, UP as K_U, DOWN as K_D, LIGHT as K_O, HEAVY as K_P, SPECIAL as K_S, BLOCK as K_E } from './sim/input.js';
 
 const $ = (s) => document.querySelector(s);
@@ -670,6 +670,7 @@ async function start() {
   app.boxes = params.has('boxes');
   app.say = (text, x, y, o) => say($('#bubbles'), text, x, y, o);
   app.hash = hash;
+  app.freshHash = (p1, p2, seed) => hash(createMatch({ p1, p2, seed }));   // tests: the match practice must not touch
   // portraits for the cards
   if (!params.has('noportraits')) { try { app.portraits = await portraits(renderer, app.stage, ROSTER); } catch (err) { console.warn('portraits', err); } }
   let last = performance.now();

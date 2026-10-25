@@ -85,7 +85,7 @@ kbd{display:inline-block;min-width:22px;text-align:center;font-family:var(--mono
 #select-screen .head{position:absolute;top:24px;left:0;right:0;text-align:center}
 #select-screen .head .panel-title{display:inline-block;margin:0}
 #select-screen .head .eyebrow{display:block;margin-top:6px}
-.plate{position:absolute;top:22%;width:min(30vw,340px);text-align:left}
+.plate{position:absolute;top:max(22%,225px);width:min(30vw,340px);text-align:left}
 .plate.p2{right:3.5vw;text-align:right}
 .plate.p1{left:3.5vw}
 .plate .who{font-family:var(--cond);font-weight:700;font-size:13px;letter-spacing:.24em;text-transform:uppercase;color:var(--on-neon);background:var(--p1);display:inline-block;padding:3px 9px;box-shadow:0 0 14px rgba(255,59,107,.6)}
@@ -319,7 +319,9 @@ body.lobby #online-screen .menu h2{font-size:22px;margin:0}
 body.lobby #online-screen .code{font-size:40px;padding:2px 0 2px .22em}
 body.lobby #online-screen .opt{padding:8px 12px;font-size:15px}
 body.lobby #online-screen .olnote.big{font-size:14px;padding:6px 0}
-body.lobby .pr-side{top:auto;bottom:130px}
+body.lobby .pr-side{right:auto;left:16px;top:clamp(300px,42vh,340px);width:min(250px,28vw)}
+body.lobby .pr-inputs{top:16px}
+body.lobby #pr-in li:nth-child(n+10){display:none}
 body.lobby .pr-moves{bottom:16px}
 @media (max-height:700px){.pr-moves{grid-template-columns:repeat(4,auto)}}
 #netwait .box{display:flex;gap:12px;align-items:center;font-family:var(--cond);font-weight:700;font-size:20px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);background:rgba(29,22,48,.95);border:2px solid var(--violet);border-radius:4px;padding:18px 26px}

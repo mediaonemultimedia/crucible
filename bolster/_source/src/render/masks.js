@@ -87,7 +87,7 @@ export function paintLuchaMask(maskTex, patTex, rig, { evil = false, eu = 0.074,
 
 /* the bandit's mask across the crow's eyes (0.5 ± eu, ev); the bib stays */
 export function paintBanditMask(maskTex, patTex, rig, { eu = 0.15, ev = 0.43 } = {}) {
-  const band = [[0.3, ev - 0.06], [0.42, ev - 0.08], [0.5, ev - 0.05], [0.58, ev - 0.08], [0.7, ev - 0.06], [0.74, ev + 0.0], [0.7, ev + 0.07], [0.58, ev + 0.06], [0.5, ev + 0.09], [0.42, ev + 0.06], [0.3, ev + 0.07], [0.26, ev + 0.0]];
+  const band = [[0.27, ev - 0.08], [0.4, ev - 0.1], [0.5, ev - 0.065], [0.6, ev - 0.1], [0.73, ev - 0.08], [0.78, ev + 0.0], [0.73, ev + 0.09], [0.6, ev + 0.08], [0.5, ev + 0.11], [0.4, ev + 0.08], [0.27, ev + 0.09], [0.22, ev + 0.0]];
   const P = painter(patTex, rig, 'head'), g = P.g;
   g.save();
   g.globalCompositeOperation = 'source-over';
@@ -99,7 +99,7 @@ export function paintBanditMask(maskTex, patTex, rig, { eu = 0.15, ev = 0.43 } =
   g.beginPath(); P.poly([[0.74, ev - 0.02], [1.0, ev - 0.025], [1.0, ev + 0.025], [0.74, ev + 0.02]]); g.fill();
   // little holes round the bead eyes, so they still read
   g.fillStyle = 'rgb(0,0,0)';
-  g.beginPath(); for (const s of [-1, 1]) P.ell(0.5 + s * eu, ev, 0.034, 0.05); g.fill();
+  g.beginPath(); for (const s of [-1, 1]) P.ell(0.5 + s * eu, ev, 0.028, 0.042); g.fill();
   g.restore();
   patTex.needsUpdate = true;
   // the mask's pile short and flat
@@ -115,8 +115,8 @@ export function makeGoldChain({ c = [0, 1.6, 0.1], rx = 0.5, rz = 0.46, tip = 0.
   const g = new THREE.Group();
   const gold = new THREE.MeshBasicNodeMaterial();
   gold.colorNode = Fn(() => vec4(shade(vec3(0.95, 0.72, 0.22), normalize(normalWorld), { spec: 0.75, power: 34, wrap: 0.3 }), 1))();
-  const geo = new THREE.TorusGeometry(link, link * 0.32, 8, 14);
-  const N = 26;
+  const geo = new THREE.TorusGeometry(link, link * 0.36, 8, 14);
+  const N = 22;
   const links = new THREE.InstancedMesh(geo, gold, N);
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), sc = new THREE.Vector3(1, 1, 1);
   for (let k = 0; k < N; k++) {

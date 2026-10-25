@@ -12,10 +12,17 @@ The only edits:
 | `grommet/athletes/panda.rig.js` | adds `buildPandaSolo()` (one panda, the champion, at the origin facing +z) | Grommet's rig is two pandas in one ring; Sumaura is one |
 | `grommet/athletes/standing.js` | adds `sunk()` and `remap()` | Pillow Fight polish: where a biped's arm socket goes (inside the torso) and how a fraction along the old arm maps onto the longer chain |
 | `grommet/athletes/bear.rig.js`, `leopard.rig.js`, `panda.rig.js` | the arm chains start at a socket sunk ~0.24 into the torso (the hand ends where it did); the bear's gloves and fur mask, the leopard's sleeves and fur mask remapped so they sit where they did along the visible arm | the arms read as separate pieces when turned far from their sewn pose (a punch, a guard): their round ends stood off the body. Grommet's own copies are untouched |
+| `flock/rigs.js` | `buildWolf({ fighter })`: with `fighter`, the front legs are free chains (not in the torso's cloud; bend 2.6, mem 5, stretch 1.14, like a biped's arms) and the toy names them `armR` / `armL`; `frontLegs` takes `inCloud`, `bend`, `mem`, `stretch` | Sebas Perra punches, slides and grabs with them. Without the option it is Flock's wolf exactly |
+| `grommet/crowprops.js` | exports `makeCap` | Zach Sparrow's Bottle Cap Flick is Grommet's bottle cap |
+
+Roster 2 also copied, unmodified (headers only): `grommet/athletes/crow.rig.js`,
+`grommet/athletes/crow.game.js` (for `BEAK_OPEN`, and `crowprops.js`'s imports),
+`grommet/crowprops.js` — all from grommet-source @ b6164e2, which carries the
+crow's fixed beak and wings (PRs #20, #24, #25).
 
 Not copied (not needed): the athletes' games other than `leopard.game.js`
 (its racquet frame and constants are used), `main.js`, `tools.js`, `net.js`,
-`crowprops.js`, `otterprops.js`, the other rigs; Flock's renderer (Grommet's
+`otterprops.js`, the other rigs; Flock's renderer (Grommet's
 `softbody.js`, `body.js` and `fur.js` are Flock's, extended, and run the
 octopus rig unchanged).
 

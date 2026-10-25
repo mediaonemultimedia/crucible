@@ -185,11 +185,11 @@ export const FIGHTERS = {
 
   sebas: {
     id: 'sebas', name: 'Sebas Perra', animal: 'Wolf', flag: '🇲🇽', nation: 'mx', style: 'Luchador — flips, slides and flying moves',
-    health: 1000, walkF: 58, walkB: 46, jumpV: 460, jumpX: 150, jumpB: 118, jumpG: 22, fallG: 30, grav: 12,
+    health: 1030, walkF: 58, walkB: 46, jumpV: 460, jumpX: 150, jumpB: 118, jumpG: 22, fallG: 30, grav: 12,
     push: { w: 1600, h: 2800 },
     hurt: { stand: { x: -850, y: 0, w: 1700, h: 3000 }, crouch: { x: -850, y: 0, w: 1700, h: 2100 }, air: { x: -800, y: 300, w: 1600, h: 2500 } },
     moves: {
-      ...normals({ tDmg: 105, lReach: 2000, hReach: 2600, cReach: 2050, lDmg: 38, hDmg: 88, cDmg: 36, lY: 1500, hY: 1400, hStart: 13, hTotal: 41, lW: 1000, hW: 1300, lungeV: 62, lunge: 8 }),
+      ...normals({ tDmg: 105, lReach: 2050, hReach: 2700, cReach: 2100, lDmg: 40, hDmg: 95, cDmg: 38, lY: 1500, hY: 1400, hStart: 13, hTotal: 41, lW: 1000, hW: 1300, lungeV: 66, lunge: 8 }),
       // the moonsault: a backflip off the top of the jump into a body
       // splash — a wider box than the others' dive (the whole body comes down)
       dive: move({ total: 200, air: 1, dive: 520, hits: [hit(7, 199, { x: -500, y: -1000, w: 2000, h: 1800 }, 74, { level: 'high', hitstun: 20, blockstun: 16, push: 36, pause: 10 })] }),
@@ -217,11 +217,11 @@ export const FIGHTERS = {
     id: 'zach', name: 'Zach Sparrow', animal: 'Crow', flag: '🇨🇦', nation: 'ca', style: 'Sneaky thief — quick, floaty, loves shiny things',
     // a lighter, floatier jump than the rest (the same rules: a crouch, a
     // ballistic arc, a hang at the top), a quick walk, less STUFFING
-    health: 920, walkF: 64, walkB: 52, jumpV: 435, jumpX: 155, jumpB: 120, jumpG: 20, fallG: 27, grav: 12,
+    health: 960, walkF: 64, walkB: 52, jumpV: 435, jumpX: 155, jumpB: 120, jumpG: 20, fallG: 27, grav: 12,
     push: { w: 1300, h: 2400 },
     hurt: { stand: { x: -700, y: 0, w: 1400, h: 2600 }, crouch: { x: -700, y: 0, w: 1400, h: 1800 }, air: { x: -650, y: 250, w: 1300, h: 2200 } },
     moves: {
-      ...normals({ tDmg: 95, lReach: 1900, hReach: 2550, cReach: 2000, lDmg: 32, hDmg: 80, cDmg: 32, aDmg: 52, ahDmg: 76, lY: 1500, hY: 1500, hStart: 13, hTotal: 40, lW: 1000, hW: 1300, lungeV: 58, lunge: 8 }),
+      ...normals({ tDmg: 100, lReach: 2000, hReach: 2650, cReach: 2050, lDmg: 37, hDmg: 90, cDmg: 35, aDmg: 56, ahDmg: 82, lY: 1500, hY: 1500, hStart: 13, hTotal: 40, lW: 1000, hW: 1300, lungeV: 58, lunge: 8 }),
       // the dive bomb: beak first, on a slant forward
       dive: move({ total: 200, air: 1, dive: 520, diveX: 90, hits: [hit(7, 199, { x: 0, y: -900, w: 1500, h: 1600 }, 70, { level: 'high', hitstun: 20, blockstun: 16, push: 36, pause: 10 })] }),
       // Bottle Cap Flick: a shiny cap flicked off the wingtip (one on screen at a time)

@@ -192,3 +192,19 @@ test('events: cosmetic and flow events fire exactly once despite rollbacks', () 
     }
   }
 });
+
+test('roster 2 online: Sebas Perra and Zach Sparrow, both ways, CPU and random inputs over a lossy link', () => {
+  const cases = [
+    { p1: 'sebas', p2: 'zach', seed: 230, latency: 60, jitter: 20, loss: 0.05, kind: 'cpu' },
+    { p1: 'zach', p2: 'sebas', seed: 231, latency: 120, jitter: 40, loss: 0.05, kind: 'cpu' },
+    { p1: 'sebas', p2: 'kevalanche', seed: 232, latency: 90, jitter: 30, loss: 0.05, kind: 'random' },
+    { p1: 'k8e', p2: 'zach', seed: 233, latency: 40, jitter: 10, loss: 0, kind: 'cpu' },
+  ];
+  for (const c of cases) {
+    const net = makeNet({ latency: c.latency, jitter: c.jitter, loss: c.loss, seed: c.seed });
+    const inputs = c.kind === 'cpu' ? cpuInputs(c.p1, c.p2, c.seed) : randomInputs(c.seed);
+    const res = playOnline({ p1: c.p1, p2: c.p2, seed: c.seed, net, inputs, clockSkew: 6 });
+    const r = checkMatch(res, createMatch({ p1: c.p1, p2: c.p2, seed: c.seed }), `${c.p1} v ${c.p2} (${c.kind})`);
+    console.log(`  ${c.p1} v ${c.p2} ${c.kind} @${c.latency}ms: ${r.ticks} ticks, rollbacks ${r.stats[0].rollbacks}/${r.stats[1].rollbacks}, max ${r.stats[0].maxRollback}`);
+  }
+});

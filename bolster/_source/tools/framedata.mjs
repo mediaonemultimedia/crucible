@@ -44,6 +44,8 @@ const BNB = {
   johnny: [['light', 'light', 'heavy'], ['light', 'heavy']],
   sumaura: [['light', 'light', 'heavy'], ['lowLight', 'signature'], ['light', 'heavy']],
   k8e: [['light', 'light', 'heavy'], ['light', 'heavy']],
+  sebas: [['light', 'light', 'heavy'], ['lowLight', 'signature'], ['light', 'heavy']],
+  zach: [['light', 'light', 'heavy'], ['light', 'heavy']],
 };
 const SHORT = { light: 'O', heavy: 'P', lowLight: 'S+O', signature: 'S+P' };
 const sign = (n) => (n > 0 ? `+${n}` : `${n}`);
@@ -70,7 +72,7 @@ for (const id of ROSTER) {
     const fd = frameData(m);
     const notes0 = [];
     const h = m.hits[m.hits.length - 1];
-    const dmg = m.hits.length ? m.hits.reduce((s, x) => s + x.dmg, 0) : m.spawn.reduce((s, x) => s + x.proj.dmg, 0);
+    const dmg = m.hits.reduce((s, x) => s + x.dmg, 0) + m.spawn.reduce((s, x) => s + x.proj.dmg, 0);
     const reach = m.spawn.length ? 'shot' : m.grab ? (m.grab.throw ? `grab touch+${m.grab.near}` : `grab ${m.grab.range}`) : m.track ? 'tracks' : key === 'dive' ? 'below' : reachOf(m);
     let onHit = '—', onBlock = '—';
     if (h && !m.air && !h.auto && !h.whiff) {
@@ -91,10 +93,10 @@ for (const id of ROSTER) {
     if (key === 'special') notes.push(`needs a full meter (${MAX_METER})`);
     if (m.spawn.length) {
       const P = m.spawn[0].proj;
-      notes.push(`${m.spawn.length > 1 ? `${m.spawn.length} shots` : 'one on screen at a time'}; speed ${P.vx}/tick, at height ${P.y}, ${P.dmg} dmg, chip ${P.chip} on block`);
+      notes.push(`${key === 'special' ? `${m.spawn.length} shot${m.spawn.length > 1 ? 's' : ''} (${P.kind}, ${P.level})` : 'one on screen at a time'}; speed ${P.vx}/tick, at height ${P.y}, ${P.dmg} dmg, chip ${P.chip} on block`);
     }
     const dm = key === 'throw' ? F.moves.throwHold.hits[0].dmg : key === 'dive' ? `${dmg} (+${F.moves.diveLand.hits[0].dmg} shockwave)` : dmg;
-    out.push(`| ${NAMES[key]} — ${key === 'signature' ? F.signatureName : key === 'special' ? F.specialName : ''} | ${fd.startup} | ${key === 'dive' ? 'to the floor' : fd.active} | ${key === 'dive' ? 'landing' : fd.recovery} | ${dm} | ${reach} | ${onHit} | ${onBlock} | ${notes.join('; ')} |`.replace(' —  |', ' |'));
+    out.push(`| ${NAMES[key]} — ${key === 'signature' ? F.signatureName : key === 'special' ? F.specialName : key === 'dive' ? F.diveName : key === 'throw' ? F.throwName : ''} | ${fd.startup} | ${key === 'dive' ? 'to the floor' : fd.active} | ${key === 'dive' ? 'landing' : fd.recovery} | ${dm} | ${reach} | ${onHit} | ${onBlock} | ${notes.join('; ')} |`.replace(' —  |', ' |'));
   }
   out.push('', `**Bread and butter** (run in the sim on Kevalanche, from just inside the light's reach; every one a true combo):`, '');
   for (const seq of BNB[id]) {

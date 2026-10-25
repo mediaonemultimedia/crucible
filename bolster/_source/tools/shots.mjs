@@ -35,7 +35,7 @@ const SCENES = {
   bubbles: {
     q: '?hold&webgl&noportraits',
     run: `document.querySelector('#title-screen').classList.remove('on'); B.step(0.2);
-      const L = ['Knocked out cold.', 'You just lost to a pillow.', 'Eight arms, zero chances.', 'Tentacle-ly speaking… you lost.', "Game, set, match… sorry 'bout that.", "My mom has a better backhand, and she's a house cat.", "Right. That's you squashed.", 'Blimey, you look absolutely cream crackered.', 'Heads up next time, eh.', "I can see your house from up here. It's sad, eh.", 'Patience, love.', 'Calma!', 'Nog niet!', 'Not yet, bud.', 'Toques on, eh.'];
+      const L = ['Knocked out cold.', 'You just lost to a pillow.', 'Eight arms, zero chances.', 'Tentacle-ly speaking… you lost.', "Game, set, match… sorry 'bout that.", "My mom has a better backhand, and she's a house cat.", "Right. That's you squashed.", 'Blimey, you look absolutely cream crackered.', 'Heads up next time, eh.', "I can see your house from up here. It's sad, eh.", 'Patience, love.', 'Calma!', 'Nog niet!', 'Not yet, bud.', 'Toques on, eh.', 'Rápido next time, bitch!', "Who's the perra now, huh?", 'Espérate! Not yet!', 'Finders keepers, loser.', 'Arre yaar, my mother-in-law hits harder than you.'];
       const T = ['down-left', 'down-right', 'left', 'right', 'down'];
       L.forEach((t, k) => B.say(t, 230 + (k % 4) * 330, 190 + Math.floor(k / 4) * 190, { size: k > 9 ? 22 : 26, maxWidth: 260, tail: T[k % 5] }));`,
     settle: 900,
@@ -143,6 +143,83 @@ const SCENES = {
       script((i) => [i === 1 || i === 3 ? ${R} : 0, 0]);
       until(() => ST().f[0].act === 'dash' && ST().f[0].t >= 7, 2); B.step(0)`,
   },
+  // ── roster 2: Sebas Perra and Zach Sparrow ──────────────────────────────
+  'fight-sebas': { q: fightQ('sebas', 'zach'), run: `toFight(); B.step(3.0)` },
+  'fight-zach': { q: fightQ('zach', 'k8e'), run: `toFight(); B.step(3.3)` },
+  'mirror-sebas': { q: fightQ('sebas', 'sebas'), run: `toFight(); F().cpu = [null, null]; place(-2000, 2000); B.step(1.5)` },
+  'mirror-zach': { q: fightQ('zach', 'zach'), run: `toFight(); F().cpu = [null, null]; place(-1800, 1800); B.step(1.5)` },
+  'toques-roster2': { q: fightQ('sebas', 'zach', '&toques=1'), run: `toFight(); F().cpu = [null, null]; place(-2000, 2000); B.step(1.5)` },
+  'impatient-sebas': {
+    q: fightQ('sebas', 'zach'),
+    run: `toFight(); F().cpu = [null, null]; place(-2400, 2400);
+      script((i) => [i % 2 === 0 && i < 10 ? ${SP} : 0, 0]);
+      B.step(0.6)`,
+    settle: 500,
+  },
+  'ko-sebas': {
+    q: fightQ('zach', 'sebas'),
+    run: `toFight(); F().cpu = [null, null]; place(-1600, 900); ST().f[1].hp = 1;
+      script((i) => [i === 1 ? ${P} : 0, 0]);
+      until(() => ST().phase === 'ko', 3); B.step(0.9)`,
+  },
+  'ko-zach': {
+    q: fightQ('sebas', 'zach'),
+    run: `toFight(); F().cpu = [null, null]; place(-1600, 900); ST().f[1].hp = 1;
+      script((i) => [i === 1 ? ${P} : 0, 0]);
+      until(() => ST().phase === 'ko', 3); B.step(0.9)`,
+  },
+  'fluffatality-zach': {
+    q: fightQ('sebas', 'zach'),
+    run: `toFight(); F().cpu = [null, null]; place(-1300, 1300); ST().f[1].hp = 1; ST().wins = [1, 0]; ST().f[0].meter = 1000;
+      script((i) => [i === 1 ? ${SP} : 0, 0]);
+      until(() => ST().phase === 'ko', 4); ST().fluff = 1; until(() => document.querySelector('#banner').textContent.includes('Fluffatality'), 6); B.step(0.4)`,
+  },
+  'fluffatality-sebas': {
+    q: fightQ('zach', 'sebas'),
+    run: `toFight(); F().cpu = [null, null]; place(-1600, 1600); ST().f[1].hp = 1; ST().wins = [1, 0]; ST().f[0].meter = 1000;
+      script((i) => [i === 1 ? ${SP} : 0, 0]);
+      until(() => ST().phase === 'ko', 4); ST().fluff = 1; until(() => document.querySelector('#banner').textContent.includes('Fluffatality'), 6); B.step(0.4)`,
+  },
+  'winner-sebas': {
+    q: fightQ('sebas', 'zach'),
+    run: `toFight(); F().cpu = [null, null]; place(-1500, 900); ST().f[1].hp = 1; ST().wins = [1, 0];
+      script((i) => [i === 1 ? ${P} : 0, 0]);
+      until(() => ST().phase === 'end', 6); ST().egg = 0; until(() => B.screen === 'win', 3); B.step(1.6)`,
+    settle: 700, clip: '.bubble',
+  },
+  'winner-sebas-egg': {
+    q: fightQ('sebas', 'kevalanche'),
+    run: `toFight(); F().cpu = [null, null]; place(-1500, 900); ST().f[1].hp = 1; ST().wins = [1, 0];
+      script((i) => [i === 1 ? ${P} : 0, 0]);
+      until(() => ST().phase === 'end', 6); ST().egg = 1; until(() => B.screen === 'win', 3); B.step(1.6)`,
+    settle: 700, clip: '.bubble',
+  },
+  'winner-zach': {
+    q: fightQ('zach', 'sebas'),
+    run: `toFight(); F().cpu = [null, null]; place(-1500, 900); ST().f[1].hp = 1; ST().wins = [1, 0];
+      script((i) => [i === 1 ? ${P} : 0, 0]);
+      until(() => ST().phase === 'end', 6); ST().egg = 0; until(() => B.screen === 'win', 3); B.step(1.6)`,
+    settle: 700, clip: '.bubble',
+  },
+  'winner-zach-egg': {
+    q: fightQ('zach', 'johnny'),
+    run: `toFight(); F().cpu = [null, null]; place(-1500, 900); ST().f[1].hp = 1; ST().wins = [1, 0];
+      script((i) => [i === 1 ? ${P} : 0, 0]);
+      until(() => ST().phase === 'end', 6); ST().egg = 1; until(() => B.screen === 'win', 3); B.step(1.6)`,
+    settle: 700, clip: '.bubble',
+  },
+  'select-roster2': { q: '?screen=select&hold&webgl', run: `B._cursor(5); B._lock(); B._cursor(5); B.step(1.2)` },
+  'select-laptop': { q: '?screen=select&hold&webgl', vp: { width: 1280, height: 720 }, run: `B._cursor(6); B.step(1.2)` },
+  'practice-menu': {
+    q: '?hold&webgl',
+    run: `document.querySelector('#title-screen').click(); B.step(0.1);
+      document.querySelector('#mode-screen .opt[data-mode=practice]').click(); B.step(0.2);
+      B._cursor(6); B._lock(); B._cursor(4); B._lock(); B.step(0.5);
+      dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit6' }));
+      const f = F(); f.st.f[0].x = -1200; f.st.f[1].x = 1200; f.prev = f.st.f.map((g) => ({ x: g.x, y: g.y }));
+      let i = 0; f.override = () => { i++; return [[0, 16, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 32][i] || (i > 40 && i < 46 ? 8 : 0) | (i === 44 ? 32 : 0), null]; };
+      B.step(1.4)`,
+  },
   'fight-mobile': { q: fightQ('johnny', 'kevalanche'), mobile: true, run: `toFight(); B.step(2.5)` },
 };
 
@@ -156,7 +233,7 @@ let errors = 0;
 for (const name of names) {
   const S = SCENES[name];
   if (!S) { console.log(`no scene ${name}`); continue; }
-  const page = await browser.newPage(S.mobile ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true } : { viewport: { width: 1440, height: 810 }, deviceScaleFactor: 1 });
+  const page = await browser.newPage(S.mobile ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true } : { viewport: S.vp || { width: 1440, height: 810 }, deviceScaleFactor: 1 });
   const errs = [];
   page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
   page.on('pageerror', (e) => errs.push(String(e)));
