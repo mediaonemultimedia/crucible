@@ -3,7 +3,9 @@
    floor, the back wall glowing pink on player 1's side and mint on player
    2's — Pillow Fight's palette), contact shadows,
    and the cosmetic effects — hit sparks, tufts of stuffing, screen shake,
-   the projectiles (tennis balls, felt rings), and a Fluffatality's burst.
+   the projectiles (tennis balls, felt rings, bottle caps, the howl's
+   shockwave, a murder of crows), the full moon behind a howl, and a
+   Fluffatality's burst.
    All of it reads the sim and the plush; none of it feeds back.          */
 
 import * as THREE from 'three/webgpu';
@@ -13,6 +15,8 @@ import { TENNIS_R } from '../../shared/grommet/athletes/leopard.game.js';
 import { shade } from '../../shared/grommet/props.js';
 import { RING_COLORS } from '../../shared/grommet/giraffeprops.js';
 import { KEY } from '../../shared/grommet/fur.js';
+import { makeCap } from '../../shared/grommet/crowprops.js';
+import { ITEMS } from '../../shared/grommet/athletes/crow.game.js';
 
 export const U = 1000;   // sim units per world unit
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -112,6 +116,145 @@ export class Stage {
     this.ballPool = [];
     this.ringPool = [];
     this.ringGeo = new THREE.TorusGeometry(0.42, 0.12, 14, 32);
+    this.extras = new Map();      // the roster 2 shots: caps, howls, crows
+    this.pools = { cap: [], howl: [], crow: [] };
+    this._initMoon();
+  }
+
+  /* ── roster 2's shots ─────────────────────────────────────────────────── */
+  _makeShot(kind) {
+    if (kind === 'cap') {
+      // Zach's bottle cap: Grommet's crimped red-and-silver cap, a touch big
+      const g = new THREE.Group();
+      const m = makeCap(ITEMS.cap.r * 2.4);
+      g.add(m);
+      return g;
+    }
+    if (kind === 'howl') {
+      // the howl's shockwave: three crescents of pale moonlight rolling
+      // along the mat, the front one brightest
+      const g = new THREE.Group();
+      for (let k = 0; k < 3; k++) {
+        const mat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+        const a = 0.75 - k * 0.22;
+        mat.colorNode = Fn(() => vec4(vec3(0.62, 0.78, 1.0).mul(a), 1))();
+        const arc = new THREE.Mesh(new THREE.TorusGeometry(0.9 + k * 0.28, 0.07 - k * 0.012, 8, 40, Math.PI), mat);
+        arc.rotation.z = -Math.PI / 2;
+        arc.position.x = -k * 0.32;
+        arc.renderOrder = 15;
+        g.add(arc);
+      }
+      g.userData.t = 0;
+      return g;
+    }
+    // a crow of the murder: a little black bird, wings beating, beak first,
+    // two more flying with it
+    const g = new THREE.Group();
+    const black = new THREE.MeshBasicNodeMaterial();
+    black.colorNode = Fn(() => vec4(shade(vec3(0.035, 0.032, 0.045), normalize(normalWorld), { spec: 0.35, power: 30, wrap: 0.3 }).mul(0.55).add(vec3(0.012, 0.01, 0.03)), 1))();
+    const beak = new THREE.MeshBasicNodeMaterial();
+    beak.colorNode = Fn(() => vec4(shade(vec3(0.24, 0.24, 0.27), normalize(normalWorld), { spec: 0.3 }), 1))();
+    const bird = () => {
+      const b = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 10), black);
+      body.scale.set(1.5, 0.9, 0.9);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 9), black);
+      head.position.set(0.3, 0.08, 0);
+      const bk = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.2, 10), beak);
+      bk.rotation.z = -Math.PI / 2; bk.position.set(0.48, 0.06, 0);
+      const tail = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.32, 3), black);
+      tail.rotation.z = Math.PI / 2; tail.position.set(-0.4, 0.02, 0); tail.scale.z = 0.3;
+      const wings = [1, -1].map((s) => {
+        const w = new THREE.Group();
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.5), black);
+        m.material = black;
+        m.position.z = s * 0.25;
+        m.rotation.x = Math.PI / 2;
+        w.add(m);
+        w.userData.s = s;
+        return w;
+      });
+      black.side = THREE.DoubleSide;
+      b.add(body, head, bk, tail, ...wings);
+      b.userData.wings = wings;
+      return b;
+    };
+    const birds = [bird(), bird(), bird()];
+    birds[1].position.set(-0.6, 0.45, -0.5); birds[1].scale.setScalar(0.8);
+    birds[2].position.set(-0.9, -0.35, 0.4); birds[2].scale.setScalar(0.7);
+    g.add(...birds);
+    g.userData.birds = birds;
+    return g;
+  }
+
+  _shot(p, x, y) {
+    let m = this.extras.get(p.id);
+    if (!m) {
+      m = this.pools[p.kind].pop() || this._makeShot(p.kind);
+      m.userData.kind = p.kind;
+      this.scene.add(m); this.extras.set(p.id, m);
+    }
+    m.visible = true;
+    const dir = Math.sign(p.vx) || 1;
+    if (p.kind === 'cap') {
+      // flicked: spinning edge-over-edge
+      m.position.set(x, y, 0.25);
+      m.rotation.set(Math.PI / 2 - 0.35, 0, -p.t * 0.55 * dir);
+    } else if (p.kind === 'howl') {
+      m.position.set(x, y + 0.15, 0.2);
+      m.scale.set(dir * (1 + 0.08 * Math.sin(p.t * 0.6)), 0.85 + 0.25 * Math.min(1, p.t / 10), 1);
+      // the mat stirs as it passes
+      if (p.t % 4 === 0 && m.userData.last !== p.t) { m.userData.last = p.t; this.tufts(x - dir * 0.3, 0.1, 1, 0.5, dir); }
+    } else {
+      m.position.set(x, y, 0.35 + 0.25 * Math.sin(p.id * 1.7));
+      m.scale.set(dir, 1, 1);
+      m.userData.birds.forEach((b, j) => {
+        b.position.y += Math.sin((p.t + j * 7) * 0.4) * 0.01;
+        for (const w of b.userData.wings) w.rotation.x = w.userData.s * Math.sin((p.t + j * 5) * 0.9) * 0.9;
+      });
+    }
+  }
+
+  /* ── the full moon behind a howl ─────────────────────────────────────── */
+  _initMoon() {
+    const c = document.createElement('canvas'); c.width = c.height = 512;
+    const g = c.getContext('2d');
+    // a halo, the moon, its craters, and the night biting a crescent out of it
+    const halo = g.createRadialGradient(256, 256, 120, 256, 256, 256);
+    halo.addColorStop(0, 'rgba(210,225,255,0.55)'); halo.addColorStop(1, 'rgba(160,140,255,0)');
+    g.fillStyle = halo; g.fillRect(0, 0, 512, 512);
+    const disc = g.createRadialGradient(220, 210, 20, 256, 256, 150);
+    disc.addColorStop(0, '#fffbea'); disc.addColorStop(1, '#e6dcc2');
+    g.fillStyle = disc; g.beginPath(); g.arc(256, 256, 150, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(160,150,130,0.35)';
+    for (const [x, y, r] of [[200, 220, 26], [300, 300, 34], [250, 330, 16], [310, 200, 14], [190, 300, 12]]) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+    g.globalCompositeOperation = 'destination-out';
+    const bite = g.createRadialGradient(330, 210, 60, 330, 210, 150);
+    bite.addColorStop(0, 'rgba(0,0,0,1)'); bite.addColorStop(0.92, 'rgba(0,0,0,1)'); bite.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = bite; g.beginPath(); g.arc(330, 210, 150, 0, Math.PI * 2); g.fill();
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, map: tex });
+    this.moon = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+    this.moon.visible = false;
+    this.moon.renderOrder = -1;
+    this.scene.add(this.moon);
+    this.moonT = 9;
+  }
+
+  /* the moon comes up behind him (x in world units) for the howl */
+  moonAt(x) { this.moonT = 0; this.moonX = x; }
+
+  _moonStep(dt) {
+    const m = this.moon;
+    this.moonT += dt;
+    const t = this.moonT, life = 1.5;
+    if (t >= life) { m.visible = false; return; }
+    m.visible = true;
+    const a = Math.min(1, t / 0.12) * (1 - Math.max(0, (t - 1.05) / (life - 1.05)));
+    m.material.opacity = a;
+    const s = 7.5 * (0.85 + 0.15 * Math.min(1, t / 0.25));
+    m.scale.set(s, s, 1);
+    m.position.set(this.moonX + 0.6, 5.2 + t * 0.25, -6);
   }
 
   _paintMat() {
@@ -318,6 +461,8 @@ export class Stage {
         m.visible = true;
         m.position.set(x, y, 0.2);
         m.rotation.z -= 0.35 * Math.sign(p.vx); m.rotation.x += 0.2;
+      } else if (this.pools[p.kind]) {
+        this._shot(p, x, y);
       } else {
         let m = this.rings.get(p.id);
         if (!m) {
@@ -334,12 +479,14 @@ export class Stage {
     }
     for (const [id, m] of this.balls) if (!seen.has(id)) { m.visible = false; this.balls.delete(id); this.ballPool.push(m); }
     for (const [id, m] of this.rings) if (!seen.has(id)) { m.visible = false; this.rings.delete(id); this.ringPool.push(m); }
-    return [...this.balls.values(), ...this.rings.values()].map((m) => [m.position.x, m.position.y, m.position.z, 0.3]);
+    for (const [id, m] of this.extras) if (!seen.has(id)) { m.visible = false; this.extras.delete(id); this.pools[m.userData.kind].push(m); }
+    return [...this.balls.values(), ...this.rings.values(), ...[...this.extras.values()].filter((m) => m.userData.kind !== 'howl')].map((m) => [m.position.x, m.position.y, m.position.z, 0.3]);
   }
 
   /* per render frame: sparks and fluff */
   update(dt) {
     const C = this.camera;
+    this._moonStep(dt);
     for (const s of this.sparks) {
       if (!s.mesh.visible) continue;
       s.t += dt;

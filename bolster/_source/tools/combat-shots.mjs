@@ -16,7 +16,7 @@ const out = path.join(root, 'shots', 'combat');
 fs.mkdirSync(out, { recursive: true });
 const html = path.join(root, 'final.html');
 const names = process.argv.slice(2).length ? process.argv.slice(2) : ['block', 'throws', 'counter', 'combo', 'controls', 'ko', 'ko-final'];
-const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const PRE = `
   window.B = window.__bolster; window.F = () => B.fight; window.ST = () => B.fight.st;
   window.until = (cond, n = 10) => { for (let t = 0; t < n; t += 1 / 60) { B.frame(1 / 60, false); if (cond()) return true; } return false; };

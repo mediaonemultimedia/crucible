@@ -9,7 +9,7 @@ import { makeRenderer, Stage } from './render/stage.js';
 import { Showcase, Lineup, portraits } from './render/showcase.js';
 import { Fight } from './fight.js';
 import { Keyboard } from './input/keyboard.js';
-import { FIGHTERS, ROSTER, MAX_METER } from './fighters/index.js';
+import { FIGHTERS, ROSTER, MAX_METER, fighterId } from './fighters/index.js';
 import { U } from './render/stage.js';
 import { ROUND_TICKS, hurtBox, limbBox, activeHits } from './sim/sim.js';
 import { moveOf } from './fighters/index.js';
@@ -18,6 +18,9 @@ import { say, dismiss } from './ui/bubble.js';
 import { SAYINGS } from './ui/sayings.js';
 import { Online } from './online.js';
 import { CPU } from './ai/cpu.js';
+import { DUMMY_MODES, defaultSettings } from './practice.js';
+import { hash } from './sim/sim.js';
+import { LEFT as K_L, RIGHT as K_R, UP as K_U, DOWN as K_D, LIGHT as K_O, HEAVY as K_P, SPECIAL as K_S, BLOCK as K_E } from './sim/input.js';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -57,6 +60,9 @@ class App {
     this.locked = [false, false];
     this.picking = 0;
     this.level = 'normal';
+    this.mode = 'cpu';             // 'cpu' or 'practice' (the select screen's flow)
+    this.practice = null;          // a practice session: { lobby, p1, p2 }
+    this.practiceSettings = defaultSettings();
     this.toques = false;
     this.eggKeys = '';
     this.idle = 0;
@@ -91,6 +97,7 @@ class App {
 
   /* ── screens ──────────────────────────────────────────────────────────── */
   go(name) {
+    if (this.practice && !(name === 'fight' || name === 'pause' || (name === 'online' && this.practice.lobby))) this.endPractice();
     this.screen = name;
     for (const s of $$('.screen')) s.classList.toggle('on', s.id === `${name}-screen`);
     document.body.classList.toggle('fighting', name === 'fight' || name === 'pause');
@@ -104,7 +111,10 @@ class App {
   }
 
   _bindUI() {
-    for (const b of $$('#mode-screen .opt')) b.onclick = () => { if (b.disabled) return; if (b.dataset.mode === 'online') this.net.menu(); else this.go('select'); };
+    for (const b of $$('#mode-screen .opt')) b.onclick = () => {
+      if (b.disabled) return;
+      if (b.dataset.mode === 'online') { this.mode = 'cpu'; this.net.menu(); } else { this.mode = b.dataset.mode; this.go('select'); }
+    };
     for (const b of $$('#online-screen .opt')) b.onclick = () => this.net.act(b.dataset.act);
     for (const b of $$('#diff-screen .opt')) b.onclick = () => { this.level = b.dataset.level; this.startFight(); };
     for (const b of $$('#pause-screen .opt')) b.onclick = () => this._pauseAct(b.dataset.act);
@@ -138,6 +148,13 @@ class App {
       else if (back) this.go('title');
       return;
     }
+    if (s === 'online' && this.practice?.lobby) {
+      // practising in the lobby: the game keys are the fight's; C copies the link, Esc leaves
+      if (k === 'Escape') this.net.act('cancel');
+      else if (k === 'KeyC' && $('#online-screen').dataset.state === 'hosting') this.net.copy();
+      else this._practiceKey(k);
+      return;
+    }
     if (s === 'online') {
       const sel = `#online-screen .ol-${$('#online-screen').dataset.state} .opt`;
       if (up || down) this._menuMove(sel, up ? -1 : 1);
@@ -162,7 +179,7 @@ class App {
       else if (back) { this.go('select'); }
       return;
     }
-    if (s === 'fight') { if (k === 'Escape' && !this.net.on) { e.preventDefault(); this.pause(true); } return; }
+    if (s === 'fight') { if (k === 'Escape' && !this.net.on) { e.preventDefault(); this.pause(true); } else if (this.practice) this._practiceKey(k); return; }
     if (s === 'pause') {
       if (k === 'Escape') this.pause(false);
       else if (up || down) this._menuMove('#pause-screen .opt', up ? -1 : 1);
@@ -208,7 +225,8 @@ class App {
     this.locked[this.picking] = true;
     if (this.picking === 0) { this.picking = 1; this._paintSelect(); return; }
     this._paintSelect();
-    this.go('diff');
+    if (this.mode === 'practice') this.startPractice({ p1: ROSTER[this.pick[0]], p2: ROSTER[this.pick[1]] });
+    else this.go('diff');
   }
 
   _paintSelect() {
@@ -220,7 +238,7 @@ class App {
       c.classList.toggle('c2', i === this.pick[1] && (this.picking === 1 || this.locked[1]));
       c.querySelectorAll('.tag').forEach((t) => t.remove());
       if (i === this.pick[0]) c.insertAdjacentHTML('beforeend', '<span class="tag t1">P1</span>');
-      if (i === this.pick[1] && this.picking === 1) c.insertAdjacentHTML('beforeend', '<span class="tag t2">CPU</span>');
+      if (i === this.pick[1] && this.picking === 1) c.insertAdjacentHTML('beforeend', `<span class="tag t2">${this.mode === 'practice' ? 'DUMMY' : 'CPU'}</span>`);
     }
     const plate = (sel, id, evil, locked, active) => {
       const f = FIGHTERS[id];
@@ -233,9 +251,10 @@ class App {
     };
     plate('.plate.p1', ids[0], false, this.locked[0], this.picking === 0);
     plate('.plate.p2', ids[1], mirror && (this.picking === 1 || this.locked[1]), this.locked[1], this.picking === 1);
-    $('#select-step').textContent = this.picking === 0 ? 'Pick for Player 1' : 'Pick the Computer’s fighter';
-    $('#select-hint').textContent = this.picking === 0 ? 'Player 1 — A / D to choose, O to pick' : 'Computer — A / D to choose, O to pick, P to go back';
-    $('.plate.p2 .who').textContent = this.net.on ? 'Player 2' : 'Computer';
+    const pr = this.mode === 'practice';
+    $('#select-step').textContent = this.picking === 0 ? (pr ? 'Practice — pick your fighter' : 'Pick for Player 1') : (pr ? 'Pick the practice dummy' : 'Pick the Computer’s fighter');
+    $('#select-hint').textContent = this.picking === 0 ? 'Player 1 — A / D to choose, O to pick' : pr ? 'Dummy — A / D to choose, O to start practising, P to go back' : 'Computer — A / D to choose, O to pick, P to go back';
+    $('.plate.p2 .who').textContent = this.net.on ? 'Player 2' : pr ? 'Dummy' : 'Computer';
     if (this.net.on) this.net.paintSelect(ids, mirror, plate);
     if (this.show) {
       this.show.set(0, ids[0], { toque: this.toques });
@@ -267,8 +286,11 @@ class App {
     if (this.fight) this.fight.dispose();
     this.seed = seed ?? (((this.seed * 1103515245 + 12345) >>> 0) || 1);
     this.last = { p1, p2, level, p1cpu };
+    this.endPractice();
     this.kb.clear();
     const f = (this.fight = new Fight(this.stage, { p1, p2, seed: this.seed, cpu: [p1cpu, level], keyboard: this.kb, toques: this.toques, net }));
+    // (the state the match starts from: a test checks it's the fresh one, whatever practice came before)
+    this.matchStart = { p1, p2, seed: this.seed, hash: hash(f.st) };
     f.onEvent = (e) => this._event(e);
     f.onTick = (st) => this._hud(st);
     $('#banner').textContent = '';
@@ -280,6 +302,114 @@ class App {
     this._hud(f.st);
     this.go('fight');
     this._nag = [0, 0];
+  }
+
+  /* ── practice ─────────────────────────────────────────────────────────
+     A fighter against the dummy (src/practice.js), from the menu (any
+     fighter, any dummy) or in the online lobby while waiting for the other
+     player. Local only: its own seed (never the app's match seed), nothing
+     sent; thrown away when it ends. */
+  startPractice({ p1, p2, lobby = false } = {}) {
+    if (this.show) { this.show.dispose(); this.show = null; }
+    if (this.fight) { this.fight.dispose(); this.fight = null; }
+    if (!p2) p2 = ROSTER[(ROSTER.indexOf(p1) + 1) % ROSTER.length];
+    this.kb.clear();
+    const seed = ((Math.random() * 0x7fffffff) | 0) || 1;
+    const f = (this.fight = new Fight(this.stage, { p1, p2, seed, keyboard: this.kb, toques: this.toques, practice: this.practiceSettings }));
+    f.onEvent = (e) => this._event(e);
+    f.onTick = (st) => this._hud(st);
+    this.practice = { lobby, p1, p2 };
+    $('#banner').textContent = '';
+    $('#bubbles').textContent = '';
+    for (const c of $$('.combo')) c.classList.remove('on', 'amp');
+    $('#n1').innerHTML = `${flagOf(p1)}<span>${f.name(0)}</span>`;
+    $('#n2').innerHTML = `<span>Dummy · ${FIGHTERS[p2].name}</span>${flagOf(p2)}`;
+    this._hudCache = {};
+    this._hud(f.st);
+    document.body.classList.add('practicing');
+    document.body.classList.toggle('lobby', lobby);
+    this._prCache = {};
+    this._paintDummy();
+    this._paintMoves(p1);
+    if (!lobby) this.go('fight');
+  }
+
+  endPractice() {
+    if (!this.practice) return;
+    if (this.fight?.practice) { this.fight.dispose(); this.fight = null; }
+    this.practice = null;
+    this.kb.clear();
+    document.body.classList.remove('practicing', 'lobby');
+    $('#bubbles').textContent = '';
+  }
+
+  /* the dummy panel's keys: 1–6 the dummy, R refill, M meter, X reset, H hide */
+  _practiceKey(k) {
+    const S = this.practiceSettings;
+    const m = /^(Digit|Numpad)([1-6])$/.exec(k);
+    if (m) S.mode = DUMMY_MODES[+m[2] - 1].id;
+    else if (k === 'KeyR') S.refill = !S.refill;
+    else if (k === 'KeyM') S.meter = !S.meter;
+    else if (k === 'KeyX') this._practiceReset();
+    else if (k === 'KeyH') document.body.classList.toggle('pr-hide');
+    else return;
+    this._paintDummy();
+  }
+
+  _practiceReset() {
+    const f = this.fight;
+    if (!f?.practice) return;
+    const st = f.st;
+    st.proj = [];
+    st.f.forEach((g, k) => { g.x = k ? 2300 : -2300; g.y = 0; g.vx = g.vy = g.pv = 0; g.air = 0; g.act = 'idle'; g.t = 0; g.mv = ''; g.face = k ? -1 : 1; g.hp = FIGHTERS[g.id].health; });
+    f.prev = st.f.map((g) => ({ x: g.x, y: g.y }));
+    for (const p of f.plush) p.reset();
+  }
+
+  _paintDummy() {
+    const S = this.practiceSettings, el = $('#pr-dummy');
+    el.innerHTML = `<h5>Dummy <small>H hides</small></h5><div class="modes">${DUMMY_MODES.map((d) => `<button data-m="${d.id}" class="${S.mode === d.id ? 'on' : ''}"><kbd>${d.key}</kbd>${d.label}</button>`).join('')}</div>
+      <div class="toggles"><button data-t="refill" class="${S.refill ? 'on' : ''}"><kbd>R</kbd>Refill</button><button data-t="meter" class="${S.meter ? 'on' : ''}"><kbd>M</kbd>Meter</button><button data-t="reset"><kbd>X</kbd>Reset</button></div>`;
+    for (const b of el.querySelectorAll('button')) b.onclick = (e) => {
+      e.stopPropagation();
+      if (b.dataset.m) S.mode = b.dataset.m;
+      else if (b.dataset.t === 'reset') this._practiceReset();
+      else S[b.dataset.t] = !S[b.dataset.t];
+      b.blur();
+      this._paintDummy();
+    };
+  }
+
+  _paintMoves(id) {
+    const f = FIGHTERS[id], k = (...ks) => ks.map((x) => `<kbd>${x}</kbd>`).join('+');
+    $('#pr-moves').innerHTML = `<h5>${f.name} — moves <small>Esc pause · X reset</small></h5>
+      <span>${k('O')} light</span><span>${k('P')} heavy</span><span>${k('S', 'O')} low</span><span>${k('S', 'P')} ${f.signatureName}</span><span>${k('Space')} ${f.specialName}</span>
+      <span><kbd>W</kbd> then ${k('S', 'P')} ${f.diveName}</span><span>${k('O', 'P')} ${f.throwName}</span><span>${k('E')} / ${k('S', 'E')} block</span><span><kbd>D</kbd><kbd>D</kbd> · <kbd>A</kbd><kbd>A</kbd> dash</span>
+      <span class="bnb"><kbd>O</kbd> → <kbd>O</kbd> → <kbd>P</kbd> bread &amp; butter</span>`;
+  }
+
+  /* per frame: the input display and the combo readout */
+  _paintPractice() {
+    const f = this.fight;
+    if (!f?.practice) return;
+    const C = this._prCache || (this._prCache = {});
+    const rows = f.inputs.rows;
+    const key = rows.map((r) => `${r.m}:${r.t}`).join(',');
+    if (C.in !== key) {
+      C.in = key;
+      const ic = (m) => {
+        const o = [];
+        for (const [b, t] of [[K_L, '←'], [K_R, '→'], [K_U, '↑'], [K_D, '↓']]) if (m & b) o.push(`<span class="ik d">${t}</span>`);
+        for (const [b, t, c] of [[K_O, 'O', 'o'], [K_P, 'P', 'p'], [K_S, 'SP', 's'], [K_E, 'E', 'e']]) if (m & b) o.push(`<span class="ik ${c}">${t}</span>`);
+        return o.join('') || '<span class="ik d">·</span>';
+      };
+      $('#pr-in').innerHTML = rows.map((r, j) => `<li style="--k:${j}"><b>${Math.min(99, r.t)}</b>${ic(r.m)}</li>`).join('');
+    }
+    const c = f.combos.last, ck = c ? `${c.hits}|${c.dmg}|${c.amp}|${c.ctr}|${f.combos.best}` : '';
+    if (C.combo !== ck) {
+      C.combo = ck;
+      $('#pr-combo').innerHTML = c ? `<b>${c.hits}</b> hit${c.hits > 1 ? 's' : ''} · <b>${c.dmg}</b> damage${c.amp ? '<em>AMPLIFIED!</em>' : ''}${c.ctr ? '<i>COUNTER</i>' : ''}<span class="best">best ${f.combos.best} damage</span>` : 'Land a hit — O, O, P';
+    }
   }
 
   pause(on) {
@@ -321,7 +451,7 @@ class App {
       const pips = $$(`#pips${k + 1} b`);
       pips.forEach((p, i) => p.classList.toggle('on', st.wins[k] > i));
     }
-    const sec = Math.ceil(st.timer / 60);
+    const sec = this.fight?.practice ? '∞' : Math.ceil(st.timer / 60);
     if (C.t !== sec) { C.t = sec; $('#timer').textContent = sec; $('#timer').classList.toggle('low', sec <= 10); }
   }
 
@@ -486,6 +616,7 @@ class App {
     if (this.fight) {
       this.fight.frame(dt);
       this._flash(this.fight.st);
+      if (this.practice) this._paintPractice();
       this._pops(this.fight.paused ? 0 : dt);
     } else if (this.show) this.show.frame(dt);
     else if (this.lineup) this.lineup.frame(dt);
@@ -538,6 +669,7 @@ async function start() {
   app.cpuFor = (k, level, seed) => new CPU(k, level, seed);   // tests: scripted online play
   app.boxes = params.has('boxes');
   app.say = (text, x, y, o) => say($('#bubbles'), text, x, y, o);
+  app.hash = hash;
   // portraits for the cards
   if (!params.has('noportraits')) { try { app.portraits = await portraits(renderer, app.stage, ROSTER); } catch (err) { console.warn('portraits', err); } }
   let last = performance.now();
@@ -551,13 +683,14 @@ async function start() {
   });
   /* deep link: ?p1=kevalanche&p2=sumaura&cpu=hard straight into a fight
      (p1cpu=LEVEL hands player 1 to the computer too: CPU vs CPU) */
-  const p1 = params.get('p1'), p2 = params.get('p2');
-  if (p1 && p2 && FIGHTERS[p1] && FIGHTERS[p2]) {
+  const p1 = fighterId(params.get('p1')), p2 = fighterId(params.get('p2'));
+  if (p1 && p2) {
     app.toques = params.get('toques') === '1';
     app.startFight({ p1, p2, level: params.get('cpu') || 'normal', p1cpu: params.get('p1cpu'), seed: (params.get('seed') | 0) || null });
     if (params.get('speed')) app.fight.speed = +params.get('speed');
   } else if (params.get('room')) app.net.joinRoom(params.get('room'));
   else if (params.get('screen') === 'select') app.go('select');
+  else if (params.get('practice') !== null) app.startPractice({ p1: fighterId(params.get('practice')) || ROSTER[0], p2: fighterId(params.get('dummy')) || null });
   else app.go('title');
   document.body.classList.add('is-live');
 }

@@ -10,13 +10,17 @@ import { CPU } from './ai/cpu.js';
 import { Plush } from './render/plush.js';
 import { U } from './render/stage.js';
 import { Rollback } from './net/rollback.js';
+import { Dummy, practiceMatch, practiceAfter, ComboMeter, InputLog } from './practice.js';
 
 export const TICK = 1 / 60;
 
 export class Fight {
-  constructor(stage, { p1, p2, seed = 1, cpu = [null, 'normal'], keyboard = null, toques = false, net = null }) {
+  constructor(stage, { p1, p2, seed = 1, cpu = [null, 'normal'], keyboard = null, toques = false, net = null, practice = null }) {
     this.stage = stage;
-    this.st = createMatch({ p1, p2, seed });
+    // practice (src/practice.js): player 2 is the dummy, the state tended between ticks
+    this.practice = practice;
+    if (practice) { net = null; cpu = [null, null]; this.dummy = new Dummy(1, seed); this.pmem = {}; this.combos = new ComboMeter(0); this.inputs = new InputLog(14); }
+    this.st = practice ? practiceMatch({ p1, p2, seed }) : createMatch({ p1, p2, seed });
     // online: the sim runs inside a rollback session; this side's keyboard is player `net.local`
     this.session = net ? new Rollback(this.st, { local: net.local, send: net.send, onDesync: net.onDesync }) : null;
     if (net) cpu = [null, null];
@@ -51,11 +55,16 @@ export class Fight {
     this.prev = st.f.map((f) => ({ x: f.x, y: f.y }));
     this.prevProj = new Map(st.proj.map((p) => [p.id, { x: p.x, y: p.y }]));
     let a = this.cpu[0] ? this.cpu[0].input(st) : this.kb ? this.kb.sample() : 0;
-    let b = this.cpu[1] ? this.cpu[1].input(st) : 0;
+    let b = this.cpu[1] ? this.cpu[1].input(st) : this.dummy ? this.dummy.input(st, this.practice) : 0;
     // a scripted input (screenshots, the browser test) can take either side
     if (this.override) { const o = this.override(st); if (o[0] !== null) a = o[0]; if (o[1] !== null) b = o[1]; }
     this.lastInputs = [a, b];
     stepInPlace(st, a, b);
+    if (this.practice) {
+      this.inputs.push(a);
+      for (const e of st.ev) this.combos.event(e);
+      practiceAfter(st, this.practice, this.pmem);
+    }
     for (const e of st.ev) this._fx(e);
     this.onTick(st);
   }
@@ -121,6 +130,10 @@ export class Fight {
       const f = st.f[e.p], back = -f.face * e.d;
       S.tufts(f.x / U + back * 0.4, 0.15, 4, 0.45, back);
     }
+    // Sebas Perra's howl: the full moon comes up behind him
+    if (e.k === 'special' && st.f[e.p].id === 'sebas') this.stage.moonAt(st.f[e.p].x / U);
+    // a murder of crows: a shake as they come in
+    if (e.k === 'special' && st.f[e.p].id === 'zach') S.shake(0.3);
     if (e.k === 'clash') { S.spark(e.x / U, e.y / U, 'hit', 1.2); S.tufts(e.x / U, e.y / U, 4, 0.6, 1); }
     this.onEvent(e, this);
   }

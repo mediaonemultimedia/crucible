@@ -59,6 +59,15 @@ export class Online {
     if (msg && name === 'error') $('#ol-err').textContent = msg;
   }
 
+  /* the lobby's practice: while the host waits for a friend (and while a
+     guest connects), this player's fighter (the last one played, or the
+     one picked) against a dummy — local only, ended the moment they meet */
+  lobbyPractice() {
+    const A = this.app;
+    const p1 = A.last?.p1 || ROSTER[A.pick[this.local]] || ROSTER[0];
+    A.startPractice({ p1, p2: null, lobby: true });
+  }
+
   /* ── lobby ─────────────────────────────────────────────────────────── */
   menu() { this.teardown(); this.app.go('online'); this._state('menu'); }
 
@@ -85,6 +94,7 @@ export class Online {
     this.code = roomCode();
     this.app.go('online');
     this._state('hosting');
+    this.lobbyPractice();
     $('#ol-code').textContent = '·····';
     $('#ol-link').value = 'Opening a room…';
     $('#ol-wait').textContent = 'Opening a room…';
@@ -128,6 +138,7 @@ export class Online {
     this._state('joining');
     $('#ol-joinmsg').textContent = `Joining match ${this.code}…`;
     if (this.code.length < 4) { this.fail('notfound'); return; }
+    this.lobbyPractice();
     const code = this.code;
     this.handle = join(this.params, code, {
       link: (link) => { if (this.code === code) this._linked(link); },
@@ -139,6 +150,7 @@ export class Online {
     const msg = MESSAGES[kind] || MESSAGES.network;
     console.info(`online: ${kind}`);
     const role = this.role, code = this.code;
+    this.app.endPractice();
     this.teardown();
     this.role = role; this.code = code;
     if (this.app.fight) { this.app.fight.dispose(); this.app.fight = null; }
@@ -153,6 +165,7 @@ export class Online {
   }
 
   teardown() {
+    this.app.endPractice?.();
     this.on = false;
     this.waiting = false;
     this.desynced = null;

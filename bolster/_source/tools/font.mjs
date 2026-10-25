@@ -24,7 +24,7 @@ console.log(`${out}: ${fs.statSync(out).size} bytes (from ${fs.statSync(src).siz
 
 /* the display face for the HUD, menus and banners: Lilita One (SIL OFL
    1.1), subset to printable ASCII plus the few marks the UI uses */
-const ui = Array.from({ length: 95 }, (_, k) => String.fromCharCode(32 + k)).join('') + '’…—·✓';
+const ui = Array.from({ length: 95 }, (_, k) => String.fromCharCode(32 + k)).join('') + '’…—·✓∞←→↑↓';
 const src2 = path.join(root, 'node_modules/@fontsource/lilita-one/files/lilita-one-latin-400-normal.woff2');
 const out2 = path.join(root, 'src/assets/lilita-one-subset.woff2');
 execFileSync('pyftsubset', [src2, `--text=${ui}`, `--output-file=${out2}`, '--flavor=woff2', '--layout-features=*', '--no-hinting'], { stdio: 'inherit' });

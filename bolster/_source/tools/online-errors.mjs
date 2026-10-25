@@ -18,7 +18,7 @@ const broker = arg('broker', null);
 const out = path.join(root, 'shots', 'online');
 fs.mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
 });
 const base = `file://${path.join(root, 'final.html')}`;

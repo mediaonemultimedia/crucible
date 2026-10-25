@@ -20,7 +20,7 @@ const out = path.join(root, 'shots', arg('out', broker ? 'online-peerjs' : 'onli
 fs.mkdirSync(out, { recursive: true });
 
 const browser = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', ...(broker ? ['--disable-features=WebRtcHideLocalIpsWithMdns'] : [])],
 });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });

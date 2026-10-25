@@ -26,7 +26,7 @@ let names = args.length ? args : ['all'];
 if (names.includes('all')) names = [...IDS.map((i) => `shoulders-${i}`), 'strikes-kevalanche', 'strikes-sumaura'];
 
 const browser = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium',
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
 });
 

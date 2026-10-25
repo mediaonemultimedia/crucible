@@ -14,12 +14,23 @@
 
    Bipeds (Kevalanche, Johnny Deuce, Sumaura) and the giraffe (K8-E) extend
    Grommet's Athlete (attention, balance, footwork-in-place, daze wobble);
-   the octopus (Rubberta) is Flock's rig, driven directly.                 */
+   the octopus (Rubberta) is Flock's rig, driven directly. Roster 2: the
+   wolf (Sebas Perra) is Flock's wolf with its front legs freed as arms,
+   driven as a biped (a luchador: lariats, slides, flips); the crow (Zach
+   Sparrow) is Grommet's crow, his wings the arms, with his felt beak.
+
+   `acro(F)` (wolf, crow): a whole-body turn in the screen's plane for the
+   acrobatics — a somersault over a forward jump, the moonsault, the
+   huracanrana, the slide's lean back, the dive bomb's nose-down — that
+   the plush's group takes (render only; the sim's boxes don't turn).     */
 
 import { Athlete, clamp, spring, ease, TAU } from '../../shared/grommet/athletes/game.js';
 import { Pose } from '../../shared/grommet/pose.js';
 import { rightUp, settle } from '../../shared/grommet/balance.js';
 import { racquetFrame } from '../../shared/grommet/athletes/leopard.game.js';
+import { CROW } from '../../shared/grommet/athletes/crow.rig.js';
+import { BEAK_OPEN } from '../../shared/grommet/athletes/crow.game.js';
+import { extractRotation, quatToMat } from '../../shared/grommet/math.js';
 import { FIGHTERS } from '../fighters/index.js';
 
 const norm = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
@@ -125,6 +136,10 @@ const READY = {
   boxer:  { R: [-0.28, 0.42, 0.86], L: [0.2, 0.5, 0.86], lean: 0.12 },
   tennis: { R: [-0.75, 0.05, 0.65], L: [0.45, 0.1, 0.85], lean: 0.08 },
   sumo:   { R: [-0.8, -0.05, 0.6], L: [0.8, -0.05, 0.6], lean: 0.2 },
+  // the wolf's front paws up in a luchador's crouch; the crow's wings held
+  // half open in front of him, a thief's hands ready
+  lucha:  { R: [-0.45, 0.25, 0.85], L: [0.35, 0.4, 0.85], lean: 0.1 },
+  thief:  { R: [-0.75, 0.05, 0.65], L: [0.75, 0.15, 0.6], lean: 0.12 },
 };
 
 export class BipedPuppet extends FightMixin(Athlete) {
@@ -796,5 +811,257 @@ export class OctopusPuppet extends FightMixin(class {}) {
   reset() {
     for (const a of this.arms) if (a.grab) { this.soft.release('arm' + a.k); a.grab = false; }
     this.plan = [];
+  }
+}
+
+/* ── the wolf: Sebas Perra, a luchador ────────────────────────────────────
+   Flock's sitting wolf with its front legs freed (shared/flock/rigs.js
+   `fighter`): they're his arms. The rest is the biped's machinery; these
+   are his own moves, his howl (the head thrown back), the toque (the ears
+   splayed out under the brim), and the flips.                           */
+
+export class WolfPuppet extends BipedPuppet {
+  constructor(soft) {
+    super(soft, 'lucha');
+    this.tilt = spring();          // the head thrown back (howl) or down
+    this.splay = spring();         // the ears out sideways (under a toque)
+    this.tTilt = 0;
+    this.toque = false;
+  }
+
+  _springs() { return [...super._springs(), this.tilt, this.splay]; }
+
+  perform(F, ph) {
+    super.perform(F, ph);
+    this.tTilt = 0;
+    if (F.act === 'win') {
+      // the champion's pose: both paws up, flexing, the head back
+      const w = Math.sin(this.time * TAU * 1.3);
+      this.tR = [-0.7, 0.75 + 0.15 * w, 0.2]; this.tL = [0.7, 0.75 - 0.15 * w, 0.2]; this.tTilt = 0.25;
+    }
+    if (ph && ph.m.kind === 'special') this.tTilt = 0.75 * smooth(2, 10, ph.t) * (1 - smooth(40, 60, ph.t));
+  }
+
+  _attack(F, ph, R, L, lean, k, wrist) {
+    const mv = F.mv, t = ph.t, o = ph.out;
+    const tip = (h) => (h.box.x + h.box.w) / 1000 - 0.12;
+    if (mv === 'heavy') {
+      // the lariat: the right paw swung back and wide, then round and out
+      // at neck height, the body turning through it
+      const first = ph.first, load = smooth(0, first * 0.55, t), fire = smooth(first - 5, first - 1, t);
+      const back = load * (1 - fire), out = Math.max(fire * (t <= ph.last ? 1 : o), 0);
+      const S = this._reachFor(this.reachR, tip(ph.m.hits[0]), 0.4) * 1.15;
+      R = mix3(mix3(R, [-1, 0.45, -0.5], back), [0.1, 0.3, 1], out);
+      L = mix3(L, [0.6, 0.35, 0.3], back);
+      lean = [mix(-0.2 * back, 0.4, out), mix(-0.8 * back, 0.6, out), 0];
+      this.tS = [mix(1, S, out), 1];
+      k = back > 0.05 && out < 0.05 ? 500 : 1800;
+    } else if (mv === 'signature') {
+      // Lobo Slide: feet first along the mat, leaning right back, paws up
+      const s = smooth(3, 8, t) * (1 - smooth(22, 34, t));
+      R = mix3(R, [-0.7, 0.6, -0.45], s); L = mix3(L, [0.7, 0.6, -0.45], s);
+      lean = [mix(lean[0], -0.4, s), 0, 0]; k = 900;
+    } else if (mv === 'special') {
+      // Aullido de la Luna: paws flung up and out, the head back, then the
+      // blast — both paws thrust forward with the howl
+      const up = smooth(2, 10, t), push = smooth(14, 18, t) * (1 - smooth(30, 50, t));
+      R = mix3(mix3(R, [-0.75, 0.85, 0.15], up), [-0.2, 0.35, 1], push);
+      L = mix3(mix3(L, [0.75, 0.85, 0.15], up), [0.2, 0.35, 1], push);
+      lean = [mix(-0.3 * up, 0.25, push), 0, 0]; k = 800;
+    } else if (mv === 'dive' || mv === 'diveLand') {
+      // the moonsault: arms spread through the backflip, then the splash —
+      // flat out, paws wide
+      const d = mv === 'diveLand' ? 1 : smooth(8, 12, t), rec = mv === 'diveLand' ? smooth(10, 28, t) : 0;
+      R = mix3([-1, 0.6, 0], [-1, 0.05, 0.35], d); L = mix3([1, 0.6, 0], [1, 0.05, 0.35], d);
+      lean = [mix(-0.2, 0.9, d), 0, 0];
+      if (rec) { R = mix3(R, READY.lucha.R, rec); L = mix3(L, READY.lucha.L, rec); lean = mix3(lean, [READY.lucha.lean, 0, 0], rec); }
+      k = 1100;
+    } else if (mv === 'throwHold') {
+      // the huracanrana: paws round his neck, a hop and a backflip that
+      // takes him over too — flung off the bottom of it
+      const flip = smooth(12, 26, t), rec = smooth(28, 44, t);
+      R = mix3([0.15, 0.45, 0.9], [-0.6, -0.3, 0.6], flip); L = mix3([-0.15, 0.45, 0.9], [0.6, -0.3, 0.6], flip);
+      lean = [mix(0.2, -0.3, flip), 0, 0];
+      this.tS = [mix(1.3, 1, flip), mix(1.3, 1, flip)];
+      if (rec) { R = mix3(R, READY.lucha.R, rec); L = mix3(L, READY.lucha.L, rec); lean = mix3(lean, [READY.lucha.lean, 0, 0], rec); this.tS = [1, 1]; }
+      k = 1100;
+    } else return super._attack(F, ph, R, L, lean, k, wrist);
+    return { R, L, lean, k, wrist };
+  }
+
+  _think(dt) {
+    super._think(dt);
+    ease(this.tilt, this.tTilt, 160, dt);
+    ease(this.splay, this.toque ? 0.85 : 0, 120, dt);
+  }
+
+  /* the head bone carries the howl's tilt; the ears splay under a toque */
+  _applyPose() {
+    const { cfg } = this, rest = this.rig.rest;
+    const extra = this._bones();
+    const head = { ix: cfg.head, rv: [-(this.pitch.x + this.tilt.x), this.yaw.x, 0], pivotIx: this._neckIx() };
+    const sp = this.splay.x;
+    const ears = cfg.ears.map((e) => {
+      const s = Math.sign(rest[e.root * 3]) || 1;
+      return { ix: e.ix, rv: [this.perk.x * 0.25 * (1 - sp), this.earTurn.x * 0.3, -s * sp], pivotIx: e.root };
+    });
+    this.pose.apply([...extra.filter((b) => b.first), head, ...ears, ...extra.filter((b) => !b.first)]);
+    if (this.pose.active) { this.reachR.pose(); this.reachL.pose(); }
+  }
+
+  acro(F) {
+    const f = F.face || 1;
+    if (F.act === 'jump' && F.jd) {
+      // a somersault over a forward jump (a backflip going back)
+      const p = smooth(2, 36, F.t);
+      return { a: -f * F.jd * TAU * p, h: 1.4, y: 0 };
+    }
+    if (F.act !== 'attack') return null;
+    const t = F.t;
+    if (F.mv === 'dive') return { a: f * TAU * smooth(0, 11, t), h: 1.4, y: 0 };
+    if (F.mv === 'throwHold') { const p = smooth(12, 26, t); return { a: f * TAU * p, h: 1.4, y: 1.3 * Math.sin(Math.PI * p) }; }
+    if (F.mv === 'signature') return { a: f * 1.05 * smooth(3, 8, t) * (1 - smooth(22, 34, t)), h: 0.3, y: 0 };
+    return null;
+  }
+}
+
+/* ── the crow: Zach Sparrow, a thief ──────────────────────────────────────
+   Grommet's crow, his wings the arms. His beak is the two felt mandibles
+   (shared/grommet/crowprops.js) on the head's own frame — the head's
+   stuffing shape-matched to its sewn shape, as CrowGame measures it — and
+   it opens for a peck, a caw, the special, a win.                       */
+
+const _A = new Float64Array(9);
+
+export class CrowPuppet extends BipedPuppet {
+  constructor(soft) {
+    super(soft, 'thief');
+    this.peck = spring();          // the head pitched forward (a peck)
+    this.beak = spring();          // 0 shut … 1 wide
+    this.tPeck = 0; this.tBeak = 0;
+    const rest = this.rig.rest, core = this.cfg.core;
+    this._hc0 = [0, 0, 0];
+    for (const i of core) for (let d = 0; d < 3; d++) this._hc0[d] += rest[i * 3 + d] / core.length;
+    this._hq0 = new Float64Array(core.length * 3);
+    core.forEach((i, j) => { for (let d = 0; d < 3; d++) this._hq0[j * 3 + d] = rest[i * 3 + d] - this._hc0[d]; });
+    this._hq = [0, 0, 0, 1];
+    this.hC = [0, 0, 0];
+    this.hR = new Float64Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+    const B = CROW.BEAK, dl = Math.hypot(...B.dir);
+    this.beakDir = B.dir.map((v) => v / dl);
+    this.beakBase = [CROW.HEAD.c[0] + B.base[0] - this._hc0[0], CROW.HEAD.c[1] + B.base[1] - this._hc0[1], CROW.HEAD.c[2] + B.base[2] - this._hc0[2]];
+  }
+
+  _springs() { return [...super._springs(), this.peck, this.beak]; }
+
+  perform(F, ph) {
+    super.perform(F, ph);
+    this.tPeck = 0; this.tBeak = 0;
+    const act = F.act, w = Math.sin(this.time * TAU * 4.5);
+    if (act === 'jump') {
+      // the wings beat all the way up and down: a floaty little flier
+      this.tR = [-0.95, 0.35 + 0.55 * w, 0.1]; this.tL = [0.95, 0.35 + 0.55 * w, 0.1]; this.stiff = 700;
+    }
+    if (act === 'win') {
+      const b = Math.sin(this.time * TAU * 1.6);
+      this.tR = [-0.9, 0.6 + 0.35 * b, 0.15]; this.tL = [0.9, 0.6 + 0.35 * b, 0.15];
+      this.tBeak = 0.6 + 0.4 * Math.max(0, b);
+    }
+    if (act === 'hitstun' || act === 'grabbed') this.tBeak = 0.5;
+    if (!ph) return;
+    const t = ph.t, mv = F.mv;
+    if (mv === 'heavy' || mv === 'lowLight') {
+      const fire = smooth(ph.first - 4, ph.first, t) * (t <= ph.last ? 1 : ph.out);
+      this.tPeck = (mv === 'heavy' ? 0.55 : 0.75) * fire; this.tBeak = 0.8 * fire * (1 - smooth(ph.last, ph.last + 4, t));
+    }
+    if (mv === 'throwHold') {
+      // the pecks: four quick ones, then the toss
+      const pk = t < 22 ? Math.max(0, Math.sin(t * 0.75)) : 0;
+      this.tPeck = 0.5 * pk; this.tBeak = 0.9 * pk;
+    }
+    if (mv === 'signature') this.tBeak = 0.25 * smooth(12, 16, t) * (1 - smooth(22, 30, t));
+    if (mv === 'special') this.tBeak = smooth(2, 8, t) * (1 - smooth(40, 60, t));
+    if (mv === 'dive') this.tPeck = 0.35;
+  }
+
+  _attack(F, ph, R, L, lean, k, wrist) {
+    const mv = F.mv, t = ph.t, o = ph.out;
+    if (mv === 'heavy') {
+      // the peck lunge: wings swept back, the whole crow thrown forward
+      // behind his beak
+      const first = ph.first, back = smooth(0, first * 0.55, t) * (1 - smooth(first - 4, first - 1, t));
+      const out = Math.max(smooth(first - 4, first - 1, t) * (t <= ph.last ? 1 : o), 0);
+      R = mix3(mix3(R, [-0.7, 0.6, -0.5], back), [-0.8, 0.2, -0.75], out);
+      L = mix3(mix3(L, [0.7, 0.6, -0.5], back), [0.8, 0.2, -0.75], out);
+      lean = [mix(-0.3 * back, 0.75, out), 0, 0];
+      k = back > 0.05 && out < 0.05 ? 500 : 1600;
+    } else if (mv === 'signature') {
+      // Bottle Cap Flick: the right wingtip drawn back and whipped through
+      const sw = smooth(11, 16, t), rec = smooth(24, 40, t);
+      R = mix3(mix3([-0.7, 0.55, -0.6], [0.15, 0.25, 1], sw), READY.thief.R, rec);
+      lean = [mix(-0.1, 0.25, sw) * (1 - rec), mix(-0.4, 0.3, sw) * (1 - rec), 0]; k = 1200;
+    } else if (mv === 'special') {
+      // Murder Most Fowl: wings flung wide and up — calling them in
+      const up = smooth(2, 9, t) * (1 - smooth(46, 62, t)), b = Math.sin(t * 0.9) * 0.2;
+      R = mix3(R, [-1, 0.8 + b, -0.1], up); L = mix3(L, [1, 0.8 - b, -0.1], up);
+      lean = [-0.25 * up, 0, 0]; k = 900;
+    } else if (mv === 'dive' || mv === 'diveLand') {
+      // the dive bomb: wings folded tight back, beak first
+      const d = mv === 'diveLand' ? 1 - smooth(8, 26, t) : smooth(3, 8, t);
+      R = mix3(READY.thief.R, [-0.35, 0.15, -1], d); L = mix3(READY.thief.L, [0.35, 0.15, -1], d);
+      lean = [0.5 * d, 0, 0]; k = 1100;
+    } else if (mv === 'throwHold') {
+      // grab, peck peck peck, toss: wings clamp him, then fling
+      const toss = smooth(19, 25, t), rec = smooth(28, 44, t);
+      R = mix3([-0.25, 0.4, 1], [-0.9, 0.5, 0.3], toss); L = mix3([0.25, 0.4, 1], [0.9, 0.5, 0.3], toss);
+      lean = [mix(0.3, 0.1, toss), mix(0, -0.6, toss), 0];
+      if (rec) { R = mix3(R, READY.thief.R, rec); L = mix3(L, READY.thief.L, rec); lean = mix3(lean, [READY.thief.lean, 0, 0], rec); }
+      k = 1100;
+    } else return super._attack(F, ph, R, L, lean, k, wrist);
+    return { R, L, lean, k, wrist };
+  }
+
+  _think(dt) {
+    super._think(dt);
+    ease(this.peck, this.tPeck, 900, dt);
+    ease(this.beak, this.tBeak, 700, dt);
+  }
+
+  _applyPose() {
+    const p = this.pitch.x;
+    this.pitch.x = p - this.peck.x;
+    super._applyPose();
+    this.pitch.x = p;
+  }
+
+  /* the head's frame (its stuffing shape-matched to its sewn shape) and
+     the beak riding on it, for poseBeak */
+  beakFrame() {
+    const x = this.soft.x, core = this.cfg.core, q = this._hq0, m = core.length, c = this.hC;
+    c[0] = c[1] = c[2] = 0;
+    for (const i of core) { c[0] += x[i * 3]; c[1] += x[i * 3 + 1]; c[2] += x[i * 3 + 2]; }
+    c[0] /= m; c[1] /= m; c[2] /= m;
+    _A.fill(0);
+    for (let j = 0; j < m; j++) {
+      const i = core[j];
+      const px = x[i * 3] - c[0], py = x[i * 3 + 1] - c[1], pz = x[i * 3 + 2] - c[2];
+      const qx = q[j * 3], qy = q[j * 3 + 1], qz = q[j * 3 + 2];
+      _A[0] += px * qx; _A[1] += px * qy; _A[2] += px * qz;
+      _A[3] += py * qx; _A[4] += py * qy; _A[5] += py * qz;
+      _A[6] += pz * qx; _A[7] += pz * qy; _A[8] += pz * qz;
+    }
+    extractRotation(_A, this._hq, 4);
+    quatToMat(this._hq, this.hR);
+    const R = this.hR, l = this.beakBase;
+    const base = [c[0] + R[0] * l[0] + R[1] * l[1] + R[2] * l[2], c[1] + R[3] * l[0] + R[4] * l[1] + R[5] * l[2], c[2] + R[6] * l[0] + R[7] * l[1] + R[8] * l[2]];
+    return { base, R, dir: this.beakDir, open: clamp(this.beak.x, 0, 1) * BEAK_OPEN };
+  }
+
+  acro(F) {
+    if (F.act !== 'attack') return null;
+    const f = F.face || 1, t = F.t;
+    if (F.mv === 'dive') return { a: -f * 0.95 * smooth(4, 8, t), h: 1.1, y: 0 };
+    if (F.mv === 'diveLand') return { a: -f * 0.95 * (1 - smooth(0, 10, t)), h: 1.1, y: 0 };
+    return null;
   }
 }

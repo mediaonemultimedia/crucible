@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#120d1f">
 <title>Pillow Fight — Bolster</title>
-<meta name="description" content="Pillow Fight: a one-on-one fighting game with plush soft-body fighters: a polar-bear boxer, a capoeira octopus, a tennis leopard, a sumo panda and a long-necked giraffe, knocking the stuffing out of each other.">
+<meta name="description" content="Pillow Fight: a one-on-one fighting game with plush soft-body fighters: a polar-bear boxer, a capoeira octopus, a tennis leopard, a sumo panda, a long-necked giraffe, a luchador wolf and a thieving crow, knocking the stuffing out of each other.">
 <style>
 /*FONTFACE*/
 :root{
@@ -96,11 +96,11 @@ kbd{display:inline-block;min-width:22px;text-align:center;font-family:var(--mono
 .plate .moves{margin-top:10px;font-family:var(--mono);font-size:11px;line-height:1.75;letter-spacing:.04em;color:var(--ink)}
 .plate .moves b{font-weight:600;color:#cdb6ff}
 .plate.locked .who::after{content:" ✓"}
-.cards{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);display:flex;gap:12px}
-.card{position:relative;width:clamp(96px,11vw,150px);aspect-ratio:3/4;background:var(--panel);border:2px solid var(--line);border-radius:4px;cursor:pointer;overflow:hidden;transition:transform .12s,box-shadow .12s}
+.cards{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);display:flex;gap:10px}
+.card{position:relative;width:clamp(84px,9.6vw,136px);aspect-ratio:3/4;background:var(--panel);border:2px solid var(--line);border-radius:4px;cursor:pointer;overflow:hidden;transition:transform .12s,box-shadow .12s}
 .card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform-origin:50% 90%}
-.card .lab{position:absolute;left:0;right:0;bottom:0;background:rgba(18,13,31,.9);color:var(--ink);font-family:var(--cond);font-weight:700;font-size:clamp(11px,1.15vw,14px);text-transform:uppercase;letter-spacing:.08em;padding:5px 6px 5px 30px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.card .flag{position:absolute;left:6px;bottom:6px;width:20px;height:13px;border:1px solid rgba(255,255,255,.7)}
+.card .lab{position:absolute;left:0;right:0;bottom:0;background:rgba(18,13,31,.9);color:var(--ink);font-family:var(--cond);font-weight:700;font-size:clamp(9.5px,.98vw,13px);text-transform:uppercase;letter-spacing:.03em;padding:5px 4px 5px 25px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .flag{position:absolute;left:5px;bottom:7px;width:16px;height:11px;border:1px solid rgba(255,255,255,.7)}
 .card:hover{transform:translateY(-4px)}
 .card.c1{border-color:var(--p1);box-shadow:0 0 0 2px var(--p1),0 0 22px rgba(255,59,107,.65)}
 .card.c2{border-color:var(--p2);box-shadow:0 0 0 2px var(--p2),0 0 22px rgba(63,240,200,.55)}
@@ -115,6 +115,8 @@ body.napping .card:nth-child(2) img{animation-delay:-.7s}
 body.napping .card:nth-child(3) img{animation-delay:-1.5s}
 body.napping .card:nth-child(4) img{animation-delay:-2.1s}
 body.napping .card:nth-child(5) img{animation-delay:-2.7s}
+body.napping .card:nth-child(6) img{animation-delay:-.3s}
+body.napping .card:nth-child(7) img{animation-delay:-1.9s}
 @keyframes doze{0%,100%{transform:rotate(-2deg) translateY(2px)}50%{transform:rotate(-7deg) translateY(7px) scaleY(.97)}}
 body.napping .card .zzz{opacity:1}
 body.napping .card .zzz i{animation:zz 2.4s ease-out infinite}
@@ -129,7 +131,7 @@ body.napping .card .zzz i:nth-child(3){animation-delay:1.6s;font-size:.65em}
 #select-screen .controls h4{display:none}
 #select-screen .controls span{white-space:nowrap}
 #select-screen .controls span:nth-child(odd){margin-right:-9px}
-#select-screen .step{position:absolute;right:3.5vw;bottom:calc(22px + clamp(96px,11vw,150px) * 4 / 3 + 26px);font-family:var(--cond);font-weight:700;font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink);background:rgba(29,22,48,.94);border:1px solid var(--violet);padding:8px 12px;box-shadow:0 0 14px rgba(155,92,255,.4)}
+#select-screen .step{position:absolute;right:3.5vw;bottom:calc(22px + clamp(84px,9.6vw,136px) * 4 / 3 + 26px);font-family:var(--cond);font-weight:700;font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink);background:rgba(29,22,48,.94);border:1px solid var(--violet);padding:8px 12px;box-shadow:0 0 14px rgba(155,92,255,.4)}
 
 /* HUD ----------------------------------------------------------------------- */
 #hud{position:absolute;left:0;right:0;top:0;display:none;pointer-events:none;padding:18px 3vw 0}
@@ -240,8 +242,10 @@ body[data-screen=win] #hud{display:none}
   #mark{top:16px;left:16px}
   .plate{top:16%;width:44vw}
   .plate .moves,.plate .an{display:none}
-  .cards{gap:6px;bottom:14px}
-  .card{width:17vw}
+  .cards{gap:4px;bottom:14px}
+  .card{width:12.8vw}
+  .card .lab{font-size:9px;padding-left:6px}
+  .card .flag{display:none}
   #select-screen .controls,#select-screen .step{display:none}
   #hud{padding:10px 3vw 0}
   #pause-screen .menu{flex-direction:column;align-items:center}
@@ -268,6 +272,56 @@ body.online.fighting #net,body.online[data-screen=select] #net{display:block}
 #net .desync{color:#ffd23f;margin-left:10px}
 #netwait{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(10,6,22,.55);z-index:6}
 body.netwait #netwait{display:flex}
+/* practice ------------------------------------------------------------------ */
+#practice{position:absolute;inset:0;display:none;pointer-events:none}
+body.practicing #practice{display:block}
+body.practicing #mark{display:none}
+body.practicing #hud .pips{visibility:hidden}
+body.practicing.lobby #hud{display:none}
+.pr-box{position:absolute;background:rgba(18,13,31,.82);border:1px solid var(--line);border-radius:4px;padding:8px 10px;font-family:var(--cond);font-weight:700;color:var(--ink);pointer-events:auto}
+.pr-box h5{margin:0 0 6px;font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--dim);display:flex;justify-content:space-between;gap:10px}
+.pr-box h5 small{font-size:10px;letter-spacing:.14em;color:#8f84b3}
+.pr-inputs{left:16px;top:clamp(120px,16vh,170px);width:118px}
+#pr-in{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px}
+#pr-in li{display:flex;align-items:center;gap:4px;font-size:12px;min-height:20px;opacity:calc(1 - var(--k) * .055)}
+#pr-in li b{width:24px;text-align:right;color:#8f84b3;font-size:11px;margin-right:2px}
+.ik{display:inline-flex;align-items:center;justify-content:center;min-width:19px;height:19px;padding:0 3px;border-radius:50%;font-size:11px;line-height:1;background:var(--panel2);border:1.5px solid #8a78c4;color:#fff}
+.ik.d{border-radius:3px;background:#2a2140;font-size:13px}
+.ik.o{background:#ff3b6b;border-color:#ffb3c6;color:#120d1f}
+.ik.p{background:#9b5cff;border-color:#d6c1ff}
+.ik.s{background:#ffd23f;border-color:#fff1b8;color:#120d1f;border-radius:9px;padding:0 5px}
+.ik.e{background:#3ff0c8;border-color:#c5fff1;color:#120d1f}
+.pr-side{position:absolute;right:16px;top:clamp(120px,16vh,170px);width:min(260px,30vw);display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.pr-side .pr-box{position:relative}
+#pr-dummy .modes{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+#pr-dummy button{font-family:var(--cond);font-weight:700;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;text-align:left;color:var(--ink);background:var(--panel);border:1.5px solid var(--line);border-radius:3px;padding:5px 6px;cursor:pointer;display:flex;gap:6px;align-items:center}
+#pr-dummy button kbd{min-width:16px;font-size:10px;padding:0 3px;margin:0}
+#pr-dummy button.on{border-color:var(--p2);background:#173a35;box-shadow:0 0 10px rgba(63,240,200,.35)}
+#pr-dummy .toggles{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:6px}
+#pr-combo{font-size:15px;letter-spacing:.06em;line-height:1.35}
+#pr-combo b{font-size:22px;color:#fff;text-shadow:0 0 10px var(--p1)}
+#pr-combo em{display:inline-block;margin-left:4px;font-style:italic;font-size:13px;color:#fff;background:var(--violet);padding:0 6px;box-shadow:0 0 12px var(--violet)}
+#pr-combo i{display:inline-block;margin-left:4px;font-style:normal;font-size:12px;color:#120d1f;background:#ffd23f;padding:0 5px}
+#pr-combo .best{display:block;font-size:11px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
+.pr-moves{left:50%;transform:translateX(-50%);bottom:64px;width:min(92vw,900px);display:grid;grid-template-columns:repeat(5,auto);gap:3px 16px;font-size:11.5px;letter-spacing:.04em;padding:7px 12px}
+.pr-moves h5{grid-column:1/-1;margin-bottom:2px}
+.pr-moves span{white-space:nowrap;font-family:var(--sans);font-weight:500;color:#e8dcff}
+.pr-moves span kbd{font-size:10px;padding:1px 4px;min-width:18px}
+.pr-moves span.bnb{color:#fff}
+.pr-hidden-hint{display:none;position:absolute;right:16px;top:clamp(120px,16vh,170px);font-family:var(--cond);font-weight:700;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+body.pr-hide .pr-box{display:none}
+body.pr-hide .pr-hidden-hint{display:block}
+/* the online lobby: the room card up in a corner, the practice arena behind it */
+.prnote{display:none!important}
+body.lobby .prnote{display:flex!important;font-size:11px}
+body.lobby #online-screen .menu{left:auto;right:16px;top:16px;transform:none;width:min(340px,40vw);gap:8px;background:rgba(18,13,31,.86);border:1px solid var(--violet);border-radius:6px;padding:12px;box-shadow:0 0 24px rgba(155,92,255,.35)}
+body.lobby #online-screen .menu h2{font-size:22px;margin:0}
+body.lobby #online-screen .code{font-size:40px;padding:2px 0 2px .22em}
+body.lobby #online-screen .opt{padding:8px 12px;font-size:15px}
+body.lobby #online-screen .olnote.big{font-size:14px;padding:6px 0}
+body.lobby .pr-side{top:auto;bottom:130px}
+body.lobby .pr-moves{bottom:16px}
+@media (max-height:700px){.pr-moves{grid-template-columns:repeat(4,auto)}}
 #netwait .box{display:flex;gap:12px;align-items:center;font-family:var(--cond);font-weight:700;font-size:20px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);background:rgba(29,22,48,.95);border:2px solid var(--violet);border-radius:4px;padding:18px 26px}
 </style>
 </head>
@@ -287,7 +341,7 @@ body.netwait #netwait{display:flex}
       <h1 style="margin:0"><img class="logo" src="__LOGO__" alt="Pillow Fight" width="1400" height="739"></h1>
     </div>
     <div class="press-wrap">
-      <p class="tagline">Five plush fighters · <b>knock the stuffing out</b></p>
+      <p class="tagline">Seven plush fighters · <b>knock the stuffing out</b></p>
       <div class="press">Press any key</div>
       <div class="keyboard-only">Pillow Fight is best on a keyboard. Come back on a computer to fight — A D W S to move, O and P to hit, Space for the special.</div>
     </div>
@@ -297,6 +351,7 @@ body.netwait #netwait{display:flex}
     <div class="menu">
       <h2>Mode</h2>
       <button class="opt sel" data-mode="cpu">Vs Computer <small>1 player</small></button>
+      <button class="opt" data-mode="practice">Practice <small>any fighter vs a dummy</small></button>
       <button class="opt" data-mode="online">Online <small>play a friend</small></button>
       <div class="hintline">W / S choose · O or Enter to go</div>
     </div>
@@ -316,10 +371,12 @@ body.netwait #netwait{display:flex}
         <div class="linkrow"><input id="ol-link" readonly value="" aria-label="share link"><button class="opt small sel" data-act="copy" id="ol-copy">Copy link</button></div>
         <div class="olnote wait"><span class="spin"></span><span id="ol-wait">Waiting for your friend to open it…</span></div>
         <button class="opt" data-act="cancel">Cancel</button>
+        <div class="olnote prnote">Practise while you wait · <kbd>C</kbd> copy link · <kbd>Esc</kbd> leave</div>
       </div>
       <div class="ol ol-joining">
         <div class="olnote big"><span class="spin"></span><span id="ol-joinmsg">Joining the match…</span></div>
         <button class="opt" data-act="cancel">Cancel</button>
+        <div class="olnote prnote">Practise while it connects · <kbd>Esc</kbd> leave</div>
       </div>
       <div class="ol ol-error">
         <div class="olnote err" id="ol-err">Connection failed</div>
@@ -371,6 +428,16 @@ body.netwait #netwait{display:flex}
       <div class="meter" id="m1"><span class="mlab">SPECIAL</span><div class="mbar"><i></i></div></div>
       <div class="meter r" id="m2"><span class="mlab">SPECIAL</span><div class="mbar"><i></i></div></div>
     </div>
+  </div>
+
+  <div id="practice" aria-live="off">
+    <div class="pr-box pr-inputs"><h5>Inputs</h5><ol id="pr-in"></ol></div>
+    <div class="pr-side">
+      <div class="pr-box" id="pr-dummy"></div>
+      <div class="pr-box pr-combo"><h5>Combo</h5><div id="pr-combo">—</div></div>
+    </div>
+    <div class="pr-box pr-moves" id="pr-moves"></div>
+    <div class="pr-hidden-hint"><kbd>H</kbd> practice panels</div>
   </div>
 
   <div id="net" aria-live="polite"></div>

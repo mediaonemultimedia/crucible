@@ -23,8 +23,12 @@ import { buildLeopard } from '../../shared/grommet/athletes/leopard.rig.js';
 import { buildPandaSolo } from '../../shared/grommet/athletes/panda.rig.js';
 import { buildGiraffe } from '../../shared/grommet/athletes/giraffe.rig.js';
 import { buildRig as buildFlockRig } from '../../shared/flock/rig.js';
+import { buildWolf } from '../../shared/flock/rigs.js';
+import { buildCrow } from '../../shared/grommet/athletes/crow.rig.js';
+import { makeBeak, poseBeak } from '../../shared/grommet/crowprops.js';
+import { paintLuchaMask, paintBanditMask, makeGoldChain } from './masks.js';
 import { makeRacquet, poseRacquet, makeStars, poseStars, shade } from '../../shared/grommet/props.js';
-import { BipedPuppet, GiraffePuppet, OctopusPuppet, phaseOf } from './puppets.js';
+import { BipedPuppet, GiraffePuppet, OctopusPuppet, WolfPuppet, CrowPuppet, phaseOf } from './puppets.js';
 import { FIGHTERS } from '../fighters/index.js';
 import { Gloves, shaveCaps, cuffOnly } from './gloves.js';
 
@@ -57,6 +61,23 @@ export const LOOKS = {
     build: () => buildFlockRig('octopus'), info: () => ({ ...F_INFO.octopus, pile: 9 }), paint: 'octopus', Puppet: (s) => new OctopusPuppet(s), yaw: 0.75,
     colors: { ...F_INFO.octopus.colors.coral, spot: '#c4553e', nose: '#8a5a62', cloth: '#ffffff', trim: '#ffffff' },
     evil: { ...F_INFO.octopus.colors.lagoon, fur: '#2f6f8f', accent: '#2f6f8f', under: '#bfe0e8', spot: '#1d4a60', nose: '#203040', cloth: '#ffffff', trim: '#ffffff' },
+  },
+  // Flock's wolf, front legs freed as arms, in a luchador's mask: the
+  // técnico's emerald with white trim; his evil twin a darker wolf in the
+  // rudo's black and red (spot: the mask, nose: its trim)
+  sebas: {
+    build: () => buildWolf({ fighter: true }), info: () => ({ ...F_INFO.wolf, pile: 9 }), paint: 'wolf', Puppet: (s) => new WolfPuppet(s), yaw: 0.8,
+    colors: { ...F_INFO.wolf.colors.grey, spot: '#14915a', nose: '#f4f1ea', cloth: '#ffffff', trim: '#ffffff' },
+    evil: { ...F_INFO.wolf.colors.dusk, spot: '#151318', nose: '#d4102c', cloth: '#ffffff', trim: '#ffffff' },
+    mask: (m, p, rig, evil) => paintLuchaMask(m, p, rig, { evil }), noMonocle: true,
+  },
+  // Grommet's crow with his felt beak; his evil twin an ash-grey crow in a
+  // bandit's mask, wearing a stolen gold chain
+  zach: {
+    build: buildCrow, info: () => G.crow, paint: 'crow', Puppet: (s) => new CrowPuppet(s), yaw: 0.85,
+    colors: G.crow.colors.crow,
+    evil: { fur: '#7d7a86', under: '#8c8995', accent: '#86838f', spot: '#121115', nose: '#2a292f', cloth: '#2a292f', trim: '#2a292f', sheen: '#1e1e3a', beak: 1 },
+    mask: (m, p, rig, evil) => { if (evil) paintBanditMask(m, p, rig); }, chain: true, noMonocle: true,
   },
 };
 
@@ -147,14 +168,15 @@ export class Plush {
     this.clothMat = makeClothMaterial();
 
     const info = (this.info = L.info());
-    if (L.paint === 'octopus') {
-      paintFace(this.maskTex, 'octopus', rig);
+    if (L.paint === 'octopus' || L.paint === 'wolf') {
+      paintFace(this.maskTex, L.paint, rig);
       const g = this.patTex.userData.ctx;
       g.fillStyle = '#000'; g.fillRect(0, 0, this.patTex.userData.size, this.patTex.userData.size);
       this.patTex.needsUpdate = true;
     } else if (L.paint === 'panda') paintSoloPanda(this.maskTex, this.patTex, rig);
     else paintAthlete(this.maskTex, this.patTex, L.paint, rig);
     shaveCaps(this.maskTex, rig);
+    L.mask?.(this.maskTex, this.patTex, rig, evil);
     this.setColors(evil ? L.evil : L.colors);
     this.fur.uniforms.pile.value = (info.pile || 9) / 90;
     this.fur.uniforms.shells.value = SHELLS_EACH;
@@ -174,6 +196,16 @@ export class Plush {
     this.eyes = [-1, 1].map((s) => { const m = new THREE.Mesh(eyeGeo, eyeMat); m.userData.side = s; group.add(m); return m; });
     if (rig.racquet) { this.racquet = makeRacquet(); group.add(this.racquet); }
     if (L.gloves) this.gloves = new Gloves(group, soft, rig, (evil ? L.evil : L.colors).cloth);
+    if (rig.beak) {
+      // the crow's felt beak, riding the head's own frame
+      const c = evil ? L.evil : L.colors;
+      this.beak = makeBeak(rig.beak);
+      this.beak.userData.color.value.set(c.nose);
+      this.beakScale = c.beak || 1;
+      group.add(this.beak);
+    }
+    if (L.chain && evil) { this.chain = makeGoldChain({ c: [0, 1.6, 0.06], rx: 0.53, rz: 0.52 }); this.chain.visible = true; group.add(this.chain); }
+    this.monocleOK = !L.noMonocle;
     this.stars = makeStars();
     group.add(this.stars);
     this.toque = makeToque();
@@ -267,13 +299,19 @@ export class Plush {
     g.rotation.y = this.yaw.x;
     // the K.O. launch: he tumbles end over end (the sim's own spin, kr in
     // thousandths of a turn), about his middle; flat out once he's down
-    if (F.act === 'ko' && F.kb < 1 && F.kdir) this._spin = -F.kdir * (F.kr / 1000) * Math.PI * 2;
+    // the wolf's and the crow's acrobatics (a flip, the moonsault, the
+    // dive bomb's nose-down) turn the whole plush the same way, about its
+    // own pivot height (render only)
+    const ac = F.act === 'ko' ? null : this.puppet.acro?.(F);
+    this._lift = 0;
+    if (F.act === 'ko' && F.kb < 1 && F.kdir) { this._spin = -F.kdir * (F.kr / 1000) * Math.PI * 2; this._spinH = 1.5; }
+    else if (ac) { this._spin = ac.a; this._spinH = ac.h; this._lift = ac.y || 0; }
     else { const w = Math.atan2(Math.sin(this._spin || 0), Math.cos(this._spin || 0)); this._spin = w * Math.max(0, 1 - dt * 10); if (Math.abs(this._spin) < 0.01) this._spin = 0; }
-    if (this._spin) {
-      const h = 1.5, a = this._spin;
+    if (this._spin || this._lift) {
+      const h = this._spinH ?? 1.5, a = this._spin || 0;
       g.rotation.order = 'ZYX';
       g.rotation.z = a;
-      g.position.set(nx + h * Math.sin(a), ny + h - h * Math.cos(a), 0);
+      g.position.set(nx + h * Math.sin(a), ny + h - h * Math.cos(a) + this._lift, 0);
     } else g.rotation.z = 0;
     // hit squash
     const ks = 260;
@@ -320,6 +358,9 @@ export class Plush {
     if (this.groom.dirty) { this.groomTex.needsUpdate = true; this.groom.dirty = false; }
 
     if (this.racquet && P.rq) poseRacquet(this.racquet, P.rq);
+    if (this.beak) poseBeak(this.beak, P.beakFrame(), [this.beakScale, 0.92 + 0.12 * this.beakScale]);
+    if (this.chain) this._necklace();
+    if ('toque' in P) P.toque = this.toque.visible;
     this.gloves?.update();
     P.headCentre(this.hc);
     poseStars(this.stars, this.hc, P.daze, this.time);
@@ -351,7 +392,9 @@ export class Plush {
       e.scale.set(...ey.scale);
       this.eyePos.push({ p: e.position.clone(), n: N.clone(), q: e.quaternion.clone() });
     }
-    // the monocle over the eye nearer the camera
+    // the monocle over the eye nearer the camera (not for the two whose
+    // evil twins have their own looks: the rudo's mask, the bandit's)
+    if (this.monocle.visible && !this.monocleOK) this.monocle.visible = false;
     if (this.monocle.visible) {
       const w0 = this.eyes[0].getWorldPosition(new THREE.Vector3()), w1 = this.eyes[1].getWorldPosition(new THREE.Vector3());
       const k = w0.z > w1.z ? 0 : 1, E = this.eyePos[k];
@@ -360,6 +403,15 @@ export class Plush {
       const r = Math.max(ey.scale[0], ey.scale[1]) * 1.25;
       this.monocle.scale.setScalar(r);
     }
+  }
+
+  /* the gold chain round his neck, carried by the body's own frame */
+  _necklace() {
+    const P = this.puppet, c = this.chain.userData.c, R = this.soft.cloudR[0];
+    const w = P.worldOf(c);
+    this.chain.position.set(w[0], w[1], w[2]);
+    this._M.set(R[0], R[1], R[2], 0, R[3], R[4], R[5], 0, R[6], R[7], R[8], 0, 0, 0, 0, 1);
+    this.chain.quaternion.setFromRotationMatrix(this._M);
   }
 
   /* the toque sits on the crown of the head, tipped with it */

@@ -17,7 +17,7 @@ const shot = arg('--shot');
 const args = webgpu
   ? ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader', '--use-angle=swiftshader', '--ignore-gpu-blocklist']
   : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
-const browser = await chromium.launch({ args });
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: Number(arg('--dpr') || 1) });
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });

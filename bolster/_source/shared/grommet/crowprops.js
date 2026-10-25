@@ -378,3 +378,6 @@ export function poseItems(g, items) {
     M.delete(id);
   }
 }
+
+/* Bolster: the bottle cap on its own (Zach Sparrow's Bottle Cap Flick) */
+export { makeCap };
