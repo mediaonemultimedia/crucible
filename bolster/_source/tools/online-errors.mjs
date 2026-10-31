@@ -35,6 +35,8 @@ const open = async (q) => {
   return { page, log };
 };
 const step = (p, s, d = false) => p.evaluate(([s, d]) => window.__bolster.step(s, d), [s, d]);
+// the name screen (before vs Computer, or a room link): Enter plays without one
+const pastNames = async (p) => { await step(p, 0.05); if (await p.evaluate(() => window.__bolster.screen) === 'names') { await p.keyboard.press('Enter'); await step(p, 0.1); } };
 
 // 1. offline: menus, select, a fight vs the computer — zero requests
 {
@@ -42,6 +44,7 @@ const step = (p, s, d = false) => p.evaluate(([s, d]) => window.__bolster.step(s
   await page.keyboard.press('Enter'); await step(page, 0.2);
   await page.keyboard.press('KeyS'); await step(page, 0.1);
   await page.keyboard.press('KeyW'); await page.keyboard.press('Enter'); await step(page, 0.2);   // Vs Computer
+  await pastNames(page);
   await page.keyboard.press('KeyO'); await step(page, 0.2); await page.keyboard.press('KeyO'); await step(page, 0.2);
   await page.keyboard.press('KeyO'); await step(page, 0.2);     // difficulty
   const s = await page.evaluate(() => window.__bolster.screen);
@@ -77,6 +80,7 @@ const step = (p, s, d = false) => p.evaluate(([s, d]) => window.__bolster.step(s
 // 3. the real cloud broker: a guest opening a link
 {
   const { page, log } = await open('room=ABCDE&hold&webgl&noportraits');
+  await pastNames(page);
   await step(page, 0.1, true);
   await page.screenshot({ path: path.join(out, '11-public-broker-joining.png') });
   await page.waitForFunction(() => document.querySelector('#online-screen').dataset.state === 'error', null, { timeout: 40000 }).catch(() => {});
@@ -100,6 +104,7 @@ const step = (p, s, d = false) => p.evaluate(([s, d]) => window.__bolster.step(s
 // 4. room not found (needs a broker that answers: a local PeerServer)
 if (broker) {
   const { page } = await open(`room=ZZZZZ&net=peer&broker=127.0.0.1:${broker}&hold&webgl&noportraits`);
+  await pastNames(page);
   await page.waitForFunction(() => document.querySelector('#online-screen').dataset.state === 'error', null, { timeout: 30000 }).catch(() => {});
   await step(page, 0.1, true);
   const st = await page.evaluate(() => document.querySelector('#ol-err').textContent);

@@ -18,6 +18,7 @@ const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ?
 const broker = arg('broker', null), lag = arg('lag', null);
 // who each side plays (the cursor's moved there on the shared select)
 const P1 = arg('p1', 'sumaura'), P2 = arg('p2', 'johnny');
+const NAMES = ['Kevin', 'John'];
 const ROSTER = ['kevalanche', 'rubberta', 'johnny', 'sumaura', 'k8e', 'sebas', 'zach'];
 const out = path.join(root, 'shots', arg('out', broker ? 'online-peerjs' : 'online'));
 fs.mkdirSync(out, { recursive: true });
@@ -47,9 +48,12 @@ const shot = async (name) => {
   await B.screenshot({ path: path.join(out, `${name}-guest.png`), timeout: 240000 });
 };
 
-// host: title → mode → Online (Vs Computer, Practice, Online) → Host a match
+// host: title → mode → Online (Vs Computer, Versus, Practice, Online) → a name → Host a match
 await A.keyboard.press('Enter'); await step(A, 0.1);
-await A.keyboard.press('KeyS'); await A.keyboard.press('KeyS'); await A.keyboard.press('Enter'); await step(A, 0.1);
+for (let i = 0; i < 3; i++) await A.keyboard.press('KeyS');
+await A.keyboard.press('Enter'); await step(A, 0.1);
+if (await A.evaluate(() => window.__bolster.screen) !== 'names') throw new Error('no name screen before Online');
+await A.keyboard.type(NAMES[0]); await A.keyboard.press('Enter'); await step(A, 0.1);
 const seed0 = await A.evaluate(() => window.__bolster.seed);
 if (await A.evaluate(() => window.__bolster.screen) !== 'online') throw new Error('Online did not open');
 await A.keyboard.press('Enter');        // Host a match
@@ -75,6 +79,19 @@ const B = await ctx.newPage(); watch(B, 'guest');
 const gurl = link.replace(/^.*\?/, `${base}?`) + '&hold&webgl&noportraits';
 await B.goto(gurl);
 await B.waitForFunction(() => document.body.classList.contains('is-live'), null, { timeout: 240000 });
+// the link opens on the name screen: the guest types theirs, then joins
+await step(B, 0.05, true);
+if (await B.evaluate(() => window.__bolster.screen) !== 'names') throw new Error('no name screen on the link');
+await B.screenshot({ path: path.join(out, '2a-name-guest.png') });
+// (both pages share this browser's storage, so the host's name is already on
+// the guest's list: down to '＋ New name' first)
+if (!(await B.evaluate(() => !!document.querySelector('#np-input')))) {
+  const n = await B.evaluate(() => [...document.querySelectorAll('#np-row .nrow')].findIndex((b) => /New name/.test(b.textContent)));
+  const cur = await B.evaluate(() => [...document.querySelectorAll('#np-row .nrow')].findIndex((b) => b.classList.contains('sel')));
+  for (let i = cur; i < n; i++) await B.keyboard.press('ArrowDown');
+  await B.keyboard.press('Enter'); await step(B, 0.05);
+}
+await B.keyboard.type(NAMES[1]); await B.keyboard.press('Enter'); await step(B, 0.05);
 await step(B, 0, true);
 const joinText = await B.evaluate(() => document.querySelector('#ol-joinmsg').textContent);
 console.log('guest lobby', JSON.stringify(await B.evaluate(() => ({ screen: window.__bolster.screen, practice: window.__bolster.practice }))));
@@ -163,6 +180,19 @@ console.log('winner screens', JSON.stringify(winTxt));
 await shot('7-winner');
 if (winTxt[0].screen !== 'win' || winTxt[1].screen !== 'win') errs.push('match did not reach the winner screen on both');
 if (winTxt[0].line !== winTxt[1].line || winTxt[0].winner !== winTxt[1].winner || winTxt[0].egg !== winTxt[1].egg) errs.push('the winner / catchphrase differ between the peers');
+// names: exchanged over the link, on both HUDs, and the result on both devices' leaderboards under both names
+const nm = await Promise.all([A, B].map((p) => p.evaluate(() => ({ hud: [document.querySelector('#pn1').textContent, document.querySelector('#pn2').textContent], eyebrow: document.querySelector('#win-eyebrow').textContent, board: JSON.parse(localStorage.getItem('pillowfight.board.v1') || '{}') }))));
+console.log('names', JSON.stringify(nm.map((n) => ({ hud: n.hud, eyebrow: n.eyebrow, board: Object.values(n.board.players || {}).map((r) => `${r.name} ${r.w}-${r.l}`) }))));
+for (const n of nm) {
+  if (n.hud[0] !== NAMES[0] || n.hud[1] !== NAMES[1]) errs.push(`HUD names ${n.hud}`);
+  const w = winTxt[0].winner;
+  if (w === 0 || w === 1) {
+    const pl = n.board.players || {};
+    const win = pl[NAMES[w].toLowerCase()], lose = pl[NAMES[1 - w].toLowerCase()];
+    if (!win || !lose) errs.push('the result is missing from a leaderboard');
+    if (!n.eyebrow.includes(NAMES[w])) errs.push(`winner eyebrow without the name: ${n.eyebrow}`);
+  }
+}
 
 // rematch from the guest's side: both go back to the shared select
 await B.keyboard.press('Enter');

@@ -252,6 +252,74 @@ body[data-screen=win] #hud{display:none}
 }
 @media (prefers-reduced-motion:reduce){.logo,.press{animation:none}}
 
+
+/* names ----------------------------------------------------------------------- */
+#names-screen .names-wrap{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(94vw,820px);display:flex;flex-direction:column;align-items:center;gap:14px}
+.np-row{display:flex;gap:22px;justify-content:center;width:100%;flex-wrap:wrap}
+.np{width:min(86vw,360px);background:rgba(29,22,48,.94);border:2px solid var(--line);border-radius:4px;padding:14px;display:flex;flex-direction:column;gap:8px;opacity:.5;transition:opacity .15s}
+.np.on{opacity:1;border-color:var(--p1);box-shadow:0 0 22px rgba(255,59,107,.35)}
+.np.s1.on{border-color:var(--p2);box-shadow:0 0 22px rgba(63,240,200,.3)}
+.np.done{opacity:.85}
+.np .seat{align-self:flex-start;font-family:var(--cond);font-weight:700;font-size:13px;letter-spacing:.24em;text-transform:uppercase;color:var(--on-neon);background:var(--p1);padding:3px 9px}
+.np.s1 .seat{background:var(--p2)}
+.np .picked{font-family:var(--cond);font-weight:700;font-style:italic;font-size:30px;text-transform:uppercase;letter-spacing:.03em;min-height:36px}
+.np .rows{display:flex;flex-direction:column;gap:6px;max-height:min(46vh,340px);overflow:auto}
+.np .nrow{text-align:left;background:var(--panel);border:2px solid var(--line);border-radius:4px;color:var(--ink);padding:9px 12px;cursor:pointer;font-family:var(--cond);font-weight:700;font-size:17px;letter-spacing:.04em;display:flex;justify-content:space-between;align-items:center}
+.np .nrow small{font-size:10.5px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
+.np .nrow.sel{border-color:var(--violet);background:var(--panel2);box-shadow:inset 4px 0 0 var(--violet),0 0 14px rgba(155,92,255,.4)}
+.np .nrow.ghost{color:var(--dim);font-size:14px}
+.np input{font:700 20px var(--cond);letter-spacing:.04em;background:#0d0918;color:var(--ink);border:2px solid var(--violet);border-radius:4px;padding:9px 12px;outline:none;box-shadow:0 0 14px rgba(155,92,255,.45);width:100%}
+.np input::placeholder{color:#7d70a8}
+.np .err{font-family:var(--cond);font-weight:700;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#ffd0db;min-height:14px}
+#names-hint kbd{font-size:10px}
+
+/* leaderboard --------------------------------------------------------------- */
+#board-screen{background:rgba(18,13,31,.55)}
+#board-screen .board-wrap{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(96vw,940px);display:flex;flex-direction:column;gap:12px;align-items:center}
+#board-screen .board-sub{text-align:center}
+.board-scroll{width:100%;max-height:min(58vh,520px);overflow:auto;background:rgba(29,22,48,.94);border:1px solid var(--line);border-radius:4px}
+#board{width:100%;border-collapse:collapse;font-family:var(--cond);font-weight:700;letter-spacing:.04em}
+#board th{position:sticky;top:0;background:var(--panel2);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);padding:9px 10px;text-align:right;white-space:nowrap}
+#board th:nth-child(2),#board td:nth-child(2){text-align:left}
+#board td{padding:9px 10px;border-top:1px solid #33285a;text-align:right;font-size:17px;white-space:nowrap}
+#board td.rk{color:var(--dim);font-size:14px;width:36px}
+#board tr:first-child td.nm{color:#ffe7a8;text-shadow:0 0 12px rgba(255,200,80,.55)}
+#board td.nm{font-size:20px;font-style:italic;text-transform:uppercase}
+#board td.nm em{display:inline-block;margin-left:10px;font-style:normal;font-size:10px;letter-spacing:.18em;padding:2px 6px;border:1px solid var(--violet);color:#cdb6ff;vertical-align:middle;text-transform:uppercase}
+#board td.fav{font-size:14px;color:var(--dim)}
+#board td.fav svg{width:18px;height:12px;vertical-align:-1px;margin-right:6px;border:1px solid rgba(255,255,255,.5)}
+#board td.w{color:var(--p2)}#board td.l{color:#ff8fab}
+#board .empty td{text-align:center !important;color:var(--dim);font-size:15px;padding:30px;font-style:italic;letter-spacing:.06em}
+.board-actions{display:flex;gap:14px}
+.opt.danger.sel,.opt.danger:hover{border-color:var(--p1);box-shadow:inset 4px 0 0 var(--p1),0 0 18px rgba(255,59,107,.45)}
+.opt.danger.armed{background:#4a1430;border-color:var(--p1)}
+
+/* versus controls card -------------------------------------------------------- */
+.controls.vs{display:grid !important;grid-template-columns:1fr 1fr;gap:4px 22px;width:auto}
+.controls.vs .pcol{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:center;align-content:start}
+.controls.vs .pcol h5{grid-column:1/-1;margin:0 0 2px;font-family:var(--cond);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--on-neon);background:var(--p1);padding:2px 8px;justify-self:start}
+.controls.vs .pcol.p2 h5{background:var(--p2)}
+.controls.vs button.cap{all:unset;cursor:pointer}
+.controls.vs button.cap kbd{transition:box-shadow .1s}
+.controls.vs button.cap:hover kbd,.controls.vs button.cap.wait kbd{border-color:var(--violet);box-shadow:0 0 10px rgba(155,92,255,.8)}
+.controls.vs button.cap.wait kbd{background:var(--violet);color:#fff}
+.controls.vs .foot{grid-column:1/-1;font-size:11px;color:#cdb6ff;border-top:1px solid var(--line);padding-top:6px;margin-top:4px;line-height:1.45}
+.controls.vs .foot button{all:unset;cursor:pointer;color:var(--ink);text-decoration:underline;text-underline-offset:2px;margin-left:6px}
+#select-screen .controls.vs{top:112px;padding:8px 12px;font-size:11px;gap:2px 26px}
+#select-screen .controls.vs .pcol{grid-template-columns:auto auto auto auto;gap:3px 8px}
+#select-screen .controls.vs .pcol span{margin-right:6px}
+#select-screen .controls.vs kbd{font-size:10px;padding:1px 4px;min-width:18px}
+#select-screen .controls.vs .foot{font-size:10.5px;padding-top:4px;margin-top:2px}
+#select-screen .controls.vs span:nth-child(odd){margin-right:0}
+#select-screen .controls.vs .foot{display:block}
+body.versus #select-screen .step{display:none}
+
+/* player names on the HUD and the win screen ---------------------------------- */
+.pname{font-family:var(--cond);font-weight:700;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--on-neon);background:var(--p1);padding:2px 8px;align-self:flex-start;box-shadow:0 0 12px rgba(255,59,107,.5)}
+.side.r .pname{align-self:flex-end;background:var(--p2);box-shadow:0 0 12px rgba(63,240,200,.45)}
+.pname:empty{display:none}
+#win-record{display:block;margin-top:10px;font-family:var(--cond);font-weight:700;font-size:14px;letter-spacing:.16em;text-transform:uppercase;color:#cdb6ff}
+
 /* online */
 #online-screen .menu{width:min(90vw,460px)}
 #online-screen .ol{display:none;flex-direction:column;gap:14px}
@@ -353,9 +421,32 @@ body.lobby .pr-moves{bottom:16px}
     <div class="menu">
       <h2>Mode</h2>
       <button class="opt sel" data-mode="cpu">Vs Computer <small>1 player</small></button>
+      <button class="opt" data-mode="versus">Versus <small>2 players · 1 keyboard</small></button>
       <button class="opt" data-mode="practice">Practice <small>any fighter vs a dummy</small></button>
       <button class="opt" data-mode="online">Online <small>play a friend</small></button>
+      <button class="opt" data-mode="board">Leaderboard <small>who's the big pillow</small></button>
       <div class="hintline">W / S choose · O or Enter to go</div>
+    </div>
+  </section>
+
+  <section id="names-screen" class="screen">
+    <div class="names-wrap">
+      <h2 class="panel-title" id="names-title">Who's fighting?</h2>
+      <div class="np-row" id="np-row"></div>
+      <div class="hintline" id="names-hint"></div>
+    </div>
+  </section>
+
+  <section id="board-screen" class="screen">
+    <div class="board-wrap">
+      <h2 class="panel-title">Leaderboard</h2>
+      <div class="eyebrow board-sub">Kept on this device · every name that's fought here</div>
+      <div class="board-scroll"><table id="board"></table></div>
+      <div class="board-actions">
+        <button class="opt small sel" data-act="back">Back</button>
+        <button class="opt small danger" data-act="reset">Reset leaderboard</button>
+      </div>
+      <div class="hintline">A / D choose · Enter to go · Esc back</div>
     </div>
   </section>
 
@@ -410,6 +501,7 @@ body.lobby .pr-moves{bottom:16px}
   <div id="hud" aria-live="off">
     <div class="top">
       <div class="side l">
+        <div class="pname" id="pn1"></div>
         <div class="nameline" id="n1"></div>
         <span class="label">STUFFING</span>
         <div class="bar" id="hp1"><i class="lag"></i><i class="fill"></i></div>
@@ -417,6 +509,7 @@ body.lobby .pr-moves{bottom:16px}
       </div>
       <div id="timer">99</div>
       <div class="side r">
+        <div class="pname" id="pn2"></div>
         <div class="nameline" id="n2"></div>
         <span class="label">STUFFING</span>
         <div class="bar" id="hp2"><i class="lag"></i><i class="fill"></i></div>
@@ -461,7 +554,7 @@ body.lobby .pr-moves{bottom:16px}
   </section>
 
   <section id="win-screen" class="screen">
-    <div class="who"><span class="eyebrow" id="win-eyebrow">Winner</span><h2 class="panel-title" id="win-name"></h2></div>
+    <div class="who"><span class="eyebrow" id="win-eyebrow">Winner</span><h2 class="panel-title" id="win-name"></h2><span id="win-record"></span></div>
     <div class="menu">
       <button class="opt sel" data-act="rematch">Rematch</button>
       <button class="opt" data-act="select">Character select</button>

@@ -9,6 +9,7 @@
 
 import { host, join, roomCode, cleanRoom } from './net/link.js';
 import { ROSTER } from './fighters/index.js';
+import { cleanName } from './ui/players.js';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -47,6 +48,7 @@ export class Online {
     this.clock = 0;              // app time, ms
     this.waiting = false;
     this.desynced = null;
+    this.remoteName = '';       // the other player's name (metadata: never in the sim)
   }
 
   get remote() { return 1 - this.local; }
@@ -176,6 +178,7 @@ export class Online {
     else if (h) { try { h.close(); } catch { /* */ } }
     this.code = '';
     this.role = null;
+    this.remoteName = '';
     const b = $('#win-screen .opt[data-act=select]');
     if (b) b.textContent = 'Character select';
   }
@@ -188,6 +191,8 @@ export class Online {
     link.on = (ch, m) => this._msg(ch, m);
     link.onclose = () => this._closed();
     link.send('ctl', { t: 'hello', v: 1 });
+    // names ride the control channel; each side records the match under both
+    link.send('ctl', { t: 'name', name: this.app.myName || '' });
     this.goSelect();
   }
 
@@ -268,8 +273,9 @@ export class Online {
     }
     plate('.plate.p1', ids[0], false, A.locked[0], true);
     plate('.plate.p2', ids[1], mirror, A.locked[1], true);
-    $('.plate.p1 .who').textContent = L === 0 ? 'Player 1 · you' : 'Player 1';
-    $('.plate.p2 .who').textContent = L === 1 ? 'Player 2 · you' : 'Player 2';
+    const nm = (k) => (k === L ? A.myName : this.remoteName) || `Player ${k + 1}`;
+    $('.plate.p1 .who').textContent = L === 0 ? `${nm(0)} · you` : nm(0);
+    $('.plate.p2 .who').textContent = L === 1 ? `${nm(1)} · you` : nm(1);
     const R = this.remote;
     $('#select-step').textContent = A.locked[L]
       ? (A.locked[R] ? 'Both locked in — fight!' : `Locked in — waiting for Player ${R + 1}…`)
@@ -326,6 +332,7 @@ export class Online {
       return;
     }
     switch (m.t) {
+      case 'name': this.remoteName = cleanName(m.name); if (A.screen === 'select') A._paintSelect(); if (A.fight && !A.fight.practice) $(`#pn${this.remote + 1}`).textContent = A.seatLabel(this.remote); break;
       case 'cur': A.pick[this.remote] = m.i; if (A.screen === 'select') A._paintSelect(); break;
       case 'lock': A.pick[this.remote] = m.i; A.locked[this.remote] = true; if (A.screen === 'select') A._paintSelect(); this._maybeStart(); break;
       case 'unlock': A.locked[this.remote] = false; if (A.screen === 'select') A._paintSelect(); break;

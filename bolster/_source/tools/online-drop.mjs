@@ -18,6 +18,7 @@ await A.evaluate(() => window.__bolster.net.host());
 await A.waitForFunction(() => /room=/.test(document.querySelector('#ol-link').value));
 const code = await A.evaluate(() => document.querySelector('#ol-code').textContent);
 const B = await live(`${base}?room=${code}&net=local&hold&webgl&noportraits`);
+await step(B, 0.05); await B.keyboard.press('Enter'); await step(B, 0.1);      // the name screen: no name
 await A.waitForFunction(() => window.__bolster.screen === 'select', null, { timeout: 20000 });
 await A.keyboard.press('KeyO'); await B.keyboard.press('KeyO');
 for (let i = 0; i < 6; i++) { await step(A, 0.2); await step(B, 0.2); }

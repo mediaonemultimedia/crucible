@@ -15,7 +15,7 @@ import { Dummy, practiceMatch, practiceAfter, ComboMeter, InputLog } from './pra
 export const TICK = 1 / 60;
 
 export class Fight {
-  constructor(stage, { p1, p2, seed = 1, cpu = [null, 'normal'], keyboard = null, toques = false, net = null, practice = null }) {
+  constructor(stage, { p1, p2, seed = 1, cpu = [null, 'normal'], keyboard = null, keyboard2 = null, toques = false, net = null, practice = null }) {
     this.stage = stage;
     // practice (src/practice.js): player 2 is the dummy, the state tended between ticks
     this.practice = practice;
@@ -27,6 +27,7 @@ export class Fight {
     this.mirror = p1 === p2;
     this.cpu = cpu.map((lv, k) => (lv ? new CPU(k, lv, seed * 7 + k) : null));
     this.kb = keyboard;
+    this.kb2 = practice || net ? null : keyboard2;     // versus on one keyboard: player 2's keys
     this.plush = [new Plush(stage.scene, p1, { side: 0 }), new Plush(stage.scene, p2, { side: 1, evil: this.mirror })];
     this.plush[1].monocle.visible = this.mirror;
     for (const p of this.plush) p.toque.visible = toques;
@@ -55,7 +56,7 @@ export class Fight {
     this.prev = st.f.map((f) => ({ x: f.x, y: f.y }));
     this.prevProj = new Map(st.proj.map((p) => [p.id, { x: p.x, y: p.y }]));
     let a = this.cpu[0] ? this.cpu[0].input(st) : this.kb ? this.kb.sample() : 0;
-    let b = this.cpu[1] ? this.cpu[1].input(st) : this.dummy ? this.dummy.input(st, this.practice) : 0;
+    let b = this.cpu[1] ? this.cpu[1].input(st) : this.dummy ? this.dummy.input(st, this.practice) : this.kb2 ? this.kb2.sample() : 0;
     // a scripted input (screenshots, the browser test) can take either side
     if (this.override) { const o = this.override(st); if (o[0] !== null) a = o[0]; if (o[1] !== null) b = o[1]; }
     this.lastInputs = [a, b];

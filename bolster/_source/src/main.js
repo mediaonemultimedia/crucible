@@ -20,6 +20,8 @@ import { Online } from './online.js';
 import { CPU } from './ai/cpu.js';
 import { DUMMY_MODES, defaultSettings } from './practice.js';
 import { hash, createMatch } from './sim/sim.js';
+import { SOLO, ACTIONS, toMap, rebind, loadBindings, saveBindings, resetBindings, keyCap } from './input/layouts.js';
+import { cleanName, nameKey, loadNames, useName, loadBoard, saveBoard, recordMatch, resetBoard, standings } from './ui/players.js';
 import { LEFT as K_L, RIGHT as K_R, UP as K_U, DOWN as K_D, LIGHT as K_O, HEAVY as K_P, SPECIAL as K_S, BLOCK as K_E } from './sim/input.js';
 
 const $ = (s) => document.querySelector(s);
@@ -46,6 +48,10 @@ const CONTROLS = `
   <p class="tip">Don't just mash forward: block their heavy, then hit back — a light or a throw gets in first. Hitting them as they wind up is a COUNTER.</p>`;
 
 const flagOf = (id) => FLAGS[FIGHTERS[id].nation];
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// this device's storage (names, the leaderboard, versus keys); none: this session only
+const LS = (() => { try { const s = window.localStorage; s.getItem('x'); return s; } catch { return null; } })();
+const caps = (codes) => codes.map((c) => `<kbd>${esc(keyCap(c))}</kbd>`).join('');
 
 class App {
   constructor(renderer, canvas) {
@@ -53,6 +59,12 @@ class App {
     this.canvas = canvas;
     this.stage = new Stage();
     this.kb = new Keyboard();
+    // versus on one keyboard: player 2's keys (input/layouts.js), heard only in a versus fight
+    this.bind = loadBindings(LS);
+    this.kb2 = new Keyboard(window, toMap(this.bind[1]));
+    this.kb2.enabled = false;
+    this.players = ['', ''];       // the names in the seats ('' none, or the computer)
+    this.myName = '';              // online: this player's name
     this.screen = 'title';
     this.fight = null;
     this.show = null;
@@ -60,7 +72,7 @@ class App {
     this.locked = [false, false];
     this.picking = 0;
     this.level = 'normal';
-    this.mode = 'cpu';             // 'cpu' or 'practice' (the select screen's flow)
+    this.mode = 'cpu';             // 'cpu', 'versus' or 'practice' (the select screen's flow)
     this.practice = null;          // a practice session: { lobby, p1, p2 }
     this.practiceSettings = defaultSettings();
     this.toques = false;
@@ -72,8 +84,7 @@ class App {
     this.backend = renderer.backend && renderer.backend.isWebGPUBackend ? 'WebGPU' : 'WebGL 2';
     this.errors = [];
     this.timers = [];
-    $('#controls-select').innerHTML = CONTROLS;
-    $('#controls-pause').innerHTML = CONTROLS;
+    this._controls();
     this._bindUI();
     this.resize();
     addEventListener('resize', () => this.resize());
@@ -102,6 +113,8 @@ class App {
     for (const s of $$('.screen')) s.classList.toggle('on', s.id === `${name}-screen`);
     document.body.classList.toggle('fighting', name === 'fight' || name === 'pause');
     document.body.dataset.screen = name;
+    document.body.classList.toggle('versus', this.mode === 'versus' && !this.net.on);
+    if (['title', 'mode', 'names', 'board'].includes(name)) $('#bubbles').textContent = '';   // (a winner's line left talking)
     this.idle = 0;
     document.body.classList.remove('napping');
     if (name === 'select') this._enterSelect();
@@ -113,12 +126,17 @@ class App {
   _bindUI() {
     for (const b of $$('#mode-screen .opt')) b.onclick = () => {
       if (b.disabled) return;
-      if (b.dataset.mode === 'online') { this.mode = 'cpu'; this.net.menu(); } else { this.mode = b.dataset.mode; this.go('select'); }
+      const m = b.dataset.mode;
+      if (m === 'online') { this.mode = 'cpu'; this.askNames(1, () => this.net.menu(), true); }
+      else if (m === 'board') this.showBoard();
+      else if (m === 'practice') { this.mode = m; this.go('select'); }
+      else { this.mode = m; this.askNames(m === 'versus' ? 2 : 1, () => this.go('select')); }
     };
     for (const b of $$('#online-screen .opt')) b.onclick = () => this.net.act(b.dataset.act);
     for (const b of $$('#diff-screen .opt')) b.onclick = () => { this.level = b.dataset.level; this.startFight(); };
     for (const b of $$('#pause-screen .opt')) b.onclick = () => this._pauseAct(b.dataset.act);
     for (const b of $$('#win-screen .opt')) b.onclick = () => this._winAct(b.dataset.act);
+    for (const b of $$('#board-screen .opt')) b.onclick = () => this._boardAct(b.dataset.act);
     $('#title-screen').onclick = () => this.go('mode');
     addEventListener('keydown', (e) => this._key(e));
     addEventListener('pointerdown', () => this._wake());
@@ -136,6 +154,8 @@ class App {
   _key(e) {
     const k = e.code;
     this._wake();
+    if (this.remap) { e.preventDefault(); this._remapKey(k); return; }
+    if (this.screen === 'names') { this._namesKey(e); return; }
     const up = k === 'KeyW' || k === 'ArrowUp', down = k === 'KeyS' || k === 'ArrowDown';
     const left = k === 'KeyA' || k === 'ArrowLeft', right = k === 'KeyD' || k === 'ArrowRight';
     const ok = k === 'KeyO' || k === 'Enter', back = k === 'KeyP' || k === 'Escape' || k === 'Backspace';
@@ -146,6 +166,12 @@ class App {
       if (up || down) this._menuMove('#mode-screen .opt', up ? -1 : 1);
       else if (ok || k === 'Space') this._menuFire('#mode-screen .opt');
       else if (back) this.go('title');
+      return;
+    }
+    if (s === 'board') {
+      if (left || right || up || down) this._menuMove('#board-screen .opt', left || up ? -1 : 1);
+      else if (ok || k === 'Space') this._menuFire('#board-screen .opt');
+      else if (back) this.go('mode');
       return;
     }
     if (s === 'online' && this.practice?.lobby) {
@@ -163,6 +189,7 @@ class App {
       return;
     }
     if (s === 'select' && this.net.on) { this.net.selectKey(k, { left, right, ok, back }); return; }
+    if (s === 'select' && this.mode === 'versus') { this._versusSelectKey(k); return; }
     if (s === 'select') {
       // the toque code: E then H
       if (k === 'KeyE') this.eggKeys = 'e';
@@ -198,6 +225,8 @@ class App {
     this.locked = [false, false];
     this.picking = 0;
     this.toques = false;
+    if (this.mode === 'versus' && this.pick[0] === this.pick[1]) this.pick[1] = (this.pick[0] + 1) % ROSTER.length;
+    this._controls();
     if (this.fight) { this.fight.dispose(); this.fight = null; }
     if (!this.show) this.show = new Showcase(this.stage);
     const cards = $('#cards');
@@ -209,19 +238,46 @@ class App {
       c.dataset.id = id;
       c.innerHTML = `<span class="zzz"><i>z</i><i>z</i><i>z</i></span><span class="flag">${flagOf(id)}</span><span class="lab">${f.name}</span>`;
       if (this.portraits[id]) { const im = new Image(); im.alt = ''; im.src = this.portraits[id]; c.prepend(im); }
-      c.onclick = () => { if (this.net.on) { this.net.choose(i, true); return; } this.pick[this.picking] = i; this._lock(); };
-      c.onmouseenter = () => { if (this.screen !== 'select') return; if (this.net.on) { this.net.choose(i, false); return; } this.pick[this.picking] = i; this._paintSelect(); };
+      // (versus: the mouse picks for whichever player hasn't locked in yet)
+      const seat = () => (this.mode === 'versus' ? (this.locked[0] ? 1 : 0) : this.picking);
+      c.onclick = () => { if (this.net.on) { this.net.choose(i, true); return; } const k = seat(); if (this.locked[k]) return; this.pick[k] = i; this._lock(k); };
+      c.onmouseenter = () => { if (this.screen !== 'select') return; if (this.net.on) { this.net.choose(i, false); return; } const k = seat(); if (this.locked[k]) return; this.pick[k] = i; this._paintSelect(); };
       cards.appendChild(c);
     });
     this._paintSelect();
   }
 
-  _cursor(d) {
-    this.pick[this.picking] = (this.pick[this.picking] + d + ROSTER.length) % ROSTER.length;
+  _cursor(d, k = this.picking) {
+    this.pick[k] = (this.pick[k] + d + ROSTER.length) % ROSTER.length;
     this._paintSelect();
   }
 
-  _lock() {
+  /* versus select: both pick at once, each on their own keys — move with
+     their walk keys, lock in with their light, change their mind with
+     their heavy; Esc back to the names */
+  _versusSelectKey(k) {
+    if (this._vsGo) return;
+    if (k === 'Escape') { this.askNames(2, () => this.go('select')); return; }
+    for (let p = 0; p < 2; p++) {
+      const B = this.bind[p];
+      const lockKeys = p === 0 ? [...B.light] : [...B.light, 'NumpadEnter'];
+      if (B.left.includes(k) || B.right.includes(k)) { if (!this.locked[p]) this._cursor(B.left.includes(k) ? -1 : 1, p); return; }
+      if (lockKeys.includes(k)) { if (!this.locked[p]) this._lock(p); return; }
+      if (B.heavy.includes(k)) { if (this.locked[p]) { this.locked[p] = false; this._paintSelect(); } return; }
+    }
+  }
+
+  _lock(seat = this.picking) {
+    if (this.mode === 'versus') {
+      this.locked[seat] = true;
+      this._paintSelect();
+      if (this.locked[0] && this.locked[1] && !this._vsGo) {
+        // a beat on the two picks, then fight
+        this._vsGo = true;
+        this.later(0.55, () => { this._vsGo = false; if (this.screen === 'select' && this.locked[0] && this.locked[1]) this.startFight({ versus: true }); });
+      }
+      return;
+    }
     this.locked[this.picking] = true;
     if (this.picking === 0) { this.picking = 1; this._paintSelect(); return; }
     this._paintSelect();
@@ -249,6 +305,7 @@ class App {
       P.querySelector('.an').innerHTML = `${f.animal} · ${f.style}`;
       P.querySelector('.moves').innerHTML = `<b>S+P</b> ${f.signatureName}<br><b>Space</b> ${f.specialName}`;
     };
+    if (this.mode === 'versus' && !this.net.on) { this._paintVersusSelect(ids, mirror, plate); return; }
     plate('.plate.p1', ids[0], false, this.locked[0], this.picking === 0);
     plate('.plate.p2', ids[1], mirror && (this.picking === 1 || this.locked[1]), this.locked[1], this.picking === 1);
     const pr = this.mode === 'practice';
@@ -260,6 +317,234 @@ class App {
       this.show.set(0, ids[0], { toque: this.toques });
       this.show.set(1, this.picking === 1 || this.locked[1] ? ids[1] : null, { evil: mirror, toque: this.toques });
     }
+  }
+
+  _paintVersusSelect(ids, mirror, plate) {
+    for (const c of $$('.card')) {
+      const i = ROSTER.indexOf(c.dataset.id);
+      c.classList.toggle('c2', i === this.pick[1]);
+      c.querySelectorAll('.tag.t2').forEach((t) => t.remove());
+      if (i === this.pick[1]) c.insertAdjacentHTML('beforeend', '<span class="tag t2">P2</span>');
+    }
+    plate('.plate.p1', ids[0], false, this.locked[0], true);
+    plate('.plate.p2', ids[1], mirror, this.locked[1], true);
+    $('.plate.p1 .who').textContent = this.players[0] || 'Player 1';
+    $('.plate.p2 .who').textContent = this.players[1] || 'Player 2';
+    const B = this.bind;
+    $('#select-step').textContent = this.locked[0] && this.locked[1] ? 'Both locked in — fight!' : 'Both pick at once';
+    $('#select-hint').innerHTML = `P1 ${caps([B[0].left[0], B[0].right[0]])} choose ${caps([B[0].light[0]])} lock · P2 ${caps([B[1].left[0], B[1].right[0]])} choose ${caps([B[1].light[0]])} lock · Esc back`;
+    if (this.show) {
+      this.show.set(0, ids[0], { toque: this.toques });
+      this.show.set(1, ids[1], { evil: mirror, toque: this.toques });
+    }
+  }
+
+  /* ── the controls cards: one player's (select, pause), or the versus pair
+     with every key rebindable (click a key, press the new one) ─────────── */
+  _controls() {
+    const vs = this.mode === 'versus' && !this.net.on;
+    for (const id of ['#controls-select', '#controls-pause']) {
+      const el = $(id);
+      el.classList.toggle('vs', vs);
+      el.innerHTML = vs ? this._versusCard() : CONTROLS;
+    }
+    if (!vs) return;
+    for (const b of $$('.controls.vs button.cap')) b.onclick = (e) => { e.stopPropagation(); this.remap = { p: +b.dataset.p, a: b.dataset.a }; b.blur(); this._controls(); };
+    for (const b of $$('.controls.vs button.rk')) b.onclick = (e) => { e.stopPropagation(); b.blur(); this._setBindings(resetBindings(LS)); };
+  }
+
+  _versusCard() {
+    const B = this.bind, R = this.remap;
+    const col = (p) => {
+      const row = (a) => {
+        const wait = R && R.p === p && R.a === a.id;
+        return `<button class="cap${wait ? ' wait' : ''}" data-p="${p}" data-a="${a.id}" title="Click, then press a key">${wait ? '<kbd>press a key…</kbd>' : caps(B[p][a.id].length ? B[p][a.id] : ['—'])}</button><span>${a.label}</span>`;
+      };
+      const L = B[p].light[0], H = B[p].heavy[0], D = B[p].down[0], F = B[p].right[0];
+      return `<div class="pcol p${p + 1}"><h5>${esc(this.players[p] || `Player ${p + 1}`)}</h5>${ACTIONS.map(row).join('')}
+        <span>${caps([L])}+${caps([H])}</span><span>throw</span><span>${caps([D])}+${caps([H])}</span><span>signature</span><span>${caps([F])}${caps([F])}</span><span>dash</span></div>`;
+    };
+    return `<h4>Versus · one keyboard</h4>${col(0)}${col(1)}<div class="foot">Same moves as one player: light is O, heavy is P, crouch + light a low, the dive slam in the air. Click a key to change it.<button class="rk">Reset keys</button></div>`;
+  }
+
+  _remapKey(code) {
+    const R = this.remap;
+    this.remap = null;
+    if (code !== 'Escape') { const b = rebind(this.bind, R.p, R.a, code); if (b) { this._setBindings(b); return; } }
+    this._controls();
+  }
+
+  _setBindings(b) {
+    this.bind = b;
+    // an action left without a key (its key taken by the other player) isn't saved
+    if (b.every((x) => ACTIONS.every((a) => x[a.id].length))) saveBindings(LS, b);
+    this.kb2.setMap(toMap(b[1]));
+    if (this.fight && this.versus) this.kb.setMap(toMap(b[0]));
+    this._controls();
+    if (this.screen === 'select') this._paintSelect();
+  }
+
+  /* ── names: before a match, each person types a name or picks one used
+     before on this device (the last one pre-selected), or plays without.
+     Seats one at a time; Enter / O / G / Num 4 picks, Esc goes back. ─── */
+  askNames(n, then, online = false) {
+    this.names = loadNames(LS);
+    this.nameFlow = { n, then, online, seat: 0, chosen: ['', ''], err: '' };
+    this.go('names');
+    this._namesSeat(0);
+  }
+
+  _namesSeat(k) {
+    const N = this.nameFlow, other = k === 1 ? nameKey(N.chosen[0]) : '';
+    N.seat = k;
+    N.err = '';
+    N.rows = [...this.names.list.filter((x) => !other || nameKey(x) !== other).map((name) => ({ kind: 'name', name })), { kind: 'new' }, { kind: 'none' }];
+    const last = this.names.last[N.online ? 0 : k];
+    const at = N.rows.findIndex((r) => r.kind === 'name' && last && nameKey(r.name) === nameKey(last));
+    N.cur = at >= 0 ? at : N.rows.length > 2 ? 0 : 0;
+    N.editing = N.rows.length === 2;          // no names yet: straight to typing one
+    this._paintNames();
+  }
+
+  _paintNames() {
+    const N = this.nameFlow;
+    $('#names-title').textContent = N.n === 2 ? "Who's fighting?" : N.online ? 'Your name' : "Who's playing?";
+    const panel = (k) => {
+      const on = k === N.seat, done = k < N.seat;
+      const seat = N.n === 2 ? `Player ${k + 1}` : N.online ? 'You' : 'Player 1';
+      let body = '';
+      if (on) {
+        body = `<div class="rows">${N.rows.map((r, i) => {
+          const sel = i === N.cur ? ' sel' : '';
+          if (r.kind === 'new') return N.editing ? `<input id="np-input" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Type a name, Enter">` : `<button class="nrow ghost${sel}" data-i="${i}">＋ New name</button>`;
+          if (r.kind === 'none') return `<button class="nrow ghost${sel}" data-i="${i}">No name <small>not on the leaderboard</small></button>`;
+          const rec = loadBoard(LS).players[nameKey(r.name)];
+          return `<button class="nrow${sel}" data-i="${i}">${esc(r.name)}${rec ? `<small>${rec.w}–${rec.l}</small>` : ''}</button>`;
+        }).join('')}</div><div class="err">${esc(N.err)}</div>`;
+      } else body = `<div class="picked">${done ? esc(N.chosen[k] || '—') : ''}</div>`;
+      return `<div class="np s${k}${on ? ' on' : ''}${done ? ' done' : ''}"><span class="seat">${seat}</span>${body}</div>`;
+    };
+    $('#np-row').innerHTML = panel(0) + (N.n === 2 ? panel(1) : '');
+    $('#names-hint').innerHTML = N.editing ? 'Type a name · <kbd>Enter</kbd> done · <kbd>Esc</kbd> back' : 'W / S or ↑ / ↓ choose · <kbd>Enter</kbd> pick · <kbd>Esc</kbd> back';
+    for (const b of $$('#np-row .nrow')) b.onclick = () => { N.cur = +b.dataset.i; this._nameChoose(); };
+    const inp = $('#np-input');
+    if (inp) {
+      inp.onkeydown = (e) => {
+        e.stopPropagation();
+        if (this.nameFlow !== N) return;
+        if (e.key === 'Enter') { e.preventDefault(); this._nameTyped(inp.value); }
+        else if (e.key === 'Escape') { e.preventDefault(); if (N.rows.length > 2) { N.editing = false; N.cur = N.rows.findIndex((r) => r.kind === 'new'); this._paintNames(); } else this._namesBack(); }
+      };
+      inp.focus();
+    }
+  }
+
+  _namesKey(e) {
+    const N = this.nameFlow, k = e.code;
+    if (!N) return;
+    if (N.editing) {
+      // typing landed outside the field (it lost focus): put it back there
+      const inp = $('#np-input');
+      if (inp && e.target !== inp) {
+        inp.focus();
+        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) { e.preventDefault(); inp.value = (inp.value + e.key).slice(0, 16); }
+        else if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); inp.onkeydown({ key: e.key, preventDefault() {}, stopPropagation() {} }); }
+      }
+      return;
+    }
+    if (k === 'KeyW' || k === 'ArrowUp' || k === 'Numpad8') { N.cur = (N.cur - 1 + N.rows.length) % N.rows.length; this._paintNames(); }
+    else if (k === 'KeyS' || k === 'ArrowDown' || k === 'Numpad2') { N.cur = (N.cur + 1) % N.rows.length; this._paintNames(); }
+    else if (['Enter', 'NumpadEnter', 'KeyO', 'KeyG', 'Numpad4', 'Space'].includes(k)) { if (!e.repeat) { e.preventDefault(); this._nameChoose(); } }
+    else if (k === 'Escape' || k === 'Backspace') this._namesBack();
+  }
+
+  _namesBack() {
+    const N = this.nameFlow;
+    if (N.seat === 1) this._namesSeat(0);
+    else { this.nameFlow = null; $('#np-row').textContent = ''; this.go('mode'); }
+  }
+
+  _nameChoose() {
+    const N = this.nameFlow, r = N.rows[N.cur];
+    if (r.kind === 'new') { N.editing = true; this._paintNames(); return; }
+    this._nameDone(r.kind === 'name' ? r.name : '');
+  }
+
+  _nameTyped(v) {
+    const N = this.nameFlow, n = cleanName(v);
+    if (!n) { if (N.rows.length === 2) this._nameDone(''); else { N.editing = false; this._paintNames(); } return; }
+    if (N.seat === 1 && nameKey(n) === nameKey(N.chosen[0])) { N.err = `That's Player 1 — pick another`; this._paintNames(); return; }
+    this._nameDone(n);
+  }
+
+  _nameDone(name) {
+    const N = this.nameFlow;
+    N.chosen[N.seat] = name;
+    this.names = useName(LS, N.online ? 0 : N.seat, name);
+    if (N.seat + 1 < N.n) { this._namesSeat(N.seat + 1); return; }
+    this.nameFlow = null;
+    $('#np-row').textContent = '';           // (and the field with it: no focus left behind)
+    if (N.online) this.myName = name;
+    else this.players = N.n === 2 ? [N.chosen[0], N.chosen[1]] : [N.chosen[0], ''];
+    N.then();
+  }
+
+  /* ── the leaderboard ─────────────────────────────────────────────────── */
+  showBoard() {
+    this.go('board');
+    const rows = standings(loadBoard(LS));
+    const head = '<tr><th>#</th><th>Name</th><th>W</th><th>L</th><th>D</th><th>Win %</th><th>Streak</th><th>Best</th><th>Fluffless</th><th>Vs people</th><th>Favourite</th></tr>';
+    $('#board').innerHTML = head + (rows.length ? rows.map((r) => `<tr><td class="rk">${r.rank}</td><td class="nm">${esc(r.name)}${r.title ? `<em>${r.title}</em>` : ''}</td><td class="w">${r.w}</td><td class="l">${r.l}</td><td>${r.d}</td><td>${Math.round(r.pct * 100)}</td><td>${r.streak}</td><td>${r.best}</td><td>${r.fluffless}</td><td>${r.pw}–${r.pl}</td><td class="fav">${r.fav && FIGHTERS[r.fav] ? `${flagOf(r.fav)}${FIGHTERS[r.fav].name}` : '—'}</td></tr>`).join('')
+      : '<tr class="empty"><td colspan="11">No fights on record yet. Enter a name before a match and it lands here.</td></tr>');
+    const R = $('#board-screen .opt[data-act=reset]');
+    R.classList.remove('armed');
+    R.textContent = 'Reset leaderboard';
+    R.disabled = !rows.length;
+    $$('#board-screen .opt').forEach((b) => b.classList.toggle('sel', b.dataset.act === 'back'));
+  }
+
+  _boardAct(a) {
+    if (a === 'back') { this.go('mode'); return; }
+    const R = $('#board-screen .opt[data-act=reset]');
+    if (!R.classList.contains('armed')) {
+      // the confirmation: a second press within a few seconds
+      R.classList.add('armed');
+      R.textContent = 'Really? Press again to wipe it';
+      const mine = (this._arm = (this._arm || 0) + 1);
+      this.later(4, () => { if (this._arm === mine && R.classList.contains('armed')) { R.classList.remove('armed'); R.textContent = 'Reset leaderboard'; } });
+      return;
+    }
+    saveBoard(LS, resetBoard(LS));
+    this.showBoard();
+  }
+
+  /* the names in the seats for this fight ('' none) */
+  seatName(k) {
+    const f = this.fight;
+    if (this.net.on) return k === this.net.local ? this.myName : this.net.remoteName;
+    if (f?.cpu[k]) return '';
+    return this.players[k] || '';
+  }
+
+  seatLabel(k) {
+    const f = this.fight;
+    const n = this.seatName(k);
+    if (n) return n;
+    if (f?.cpu[k]) return `CPU · ${f.cpu[k].level || ''}`.replace(/ · $/, '');
+    return `Player ${k + 1}`;
+  }
+
+  /* the match is over: on the board under the names in it (each device
+     records its own copy: online, both sides record both names) */
+  _record() {
+    const f = this.fight;
+    if (!f || f.recorded || f.practice || f.st.phase !== 'end') return;
+    f.recorded = true;
+    const players = [0, 1].map((k) => ({ name: this.seatName(k), fighter: f.st.f[k].id }));
+    if (!players[0].name && !players[1].name) return;
+    const board = recordMatch(loadBoard(LS), { players, winner: f.st.winner, fluffless: f.fluffless || [0, 0], at: Date.now() });
+    saveBoard(LS, board);
+    return board;
   }
 
   _toques() {
@@ -281,14 +566,20 @@ class App {
   }
 
   /* ── the fight ───────────────────────────────────────────────────────── */
-  startFight({ p1 = ROSTER[this.pick[0]], p2 = ROSTER[this.pick[1]], level = this.level, p1cpu = null, seed = null, net = null } = {}) {
+  startFight({ p1 = ROSTER[this.pick[0]], p2 = ROSTER[this.pick[1]], level = this.level, p1cpu = null, seed = null, net = null, versus = false } = {}) {
     if (this.show) { this.show.dispose(); this.show = null; }
     if (this.fight) this.fight.dispose();
     this.seed = seed ?? (((this.seed * 1103515245 + 12345) >>> 0) || 1);
-    this.last = { p1, p2, level, p1cpu };
+    this.last = { p1, p2, level, p1cpu, versus };
     this.endPractice();
-    this.kb.clear();
-    const f = (this.fight = new Fight(this.stage, { p1, p2, seed: this.seed, cpu: [p1cpu, level], keyboard: this.kb, toques: this.toques, net }));
+    // versus on one keyboard: player 1 on the left half's keys, player 2 on the arrows and numpad
+    versus = versus && !net;
+    this.versus = versus;
+    this.kb.setMap(versus ? toMap(this.bind[0]) : SOLO);
+    this.kb2.setMap(toMap(this.bind[1]));
+    this.kb2.enabled = versus;
+    const f = (this.fight = new Fight(this.stage, { p1, p2, seed: this.seed, cpu: versus ? [null, null] : [p1cpu, level], keyboard: this.kb, keyboard2: versus ? this.kb2 : null, toques: this.toques, net }));
+    f.fluffless = [0, 0];
     // (the state the match starts from: a test checks it's the fresh one, whatever practice came before)
     this.matchStart = { p1, p2, seed: this.seed, hash: hash(f.st) };
     f.onEvent = (e) => this._event(e);
@@ -298,6 +589,7 @@ class App {
     $('#pops').textContent = '';
     for (const c of $$('.combo')) c.classList.remove('on', 'amp');
     for (let k = 0; k < 2; k++) $(`#n${k + 1}`).innerHTML = k === 0 ? `${flagOf(f.st.f[k].id)}<span>${f.name(k)}</span>` : `<span>${f.name(k)}</span>${flagOf(f.st.f[k].id)}`;
+    for (let k = 0; k < 2; k++) $(`#pn${k + 1}`).textContent = this.seatLabel(k);
     this._hudCache = {};
     this._hud(f.st);
     this.go('fight');
@@ -313,7 +605,9 @@ class App {
     if (this.show) { this.show.dispose(); this.show = null; }
     if (this.fight) { this.fight.dispose(); this.fight = null; }
     if (!p2) p2 = ROSTER[(ROSTER.indexOf(p1) + 1) % ROSTER.length];
-    this.kb.clear();
+    this.kb.setMap(SOLO);
+    this.kb2.enabled = false;
+    this.versus = false;
     const seed = ((Math.random() * 0x7fffffff) | 0) || 1;
     const f = (this.fight = new Fight(this.stage, { p1, p2, seed, keyboard: this.kb, toques: this.toques, practice: this.practiceSettings }));
     f.onEvent = (e) => this._event(e);
@@ -324,6 +618,7 @@ class App {
     for (const c of $$('.combo')) c.classList.remove('on', 'amp');
     $('#n1').innerHTML = `${flagOf(p1)}<span>${f.name(0)}</span>`;
     $('#n2').innerHTML = `<span>Dummy · ${FIGHTERS[p2].name}</span>${flagOf(p2)}`;
+    $('#pn1').textContent = ''; $('#pn2').textContent = '';
     this._hudCache = {};
     this._hud(f.st);
     document.body.classList.add('practicing');
@@ -416,6 +711,8 @@ class App {
     if (!this.fight) return;
     this.fight.paused = on;
     this.kb.clear();
+    this.kb2.clear();
+    if (on) this._controls();
     this.go(on ? 'pause' : 'fight');
   }
 
@@ -547,6 +844,7 @@ class App {
       this.banner('Fluffatality', 'fluffatality', 0);
     }
     if (e.k === 'ko') this._fluffed = false;
+    if ((e.k === 'kobanner' || e.k === 'time') && e.perfect && (e.w === 0 || e.w === 1) && f.fluffless) f.fluffless[e.w]++;
     if (e.k === 'kobanner') {
       const dbl = e.w === 2;
       if (e.fluff) this.later(0.6, () => this.banner('Fluffatality', 'fluffatality', 1800, dbl ? '' : 'K.O.'));
@@ -572,12 +870,19 @@ class App {
     $('#banner').textContent = '';
     this.go('win');
     this.net.winScreen();
+    const board = this._record();
+    // the record line: each named player's standing after this one
+    $('#win-record').textContent = board ? [0, 1].map((k) => this.seatName(k)).filter(Boolean).map((n) => {
+      const r = board.players[nameKey(n)];
+      return r ? `${n} ${r.w}–${r.l}${r.streak >= 2 ? ` · ${r.streak} in a row` : ''}` : '';
+    }).filter(Boolean).join('   ·   ') : '';
     if (w === 2) {
       $('#win-eyebrow').textContent = 'No winner';
       $('#win-name').textContent = 'Draw';
       return;
     }
-    $('#win-eyebrow').textContent = `Pillow Fight · ${this.net.on ? `Player ${w + 1} wins${w === this.net.local ? ' — that’s you' : ''}` : w === 0 ? 'Player 1 wins' : f.cpu[0] ? 'CPU 2 wins' : 'The computer wins'}`;
+    const who = this.seatName(w);
+    $('#win-eyebrow').textContent = `Pillow Fight · ${who ? `${who} wins${this.net.on && w === this.net.local ? ' — that’s you' : ''}` : this.net.on ? `Player ${w + 1} wins${w === this.net.local ? ' — that’s you' : ''}` : f.cpu[w] ? (f.cpu[0] ? `CPU ${w + 1} wins` : 'The computer wins') : `Player ${w + 1} wins`}`;
     $('#win-name').innerHTML = `${f.name(w)} wins`;
     const id = st.f[w].id, line = st.egg ? FIGHTERS[id].catchphrase.egg : FIGHTERS[id].catchphrase.main;
     this.catchline = line;
@@ -599,7 +904,8 @@ class App {
       let dx = 0, dy = 0;
       if (left < 12) dx = 12 - left;
       if (left + bw > innerWidth - 12) dx = innerWidth - 12 - bw - left;
-      if (top + 50 < 150) dy = 150 - top - 50;
+      const floor = $('#win-record').textContent ? 182 : 150;      // under the record line, if there is one
+      if (top + 50 < floor) dy = floor - top - 50;
       if (dx || dy) { b.style.left = `${left + dx}px`; b.style.top = `${top + dy}px`; }
       this.winBubble = b;
     });
@@ -687,10 +993,19 @@ async function start() {
   const p1 = fighterId(params.get('p1')), p2 = fighterId(params.get('p2'));
   if (p1 && p2) {
     app.toques = params.get('toques') === '1';
-    app.startFight({ p1, p2, level: params.get('cpu') || 'normal', p1cpu: params.get('p1cpu'), seed: (params.get('seed') | 0) || null });
+    // (versus=1: two players on one keyboard; n1= / n2= their names)
+    const versus = params.get('versus') === '1';
+    if (versus) { app.mode = 'versus'; app.players = [cleanName(params.get('n1')), cleanName(params.get('n2'))]; }
+    app.startFight({ p1, p2, level: params.get('cpu') || 'normal', p1cpu: versus ? null : params.get('p1cpu'), seed: (params.get('seed') | 0) || null, versus });
     if (params.get('speed')) app.fight.speed = +params.get('speed');
-  } else if (params.get('room')) app.net.joinRoom(params.get('room'));
+  } else if (params.get('room')) {
+    // a friend's link: a name first (the last one is ready: Enter), then join
+    const room = params.get('room');
+    app.askNames(1, () => app.net.joinRoom(room), true);
+  }
   else if (params.get('screen') === 'select') app.go('select');
+  else if (params.get('screen') === 'board') app.showBoard();
+  else if (params.get('screen') === 'names') { app.mode = params.get('mode') === 'versus' ? 'versus' : 'cpu'; app.askNames(app.mode === 'versus' ? 2 : 1, () => app.go('select')); }
   else if (params.get('practice') !== null) app.startPractice({ p1: fighterId(params.get('practice')) || ROSTER[0], p2: fighterId(params.get('dummy')) || null });
   else app.go('title');
   document.body.classList.add('is-live');
