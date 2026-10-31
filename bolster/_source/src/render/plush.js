@@ -31,6 +31,9 @@ import { makeRacquet, poseRacquet, makeStars, poseStars, shade } from '../../sha
 import { BipedPuppet, GiraffePuppet, OctopusPuppet, WolfPuppet, CrowPuppet, phaseOf } from './puppets.js';
 import { FIGHTERS } from '../fighters/index.js';
 import { Gloves, shaveCaps, cuffOnly } from './gloves.js';
+import { SITH, SITH_T, makeSithRacquet, makeHood, makeCloak, makeEyeGlow, makeEyePatch, Trail } from './sith.js';
+import { activeHits } from '../sim/sim.js';
+import { RQ } from '../../shared/grommet/athletes/leopard.game.js';
 
 export const SHELLS_EACH = 48;
 
@@ -194,7 +197,21 @@ export class Plush {
     }
     const eyeMat = makeEyeMaterial(), eyeGeo = new THREE.SphereGeometry(1, 32, 22);
     this.eyes = [-1, 1].map((s) => { const m = new THREE.Mesh(eyeGeo, eyeMat); m.userData.side = s; group.add(m); return m; });
-    if (rig.racquet) { this.racquet = makeRacquet(); group.add(this.racquet); }
+    // the Sith twins (render/sith.js): Evil Johnny's red racquet, a cowl and
+    // a cloak, red eyes (Kevalanche's other one under a patch)
+    this.sith = evil && !!SITH[id];
+    if (rig.racquet) { this.racquet = this.sith ? makeSithRacquet() : makeRacquet(); group.add(this.racquet); }
+    if (this.sith) {
+      const part = (n) => rig.parts.find((q) => q.name === n);
+      const head = part('head'), torso = part('torso');
+      this.hood = makeHood(head.r, id === 'kevalanche' ? 1.3 : 1.2); this.hood.visible = true; group.add(this.hood);
+      const top = torso.c[1] + torso.r[1] * (id === 'sebas' ? 0.85 : 0.7);
+      this.cloak = makeCloak(torso.r, top - 0.35); this.cloak.visible = true; group.add(this.cloak);
+      this.cloakAt = [0, top, torso.c[2]];
+      this.eyeGlow = [makeEyeGlow(), makeEyeGlow()];
+      for (const e of this.eyeGlow) group.add(e);
+      if (id === 'kevalanche') { this.patch = makeEyePatch(); this.patch.visible = true; group.add(this.patch); }
+    }
     if (L.gloves) this.gloves = new Gloves(group, soft, rig, (evil ? L.evil : L.colors).cloth);
     if (rig.beak) {
       // the crow's felt beak, riding the head's own frame
@@ -205,7 +222,7 @@ export class Plush {
       group.add(this.beak);
     }
     if (L.chain && evil) { this.chain = makeGoldChain({ c: [0, 1.56, 0.06], rx: 0.64, rz: 0.62, link: 0.1, tip: 0.42 }); this.chain.visible = true; group.add(this.chain); }
-    this.monocleOK = !L.noMonocle;
+    this.monocleOK = !L.noMonocle && !this.sith;
     this.stars = makeStars();
     group.add(this.stars);
     this.toque = makeToque();
@@ -213,6 +230,11 @@ export class Plush {
     this.monocle = makeMonocle();
     group.add(this.monocle);
     scene.add(group);
+    // the swing trail: red for an evil twin, a cool blue-white for the original
+    this.trail = new Trail(scene, evil ? 'red' : 'blue', rig.racquet ? { width: 0.32, life: 0.22 } : {});
+    this.hist = [];                 // the last few frames of the soft body (and where the group was)
+    this.trailI = -1;               // the particle being traced, this swing
+    this.trailKey = '';
 
     this.yawScale = 1;              // the title lineup turns them nearly to face us
     this.yaw = { x: side ? -L.yaw : L.yaw, v: 0 };
@@ -358,6 +380,8 @@ export class Plush {
     if (this.groom.dirty) { this.groomTex.needsUpdate = true; this.groom.dirty = false; }
 
     if (this.racquet && P.rq) poseRacquet(this.racquet, P.rq);
+    if (this.sith) { SITH_T.value = Math.max(SITH_T.value, this.time); this._robe(); }
+    this._trail(dt, F);
     if (this.beak) poseBeak(this.beak, P.beakFrame(), [this.beakScale, 0.92 + 0.12 * this.beakScale]);
     if (this.chain) this._necklace();
     if ('toque' in P) P.toque = this.toque.visible;
@@ -366,6 +390,69 @@ export class Plush {
     poseStars(this.stars, this.hc, P.daze, this.time);
     this._eyes();
     this._hat();
+  }
+
+  /* the swing trail: the soft-body point nearest the active hit box (found
+     on the first active frame, then traced back through the last few frames
+     so the wind-up's arc is in it); for the racquet, its head every swing */
+  _trail(dt, F) {
+    const T = this.trail, g = this.group;
+    if (dt > 0) {
+      const H = this.hist;
+      const keep = H.length >= 9 ? H.shift() : { x: new Float32Array(this.soft.x.length), m: new THREE.Matrix4() };
+      keep.x.set(this.soft.x); keep.m.copy(g.matrixWorld);
+      H.push(keep);
+    }
+    const ph = phaseOf(F), v = this._X;
+    if (ph && this.racquet && this.puppet.rq) {
+      if (ph.t >= ph.first - 10 && ph.t <= ph.last + 6) {
+        const q = this.puppet.rq;
+        v.set(q.p[0] + q.h[0] * RQ.head, q.p[1] + q.h[1] * RQ.head, q.p[2] + q.h[2] * RQ.head).applyMatrix4(g.matrixWorld);
+        T.push(v.x, v.y, v.z);
+      }
+    } else if (ph) {
+      const key = `${F.mv}|${ph.first}`, hits = activeHits(F).filter((a) => a.box);
+      if (hits.length && (this.trailKey !== key || this.trailI < 0 || F.t < this._trailT)) {
+        // a new swing: who's doing the hitting?
+        const b = hits[0].box, cx = (b.x0 + b.x1) / 2000, cy = (b.y0 + b.y1) / 2000;
+        const x = this.soft.x, M = g.matrixWorld;
+        let best = 1e9, bi = -1;
+        for (let i = 0; i < this.soft.n; i++) {
+          v.set(x[i * 3], x[i * 3 + 1], x[i * 3 + 2]).applyMatrix4(M);
+          const d = (v.x - cx) ** 2 + (v.y - cy) ** 2;
+          if (d < best) { best = d; bi = i; }
+        }
+        this.trailI = bi; this.trailKey = key;
+        for (const h of this.hist.slice(0, -1)) { v.set(h.x[bi * 3], h.x[bi * 3 + 1], h.x[bi * 3 + 2]).applyMatrix4(h.m); T.push(v.x, v.y, v.z); }
+      }
+      this._trailT = F.t;
+      const i = this.trailI;
+      if (i >= 0 && this.trailKey === key && F.t <= ph.last + 5) {
+        const x = this.soft.x;
+        v.set(x[i * 3], x[i * 3 + 1], x[i * 3 + 2]).applyMatrix4(g.matrixWorld);
+        T.push(v.x, v.y, v.z);
+      }
+    } else { this.trailI = -1; this.trailKey = ''; }
+    T.update(dt);
+  }
+
+  /* the cowl on the head, the cloak on the shoulders, the eyes' glow */
+  _robe() {
+    const soft = this.soft, x = soft.x, P = this.puppet;
+    const ix = P.cfg?.core || this.rig.head;
+    let cx = 0, cy = 0, cz = 0;
+    for (const i of ix) { cx += x[i * 3]; cy += x[i * 3 + 1]; cz += x[i * 3 + 2]; }
+    cx /= ix.length; cy /= ix.length; cz /= ix.length;
+    const head = this.rig.parts.find((p) => p.name === 'head');
+    const R = soft.cloudR[head ? head.cloud : 0] || soft.cloudR[0];
+    this._M.set(R[0], R[1], R[2], 0, R[3], R[4], R[5], 0, R[6], R[7], R[8], 0, 0, 0, 0, 1);
+    this.hood.position.set(cx, cy, cz);
+    this.hood.quaternion.setFromRotationMatrix(this._M);
+    const R0 = soft.cloudR[0];
+    const w = P.worldOf ? P.worldOf(this.cloakAt) : this.cloakAt;
+    this.cloak.position.set(w[0], w[1], w[2]);
+    this._M.set(R0[0], R0[1], R0[2], 0, R0[3], R0[4], R0[5], 0, R0[6], R0[7], R0[8], 0, 0, 0, 0, 1);
+    this.cloak.quaternion.setFromRotationMatrix(this._M);
   }
 
   _eyes() {
@@ -391,6 +478,24 @@ export class Plush {
       e.quaternion.setFromRotationMatrix(this._M);
       e.scale.set(...ey.scale);
       this.eyePos.push({ p: e.position.clone(), n: N.clone(), q: e.quaternion.clone() });
+    }
+    // the Sith's eyes: a red glow on each bead; Kevalanche's nearer one patched
+    if (this.eyeGlow) {
+      const ey2 = this.info.eyes.scale, r = Math.max(ey2[0], ey2[1]);
+      let near = -1;
+      if (this.patch) { const w0 = this.eyes[0].getWorldPosition(new THREE.Vector3()), w1 = this.eyes[1].getWorldPosition(new THREE.Vector3()); near = w0.z > w1.z ? 0 : 1; }
+      this.eyeGlow.forEach((gl, k) => {
+        const E = this.eyePos[k];
+        gl.visible = k !== near;
+        gl.position.copy(E.p).addScaledVector(E.n, r * 0.9);
+        gl.quaternion.copy(E.q);
+        gl.scale.setScalar(r * 4.2);
+        if (k === near) {
+          this.patch.position.copy(E.p).addScaledVector(E.n, r * 0.45);
+          this.patch.quaternion.copy(E.q);
+          this.patch.scale.setScalar(r);
+        }
+      });
     }
     // the monocle over the eye nearer the camera (not for the two whose
     // evil twins have their own looks: the rudo's mask, the bandit's)
@@ -444,11 +549,13 @@ export class Plush {
     this._spin = 0;
     this.group.rotation.z = 0;
     this.group.visible = true;
+    this.trail.clear();
     for (let i = 0; i < 40; i++) this.soft.advance(1 / 120, (h) => this.puppet.update(h), (h) => { this.body.update(h); this.cloth?.update(h); });
   }
 
   dispose(scene) {
     scene.remove(this.group);
+    this.trail.dispose(scene);
     this.body.dispose?.();
     this.cloth?.dispose?.();
   }
