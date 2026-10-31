@@ -146,7 +146,7 @@ export function makeSithRacquet() {
     const a = edge.mul(shimmer.mul(0.7).add(0.45)).mul(throb).mul(0.85);
     return vec4(vec3(1, 0.16, 0.08).mul(a), a);
   })();
-  const halo = new THREE.Mesh(new THREE.TubeGeometry(curve, 96, RQ.frame * 2.9, 12, true), glow);
+  const halo = new THREE.Mesh(new THREE.TubeGeometry(curve, 96, RQ.frame * 2.1, 12, true), glow);
   halo.renderOrder = 3;
   g.add(head, halo, shaft, grip, butt, face, bridge, badge);
   g.traverse((o) => { o.frustumCulled = false; });
@@ -168,11 +168,11 @@ function robeMaterial(lining) {
     const p = positionLocal;
     // a soft twill: fine diagonal ribs, barely there
     const twill = smoothstep(0.3, 0.7, fract(p.x.add(p.y).mul(60))).mul(0.004);
-    const outside = vec3(0.034, 0.011, 0.015).add(twill);
+    const outside = vec3(0.026, 0.017, 0.021).add(twill);
     const base = select(frontFacing, outside, L);
     const glowIn = select(frontFacing, vec3(0, 0, 0), L.mul(0.5));
     // a red rim light at the silhouette (the dark side's back light)
-    const rim = pow(float(1).sub(abs(dot(N, V))), float(4.5)).mul(0.45);
+    const rim = pow(float(1).sub(abs(dot(N, V))), float(6)).mul(0.3);
     const sheen = select(frontFacing, rim, rim.mul(1.4));
     return vec4(shade(base, N, { spec: 0.025, power: 8, wrap: 0.45 }).add(glowIn).add(vec3(0.6, 0.035, 0.03).mul(sheen)), 1);
   })();
@@ -196,7 +196,9 @@ export function makeHood(r, k = 1.2) {
     const f = face(x, y, z);
     if (f < 1.6 && y > 0.1 && z > 0) z += (1.6 - f) * 0.12;
     if (z < 0 && y < 0.25) y -= (0.25 - y) * 0.7 * Math.min(1, -z * 1.6);
-    P.setXYZ(i, x, y, z);
+    // soft folds: wool gathered round the head, deeper at the back and the drape
+    const az = Math.atan2(x, z), back = Math.max(0, -z), w = 1 + (Math.sin(az * 7 + y * 4) * 0.04 + Math.sin(az * 13 - y * 9) * 0.015) * (0.4 + back);
+    P.setXYZ(i, x * w, y, z * w);
   }
   const ix = src.index.array, keep = [];
   for (let t = 0; t < ix.length; t += 3) {

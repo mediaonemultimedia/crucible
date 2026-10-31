@@ -28,17 +28,134 @@ node tools/combat-shots.mjs [block|throws|counter|combo|controls|ko|ko-final]
 node tools/roster2-shots.mjs [sheet-<id>|moves-<id>]
                                  # roster 2's move sheets and move shots → shots/roster2/
 node tools/online-match.mjs --p1 sebas --p2 zach --out online-roster2
-                                 # two pages: lobby practice, then a match with the new two
+                                 # two pages: names, lobby practice, then a match with the new two
+node tools/sith-shots.mjs        # the Sith twins vs the originals, the racquets → shots/sith/
+node tools/versus-shots.mjs      # versus on one keyboard, names, the leaderboard → shots/versus/
 ```
 
 Headless tools use `CHROMIUM` (default `/opt/pw-browsers/chromium`) as the browser.
 
 Open `final.html`, or deep-link straight into a fight:
 `final.html?p1=kevalanche&p2=sumaura&cpu=hard` (fighter ids, or `sebasperra` /
-`zachsparrow` / `johnnydeuce`; `practice=sebas&dummy=zach` opens practice; `p1cpu=normal` hands player 1
+`zachsparrow` / `johnnydeuce`; `practice=sebas&dummy=zach` opens practice; `versus=1&n1=A&n2=B` is two
+players on one keyboard; `screen=board` the leaderboard; `screen=names` the name screen; `p1cpu=normal` hands player 1
 to the computer too; `seed=N` fixes the match seed; `toques=1`; `webgl` forces
 the WebGL 2 path; `hold` stops the free-running loop for scripted stepping;
 `boxes` draws the sim's hurt, limb, hit and shot boxes over the picture).
+
+## Sith twins, versus on one keyboard, names and a leaderboard (bolster-sith)
+
+### The Sith twins (cosmetic only: `render/sith.js`)
+
+A mirror match's player 2 is the evil twin; three of them are now the dark
+side of the original, and every original swings like a Jedi.
+
+- **Sith Johnny Deuce** swings a red racquet modelled on the owner's
+  reference (`assets/refs/`): glossy red lacquer frame, red strings with a
+  big white stencilled W-style mark (stencil bridges left open; no brand
+  text), a black-and-red striped throat with a small white badge, a black
+  grip. It hums: an additive red glow round the frame that shimmers along it
+  (noise scrolling on app time) and throbs. His swing trail is red.
+- **The Sith layer** (Johnny, Sebas Perra, Kevalanche): a dark wool cowl
+  over the head — an oval face window cut out, folds at the back, the ears
+  through it, a crimson inside — and a cloak from the shoulders round the
+  back and sides, open at the front, lined in crimson; a thin red rim light
+  on both. Eyes glow red (additive, flickering; drawn past the muzzle fur).
+  Each keeps his identity: Sebas the rudo's black-and-red mask (the red eye
+  glow sits in its eye holes), Kevalanche his black gloves and a new **eye
+  patch** with a red-hot edge (on the eye nearer the camera; the other
+  glows).
+- **Layers or replaces?** It *layers* on the existing evil look (colours,
+  rudo mask, gloves). PR #28's cowboy hat / bandana / eye patch were only
+  planned ("not done"), never built — so there was nothing to replace; the
+  Sith cowl takes the hat's place (a hat over a hood reads as neither), and
+  the eye patch was kept from that plan for Kevalanche. The monocle is off
+  for the Sith three.
+- **Trails for everyone:** red for any evil twin, a cool blue-white for
+  every original (Jedi vs Sith). The trail follows the part of the plush
+  that hits: on a move's first active frame the soft-body point nearest the
+  sim's active hit box is found and traced back through the last 8 frames
+  (so the wind-up's arc is in it), then followed to 5 ticks after the last
+  active frame; Johnny's follows his racquet head through every swing. An
+  additive camera-facing ribbon, white-hot core, tapering and fading.
+- Nothing reaches the sim: hashes, rollback, replays unchanged.
+
+### Versus — two players, one keyboard (`input/layouts.js`)
+
+Mode → **Versus** (2 players · 1 keyboard), built for a full-size keyboard
+with a numpad.
+
+| | Player 1 (left half) | Player 2 (arrows + numpad) |
+|---|---|---|
+| walk / jump / crouch | A D · W · S | ← → · ↑ · ↓ |
+| light | **G** | **Num 4** |
+| heavy | **H** | **Num 5** |
+| block | E | Num 6 |
+| special | Space | Num 0 (or Num Enter) |
+| throw | G+H | Num 4+5 |
+
+- **Why G/H (not V/G):** O and P moved eight keys left, still side by side
+  with light on the left — so the throw is the same two-finger roll and
+  muscle memory carries over; P1's right hand sits at G/H with the thumb on
+  Space, well clear of P2's left hand on the arrows. V/G (the owner's idea)
+  is one click away: every key on the versus card can be rebound (click a
+  key, press the new one; a key taken from the other player leaves them;
+  Esc/Enter/Tab/modifiers refused; saved on this device; **Reset keys**).
+- **One-player, practice and online keep W A S D + O / P / E / Space.**
+- **Ghosting:** cheap membrane keyboards drop some three-key chords on the
+  letter block. Player 2's arrows and numpad usually sit on their own matrix
+  lines (the safer side); player 1's are the usual gaming cluster (W A S D,
+  E, Space) plus G/H. Matrices differ per board, so this is a likelihood,
+  not a guarantee, and it couldn't be tested here (no physical keyboard) —
+  if a key drops out on Kevin's board, rebind it on the card.
+- Select: both pick at once (P1 A/D + G to lock, H to change; P2 ←/→ +
+  Num 4 / Num Enter, Num 5); the mouse picks for whoever hasn't locked;
+  mirror = Sith twin for P2. Both layouts on the select screen (compact) and
+  the pause card. Esc pauses.
+- `Fight` takes a second keyboard (`keyboard2`) for player 2; each
+  `Keyboard` has its own map and tracks keys by code (two keys on one bit,
+  Num 0 and Num Enter, don't let go of each other), ignores typing in a text
+  field. Deep link: `?p1=sebas&p2=kevalanche&versus=1&n1=Sebas&n2=Kevin`.
+
+### Names and the leaderboard (`ui/players.js`)
+
+- Before vs Computer (one name), Versus (two: player 1 then player 2) and
+  Online (yours; also when a friend opens a room link) the **name screen**:
+  the names used on this device, most recent first, each seat's last one
+  pre-selected (Enter and go), **＋ New name** (type, Enter) or **No name**
+  (not recorded). First time: straight to typing. 1–16 characters; the same
+  name can't sit in both seats. Practice: no names.
+- Names show on the HUD (a tag above each fighter's name; `CPU · normal`
+  for the computer), on the select plates, and on the win screen
+  (*"Kevin wins"*, plus each player's record: *"Kevin 6–2 · 3 in a row"*).
+- **Leaderboard** (mode menu): per name — W, L, D, win %, current and best
+  streak, **Fluffless** rounds (a round won with no stuffing lost), wins–
+  losses against people (versus and online), favourite fighter (most
+  played). Most wins first. Titles: *Big Pillow* (top), *Professional
+  Cushion* (most losses), *On a Tear* (3+ streak), *Untouched Upholstery*
+  (3+ Fluffless). **Reset leaderboard** asks twice (the second press within
+  4 s); names are kept.
+- Storage: `localStorage` only (`pillowfight.names.v1`,
+  `pillowfight.board.v1`, `pillowfight.versusKeys.v1`); no service, no
+  requests. Private mode / blocked storage: works for the session.
+- **Online:** each side sends its name on the existing PeerJS control
+  channel (`{t:'name'}`), never in the sim; both devices record the match
+  under both names (each its own copy).
+
+Tests: `test/versus.test.mjs` (no key on both sides, every action bound,
+the layouts, rebinding never makes an overlap and refuses reserved keys,
+persistence and fallbacks, two `Keyboard`s on one target each hearing only
+their own keys, held keys by code, typing ignored), `test/players.test.mjs`
+(cleaning, the MRU list and each seat's last, a versus match for both
+names, vs CPU for the person only, draws, one name in both seats, broken
+storage, standings and titles, reset).
+Tools: `node tools/versus-shots.mjs` (the name screen, both pick at once,
+real key presses moving only their own fighter, names on the HUD, a finish,
+the board, the reset's confirmation, rebinding in the pause card),
+`node tools/sith-shots.mjs` (duels, close-ups, the racquets),
+`node tools/online-match.mjs` (now types a name on both pages and checks
+the HUD, the winner by name and both boards).
+Evidence: `shots/sith/`, `shots/versus/`, `shots/online-sith/`.
 
 ## Roster 2 and practice (bolster-roster2)
 

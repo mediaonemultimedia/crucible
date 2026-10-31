@@ -73,16 +73,25 @@ async function duel(id) {
   return errs;
 }
 
+/* the two racquets, side by side, face on: Grommet's wooden one (the
+   original's) and the Sith twin's red one */
 async function racquet() {
   const { page, errs } = await open('johnny');
   await page.evaluate(`
-    place(-2600, 2000); B.step(0.5, false);
+    place(-2600, 2600); B.step(0.5, false);
     document.querySelector('#ui').style.visibility = 'hidden';
-    const r = F().plush[1].racquet; r.updateMatrixWorld(true);
-    const p = new r.position.constructor().setFromMatrixPosition(r.matrixWorld);
-    cam(p.x, 4.2, p.y + 0.5, 30);
+    const S = B.stage.scene;
+    for (const [k, x] of [[0, -0.42], [1, 0.42]]) {
+      const r = F().plush[k].racquet.clone(true);
+      r.matrix.makeRotationZ(k ? -0.16 : 0.16).setPosition(x * 1.5, 0.7, 5.4);
+      r.matrixWorldNeedsUpdate = true;
+      S.add(r);
+    }
+    for (const p of F().plush) p.group.visible = false;
+    B.frame(1 / 60, false);
+    cam(0, 10.6, 1.55, 24);
   `);
-  await page.screenshot({ path: path.join(out, 'racquet.png') });
+  await page.screenshot({ path: path.join(out, 'racquets.png') });
   await page.close();
   return errs;
 }

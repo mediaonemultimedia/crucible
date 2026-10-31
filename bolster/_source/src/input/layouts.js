@@ -17,8 +17,8 @@
    apart from the other's. Keyboards ghost: on many membrane boards a
    few three-key chords on the letter block can drop a key; the arrows
    and the numpad usually sit on their own matrix lines, so player 2 is
-   the safer side, and the letters were picked to keep player 1's common
-   chords (move + attack, S+E, G+H) off one row. Either player can rebind
+   the safer side; player 1 has the usual gaming cluster plus G/H (boards
+   differ: a likelihood, not a guarantee). Either player can rebind
    any key on the versus controls card (saved on this device).          */
 
 import { LEFT, RIGHT, UP, DOWN, LIGHT, HEAVY, SPECIAL, BLOCK } from '../sim/input.js';
