@@ -15,7 +15,7 @@
    the top of every glove. shaveCaps() extends each chain mask over its cap. */
 
 import * as THREE from 'three/webgpu';
-import { Fn, vec3, vec4, normalWorld, normalize, positionLocal, smoothstep, abs, float, uniform, mix } from 'three/tsl';
+import { Fn, vec3, vec4, normalWorld, normalize, positionLocal, smoothstep, abs, float, uniform, mix, fract, mx_noise_float } from 'three/tsl';
 import { shade } from '../../shared/grommet/props.js';
 
 export const CUFF = 0.45;   // the cloth tube keeps this much of the old glove, from its wrist end
@@ -48,7 +48,7 @@ export function cuffOnly(rig) {
   }
 }
 
-function leather(color) {
+function leather(color, { tape = false } = {}) {
   const m = new THREE.MeshBasicNodeMaterial();
   const c = uniform(new THREE.Color(color));
   m.colorNode = Fn(() => {
@@ -57,7 +57,18 @@ function leather(color) {
     // the wrist where the padding meets the cuff
     const seam = smoothstep(0.022, 0.008, abs(p.x)).mul(smoothstep(0.0, 0.1, p.z)).add(smoothstep(0.03, 0.012, abs(p.y.sub(0.1))));
     const base = mix(c, c.mul(0.55), seam.clamp(0, 1).mul(0.8));
-    return vec4(shade(base, normalize(normalWorld), { spec: 0.6, power: 34, wrap: 0.45 }), 1);
+    if (!tape) return vec4(shade(base, normalize(normalWorld), { spec: 0.6, power: 34, wrap: 0.45 }), 1);
+    // the hockey goon's: white athletic tape wound round the knuckles —
+    // three turns on a slant, each edge a touch darker where it overlaps the
+    // next, a cloth weave, matte; the leather glossy round it
+    const w = p.y.add(p.x.mul(0.18)).add(p.z.mul(0.1));
+    const on = smoothstep(0.5, 0.52, w).mul(smoothstep(0.86, 0.84, w));
+    const turn = fract(w.sub(0.5).mul(9));
+    const lap = smoothstep(0.0, 0.08, turn).mul(smoothstep(1.0, 0.86, turn)).mul(0.25).add(0.75);
+    const weave = mx_noise_float(vec3(p.mul(160))).mul(0.05).add(0.97);
+    const tapeC = vec3(0.93, 0.91, 0.86).mul(lap).mul(weave);
+    const N = normalize(normalWorld);
+    return vec4(mix(shade(base, N, { spec: 0.6, power: 34, wrap: 0.45 }), shade(tapeC, N, { spec: 0.05, power: 10, wrap: 0.5 }), on), 1);
   })();
   m.userData.color = c;
   return m;
@@ -99,9 +110,9 @@ function makeGlove(mat, laceMat) {
 }
 
 export class Gloves {
-  constructor(group, soft, rig, color) {
+  constructor(group, soft, rig, color, { tape = false } = {}) {
     this.soft = soft;
-    this.mat = leather(color);
+    this.mat = leather(color, { tape });
     this.lace = plain('#f4efe6');
     this.arms = rig.arms.filter((c) => c.kind === 'arm').map((ch) => {
       const part = (rig.cloth?.parts || []).find((p) => p.chain === ch.k && / glove$/.test(p.name || ''));

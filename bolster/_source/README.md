@@ -31,6 +31,8 @@ node tools/online-match.mjs --p1 sebas --p2 zach --out online-roster2
                                  # two pages: names, lobby practice, then a match with the new two
 node tools/sith-shots.mjs        # the Sith twins vs the originals, the racquets → shots/sith/
 node tools/versus-shots.mjs      # versus on one keyboard, names, the leaderboard → shots/versus/
+node tools/keys-shots.mjs         # the keyboard legend → shots/keys/
+node tools/twins-shots.mjs [--lineup] # the evil twins, roster line-ups → shots/twins/
 ```
 
 Headless tools use `CHROMIUM` (default `/opt/pw-browsers/chromium`) as the browser.
@@ -42,6 +44,65 @@ players on one keyboard; `screen=board` the leaderboard; `screen=names` the name
 to the computer too; `seed=N` fixes the match seed; `toques=1`; `webgl` forces
 the WebGL 2 path; `hold` stops the free-running loop for scripted stepping;
 `boxes` draws the sim's hurt, limb, hit and shot boxes over the picture).
+
+## Keyboard legend and new evil twins (bolster-keys)
+
+### The keyboard legend (`ui/keymap.js`)
+
+A small full-size keyboard (main block, arrow cluster, numpad) in inline
+SVG; only the keys in use are lit, **P1 hot pink, P2 mint**, each with its
+action on the cap (Move ◀ ▶, Jump, Crouch, Light, Heavy, Block, Special),
+and a line for the combos (Throw = Light+Heavy, Dash = double-tap Move,
+Signature = Crouch+Heavy, Dive slam = Crouch+Heavy in the air, Low block =
+Crouch+Block). It is drawn from the live bindings, so a rebind redraws it.
+
+- **Versus:** both players on one keyboard, on the select card and the
+  pause card. Click a lit key, press the new one (Esc cancels); Reset keys.
+  A key bound off the drawing (F5, say) or an action left unbound is listed
+  under it as a button.
+- **Vs Computer / Practice / Online:** the one-player keys (W A S D, O P E,
+  Space and the arrows) in pink; on the pause card above the move list.
+- Wide and tall enough (≥ 980 × 600): the picture; narrower: the old text
+  list (unchanged). No title-menu Controls button (optional; not done).
+- `test/keymap.test.mjs`: every bound key of the versus defaults, the solo
+  layout and rebound layouts is a key on the board, lit in its player's
+  colour with its action; nothing else lit; strays listed.
+- Evidence: `node tools/keys-shots.mjs` → `shots/keys/`.
+
+### The new evil twins (`render/twins.js`)
+
+Evil Sebas (the rudo's mask) and Evil Johnny (red racquet, cowl) keep their
+Sith looks. The other five get their own, built the way the octopus is:
+the look is in the plush itself (fur colours, pile length and lie, printed
+pattern and stitching in the atlases); the few worn things are felt,
+leather or metal riding the soft body's points each frame.
+
+- **Kevalanche, hockey goon:** honey-brown bear; a mullet (back of head and
+  nape grown long and dark, top cropped); a bruised black eye; black gloves
+  taped over the knuckles in white athletic tape; one felt front tooth with
+  a gap. The Sith cowl, cloak and patch are gone.
+- **Rubberta, anglerfish:** abyss-black flock, glowing photophores (a `glow`
+  uniform on the fur's spots: `shared/CHANGES.md`), glowing rings round the
+  eyes, a grimace of needle teeth embroidered in pale thread, a felt lure
+  arching over her face with a glowing bulb on a thread that swings.
+- **Sumaura, Bond villain:** inverted panda (black fur; white eye patches,
+  ears and limbs), a tuxedo printed on the chest (white shirt front, black
+  bow tie and studs, satin lapels, pocket square; the mawashi a black satin
+  cummerbund), a rose scar with cross-stitches across one eye patch. *The
+  tiny white cat was dropped* (couldn't be made to plush quality); the
+  shirt front is mostly behind his guard in play.
+- **K8-E, punk:** charcoal with near-black patches; a neon magenta mohawk
+  (the neck mane grown long, running up over the head to the forehead), a
+  spiked leather collar, a stitched handlebar moustache, a septum ring and
+  ear hoops. (She had no piercings or moustache before; these are new.)
+- **Zach Sparrow, ghost pirate:** bleached white feathers, glowing red
+  eyes, bone-grey beak, a tattered matte felt tricorn (notched brim, one
+  tear). The bandit mask and gold chain are gone.
+
+Render only: nothing reaches the sim (hashes, rollback, online unchanged).
+Evidence: `node tools/twins-shots.mjs [--lineup] [ids]` → `shots/twins/`
+(close-ups, gameplay, mid-attack, signature, hit, K.O.; `lineup-roster.png`
+and `lineup-twins.png` for the owner's quality review).
 
 ## Sith twins, versus on one keyboard, names and a leaderboard (bolster-sith)
 

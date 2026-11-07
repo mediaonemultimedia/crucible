@@ -1,15 +1,15 @@
 /* The Sith twins and the Jedi originals (cosmetic only: nothing here
    reaches the sim).
 
-   Johnny Deuce, Sebas Perra and Kevalanche have evil twins that read as
-   the dark side of the same fighter: a hooded cowl and a short cloak over
-   their evil colours, eyes that glow red (Kevalanche's other eye under a
-   patch with a red-hot edge; Sebas's through the rudo's mask), and red
+   Johnny Deuce and Sebas Perra have evil twins that read as the dark side
+   of the same fighter: a hooded cowl and a short cloak over their evil
+   colours, eyes that glow red (Sebas's through the rudo's mask), and red
    swing trails. Evil Johnny swings a red racquet — glossy red frame, red
    strings, a white stencilled mark, a black-and-red striped throat, a
    black grip — that hums: a red rim glow that shimmers along the frame.
 
-   Everyone else's evil twin gets the red trails; every original swings
+   The other five twins have their own looks (render/twins.js) and red
+   trails; every original swings
    with a cool blue-white trail (the Jedi side), Johnny's racquet most of
    all. The trail follows the bit of the plush that does the hitting: the
    soft-body point nearest the sim's active hit box, traced back through
@@ -26,7 +26,7 @@ import { shade } from '../../shared/grommet/props.js';
 import { RQ } from '../../shared/grommet/athletes/leopard.game.js';
 
 /* the fighters with the full Sith look (the rest: trails only) */
-export const SITH = { johnny: true, sebas: true, kevalanche: true };
+export const SITH = { johnny: true, sebas: true };
 
 /* app time for the hum and the eye flicker (any plush may advance it) */
 export const SITH_T = uniform(0);

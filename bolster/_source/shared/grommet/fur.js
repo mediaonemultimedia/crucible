@@ -50,6 +50,9 @@ export function makeFurMaterial(groomTex, maskTex, patTex) {
     meshView: uniform(0),
     // a glossy sheen on the pile (a crow's blue-violet); black: none at all
     sheen: uniform(new THREE.Color(0, 0, 0)),
+    // Bolster: the spots glow (an anglerfish's lights): 0 none, 1 the spot
+    // colour lit from within, whatever the light
+    glow: uniform(0),
   };
 
   const n = normalLocal;
@@ -178,8 +181,11 @@ export function makeFurMaterial(groomTex, maskTex, patTex) {
       .add(vec3(spec).mul(vec3(1.0, 0.97, 0.92)))
       .add(base.mul(1.3).add(0.15).mul(rim))
       .add(vec3(U.sheen).mul(s2.mul(0.5).add(s1.mul(0.5)).mul(specMask).add(rim.mul(0.5))));
+    // Bolster: glowing spots, brighter toward the fibre tips
+    const glowC = vec3(U.spot).mul(mix(float(0.7), float(1.35), he)).mul(strandRand.mul(0.2).add(0.9));
+    const litG = mix(lit, glowC, pt.r.mul(U.glow));
     const meshCol = mix(base, vec3(0.2), 0.2).mul(wrap.mul(0.6).add(0.4));
-    return vec4(mix(lit, meshCol, U.meshView), 1);
+    return vec4(mix(litG, meshCol, U.meshView), 1);
   });
 
   const mat = new THREE.MeshBasicNodeMaterial();

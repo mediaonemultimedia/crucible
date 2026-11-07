@@ -95,7 +95,7 @@ async function lineupSheet(evil) {
     const { page, errs } = await open(id, { width: 640, height: 720 });
     await page.evaluate(`place(-2400, 2400); B.step(1.4, false);
       const k = ${evil ? 1 : 0}; const o = F().plush[1 - k]; o.group.visible = false;
-      const p = F().plush[k]; cam(p.group.position.x, 9.6, 2.0, 26);`);
+      const p = F().plush[k]; cam(p.group.position.x, 12.5, 2.5, 26);`);
     const buf = await page.screenshot({ clip: { x: 100, y: 40, width: 440, height: 640 } });
     tiles.push({ id, b64: buf.toString('base64') });
     errsAll = errsAll.concat(errs);
