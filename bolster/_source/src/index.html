@@ -314,6 +314,52 @@ body[data-screen=win] #hud{display:none}
 #select-screen .controls.vs .foot{display:block}
 body.versus #select-screen .step{display:none}
 
+/* keyboard legend (ui/keymap.js) ---------------------------------------------- */
+.controls .kb{display:none}
+.kb .kbsvg{display:block;width:100%;height:auto}
+.kb .base{fill:#120d1f;stroke:var(--line);stroke-width:1.5}
+.kb .blk{fill:none;stroke:#2c2347;stroke-width:1}
+.kb .cap{fill:#1d1730;stroke:#3a2f5c;stroke-width:1}
+.kb .cl{font:600 9px var(--sans);fill:#5f5585}
+.kb g.lit .cap{stroke:rgba(255,255,255,.55);stroke-width:1.2}
+.kb g.lit.p1 .cap{filter:drop-shadow(0 0 4px rgba(255,59,107,.85))}
+.kb g.lit.p2 .cap{filter:drop-shadow(0 0 4px rgba(63,240,200,.8))}
+.kb g.lit .top{fill:rgba(255,255,255,.22)}
+.kb g.lit .cl.on{font:800 13px var(--sans);fill:#120d1f}
+.kb g.lit .ar{font:700 10px var(--sans);fill:#120d1f;text-anchor:end}
+.kb g.lit .aw{font:700 11px var(--cond);letter-spacing:0;fill:#120d1f;text-anchor:middle;text-transform:uppercase}
+.kb g.lit .aw.big{font-size:12px;letter-spacing:.12em}
+.kb.two g.lit{cursor:pointer}
+.kb.two g.lit:hover .cap{stroke:#fff;stroke-width:2}
+.kb g.lit.wait .cap{fill:var(--violet) !important;stroke:#fff;stroke-width:2;animation:kbwait .8s ease-in-out infinite alternate}
+.kb g.lit.wait text{fill:#fff}
+@keyframes kbwait{to{fill:#c9a8ff}}
+.kb .kbhead{display:flex;gap:8px;align-items:center;margin:0 0 6px}
+.kb .ptag{font-family:var(--cond);font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--on-neon);background:var(--p1);padding:2px 8px}
+.kb .ptag.p2{background:var(--p2)}
+.kb .waitmsg{margin-left:auto;font-size:11px;color:#fff;background:var(--violet);padding:2px 8px}
+.kb .kbfoot{font-size:11px;color:#cdb6ff;margin-top:6px;line-height:1.5}
+.kb .kbfoot b{color:#fff;font-weight:600}
+.kb .kbhint{margin-left:8px;color:var(--dim)}
+.kb .kbfoot button{all:unset;cursor:pointer;color:var(--ink);text-decoration:underline;text-underline-offset:2px;margin-left:6px}
+.kb .kbfoot button.stray{text-decoration:none;color:var(--on-neon);background:var(--p1);padding:0 6px;margin-left:4px}
+.kb .kbfoot button.stray.p2{background:var(--p2)}
+/* wide and tall enough: the picture instead of the list (the select card),
+   the picture over the move list (one player's pause card) or instead of
+   it (versus pause card: the picture is the rebinding card too) */
+@media (min-width:980px) and (min-height:600px){
+  .controls .kb{display:block;grid-column:1/-1}
+  #select-screen .controls{display:block;top:124px;width:min(64vw,780px);padding:8px 12px 7px}
+  #select-screen .controls.vs{top:116px}
+  #select-screen .controls > :not(.kb){display:none !important}
+  #select-screen .controls .kb .kbfoot{font-size:10.5px;margin-top:4px}
+  #pause-screen .controls .kb{order:-1;margin-bottom:6px}
+  #pause-screen .controls h4{order:-2}
+  #pause-screen .controls.vs{display:block !important;width:min(66vw,720px)}
+  #pause-screen .controls.vs > :not(.kb):not(h4){display:none !important}
+  #pause-screen .controls:not(.vs){width:min(62vw,680px);max-width:none}
+}
+
 /* player names on the HUD and the win screen ---------------------------------- */
 .pname{font-family:var(--cond);font-weight:700;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--on-neon);background:var(--p1);padding:2px 8px;align-self:flex-start;box-shadow:0 0 12px rgba(255,59,107,.5)}
 .side.r .pname{align-self:flex-end;background:var(--p2);box-shadow:0 0 12px rgba(63,240,200,.45)}

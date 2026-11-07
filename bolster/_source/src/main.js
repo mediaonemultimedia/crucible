@@ -21,6 +21,7 @@ import { CPU } from './ai/cpu.js';
 import { DUMMY_MODES, defaultSettings } from './practice.js';
 import { hash, createMatch } from './sim/sim.js';
 import { SOLO, ACTIONS, toMap, rebind, loadBindings, saveBindings, resetBindings, keyCap } from './input/layouts.js';
+import { keyboardSVG, soloBinding, comboLine, strays } from './ui/keymap.js';
 import { cleanName, nameKey, loadNames, useName, loadBoard, saveBoard, recordMatch, resetBoard, standings } from './ui/players.js';
 import { LEFT as K_L, RIGHT as K_R, UP as K_U, DOWN as K_D, LIGHT as K_O, HEAVY as K_P, SPECIAL as K_S, BLOCK as K_E } from './sim/input.js';
 
@@ -346,11 +347,26 @@ class App {
     for (const id of ['#controls-select', '#controls-pause']) {
       const el = $(id);
       el.classList.toggle('vs', vs);
-      el.innerHTML = vs ? this._versusCard() : CONTROLS;
+      el.innerHTML = (vs ? this._versusCard() : CONTROLS) + this._keyboardLegend(vs);
     }
     if (!vs) return;
-    for (const b of $$('.controls.vs button.cap')) b.onclick = (e) => { e.stopPropagation(); this.remap = { p: +b.dataset.p, a: b.dataset.a }; b.blur(); this._controls(); };
+    const ask = (p, a) => { this.remap = { p, a }; this._controls(); };
+    for (const b of $$('.controls.vs button.cap, .controls.vs .kb button.stray')) b.onclick = (e) => { e.stopPropagation(); b.blur(); ask(+b.dataset.p, b.dataset.a); };
+    for (const g of $$('.controls.vs .kb g.lit')) g.addEventListener('click', (e) => { e.stopPropagation(); ask(+g.dataset.p, g.dataset.a); });
     for (const b of $$('.controls.vs button.rk')) b.onclick = (e) => { e.stopPropagation(); b.blur(); this._setBindings(resetBindings(LS)); };
+  }
+
+  /* the keyboard legend (ui/keymap.js): where the keys are, lit by player;
+     shown instead of the list on a wide enough screen (the list otherwise).
+     Versus: both players on one keyboard, every lit key clickable to
+     rebind; one player (vs Computer, practice, online): the solo keys. */
+  _keyboardLegend(vs) {
+    const B = vs ? this.bind : [soloBinding()], R = vs ? this.remap : null;
+    const tag = (p) => `<span class="ptag p${p + 1}">${esc(vs ? (this.players[p] || `Player ${p + 1}`) : 'One player')}</span>`;
+    const lost = vs ? strays(B, keyCap) : [];
+    const wait = R ? `<span class="waitmsg">${esc(this.players[R.p] || `Player ${R.p + 1}`)}: press the new key for ${esc(ACTIONS.find((a) => a.id === R.a).label)} (Esc cancels)</span>` : '';
+    return `<div class="kb${vs ? ' two' : ''}"><div class="kbhead">${tag(0)}${vs ? tag(1) : ''}${wait}</div>${keyboardSVG(B, { wait: R, click: vs, title: vs ? 'Versus keys on one keyboard' : 'One-player keys' })}
+      <div class="kbfoot">${comboLine()}${lost.map((x) => ` <button class="stray p${x.p + 1}" data-p="${x.p}" data-a="${x.a}">P${x.p + 1} ${esc(x.text)}</button>`).join('')}${vs ? '<span class="kbhint">Click a lit key to change it.<button class="rk">Reset keys</button></span>' : ''}</div></div>`;
   }
 
   _versusCard() {
