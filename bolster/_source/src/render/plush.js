@@ -31,6 +31,7 @@ import { paintLuchaMask, paintBanditMask, makeGoldChain } from './masks.js';
 import { makeRacquet, poseRacquet, makeStars, poseStars, shade } from '../../shared/grommet/props.js';
 import { BipedPuppet, GiraffePuppet, OctopusPuppet, WolfPuppet, CrowPuppet, phaseOf } from './puppets.js';
 import { FIGHTERS } from '../fighters/index.js';
+import { boxerPuppet } from './feel.js';
 import { Gloves, shaveCaps, cuffOnly } from './gloves.js';
 import { SITH, SITH_T, makeSithRacquet, makeEyeGlow, Trail } from './sith.js';
 import { makeSash, makeWingFeathers } from './attire.js';
@@ -43,7 +44,7 @@ export const SHELLS_EACH = 48;
 const G = G_INFO;
 export const LOOKS = {
   kevalanche: {
-    build: buildBear, info: () => G.bear, paint: 'bear', Puppet: (s) => new BipedPuppet(s, 'boxer'), yaw: 0.85, gloves: true,
+    build: buildBear, info: () => G.bear, paint: 'bear', Puppet: (s) => boxerPuppet(s), yaw: 0.85, gloves: true,
     // polar fur and red boxing gloves; evil: a brown bear in black
     colors: { ...G.bear.colors.polar, cloth: '#c9302a', trim: '#f4efe6' },
     evil: { ...G.bear.colors.honey, cloth: '#1d1b1f', trim: '#c9302a' },
@@ -328,6 +329,9 @@ export class Plush {
     if (c.band) this.clothMat.uniforms.band.value.set(c.band);
   }
 
+  /* the feel pass: Kevalanche's blow lands — a crunchy contact squash */
+  crunchBy(power) { this.crunch = this.crunch || { x: 0, v: 0 }; this.crunch.v += power; }
+
   /* a blow from the other side: the stuffing takes it */
   hit(dmg, kd, fromDir) {
     const P = this.puppet, b = P.aim;
@@ -403,7 +407,18 @@ export class Plush {
     this.deflate += ((this.deflateTarget || 0) - this.deflate) * Math.min(1, dt * 7);
     const df = this.deflate;
     const sx = 1 / Math.sqrt(this._ss);
-    g.scale.set((1 - sq * 0.5 + df * 0.35) * sx, (1 + sq) * this._crouch * (1 - df * 0.62) * this._ss, (1 - sq * 0.5 + df * 0.35) * sx);
+    // a crunch (the feel pass: a blow from Kevalanche): squashed along the
+    // blow, bulged up, snapping back on a stiff underdamped spring
+    let cx = 1, cy = 1;
+    if (this.crunch && (this.crunch.x || this.crunch.v)) {
+      const C = this.crunch, kc = 1400;
+      C.v += (kc * (0 - C.x) - 2 * 0.32 * Math.sqrt(kc) * C.v) * dt;
+      C.x += C.v * dt;
+      if (Math.abs(C.x) < 1e-4 && Math.abs(C.v) < 1e-3) C.x = C.v = 0;
+      const q = Math.max(-0.16, Math.min(0.12, C.x));
+      cx = 1 - q; cy = 1 + q * 0.6;
+    }
+    g.scale.set((1 - sq * 0.5 + df * 0.35) * sx * cx, (1 + sq) * this._crouch * (1 - df * 0.62) * this._ss * cy, (1 - sq * 0.5 + df * 0.35) * sx * cx);
     g.updateMatrixWorld(true);
 
     // the fight frame in the plush's own frame
@@ -418,6 +433,9 @@ export class Plush {
     P.oppHead = [oppHead.x, oppHead.y, oppHead.z];
     P.threat = threat;
     if (P instanceof GiraffePuppet) P.reachK = Math.max(0, Math.min(2.4, Math.abs(ox - wx) / 1.86 - 2.1));
+    // (the feel pass, Kevalanche: where the render is between two sim ticks,
+    // and whether the sim's hit-pause is holding — render only)
+    if ('frac' in P) { P.frac = this.frac ?? 1; P.freeze = this.simPause || 0; }
     P.perform(F, phaseOf(F));
 
     // the soft body, on its own fixed clock
@@ -434,7 +452,7 @@ export class Plush {
     if (this.chain) this._necklace();
     if (this.twinLook) SITH_T.value = Math.max(SITH_T.value, this.time);
     if ('toque' in P) P.toque = this.toque.visible;
-    this.gloves?.update();
+    this.gloves?.update(dt, P.gloveFx);
     P.headCentre(this.hc);
     poseStars(this.stars, this.hc, P.daze, this.time);
     this._eyes();

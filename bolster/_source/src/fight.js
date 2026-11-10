@@ -124,9 +124,18 @@ export class Fight {
         S.tufts(x, y, e.amp ? 20 : big ? 10 : 5, e.amp ? 1.8 : big ? 1.3 : 0.9, dir);
         S.shake(e.amp ? 0.85 : big ? 0.55 : 0.18);
         victim.hit(e.amp ? e.dmg * 1.6 : e.dmg, e.kd, dir);
+        // the feel pass (Kevalanche): a crunchy squash on the one hit, the
+        // camera knocked along a big blow (render only)
+        const att = this.plush[e.p];
+        if (att.puppet.contact) {
+          att.puppet.contact(e);
+          victim.crunchBy(big || e.amp ? 2.6 : 1.5);
+          if (big || e.amp) S.nudge(dir * (e.amp ? 2.4 : 1.7));
+        }
       } else {
         S.spark(x, y, 'block', 1.5, dir);
         victim.hit(e.dmg * 0.3, 0, dir);
+        if (this.plush[e.p].puppet.contact) { this.plush[e.p].puppet.contact(e); victim.crunchBy(0.8); }
       }
     }
     if (e.k === 'koflash') {
@@ -186,6 +195,8 @@ export class Fight {
     for (let k = 0; k < 2; k++) {
       const F = st.f[k], O = st.f[1 - k];
       const threat = O.act === 'attack' || st.proj.some((p) => p.o !== k);
+      this.plush[k].frac = koSeq || st.pause > 0 ? 1 : a;
+      this.plush[k].simPause = st.pause;
       this.plush[k].update(Math.min(dt, 0.05) * slow, F, O, P[k].x, P[k].y, P[1 - k].x, P[1 - k].y, threat);
     }
     if (koSeq) {

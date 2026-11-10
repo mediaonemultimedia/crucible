@@ -137,13 +137,25 @@ export class Gloves {
     return out.set(x[a] + (x[b] - x[a]) * u, x[a + 1] + (x[b + 1] - x[a + 1]) * u, x[a + 2] + (x[b + 2] - x[a + 2]) * u);
   }
 
-  update() {
+  /* fx (the feel pass, Kevalanche): per arm [R, L] a roll about the
+     forearm (0 thumb up … 1 palm down) and a squash spring (contact); the
+     glove's pointing lags its forearm on a soft spring (follow-through) */
+  update(dt = 0, fx = null) {
     const W = this._w, T = this._t, X = this._x, Z = this._z;
     for (const A of this.arms) {
+      const G = fx ? fx[A.inward === 1 ? 0 : 1] : null;   // (inward 1: his right arm)
       const wrist = this._at(A.ch, A.sw, this._a), end = this._at(A.ch, 1, this._b);
       T.subVectors(end, wrist);
       const reach = T.length();
       T.normalize();
+      if (G && dt > 0) {
+        // the glove's lag: its axis eased toward the forearm's (underdamped)
+        const L = A.lag || (A.lag = { x: T.clone(), v: new THREE.Vector3() }), k = 700;
+        L.v.addScaledVector(T.clone().sub(L.x), k * dt).multiplyScalar(Math.max(0, 1 - 2 * 0.45 * Math.sqrt(k) * dt));
+        L.x.addScaledVector(L.v, dt);
+        if (L.x.angleTo(T) > 0.5) L.x.copy(T);
+        T.copy(L.x).normalize();
+      }
       // the back of the hand up, square to the arm (an arm straight up or
       // down: the back of the hand forward instead)
       Z.set(0, 1, 0).addScaledVector(T, -T.y);
@@ -153,8 +165,18 @@ export class Gloves {
       // the thumb on the side toward the body's middle: mirrored per arm
       const side = X.x * A.inward >= 0 ? 1 : -1;
       if (A.side !== side) { A.side = side; A.thumb.position.x = 0.36 * side; A.thumb.rotation.z = -0.32 * side; }
-      const L = reach + A.r * 1.3;            // over the end of the paw
-      const k = (A.r * 1.9) / 0.45;           // knuckles ~1.4× the old glove's width
+      let L = reach + A.r * 1.3;            // over the end of the paw
+      let k = (A.r * 1.9) / 0.45;           // knuckles ~1.4× the old glove's width
+      if (G) {
+        // the wrist's corkscrew: the glove turned about the forearm
+        const a = G.roll * 1.35 * -A.inward, c = Math.cos(a), s = Math.sin(a);
+        const x = X.clone(), z = Z.clone();
+        X.copy(x).multiplyScalar(c).addScaledVector(z, s);
+        Z.copy(z).multiplyScalar(c).addScaledVector(x, -s);
+        // the contact: squashed along the punch, bulged round it
+        const q = Math.max(-0.22, Math.min(0.15, G.squash.x * 0.02));
+        L *= 1 + q; k *= 1 - q * 0.5;
+      }
       this._m.makeBasis(X.multiplyScalar(k), T.multiplyScalar(L), Z.multiplyScalar(k));
       W.copy(wrist).addScaledVector(this._t, -0.04 / L);
       this._m.setPosition(W);

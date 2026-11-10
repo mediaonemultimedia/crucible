@@ -8,6 +8,7 @@ import * as THREE from 'three/webgpu';
 import { makeRenderer, Stage } from './render/stage.js';
 import { Showcase, Lineup, portraits, snapPicks } from './render/showcase.js';
 import { Fight } from './fight.js';
+import { FEEL } from './render/feel.js';
 import { Keyboard } from './input/keyboard.js';
 import { FIGHTERS, ROSTER, MAX_METER, fighterId } from './fighters/index.js';
 import { U } from './render/stage.js';
@@ -29,6 +30,8 @@ import { LEFT as K_L, RIGHT as K_R, UP as K_U, DOWN as K_D, LIGHT as K_O, HEAVY 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 const params = new URLSearchParams(location.search);
+// ?feel=old: Kevalanche with the animation from before the feel pass (to compare)
+FEEL.old = params.get('feel') === 'old';
 
 const CONTROLS = `
   <h4>Controls</h4>

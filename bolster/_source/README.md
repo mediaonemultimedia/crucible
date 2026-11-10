@@ -135,6 +135,52 @@ sequences with and without the taunt watcher: identical hashes).
   pressed, four taunts, the VS card, the loss drain, the rematch prompt);
   `node tools/online-match.mjs --lag 40 --out ui/online`.
 
+## The feel pass: Kevalanche (bolster-feel)
+
+The owner: *"it would be nice to have that powerful ease-in and then strike
+on some of the attacks … maybe some of our rigs need to be a little more
+intricate."* A pilot on **one fighter, Kevalanche (OG and ALT)**; the rest
+are untouched. **`?feel=old`** plays him with the previous animation, to
+compare (e.g. `final.html?p1=kevalanche&p2=johnny&feel=old`).
+
+- **Rig** (`render/feel.js`, `BoxerFeel extends BipedPuppet`): elbows (each
+  arm chain bends at two particles, a rounded joint, folding up for the
+  guard and the wind-up, in for a hook); a spine twist (the upper body turned
+  about the vertical, weighted up the torso: hips 0, shoulders and arms 1,
+  head 0.45); the hips are the balance servo's own twist, so the hips lead
+  and the chest and arm follow; knees (a sink: the body lowered over the
+  knees, the knees forward); wrists (the glove rolls about the forearm — a
+  corkscrew to palm-down — and lags its arm on a spring, `render/gloves.js`).
+  All pose-side: the same particles, fur and gloves, so no new seams or joints
+  to show. The lead hand is the one nearer the opponent, whichever way he faces.
+- **Three beats, inside the frame data** (startup / active / recovery are the
+  sim's, unchanged): an eased coil over the startup (weight back, the hips and
+  the shoulder turned away, knees in), a 2-tick fire ending just before the
+  first active frame (stiff springs: hips, then chest, then the arm, a stretch
+  along it and a velocity kick on the fist), then an overshoot and a settle on
+  underdamped springs. The render's place between two ticks is used, so the
+  strike is smooth on 120/144 Hz screens too. Light attacks small and snappy;
+  the heavy hook, Glacier Uppercut and Avalanche Rush (each flurry punch, then
+  a wound-up last hook) big. Walk (hip sway, knee bob), jump (squat, tuck,
+  landing sink), block (a tight shell, a recoil), hit (a whip back, knees
+  buckle, loose arms on soft springs), K.O. and win/lose use the same rig.
+- **Secondary:** velocity kicks on the ears, belly and fists at the strike,
+  the contact and the landing; the stuffing carries them through. (No separate
+  fur-strand sim: the fur rides the stuffing, as before.)
+- **Impact (render only):** his glove squashes on contact; the one he hits
+  gets a crunchy squash (`Plush.crunchBy`, an anisotropic scale on a stiff
+  underdamped spring); a big blow knocks the camera along it (`Stage.nudge`).
+  Hit-stop is the sim's own `st.pause` and is unchanged; during it his springs
+  hold (the stuffing still wobbles).
+- `test/feel.test.mjs`: golden sim hashes for 16 seeded input sequences
+  (recorded on bolster-source before this pass) still match; posing him every
+  tick never changes the state hash; `?feel=old` gives the old puppet; every
+  move keeps the soft body together. `tools/feel-probe.mjs` (node: fist reach
+  and height per tick, old vs new). Evidence: `node tools/feel-shots.mjs
+  [--html F] [--q '&feel=old'] [--out D] [--clips] [scene …]` →
+  `shots/feel/before`, `shots/feel/after`, `shots/feel/clips/` (GIFs at half
+  speed), `shots/feel/compare-*.png`.
+
 ## OG / ALT, practice keys, twin polish (bolster-polish)
 
 - **OG / ALT on character select** (`ui/variant.js`): every fighter can be

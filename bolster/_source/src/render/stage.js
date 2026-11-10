@@ -302,7 +302,16 @@ export class Stage {
     this.cam.t += dt;
     this.cam.shake = Math.max(0, this.cam.shake - dt * 2.4);
     const sh = this.cam.shake * this.cam.shake;
-    const jx = Math.sin(this.cam.t * 71) * 0.18 * sh, jy = Math.cos(this.cam.t * 59) * 0.14 * sh;
+    let jx = Math.sin(this.cam.t * 71) * 0.18 * sh, jy = Math.cos(this.cam.t * 59) * 0.14 * sh;
+    // a nudge (the feel pass: Kevalanche's big blows): the camera knocked
+    // along the blow and sprung back, underdamped
+    const N = this.cam.nudge;
+    if (N && (N.x || N.v)) {
+      const kn = 600;
+      N.v += (kn * (0 - N.x) - 2 * 0.35 * Math.sqrt(kn) * N.v) * dt; N.x += N.v * dt;
+      if (Math.abs(N.x) < 1e-4 && Math.abs(N.v) < 1e-3) N.x = N.v = 0;
+      jx += N.x; jy -= Math.abs(N.x) * 0.25;
+    }
     const C = this.camera;
     C.aspect = aspect;
     C.fov = narrow ? 34 : 26;
@@ -322,6 +331,7 @@ export class Stage {
   }
 
   shake(a) { this.cam.shake = Math.min(1.2, this.cam.shake + a); }
+  nudge(v) { this.cam.nudge = this.cam.nudge || { x: 0, v: 0 }; this.cam.nudge.v += v; }
 
   /* ── contact shadows from the plush's points (in world space) ──────────── */
   paintShadows(plushes, extra = []) {
