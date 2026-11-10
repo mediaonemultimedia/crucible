@@ -45,3 +45,9 @@ new back end (`src/render/crow.js`) and the refined muzzles
 (`src/render/muzzles.js`) are built from outside with the shared builders
 (`rigbuilder.js`, `athletes/standing.js`, `crow.rig.js`'s `CROW`).
 `flock/rigs.js`'s `buildWolf({ fighter })` is no longer used by Bolster.
+
+## bolster-goon
+
+- `grommet/fur.js`: a `gloss` uniform scaling the strands' specular (1 by
+  default: every fighter unchanged). The hockey goon's near-black pile uses
+  less, so the white highlights don't grey it out.

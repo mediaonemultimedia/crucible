@@ -217,6 +217,7 @@ export class Plush {
     if (L.muzzle) paintMuzzle(this.maskTex, this.patTex, rig, L.muzzle);
     this.setColors(TW ? TW.colors : evil ? L.evil : L.colors);
     this.fur.uniforms.glow.value = TW?.glow || 0;
+    this.fur.uniforms.gloss.value = TW?.gloss ?? 1;
     this.fur.uniforms.pile.value = (info.pile || 9) / 90;
     this.fur.uniforms.shells.value = SHELLS_EACH;
     this.fur.uniforms.stitch.value.setRGB(...(TW?.stitch || info.stitch || [0.1, 0.06, 0.05]), THREE.LinearSRGBColorSpace);
@@ -249,7 +250,7 @@ export class Plush {
       this.eyeGlow = [makeEyeGlow(), makeEyeGlow()];
       for (const e of this.eyeGlow) group.add(e);
     }
-    if (L.gloves) this.gloves = new Gloves(group, soft, rig, (TW ? TW.colors : evil ? L.evil : L.colors).cloth, { tape: !!TW?.tape });
+    if (L.gloves) this.gloves = new Gloves(group, soft, rig, (TW ? TW.colors : evil ? L.evil : L.colors).cloth, { tape: !!TW?.tape, hockey: TW?.hockey });
     if (rig.beak) {
       // the crow's felt beak, riding the head's own frame
       const c = TW ? TW.colors : evil ? L.evil : L.colors;

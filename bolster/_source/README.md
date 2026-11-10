@@ -33,6 +33,8 @@ node tools/sith-shots.mjs        # the Sith twins vs the originals, the racquets
 node tools/versus-shots.mjs      # versus on one keyboard, names, the leaderboard → shots/versus/
 node tools/keys-shots.mjs         # the keyboard legend → shots/keys/
 node tools/twins-shots.mjs [--lineup] # the evil twins, roster line-ups → shots/twins/
+node tools/goon-shots.mjs [scene …]  # the hockey goon's evidence → shots/goon/
+node tools/goon-probe.mjs            # the goon's mullet in a CPU match: no clipping, no NaN
 ```
 
 Headless tools use `CHROMIUM` (default `/opt/pw-browsers/chromium`) as the browser.
@@ -44,6 +46,52 @@ players on one keyboard; `screen=board` the leaderboard; `screen=names` the name
 to the computer too; `seed=N` fixes the match seed; `toques=1`; `webgl` forces
 the WebGL 2 path; `hold` stops the free-running loop for scripted stepping;
 `boxes` draws the sim's hurt, limb, hit and shot boxes over the picture).
+
+## The hockey goon, refined (bolster-goon)
+
+Kevalanche's ALT only (his OG, every other fighter and the feel pass's
+animation are untouched). Render only: no sim, frame data, hit box, netcode
+or balance change; the golden hashes in `test/feel.test.mjs` still match.
+
+- **A black bear** (`render/twins.js`, `KEV.colors`): near-black brown fur
+  (`#20100a`, warm enough to keep its shading and depth under the lights),
+  a tan muzzle like a real black bear's, the chest and belly dark too (a
+  hint of the old underside left). The fur's white strand highlights greyed
+  a pile this dark, so the fur material has a `gloss` uniform (1 for every
+  other fighter; 0.4 here; `shared/CHANGES.md`). The bruise is a lighter
+  plum so the black eye reads on the dark fur; the felt tooth is a touch
+  bigger.
+- **Hockey gloves** (`render/gloves.js`, `makeHockeyGlove`): chunky plush
+  felt in royal blue and orange (colours only: no logo, crest, name or
+  number). Four padded finger rolls curled over the knuckles, each in three
+  puffs; a padded back of the hand; an orange piping roll on the knuckle
+  line; an orange palm; a thumb in two puffs; a short padded bell cuff with
+  an orange band and a fat roll at the wrist (closed inside the arm, so no
+  fur shows through). Same frame as the boxing glove, so they follow the
+  wrist corkscrew, the lag and the contact squash; built in true proportions
+  (`HY`: the length scale matched to the width at rest) and the same
+  envelope at the fist, so his reach reads the same. The cloth cuff tube on
+  the forearm is blue with an orange trim. The white tape is gone.
+- **A real mullet** (`Mullet` in `render/twins.js`): the top and sides
+  cropped short, the back of the head cropped under the locks; nine soft
+  plush locks from under the crown down the nape to the shoulders (the
+  side ones shorter), each a wavy S (alternating lock to lock), fat in the
+  middle, tapering to a rounded tip flipped out and up. Each lock is drawn
+  as short shell fur (14 shells, its strands in rows spiralling round it like
+  a curl; dark roots, frosted tips). It rides the head's own frame and lags
+  it on a render-only spring driven by its tip's acceleration (the strike, a
+  hit, the landing, the walk's bob and sway) and by gravity when the head
+  tips (hit, K.O.), the bend growing toward the tip. Every frame each lock
+  is pushed out of the torso and the skull (ellipsoids padded for the fur),
+  so it never clips his shoulders or back.
+- Checks: `node tools/goon-probe.mjs` (a 40 s Hard-v-Hard goon mirror: no
+  NaN, no lock point inside the torso, the springs' spread, the mullet's
+  cost per update ≈ 0.5 ms on the sandbox). Evidence: `node
+  tools/goon-shots.mjs [--html F] [--out D] [--q Q] [scene …]` →
+  `shots/goon/before`, `shots/goon/after` (head front and three-quarter
+  back, gloves, idle, heavy, hit, K.O., walk, the locks through a heavy and
+  a jump, next to the OG and to Rubberta), `shots/goon/feel-old/`
+  (`?feel=old`), `shots/goon/online/`.
 
 ## Model pass: the wolf rebuilt, the crow's tail, two muzzles (bolster-models)
 
@@ -252,10 +300,10 @@ the look is in the plush itself (fur colours, pile length and lie, printed
 pattern and stitching in the atlases); the few worn things are felt,
 leather or metal riding the soft body's points each frame.
 
-- **Kevalanche, hockey goon:** honey-brown bear; a mullet (back of head and
-  nape grown long and dark, top cropped); a bruised black eye; black gloves
-  taped over the knuckles in white athletic tape; one felt front tooth with
-  a gap. The Sith cowl, cloak and patch are gone.
+- **Kevalanche, hockey goon:** (refined in bolster-goon, above) a black
+  bear with a tan muzzle; a hockey mullet of plush locks; a bruised black
+  eye; plush hockey gloves in royal blue and orange; one felt front tooth
+  with a gap. The Sith cowl, cloak and patch are gone.
 - **Rubberta, anglerfish:** abyss-black flock, glowing photophores (a `glow`
   uniform on the fur's spots: `shared/CHANGES.md`), glowing rings round the
   eyes, a grimace of needle teeth embroidered in pale thread, a felt lure

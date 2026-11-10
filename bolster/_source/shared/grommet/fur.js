@@ -53,6 +53,9 @@ export function makeFurMaterial(groomTex, maskTex, patTex) {
     // Bolster: the spots glow (an anglerfish's lights): 0 none, 1 the spot
     // colour lit from within, whatever the light
     glow: uniform(0),
+    // Bolster: the strands' specular strength (1 as before; a near-black
+    // pile wants less, or its white highlights grey it out)
+    gloss: uniform(1),
   };
 
   const n = normalLocal;
@@ -162,7 +165,7 @@ export function makeFurMaterial(groomTex, maskTex, patTex) {
     const s2 = pow(sqrt(clamp(float(1).sub(th2.mul(th2)), 0, 1)), float(22));
     const laid = clamp(length(lean), 0, 1);
     const specMask = smoothstep(-0.1, 0.35, ndl).mul(he).mul(float(1).sub(ruffle.mul(0.75)));
-    const spec = s1.mul(0.22).add(laid.mul(0.12)).add(s2.mul(0.3).mul(base.r.add(0.3))).mul(specMask);
+    const spec = s1.mul(0.22).add(laid.mul(0.12)).add(s2.mul(0.3).mul(base.r.add(0.3))).mul(specMask).mul(U.gloss);
 
     // velvet: fibres pointing at the viewer show their cut ends (deep, matte);
     // fibres lying away show their sides (light, sheeny)
