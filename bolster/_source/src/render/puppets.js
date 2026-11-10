@@ -136,10 +136,10 @@ const READY = {
   boxer:  { R: [-0.28, 0.42, 0.86], L: [0.2, 0.5, 0.86], lean: 0.12 },
   tennis: { R: [-0.75, 0.05, 0.65], L: [0.45, 0.1, 0.85], lean: 0.08 },
   sumo:   { R: [-0.8, -0.05, 0.6], L: [0.8, -0.05, 0.6], lean: 0.2 },
-  // the wolf's front paws up in a luchador's crouch; the crow's wings
+  // the wolf's paws low and forward, a luchador's open stance; the crow's wings
   // folded and tucked against his sides (back and down, as they're sewn),
   // a touch off the body: they open for his moves
-  lucha:  { R: [-0.45, 0.25, 0.85], L: [0.35, 0.4, 0.85], lean: 0.1 },
+  lucha:  { R: [-0.36, -0.48, 0.8], L: [0.4, -0.4, 0.82], lean: 0.1 },
   thief:  { R: [0.08, -0.7, -0.72], L: [-0.08, -0.7, -0.72], lean: 0.12 },
 };
 

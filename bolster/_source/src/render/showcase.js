@@ -88,7 +88,7 @@ export async function portraits(renderer, stage, ids) {
     stage.paintShadows([p]);
     // frame his head and shoulders, a little from his good side
     const box = new THREE.Box3().setFromObject(p.shells);
-    const [cy, d] = { k8e: [2.85, 9], rubberta: [1.3, 6.4], zach: [1.55, 5.2], sebas: [2.0, 6.6] }[id] || [2.05, 6.4];
+    const [cy, d] = { k8e: [2.85, 9], rubberta: [1.3, 6.4], zach: [1.55, 5.2], sebas: [2.3, 7.0] }[id] || [2.05, 6.4];
     cam.position.set(1.6, cy + 0.5, d);
     cam.lookAt(0.15, cy, 0);
     renderer.setRenderTarget(rt);

@@ -45,6 +45,50 @@ to the computer too; `seed=N` fixes the match seed; `toques=1`; `webgl` forces
 the WebGL 2 path; `hold` stops the free-running loop for scripted stepping;
 `boxes` draws the sim's hurt, limb, hit and shot boxes over the picture).
 
+## Model pass: the wolf rebuilt, the crow's tail, two muzzles (bolster-models)
+
+Render only: no sim, frame data, hit box, netcode or balance change (the sim
+files are untouched; hashes, rollback and online unchanged). Kevalanche,
+K8-E and Rubberta are untouched (the benchmark).
+
+- **Sebas Perra, rebuilt** (`render/wolf.js`) to the owner's reference
+  (`assets/refs/wolf-plush-ref.png`): a standing plush on Kevalanche's
+  anatomy (Grommet's `standingBody`, the same fur and soft body) instead of
+  Flock's sitting wolf. A big round head as wide as the body; a short
+  rounded cream muzzle with a small dark sewn-on nose; glossy bead eyes set
+  wide; tall pointed ears (grey, cream inside, dark tips); soft grey cheek
+  ruffs (short free chains that lag a turn or a hit); grey on top, back and
+  limbs, a cream face, chest-and-belly oval, paw ends and feet; short stubby
+  arms sunk into soft shoulders, resting low and forward (`READY.lucha`);
+  short legs; a big bushy tail curling up behind him, grey with a cream tip
+  (it lags and wags: Grommet's Athlete). The luchador mask is the same
+  painting (`render/masks.js`) with its eye holes moved to the new eyes: it
+  wraps the skull and leaves the ears and muzzle free. The evil twin's felt
+  sash (`render/attire.js`) is re-laid on the new torso (shoulder to hip,
+  across the chest). Moves, name, voice unchanged; Flock's `buildWolf` is
+  no longer used (the shared copy is untouched). The card portrait is
+  reframed for the taller head (`render/showcase.js`).
+- **Zach's body into his tail** (`render/crow.js`): Grommet's crow with a
+  new back end. The rump and flat tail ellipsoids (a step and a stick-like
+  join) are replaced, as drawn, by one teardrop laid from the chest down to
+  the tail, and a fan of five layered plush feathers growing out of its
+  point (free flat chains rooted inside it: they lag hops, hits and turns,
+  and the middle one wags). The old rump and tail stay as stuffing, so he
+  stands and falls the same. Wings and their felt primaries untouched
+  (bolster-polish's).
+- **Sumaura's and Johnny's muzzles** (`render/muzzles.js`, OG and ALT): the
+  muzzle grid reshaped (panda short and broad; leopard a short cat's
+  muzzle) with a short tidy pile that lengthens toward its back edge so it
+  blends into the face; the head's pile cut short round the seam so no face
+  fur pokes over it; the old marks cleared; a sewn-on felt nose (panda a
+  black rounded pad, leopard a pink-brown cat's triangle), a small stitched
+  mouth, the leopard's whisker pads (a groove between) with three fine
+  whisker dots each.
+- Evidence: `node tools/models-shots.mjs [wolf|wolf-head|wolf-play|crow|muzzles|compare]
+  [--html F] [--tag before|after]` → `shots/models/` (before shots from the
+  previous build; `compare-*.png` side by side, the wolf next to the
+  reference), `node tools/twins-shots.mjs --lineup` → `shots/twins/lineup-*.png`.
+
 ## UI personality pass (bolster-ui)
 
 Cosmetic only: nothing reaches the sim, its hash, frame data, hitboxes,
@@ -304,7 +348,7 @@ Two new fighters, seven in all, and a practice mode.
 
 | Fighter | Animal | From | Signature (S+P) | Special (Space) | Dive slam | Throw |
 |---|---|---|---|---|---|---|
-| Sebas Perra 🇲🇽 | wolf | Flock's wolf, front legs freed as arms; a luchador's mask | Lobo Slide — a low baseball-slide kick, a knockdown | Aullido de la Luna — the full moon behind him, a howl that blasts up close (mid) and a shockwave that rolls along the mat (low) | Moonsault (a backflip, a body splash) | Huracanrana (a hop, a flip, the toss) |
+| Sebas Perra 🇲🇽 | wolf | a standing plush wolf (bolster-models: `render/wolf.js`; was Flock's wolf, front legs freed as arms); a luchador's mask | Lobo Slide — a low baseball-slide kick, a knockdown | Aullido de la Luna — the full moon behind him, a howl that blasts up close (mid) and a shockwave that rolls along the mat (low) | Moonsault (a backflip, a body splash) | Huracanrana (a hop, a flip, the toss) |
 | Zach Sparrow 🇨🇦 | crow | Grommet's crow, felt beak and all (the fixed beak and wings of #20/#24/#25) | Bottle Cap Flick — a shiny cap, one on screen at a time, with #27's limits (16 startup, 44 recovery, 120/tick, chip 4) | Murder Most Fowl — seven crows sweep across from behind him, high and low | Dive Bomb (beak first, on a slant: `diveX`) | Peck & Toss |
 
 - **Sebas**: an agile middleweight (1030 STUFFING, walk 58/46, a high jump he
@@ -325,9 +369,10 @@ Two new fighters, seven in all, and a practice mode.
   matches. Frame data: `docs/FRAMES.md`; balance: `docs/BALANCE.md` (Normal,
   every pairing within 65/35).
 - **How they're built** (`render/puppets.js`): `WolfPuppet` and `CrowPuppet`
-  are bipeds on Grommet's Athlete like Kevalanche. The wolf is Flock's rig
+  are bipeds on Grommet's Athlete like Kevalanche. The wolf was Flock's rig
   with `buildWolf({ fighter: true })` (front legs out of the torso's cloud,
-  named as the arms — Flock's wolf is unchanged without it); the crow's beak
+  named as the arms); since bolster-models he is `render/wolf.js`, a
+  standing plush on Kevalanche's anatomy; the crow's beak
   is `crowprops.js`'s two mandibles riding the head's shape-matched frame,
   opening for pecks, caws and wins. `acro(F)` turns the whole plush in the
   screen's plane for the flips (render only; the sim's boxes don't turn).
@@ -554,7 +599,7 @@ Evidence: `shots/online/` (loopback) and `shots/online-peerjs/` (real PeerJS).
 | Johnny Deuce 🇳🇱 | leopard | Grommet's tennis leopard, racquet in hand | Serve (a tennis-ball projectile) | Match Point — a volley of five serves |
 | Sumaura 🇬🇧 | panda | one of Grommet's sumo pandas (the champion) | Bamboo Headbutt (a flying charge) | Hundred Paw Slap ending in the Royal Squash |
 | K8-E 🇨🇦 | giraffe | Grommet's ring-toss giraffe | Ring Toss (a felt-ring projectile) | Sky Neck — the neck goes up out of shot and comes down on them |
-| Sebas Perra 🇲🇽 | wolf | Flock's wolf, a luchador | Lobo Slide (low) | Aullido de la Luna — the moon, the howl, a rolling shockwave |
+| Sebas Perra 🇲🇽 | wolf | a standing plush wolf, a luchador | Lobo Slide (low) | Aullido de la Luna — the moon, the howl, a rolling shockwave |
 | Zach Sparrow 🇨🇦 | crow | Grommet's crow, a thief | Bottle Cap Flick (a projectile) | Murder Most Fowl — a swarm of crows |
 
 ## How it's put together
