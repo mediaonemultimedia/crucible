@@ -88,8 +88,13 @@ compare (e.g. `final.html?p1=kevalanche&p2=johnny&feel=old`).
   move keeps the soft body together. `tools/feel-probe.mjs` (node: fist reach
   and height per tick, old vs new). Evidence: `node tools/feel-shots.mjs
   [--html F] [--q '&feel=old'] [--out D] [--clips] [scene …]` →
-  `shots/feel/before`, `shots/feel/after`, `shots/feel/clips/` (GIFs at half
-  speed), `shots/feel/compare-*.png`.
+  `shots/feel/before`, `shots/feel/after` (every move, plus walk, jump, block,
+  hit, K.O.), `shots/feel/compare-*.png` (before over after),
+  `shots/feel/clips/side-by-side-{jab,heavy,uppercut}.gif` (every tick, half
+  speed), `shots/feel/alt/` (the hockey goon), `shots/feel/feel-old-check.png`
+  (`?feel=old` against the old build), `shots/feel/online/` (an online
+  Kevalanche ALT match over two pages, in sync). `node tools/feel-fps.mjs`:
+  the game's CPU time per frame in a CPU match, feel vs `?feel=old`.
 
 ## OG / ALT, practice keys, twin polish (bolster-polish)
 
