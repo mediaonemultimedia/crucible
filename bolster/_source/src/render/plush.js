@@ -23,8 +23,9 @@ import { buildLeopard } from '../../shared/grommet/athletes/leopard.rig.js';
 import { buildPandaSolo } from '../../shared/grommet/athletes/panda.rig.js';
 import { buildGiraffe } from '../../shared/grommet/athletes/giraffe.rig.js';
 import { buildRig as buildFlockRig } from '../../shared/flock/rig.js';
-import { buildWolf } from '../../shared/flock/rigs.js';
-import { buildCrow } from '../../shared/grommet/athletes/crow.rig.js';
+import { buildWolfPlush, paintWolfFace, WOLF } from './wolf.js';
+import { buildCrowPlush } from './crow.js';
+import { refit as refitMuzzle, paintMuzzle, makeNose } from './muzzles.js';
 import { makeBeak, poseBeak } from '../../shared/grommet/crowprops.js';
 import { paintLuchaMask, paintBanditMask, makeGoldChain } from './masks.js';
 import { makeRacquet, poseRacquet, makeStars, poseStars, shade } from '../../shared/grommet/props.js';
@@ -53,11 +54,16 @@ export const LOOKS = {
     // the Sith's tennis whites: black piqué, red trim (cuffs, hem, the
     // embroidered ball) and a red terry headband
     evil: { ...G.leopard.colors.panther, cloth: '#211e25', trim: '#c4161f', band: '#c8121c' },
+    // a refined cat's muzzle: whisker pads, a pink-brown triangle of a nose
+    // (render/muzzles.js)
+    muzzle: 'leopard', nose: 'leopard', rig: (rig) => refitMuzzle(rig, 'leopard'),
   },
   sumaura: {
     build: buildPandaSolo, info: () => G.panda, paint: 'panda', Puppet: (s) => new BipedPuppet(s, 'sumo'), yaw: 0.8,
     colors: G.panda.colors.classic,
     evil: { ...G.panda.colors.qinling, trim: '#1f1d20' },
+    // a short, broad, rounded muzzle and a black rounded nose (render/muzzles.js)
+    muzzle: 'panda', nose: 'panda', rig: (rig) => refitMuzzle(rig, 'panda'),
   },
   k8e: {
     build: buildGiraffe, info: () => G.giraffe, paint: 'giraffe', Puppet: (s) => new GiraffePuppet(s), yaw: 1.2,
@@ -69,21 +75,24 @@ export const LOOKS = {
     colors: { ...F_INFO.octopus.colors.coral, spot: '#c4553e', nose: '#8a5a62', cloth: '#ffffff', trim: '#ffffff' },
     evil: { ...F_INFO.octopus.colors.lagoon, fur: '#2f6f8f', accent: '#2f6f8f', under: '#bfe0e8', spot: '#1d4a60', nose: '#203040', cloth: '#ffffff', trim: '#ffffff' },
   },
-  // Flock's wolf, front legs freed as arms, in a luchador's mask: the
-  // técnico's emerald with white trim; his evil twin a darker wolf in the
-  // rudo's black and red (spot: the mask, nose: its trim)
+  // a standing plush wolf (render/wolf.js, to the owner's reference) in a
+  // luchador's mask: the técnico's emerald with white trim; his evil twin a
+  // darker wolf in the rudo's black and red (spot: the mask, nose: its trim)
   sebas: {
-    build: () => buildWolf({ fighter: true }), info: () => ({ ...F_INFO.wolf, pile: 9 }), paint: 'wolf', Puppet: (s) => new WolfPuppet(s), yaw: 0.8,
-    colors: { ...F_INFO.wolf.colors.grey, spot: '#14915a', nose: '#f4f1ea', cloth: '#ffffff', trim: '#ffffff' },
+    build: buildWolfPlush, info: () => ({ ...F_INFO.wolf, eyes: WOLF.EYES, pile: 11, stitch: [0.035, 0.03, 0.035] }), paint: 'wolfplush', Puppet: (s) => new WolfPuppet(s), yaw: 0.8,
+    colors: { ...F_INFO.wolf.colors.grey, fur: '#7e8189', accent: '#5e6169', under: '#efe6d6', spot: '#14915a', nose: '#f4f1ea', cloth: '#ffffff', trim: '#ffffff' },
     evil: { ...F_INFO.wolf.colors.dusk, fur: '#4f515d', accent: '#2c2d36', under: '#b9b1a6', spot: '#151318', nose: '#d4102c', cloth: '#ffffff', trim: '#ffffff' },
-    mask: (m, p, rig, evil) => paintLuchaMask(m, p, rig, { evil }), noMonocle: true,
+    mask: (m, p, rig, evil) => paintLuchaMask(m, p, rig, { evil, eu: WOLF.EYES.u, ev: WOLF.EYES.v }), noMonocle: true,
+    // a small dark sewn-on nose (its `nose` colour is the mask's trim)
+    nose: 'wolf', noseColor: ['#1e1b1d', '#121013'],
     // the evil twin's felt sash (render/attire.js), shoulder to hip
-    sash: { part: 'torso' },
+    sash: { part: 'torso', vc: 0.42, A: 0.26, us: 0.68 },
   },
-  // Grommet's crow with his felt beak; his evil twin an ash-grey crow in a
+  // Grommet's crow with his felt beak, his body a smooth teardrop running
+  // into a fan of plush tail feathers (render/crow.js); his evil twin an ash-grey crow in a
   // bandit's mask, wearing a stolen gold chain
   zach: {
-    build: buildCrow, info: () => G.crow, paint: 'crow', Puppet: (s) => new CrowPuppet(s), yaw: 0.85,
+    build: buildCrowPlush, info: () => G.crow, paint: 'crow', Puppet: (s) => new CrowPuppet(s), yaw: 0.85,
     colors: G.crow.colors.crow,
     evil: { fur: '#7d7a86', under: '#8c8995', accent: '#86838f', spot: '#121115', nose: '#2a292f', cloth: '#2a292f', trim: '#2a292f', sheen: '#1e1e3a', beak: 1 },
     mask: (m, p, rig, evil) => { if (evil) paintBanditMask(m, p, rig); }, chain: true, noMonocle: true,
@@ -198,11 +207,13 @@ export class Plush {
       const g = this.patTex.userData.ctx;
       g.fillStyle = '#000'; g.fillRect(0, 0, this.patTex.userData.size, this.patTex.userData.size);
       this.patTex.needsUpdate = true;
-    } else if (L.paint === 'panda') paintSoloPanda(this.maskTex, this.patTex, rig);
+    } else if (L.paint === 'wolfplush') paintWolfFace(this.maskTex, this.patTex, rig);
+    else if (L.paint === 'panda') paintSoloPanda(this.maskTex, this.patTex, rig);
     else paintAthlete(this.maskTex, this.patTex, L.paint, rig);
     shaveCaps(this.maskTex, rig);
     if (!TW) L.mask?.(this.maskTex, this.patTex, rig, evil);
     TW?.paint?.(this.maskTex, this.patTex, rig);
+    if (L.muzzle) paintMuzzle(this.maskTex, this.patTex, rig, L.muzzle);
     this.setColors(TW ? TW.colors : evil ? L.evil : L.colors);
     this.fur.uniforms.glow.value = TW?.glow || 0;
     this.fur.uniforms.pile.value = (info.pile || 9) / 90;
@@ -221,6 +232,12 @@ export class Plush {
     }
     const eyeMat = makeEyeMaterial(), eyeGeo = new THREE.SphereGeometry(1, 32, 22);
     this.eyes = [-1, 1].map((s) => { const m = new THREE.Mesh(eyeGeo, eyeMat); m.userData.side = s; group.add(m); return m; });
+    if (L.nose) {
+      // a sewn-on felt nose on the muzzle (render/muzzles.js)
+      const nc = L.noseColor ? L.noseColor[evil ? 1 : 0] : (TW ? TW.colors : evil ? L.evil : L.colors).nose;
+      this.nose = makeNose(L.nose, nc);
+      group.add(this.nose.mesh);
+    }
     // the Sith twins (render/sith.js): Evil Johnny's red racquet, red eyes
     this.sith = evil && !!SITH[id];
     if (rig.racquet) { this.racquet = this.sith ? makeSithRacquet() : makeRacquet(); group.add(this.racquet); }
@@ -421,6 +438,7 @@ export class Plush {
     P.headCentre(this.hc);
     poseStars(this.stars, this.hc, P.daze, this.time);
     this._eyes();
+    this.nose?.update(this);
     this._hat();
     this.twin?.update(dt);
   }

@@ -37,3 +37,11 @@ colourways (`flock/characters.js`) and arm-grasp state machine
   material — the terry (style 3) headband can be its own colour (the Sith
   Johnny's red headband over black tennis whites). Off by default:
   every other kit unchanged.
+
+## bolster-models
+
+No shared file changed. The rebuilt wolf (`src/render/wolf.js`), the crow's
+new back end (`src/render/crow.js`) and the refined muzzles
+(`src/render/muzzles.js`) are built from outside with the shared builders
+(`rigbuilder.js`, `athletes/standing.js`, `crow.rig.js`'s `CROW`).
+`flock/rigs.js`'s `buildWolf({ fighter })` is no longer used by Bolster.
