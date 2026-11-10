@@ -18,6 +18,8 @@ const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ?
 const broker = arg('broker', null), lag = arg('lag', null);
 // who each side plays (the cursor's moved there on the shared select)
 const P1 = arg('p1', 'sumaura'), P2 = arg('p2', 'johnny');
+// --alt 1|2: that seat flips to its evil twin (OG / ALT) on the shared select
+const ALT = arg('alt', null);
 const NAMES = ['Kevin', 'John'];
 const ROSTER = ['kevalanche', 'rubberta', 'johnny', 'sumaura', 'k8e', 'sebas', 'zach'];
 const out = path.join(root, 'shots', arg('out', broker ? 'online-peerjs' : 'online'));
@@ -110,6 +112,7 @@ const curs = await Promise.all([A, B].map((p) => p.evaluate(() => window.__bolst
 for (let i = curs[0][0]; i !== ROSTER.indexOf(P1); i = (i + 1) % ROSTER.length) await A.keyboard.press('KeyD');
 for (let i = curs[1][1]; i !== ROSTER.indexOf(P2); i = (i + 1) % ROSTER.length) await B.keyboard.press('KeyD');
 await both(0.2, 3);
+if (ALT) { await (ALT === '1' ? A : B).keyboard.press('KeyW'); await both(0.2, 3); }
 const sel = await Promise.all([A, B].map((p) => p.evaluate(() => ({ pick: window.__bolster.pick, step: document.querySelector('#select-step').textContent, p2: document.querySelector('.plate.p2 .nm').textContent, p1: document.querySelector('.plate.p1 .nm').textContent }))));
 console.log('select', JSON.stringify(sel));
 await shot('3-select');
@@ -126,6 +129,11 @@ console.log('match start', JSON.stringify(starts));
 if (starts[0].p1 !== P1 || starts[0].p2 !== P2) errs.push(`picked ${starts[0].p1} v ${starts[0].p2}, wanted ${P1} v ${P2}`);
 if (starts.some((m) => m.hash !== m.fresh) || starts[0].hash !== starts[1].hash || starts[0].seed !== starts[1].seed) errs.push('the online match did not start from the fresh state on both');
 if (seed0 === undefined) errs.push('no seed');
+// OG / ALT: both pages draw the same looks; the variant isn't in the sim (the fresh-hash check above)
+const looks = await Promise.all([A, B].map((p) => p.evaluate(() => ({ evil: window.__bolster.fight.evil, names: [0, 1].map((k) => window.__bolster.fight.name(k)) }))));
+console.log('looks', JSON.stringify(looks));
+if (JSON.stringify(looks[0]) !== JSON.stringify(looks[1])) errs.push('the two pages draw different variants');
+if (ALT && !looks[0].evil[+ALT - 1]) errs.push(`seat ${ALT} is not ALT`);
 // scripted inputs: a hard CPU on each side, each playing only its own fighter
 for (const [p, k] of [[A, 0], [B, 1]]) {
   await p.evaluate((k) => {

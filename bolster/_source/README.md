@@ -45,6 +45,40 @@ to the computer too; `seed=N` fixes the match seed; `toques=1`; `webgl` forces
 the WebGL 2 path; `hold` stops the free-running loop for scripted stepping;
 `boxes` draws the sim's hurt, limb, hit and shot boxes over the picture).
 
+## OG / ALT, practice keys, twin polish (bolster-polish)
+
+- **OG / ALT on character select** (`ui/variant.js`): every fighter can be
+  picked as the original or the evil twin, in every mode; the grid stays 7
+  cards. The highlighted card carries an OG | ALT switch (W / S or ↑ / ↓;
+  versus: each player's own jump / crouch keys; or click it); the preview
+  swaps live, the card and plate show the twin's title (Hockey Goon,
+  Anglerfish, Sith Ace, Tuxedo Villain, Punk, El Rudo, Ghost Pirate).
+  Mirror rule: same fighter and same variant → the second seat flips.
+  Vs Computer: the computer's seat starts ALT on a seeded coin (35 %).
+  Each seat's last variant per fighter is remembered for the session.
+  Online: `cur` / `lock` carry `v` (0 / 1), the host's `start` carries both
+  resolved variants. Cosmetic only — never in the sim, its hash or
+  rollback (`test/variant.test.mjs`). Deep links: `alt1=1`, `alt2=1`.
+- **Practice keys panel:** the one-player keyboard (main block + arrows,
+  live bindings) in the right column under Combo; **K** hides / shows it
+  (default on); H still hides every panel.
+- **Evil Sebas:** hood and cloak gone; the rudo mask, red eyes and colours
+  kept; a black felt sash with crimson rolled edges and a stitched seam,
+  re-laid on the torso's skin every frame (`render/attire.js`, needs only
+  the `torso` grid, so it carries over to the wolf remodel).
+- **Evil Johnny:** hood and cloak gone; black tennis whites (red cuffs,
+  hem and ball) and a red terry headband (`shared/CHANGES.md`: cloth
+  `band`); dark fur, red eyes, red racquet kept.
+- **Zach's wings (OG and ALT):** folded and tucked against his sides at
+  rest; the drawn wing tapers from a broad wrist to a point; its flat axis
+  turns with the pose; four layered felt primaries at each tip lie along
+  the folded wing and fan open as it opens (attacks, jump, block). Body
+  and tail untouched.
+- Evidence: `node tools/alt-shots.mjs`, `node tools/wing-shots.mjs`,
+  `node tools/twins-shots.mjs --out shots/polish/after sebas johnny zach`,
+  `node tools/online-match.mjs --p1 sebas --p2 johnny --alt 2 --out polish/online-alt`
+  → `shots/polish/`; before shots in `shots/polish/before/`.
+
 ## Keyboard legend and new evil twins (bolster-keys)
 
 ### The keyboard legend (`ui/keymap.js`)

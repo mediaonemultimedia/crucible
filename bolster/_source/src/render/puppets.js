@@ -25,7 +25,7 @@
    the plush's group takes (render only; the sim's boxes don't turn).     */
 
 import { Athlete, clamp, spring, ease, TAU } from '../../shared/grommet/athletes/game.js';
-import { Pose } from '../../shared/grommet/pose.js';
+import { Pose, rodrigues } from '../../shared/grommet/pose.js';
 import { rightUp, settle } from '../../shared/grommet/balance.js';
 import { racquetFrame } from '../../shared/grommet/athletes/leopard.game.js';
 import { CROW } from '../../shared/grommet/athletes/crow.rig.js';
@@ -136,10 +136,11 @@ const READY = {
   boxer:  { R: [-0.28, 0.42, 0.86], L: [0.2, 0.5, 0.86], lean: 0.12 },
   tennis: { R: [-0.75, 0.05, 0.65], L: [0.45, 0.1, 0.85], lean: 0.08 },
   sumo:   { R: [-0.8, -0.05, 0.6], L: [0.8, -0.05, 0.6], lean: 0.2 },
-  // the wolf's front paws up in a luchador's crouch; the crow's wings held
-  // half open in front of him, a thief's hands ready
+  // the wolf's front paws up in a luchador's crouch; the crow's wings
+  // folded and tucked against his sides (back and down, as they're sewn),
+  // a touch off the body: they open for his moves
   lucha:  { R: [-0.45, 0.25, 0.85], L: [0.35, 0.4, 0.85], lean: 0.1 },
-  thief:  { R: [-0.75, 0.05, 0.65], L: [0.75, 0.15, 0.6], lean: 0.12 },
+  thief:  { R: [0.08, -0.7, -0.72], L: [-0.08, -0.7, -0.72], lean: 0.12 },
 };
 
 export class BipedPuppet extends FightMixin(Athlete) {
@@ -1019,6 +1020,20 @@ export class CrowPuppet extends BipedPuppet {
       k = 1100;
     } else return super._attack(F, ph, R, L, lean, k, wrist);
     return { R, L, lean, k, wrist };
+  }
+
+  /* the wings' flat axes turn with them (as Grommet's crow's do when he
+     beats): folded, a wing lies flat against his side; opened, it stays a
+     wing seen edge-on to its sweep, not a plank turned to us */
+  _bones() {
+    const out = super._bones();
+    [this.cfg.armR, this.cfg.armL].forEach((k, j) => {
+      const ch = this.rig.arms[k];
+      if (!ch.ref0) ch.ref0 = [...ch.ref];
+      const M = rodrigues(out[j].rv[0], out[j].rv[1], out[j].rv[2], _A), r = ch.ref0;
+      ch.ref = [M[0] * r[0] + M[1] * r[1] + M[2] * r[2], M[3] * r[0] + M[4] * r[1] + M[5] * r[2], M[6] * r[0] + M[7] * r[1] + M[8] * r[2]];
+    });
+    return out;
   }
 
   _think(dt) {

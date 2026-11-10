@@ -10,6 +10,7 @@
 import { host, join, roomCode, cleanRoom } from './net/link.js';
 import { ROSTER } from './fighters/index.js';
 import { cleanName } from './ui/players.js';
+import { selectMsg, readSelect, startMsg, readStart } from './ui/variant.js';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -217,17 +218,22 @@ export class Online {
     A.picking = this.local;
     A.locked = [false, false];
     if (A.pick[0] === A.pick[1] && A.pick[0] === 0) A.pick[1] = 1;
-    this.send({ t: 'cur', i: A.pick[this.local] });
+    A.alt[this.local] = A._altFor(this.local, A.pick[this.local]);
+    this.cursor();
     A._paintSelect();
   }
 
-  selectKey(k, { left, right, ok, back }) {
+  /* this side's cursor and variant (OG / ALT: cosmetic, both peers draw the same look) */
+  cursor() { const A = this.app; this.send(selectMsg('cur', A.pick[this.local], A.alt[this.local])); }
+
+  selectKey(k, { left, right, up, down, ok, back }) {
     const A = this.app;
     if (k === 'KeyE') { A.eggKeys = 'e'; return; }
     if (k === 'KeyH' && A.eggKeys === 'e') { A.eggKeys = ''; A._toques(); return; }   // local only
     A.eggKeys = '';
     if (k === 'Escape') { this.leave(); return; }
     if (left || right) { if (!A.locked[this.local]) this.choose((A.pick[this.local] + (left ? -1 : 1) + ROSTER.length) % ROSTER.length, false); return; }
+    if (up || down) { A._toggleAlt(this.local); return; }
     if (ok) { this.lock(); return; }
     if (back && A.locked[this.local] && !this.starting) { A.locked[this.local] = false; this.send({ t: 'unlock' }); A._paintSelect(); }
   }
@@ -235,8 +241,8 @@ export class Online {
   choose(i, lock) {
     const A = this.app;
     if (A.locked[this.local]) return;
-    A.pick[this.local] = i;
-    this.send({ t: 'cur', i });
+    A._setPick(this.local, i);
+    this.cursor();
     A._paintSelect();
     if (lock) this.lock();
   }
@@ -245,7 +251,7 @@ export class Online {
     const A = this.app;
     if (A.locked[this.local]) return;
     A.locked[this.local] = true;
-    this.send({ t: 'lock', i: A.pick[this.local] });
+    this.send(selectMsg('lock', A.pick[this.local], A.alt[this.local]));
     A._paintSelect();
     this._maybeStart();
   }
@@ -255,13 +261,13 @@ export class Online {
     if (this.role !== 'host' || !A.locked[0] || !A.locked[1] || this.starting) return;
     this.starting = true;
     const seed = ((crypto.getRandomValues(new Uint32Array(1))[0] >>> 0) % 0x7fffffff) || 1;
-    const m = { t: 'start', p1: ROSTER[A.pick[0]], p2: ROSTER[A.pick[1]], seed, n: this.matchNo + 1 };
+    const m = startMsg({ p1: ROSTER[A.pick[0]], p2: ROSTER[A.pick[1]], seed, n: this.matchNo + 1, alt: A.variants() });
     this.send(m);
     // a beat on the locked-in picks, then fight
     A.later(0.6, () => this.start(m));
   }
 
-  paintSelect(ids, mirror, plate) {
+  paintSelect(ids, plate) {
     const A = this.app, L = this.local;
     for (const c of $$('.card')) {
       const i = ROSTER.indexOf(c.dataset.id);
@@ -271,8 +277,9 @@ export class Online {
       if (i === A.pick[0]) c.insertAdjacentHTML('beforeend', `<span class="tag t1">${L === 0 ? 'You' : 'P1'}</span>`);
       if (i === A.pick[1]) c.insertAdjacentHTML('beforeend', `<span class="tag t2">${L === 1 ? 'You' : 'P2'}</span>`);
     }
-    plate('.plate.p1', ids[0], false, A.locked[0], true);
-    plate('.plate.p2', ids[1], mirror, A.locked[1], true);
+    const eff = A._paintAlt([0, 1]);
+    plate('.plate.p1', ids[0], eff[0], A.locked[0], true);
+    plate('.plate.p2', ids[1], eff[1], A.locked[1], true);
     const nm = (k) => (k === L ? A.myName : this.remoteName) || `Player ${k + 1}`;
     $('.plate.p1 .who').textContent = L === 0 ? `${nm(0)} · you` : nm(0);
     $('.plate.p2 .who').textContent = L === 1 ? `${nm(1)} · you` : nm(1);
@@ -280,10 +287,10 @@ export class Online {
     $('#select-step').textContent = A.locked[L]
       ? (A.locked[R] ? 'Both locked in — fight!' : `Locked in — waiting for Player ${R + 1}…`)
       : `You’re Player ${L + 1} (${L === 0 ? 'pink' : 'mint'}) — pick your fighter`;
-    $('#select-hint').textContent = A.locked[L] ? 'P to change your mind · Esc to leave' : 'A / D to choose · O to lock in · Esc to leave';
+    $('#select-hint').textContent = A.locked[L] ? 'P to change your mind · Esc to leave' : 'A / D to choose · W / S for OG or ALT · O to lock in · Esc to leave';
     if (A.show) {
-      A.show.set(0, ids[0], { toque: A.toques });
-      A.show.set(1, ids[1], { evil: mirror, toque: A.toques });
+      A.show.set(0, ids[0], { evil: eff[0], toque: A.toques });
+      A.show.set(1, ids[1], { evil: eff[1], toque: A.toques });
     }
   }
 
@@ -294,9 +301,9 @@ export class Online {
     if (!this.on) return;
     this.starting = false;
     this.matchNo = m.n;
-    const A = this.app;
+    const A = this.app, S0 = readStart(m);
     A.startFight({
-      p1: m.p1, p2: m.p2, seed: m.seed,
+      p1: S0.p1, p2: S0.p2, seed: S0.seed, alt: S0.alt,
       net: { local: this.local, send: (p) => this.link?.send('in', { ...p, n: m.n }), onDesync: (d, st) => this.desync(d, st) },
     });
     const S = A.fight.session;
@@ -333,8 +340,8 @@ export class Online {
     }
     switch (m.t) {
       case 'name': this.remoteName = cleanName(m.name); if (A.screen === 'select') A._paintSelect(); if (A.fight && !A.fight.practice) $(`#pn${this.remote + 1}`).textContent = A.seatLabel(this.remote); break;
-      case 'cur': A.pick[this.remote] = m.i; if (A.screen === 'select') A._paintSelect(); break;
-      case 'lock': A.pick[this.remote] = m.i; A.locked[this.remote] = true; if (A.screen === 'select') A._paintSelect(); this._maybeStart(); break;
+      case 'cur': { const r = readSelect(m); A.pick[this.remote] = r.i; A.alt[this.remote] = r.alt; } if (A.screen === 'select') A._paintSelect(); break;
+      case 'lock': { const r = readSelect(m); A.pick[this.remote] = r.i; A.alt[this.remote] = r.alt; } A.locked[this.remote] = true; if (A.screen === 'select') A._paintSelect(); this._maybeStart(); break;
       case 'unlock': A.locked[this.remote] = false; if (A.screen === 'select') A._paintSelect(); break;
       case 'start': if (this.role === 'guest') A.later(0.6, () => this.start(m)); break;   // the same beat as the host
       case 'ping': this.send({ t: 'pong', ts: m.ts }); break;

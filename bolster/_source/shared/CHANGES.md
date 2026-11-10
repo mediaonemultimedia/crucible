@@ -30,3 +30,10 @@ octopus rig unchanged).
 Flock's source branch has no README; its rig (`flock/rig.js`), face and
 colourways (`flock/characters.js`) and arm-grasp state machine
 (`flock/grasp.js`, for reference) come from `flock/_source/src/`.
+
+## bolster-polish
+
+- `grommet/cloth.js`: a `band` colour and a `bandOn` switch on the cloth
+  material — the terry (style 3) headband can be its own colour (the Sith
+  Johnny's red headband over black tennis whites). Off by default:
+  every other kit unchanged.

@@ -2,8 +2,9 @@
    reaches the sim).
 
    Johnny Deuce and Sebas Perra have evil twins that read as the dark side
-   of the same fighter: a hooded cowl and a short cloak over their evil
-   colours, eyes that glow red (Sebas's through the rudo's mask), and red
+   of the same fighter: their evil colours (Johnny in black tennis whites
+   and a red headband, Sebas the rudo's mask and a felt sash —
+   render/attire.js), eyes that glow red (Sebas's through the rudo's mask), and red
    swing trails. Evil Johnny swings a red racquet — glossy red frame, red
    strings, a white stencilled mark, a black-and-red striped throat, a
    black grip — that hums: a red rim glow that shimmers along the frame.
@@ -155,99 +156,7 @@ export function makeSithRacquet() {
   return g;
 }
 
-/* ── the hooded cowl and the cloak ────────────────────────────────────────
-   Heavy dark wool: near-black with a deep oxblood cast, the inside darker
-   still, a faint red at the silhouette (the glow of the eyes inside). */
-function robeMaterial(lining) {
-  const m = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide });
-  const L = vec3(...lining);
-  m.colorNode = Fn(() => {
-    const N0 = normalize(normalWorld);
-    const N = select(frontFacing, N0, N0.negate());
-    const V = normalize(cameraPosition.sub(positionWorld));
-    const p = positionLocal;
-    // a soft twill: fine diagonal ribs, barely there
-    const twill = smoothstep(0.3, 0.7, fract(p.x.add(p.y).mul(60))).mul(0.004);
-    const outside = vec3(0.026, 0.017, 0.021).add(twill);
-    const base = select(frontFacing, outside, L);
-    const glowIn = select(frontFacing, vec3(0, 0, 0), L.mul(0.5));
-    // a red rim light at the silhouette (the dark side's back light)
-    const rim = pow(float(1).sub(abs(dot(N, V))), float(6)).mul(0.3);
-    const sheen = select(frontFacing, rim, rim.mul(1.4));
-    return vec4(shade(base, N, { spec: 0.025, power: 8, wrap: 0.45 }).add(glowIn).add(vec3(0.6, 0.035, 0.03).mul(sheen)), 1);
-  })();
-  return m;
-}
-
-/* a cowl over the back and top of the head, open wide at the face (+z),
-   the ears through it; r: the head part's radii */
-export function makeHood(r, k = 1.2) {
-  const g = new THREE.Group();
-  const src = new THREE.SphereGeometry(1, 48, 28, 0, Math.PI * 2, 0, Math.PI * 0.64);
-  // the face window: an oval cut out of the front, brow to chin, so the crown
-  // and the sides stay covered; the brow edge brought forward a little
-  const P = src.attributes.position;
-  const face = (x, y, z) => {
-    const az = Math.atan2(x, z), el = Math.asin(Math.max(-1, Math.min(1, y)));
-    return (az / 1.05) ** 2 + ((el + 0.25) / 0.72) ** 2;
-  };
-  for (let i = 0; i < P.count; i++) {
-    let x = P.getX(i), y = P.getY(i), z = P.getZ(i);
-    const f = face(x, y, z);
-    if (f < 1.6 && y > 0.1 && z > 0) z += (1.6 - f) * 0.12;
-    if (z < 0 && y < 0.25) y -= (0.25 - y) * 0.7 * Math.min(1, -z * 1.6);
-    // soft folds: wool gathered round the head, deeper at the back and the drape
-    const az = Math.atan2(x, z), back = Math.max(0, -z), w = 1 + (Math.sin(az * 7 + y * 4) * 0.04 + Math.sin(az * 13 - y * 9) * 0.015) * (0.4 + back);
-    P.setXYZ(i, x * w, y, z * w);
-  }
-  const ix = src.index.array, keep = [];
-  for (let t = 0; t < ix.length; t += 3) {
-    let cx = 0, cy = 0, cz = 0;
-    for (let j = 0; j < 3; j++) { cx += P.getX(ix[t + j]) / 3; cy += P.getY(ix[t + j]) / 3; cz += P.getZ(ix[t + j]) / 3; }
-    const l = Math.hypot(cx, cy, cz) || 1;
-    if (face(cx / l, cy / l, cz / l) >= 1) keep.push(ix[t], ix[t + 1], ix[t + 2]);
-  }
-  src.setIndex(keep);
-  src.computeVertexNormals();
-  const hood = new THREE.Mesh(src, robeMaterial([0.09, 0.006, 0.01]));
-  hood.scale.set(r[0] * k, r[1] * (k + 0.04), r[2] * k);
-  hood.position.set(0, r[1] * 0.06, -r[2] * 0.04);
-  g.add(hood);
-  g.traverse((o) => { o.frustumCulled = false; });
-  g.visible = false;
-  return g;
-}
-
-/* a cloak from the shoulders to the shins round the back and sides, open
-   at the front, lined in crimson; r: the torso's radii, h: its length */
-export function makeCloak(r, h) {
-  const g = new THREE.Group();
-  const prof = [];
-  const top = r[0] * 0.95, bot = r[0] * 1.55;
-  for (let k = 0; k <= 14; k++) {
-    const t = k / 14;
-    prof.push(new THREE.Vector2(top + (bot - top) * Math.pow(t, 0.7), -h * t));
-  }
-  // a shoulder yoke: the top edge turned in toward the neck
-  prof.unshift(new THREE.Vector2(r[0] * 0.55, h * 0.04));
-  const half = Math.PI * 0.66;          // round the back (−z), each way
-  const geo = new THREE.LatheGeometry(prof, 48, Math.PI - half, 2 * half);
-  // folds: a ripple round it, deeper toward the hem; the depth follows the torso
-  const P = geo.attributes.position;
-  for (let i = 0; i < P.count; i++) {
-    const x = P.getX(i), y = P.getY(i), z = P.getZ(i);
-    const a = Math.atan2(x, z), d = Math.max(0, -y / h);
-    const f = 1 + Math.sin(a * 8) * 0.06 * d;
-    P.setXYZ(i, x * f, y, z * f * (r[2] / r[0]) * 1.1 - d * 0.12);
-  }
-  geo.computeVertexNormals();
-  g.add(new THREE.Mesh(geo, robeMaterial([0.3, 0.012, 0.02])));
-  g.traverse((o) => { o.frustumCulled = false; });
-  g.visible = false;
-  return g;
-}
-
-/* ── eyes: a red glow round a bead, the patch ─────────────────────────── */
+/* ── eyes: a red glow round a bead ──────────────────────────────────────── */
 function glowMaterial(color, k = 1) {
   const m = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   const c = vec3(color.r, color.g, color.b);
@@ -267,25 +176,6 @@ export function makeEyeGlow() {
   m.renderOrder = 6;
   m.frustumCulled = false;
   return m;
-}
-
-/* the patch: a black leather lozenge over the eye with a thin red-hot edge
-   (the hood covers where a strap would go); unit size = the eye's */
-export function makeEyePatch() {
-  const g = new THREE.Group();
-  const leather = new THREE.MeshBasicNodeMaterial();
-  leather.colorNode = Fn(() => vec4(shade(vec3(0.02, 0.018, 0.022), normalize(normalWorld), { spec: 0.5, power: 40 }), 1))();
-  const disc = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 14), leather);
-  disc.scale.set(1.55, 1.35, 0.5);
-  const hot = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
-  hot.colorNode = Fn(() => vec4(vec3(1, 0.12, 0.06).mul(sin(SITH_T.mul(6)).mul(0.15).add(0.85)), 1))();
-  const edge = new THREE.Mesh(new THREE.TorusGeometry(1, 0.09, 8, 40), hot);
-  edge.scale.set(1.5, 1.3, 1);
-  edge.position.z = 0.12;
-  g.add(disc, edge);
-  g.traverse((o) => { o.frustumCulled = false; });
-  g.visible = false;
-  return g;
 }
 
 /* ── the swing trail ──────────────────────────────────────────────────────

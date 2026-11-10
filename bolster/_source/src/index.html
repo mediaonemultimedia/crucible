@@ -108,6 +108,17 @@ kbd{display:inline-block;min-width:22px;text-align:center;font-family:var(--mono
 .card .tag{position:absolute;top:6px;font-family:var(--cond);font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--on-neon);padding:1px 6px}
 .card .tag.t1{left:6px;background:var(--p1)}
 .card .tag.t2{right:6px;background:var(--p2)}
+.card .ogalts{position:absolute;left:0;right:0;bottom:calc(clamp(9.5px,.98vw,13px) * 1.25 + 16px);display:flex;flex-direction:column;align-items:center;gap:3px;pointer-events:none}
+.card .ogalt{display:flex;border-radius:3px;overflow:hidden;font-family:var(--cond);font-weight:700;font-size:11px;letter-spacing:.1em;pointer-events:auto;box-shadow:0 0 0 1.5px var(--p1),0 2px 8px rgba(0,0,0,.5)}
+.card .ogalt.p2{box-shadow:0 0 0 1.5px var(--p2),0 2px 8px rgba(0,0,0,.5)}
+.card .ogalt b{padding:2px 7px;background:rgba(18,13,31,.88);color:#8f84b3;cursor:pointer}
+.card .ogalt b.on{background:var(--p1);color:var(--on-neon)}
+.card .ogalt.p2 b.on{background:var(--p2)}
+.card .ogalt b[data-v="1"].on{background:#c41a2a;color:#fff;text-shadow:0 0 6px rgba(255,80,80,.8)}
+.card .ogalt.locked{opacity:.7}
+.card.alt .lab{color:#ff9a9a}
+.plate .tw{font-family:var(--cond);font-weight:700;font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:#ff6b6b;margin:-2px 0 6px}
+.plate .tw:empty{display:none}
 .card .zzz{position:absolute;right:16%;top:22%;font-family:var(--hand);font-size:30px;color:#fff;-webkit-text-stroke:5px var(--stage);paint-order:stroke fill;opacity:0;pointer-events:none}
 .card .zzz i{position:absolute;font-style:normal;opacity:0}
 body.napping .card img{animation:doze 3.2s ease-in-out infinite}
@@ -405,7 +416,7 @@ body.practicing.lobby #hud{display:none}
 .ik.p{background:#9b5cff;border-color:#d6c1ff}
 .ik.s{background:#ffd23f;border-color:#fff1b8;color:#120d1f;border-radius:9px;padding:0 5px}
 .ik.e{background:#3ff0c8;border-color:#c5fff1;color:#120d1f}
-.pr-side{position:absolute;right:16px;top:clamp(120px,16vh,170px);width:min(260px,30vw);display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.pr-side{position:absolute;right:16px;top:clamp(120px,16vh,170px);width:min(280px,30vw);display:flex;flex-direction:column;gap:10px;pointer-events:none}
 .pr-side .pr-box{position:relative}
 #pr-dummy .modes{display:grid;grid-template-columns:1fr 1fr;gap:4px}
 #pr-dummy button{font-family:var(--cond);font-weight:700;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;text-align:left;color:var(--ink);background:var(--panel);border:1.5px solid var(--line);border-radius:3px;padding:5px 6px;cursor:pointer;display:flex;gap:6px;align-items:center}
@@ -422,6 +433,10 @@ body.practicing.lobby #hud{display:none}
 .pr-moves span{white-space:nowrap;font-family:var(--sans);font-weight:500;color:#e8dcff}
 .pr-moves span kbd{font-size:10px;padding:1px 4px;min-width:18px}
 .pr-moves span.bnb{color:#fff}
+.pr-keys{padding:6px 8px 7px}
+.pr-keys h5{margin-bottom:4px}
+body.pr-nokeys .pr-keys h5{margin:0}
+@media (max-height:640px){.pr-keys .kb{display:none}}
 .pr-hidden-hint{display:none;position:absolute;right:16px;top:clamp(120px,16vh,170px);font-family:var(--cond);font-weight:700;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
 body.pr-hide .pr-box{display:none}
 body.pr-hide .pr-hidden-hint{display:block}
@@ -576,6 +591,7 @@ body.lobby .pr-moves{bottom:16px}
     <div class="pr-side">
       <div class="pr-box" id="pr-dummy"></div>
       <div class="pr-box pr-combo"><h5>Combo</h5><div id="pr-combo">—</div></div>
+      <div class="pr-box pr-keys" id="pr-keys"></div>
     </div>
     <div class="pr-box pr-moves" id="pr-moves"></div>
     <div class="pr-hidden-hint"><kbd>H</kbd> practice panels</div>

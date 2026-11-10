@@ -29,6 +29,8 @@ export function makeClothMaterial() {
   const U = {
     cloth: uniform(new THREE.Color('#f3f1ea')),
     trim: uniform(new THREE.Color('#2f6b4f')),
+    band: uniform(new THREE.Color('#f3f1ea')),   // Bolster: the terry headband's own colour
+    bandOn: uniform(0),
     swing: uniform(0.22),
     meshView: uniform(0),
   };
@@ -56,6 +58,7 @@ export function makeClothMaterial() {
     const isGlove = smoothstep(1.5, 1.6, style).mul(smoothstep(2.5, 2.4, style));
     const isTerry = smoothstep(2.5, 2.6, style);
     const base = mix(vec3(U.cloth), vec3(U.trim), clamp(vTrim, 0, 1)).toVar();
+    base.assign(mix(base, vec3(U.band), isTerry.mul(U.bandOn)));
 
     // ── details on the polo's front ───────────────────────────────────────
     const fx = abs(fp.x);

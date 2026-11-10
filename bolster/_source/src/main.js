@@ -22,6 +22,7 @@ import { DUMMY_MODES, defaultSettings } from './practice.js';
 import { hash, createMatch } from './sim/sim.js';
 import { SOLO, ACTIONS, toMap, rebind, loadBindings, saveBindings, resetBindings, keyCap } from './input/layouts.js';
 import { keyboardSVG, soloBinding, comboLine, strays } from './ui/keymap.js';
+import { TWIN_TITLE, resolveVariants, cpuAlt, VariantMemory } from './ui/variant.js';
 import { cleanName, nameKey, loadNames, useName, loadBoard, saveBoard, recordMatch, resetBoard, standings } from './ui/players.js';
 import { LEFT as K_L, RIGHT as K_R, UP as K_U, DOWN as K_D, LIGHT as K_O, HEAVY as K_P, SPECIAL as K_S, BLOCK as K_E } from './sim/input.js';
 
@@ -72,6 +73,9 @@ class App {
     this.pick = [0, 1];            // cursor per side
     this.locked = [false, false];
     this.picking = 0;
+    // OG / ALT per seat (ui/variant.js; cosmetic), each seat's last choice per fighter
+    this.alt = [params.get('alt1') === '1', params.get('alt2') === '1'];
+    this.altMem = new VariantMemory();
     this.level = 'normal';
     this.mode = 'cpu';             // 'cpu', 'versus' or 'practice' (the select screen's flow)
     this.practice = null;          // a practice session: { lobby, p1, p2 }
@@ -189,7 +193,7 @@ class App {
       else if (k === 'Escape') this.net.act('cancel');
       return;
     }
-    if (s === 'select' && this.net.on) { this.net.selectKey(k, { left, right, ok, back }); return; }
+    if (s === 'select' && this.net.on) { this.net.selectKey(k, { left, right, up, down, ok, back }); return; }
     if (s === 'select' && this.mode === 'versus') { this._versusSelectKey(k); return; }
     if (s === 'select') {
       // the toque code: E then H
@@ -197,6 +201,7 @@ class App {
       else if (k === 'KeyH' && this.eggKeys === 'e') { this.eggKeys = ''; this._toques(); return; }
       else this.eggKeys = '';
       if (left || right) { this._cursor(left ? -1 : 1); return; }
+      if (up || down) { this._toggleAlt(this.picking); return; }
       if (ok) { this._lock(); return; }
       if (back) { if (this.picking === 1) { this.picking = 0; this.locked[0] = false; this._paintSelect(); } else this.go('mode'); }
       return;
@@ -241,16 +246,79 @@ class App {
       if (this.portraits[id]) { const im = new Image(); im.alt = ''; im.src = this.portraits[id]; c.prepend(im); }
       // (versus: the mouse picks for whichever player hasn't locked in yet)
       const seat = () => (this.mode === 'versus' ? (this.locked[0] ? 1 : 0) : this.picking);
-      c.onclick = () => { if (this.net.on) { this.net.choose(i, true); return; } const k = seat(); if (this.locked[k]) return; this.pick[k] = i; this._lock(k); };
-      c.onmouseenter = () => { if (this.screen !== 'select') return; if (this.net.on) { this.net.choose(i, false); return; } const k = seat(); if (this.locked[k]) return; this.pick[k] = i; this._paintSelect(); };
+      c.onclick = (e) => {
+        // the OG / ALT switch on a highlighted card: flip, don't lock
+        const sw = e.target.closest('.ogalt b');
+        if (sw) { e.stopPropagation(); this._clickAlt(+sw.parentNode.dataset.p, sw.dataset.v === '1', i); return; }
+        if (this.net.on) { this.net.choose(i, true); return; }
+        const k = seat(); if (this.locked[k]) return; this._setPick(k, i); this._lock(k);
+      };
+      c.onmouseenter = () => { if (this.screen !== 'select') return; if (this.net.on) { this.net.choose(i, false); return; } const k = seat(); if (this.locked[k] || this.pick[k] === i) return; this._setPick(k, i); this._paintSelect(); };
       cards.appendChild(c);
     });
     this._paintSelect();
   }
 
   _cursor(d, k = this.picking) {
-    this.pick[k] = (this.pick[k] + d + ROSTER.length) % ROSTER.length;
+    this._setPick(k, (this.pick[k] + d + ROSTER.length) % ROSTER.length);
     this._paintSelect();
+  }
+
+  /* ── OG / ALT ───────────────────────────────────────────────────────────
+     A seat's cursor lands on a fighter: the variant it last had there this
+     session (the computer's seat, the first time: a seeded coin). */
+  _setPick(k, i) {
+    this.pick[k] = i;
+    this.alt[k] = this._altFor(k, i);
+  }
+
+  _altFor(k, i) {
+    const id = ROSTER[i];
+    if (this.altMem.has(k, id)) return this.altMem.get(k, id);
+    if (k === 1 && this.mode === 'cpu' && !this.net.on) return cpuAlt(this.seed, i);
+    return false;
+  }
+
+  /* whether the second seat is in play yet (the mirror rule waits for it) */
+  _twoSeats() { return this.mode === 'versus' || this.net.on || this.picking === 1 || this.locked[1]; }
+
+  /* what each seat wears: the mirror rule applied */
+  variants(ids = this.pick.map((i) => ROSTER[i])) { return resolveVariants(ids, this.alt, this._twoSeats()); }
+
+  _toggleAlt(k) {
+    if (this.locked[k]) return;
+    this._setAlt(k, !this.variants()[k]);
+  }
+
+  _setAlt(k, alt) {
+    this.alt[k] = alt;
+    this.altMem.set(k, ROSTER[this.pick[k]], alt);
+    if (this.net.on) this.net.cursor();
+    this._paintSelect();
+  }
+
+  _clickAlt(k, alt, i) {
+    if (this.net.on && k !== this.net.local) return;
+    if (this.locked[k] || this.pick[k] !== i) return;
+    this._setAlt(k, alt);
+  }
+
+  /* the cards: the twin's title on a card whose seats all have ALT up, and
+     the OG / ALT switch on each highlighted card (one per seat on it) */
+  _paintAlt(seats) {
+    const ids = this.pick.map((i) => ROSTER[i]), eff = this.variants(ids);
+    for (const c of $$('.card')) {
+      const id = c.dataset.id, on = seats.filter((k) => ids[k] === id);
+      const old = c.querySelector('.ogalts');
+      if (old) old.outerHTML = '';
+      const alt = on.length > 0 && on.every((k) => eff[k]);
+      c.classList.toggle('alt', alt);
+      c.querySelector('.lab').textContent = alt ? TWIN_TITLE[id] : FIGHTERS[id].name;
+      if (!on.length) continue;
+      const sw = on.map((k) => `<span class="ogalt p${k + 1}${this.locked[k] ? ' locked' : ''}" data-p="${k}"><b data-v="0" class="${eff[k] ? '' : 'on'}">OG</b><b data-v="1" class="${eff[k] ? 'on' : ''}">ALT</b></span>`).join('');
+      c.insertAdjacentHTML('beforeend', `<span class="ogalts">${sw}</span>`);
+    }
+    return eff;
   }
 
   /* versus select: both pick at once, each on their own keys — move with
@@ -263,6 +331,7 @@ class App {
       const B = this.bind[p];
       const lockKeys = p === 0 ? [...B.light] : [...B.light, 'NumpadEnter'];
       if (B.left.includes(k) || B.right.includes(k)) { if (!this.locked[p]) this._cursor(B.left.includes(k) ? -1 : 1, p); return; }
+      if (B.up.includes(k) || B.down.includes(k)) { this._toggleAlt(p); return; }
       if (lockKeys.includes(k)) { if (!this.locked[p]) this._lock(p); return; }
       if (B.heavy.includes(k)) { if (this.locked[p]) { this.locked[p] = false; this._paintSelect(); } return; }
     }
@@ -280,7 +349,7 @@ class App {
       return;
     }
     this.locked[this.picking] = true;
-    if (this.picking === 0) { this.picking = 1; this._paintSelect(); return; }
+    if (this.picking === 0) { this.picking = 1; this.alt[1] = this._altFor(1, this.pick[1]); this._paintSelect(); return; }
     this._paintSelect();
     if (this.mode === 'practice') this.startPractice({ p1: ROSTER[this.pick[0]], p2: ROSTER[this.pick[1]] });
     else this.go('diff');
@@ -288,7 +357,6 @@ class App {
 
   _paintSelect() {
     const ids = this.pick.map((i) => ROSTER[i]);
-    const mirror = ids[0] === ids[1];
     for (const c of $$('.card')) {
       const i = ROSTER.indexOf(c.dataset.id);
       c.classList.toggle('c1', i === this.pick[0]);
@@ -303,40 +371,46 @@ class App {
       P.classList.toggle('locked', locked);
       P.style.opacity = active || locked ? 1 : 0.35;
       P.querySelector('.nm').textContent = (evil ? 'Evil ' : '') + f.name;
+      let tw = P.querySelector('.tw');
+      if (!tw) { tw = document.createElement('div'); tw.className = 'tw'; P.querySelector('.nm').after(tw); }
+      tw.textContent = evil ? TWIN_TITLE[id] : '';
       P.querySelector('.an').innerHTML = `${f.animal} · ${f.style}`;
       P.querySelector('.moves').innerHTML = `<b>S+P</b> ${f.signatureName}<br><b>Space</b> ${f.specialName}`;
     };
-    if (this.mode === 'versus' && !this.net.on) { this._paintVersusSelect(ids, mirror, plate); return; }
-    plate('.plate.p1', ids[0], false, this.locked[0], this.picking === 0);
-    plate('.plate.p2', ids[1], mirror && (this.picking === 1 || this.locked[1]), this.locked[1], this.picking === 1);
+    if (this.mode === 'versus' && !this.net.on) { this._paintVersusSelect(ids, plate); return; }
+    if (this.net.on) { this.net.paintSelect(ids, plate); return; }
+    const two = this.picking === 1 || this.locked[1];
+    const eff = this._paintAlt(two ? [0, 1] : [0]);
+    plate('.plate.p1', ids[0], eff[0], this.locked[0], this.picking === 0);
+    plate('.plate.p2', ids[1], two && eff[1], this.locked[1], this.picking === 1);
     const pr = this.mode === 'practice';
     $('#select-step').textContent = this.picking === 0 ? (pr ? 'Practice — pick your fighter' : 'Pick for Player 1') : (pr ? 'Pick the practice dummy' : 'Pick the Computer’s fighter');
-    $('#select-hint').textContent = this.picking === 0 ? 'Player 1 — A / D to choose, O to pick' : pr ? 'Dummy — A / D to choose, O to start practising, P to go back' : 'Computer — A / D to choose, O to pick, P to go back';
-    $('.plate.p2 .who').textContent = this.net.on ? 'Player 2' : pr ? 'Dummy' : 'Computer';
-    if (this.net.on) this.net.paintSelect(ids, mirror, plate);
+    $('#select-hint').textContent = this.picking === 0 ? 'Player 1 — A / D to choose, W / S for OG or ALT, O to pick' : pr ? 'Dummy — A / D to choose, W / S for OG or ALT, O to start practising, P to go back' : 'Computer — A / D to choose, W / S for OG or ALT, O to pick, P to go back';
+    $('.plate.p2 .who').textContent = pr ? 'Dummy' : 'Computer';
     if (this.show) {
-      this.show.set(0, ids[0], { toque: this.toques });
-      this.show.set(1, this.picking === 1 || this.locked[1] ? ids[1] : null, { evil: mirror, toque: this.toques });
+      this.show.set(0, ids[0], { evil: eff[0], toque: this.toques });
+      this.show.set(1, two ? ids[1] : null, { evil: eff[1], toque: this.toques });
     }
   }
 
-  _paintVersusSelect(ids, mirror, plate) {
+  _paintVersusSelect(ids, plate) {
     for (const c of $$('.card')) {
       const i = ROSTER.indexOf(c.dataset.id);
       c.classList.toggle('c2', i === this.pick[1]);
       c.querySelectorAll('.tag.t2').forEach((t) => t.remove());
       if (i === this.pick[1]) c.insertAdjacentHTML('beforeend', '<span class="tag t2">P2</span>');
     }
-    plate('.plate.p1', ids[0], false, this.locked[0], true);
-    plate('.plate.p2', ids[1], mirror, this.locked[1], true);
+    const eff = this._paintAlt([0, 1]);
+    plate('.plate.p1', ids[0], eff[0], this.locked[0], true);
+    plate('.plate.p2', ids[1], eff[1], this.locked[1], true);
     $('.plate.p1 .who').textContent = this.players[0] || 'Player 1';
     $('.plate.p2 .who').textContent = this.players[1] || 'Player 2';
     const B = this.bind;
     $('#select-step').textContent = this.locked[0] && this.locked[1] ? 'Both locked in — fight!' : 'Both pick at once';
-    $('#select-hint').innerHTML = `P1 ${caps([B[0].left[0], B[0].right[0]])} choose ${caps([B[0].light[0]])} lock · P2 ${caps([B[1].left[0], B[1].right[0]])} choose ${caps([B[1].light[0]])} lock · Esc back`;
+    $('#select-hint').innerHTML = `P1 ${caps([B[0].left[0], B[0].right[0]])} choose ${caps([B[0].up[0], B[0].down[0]])} OG/ALT ${caps([B[0].light[0]])} lock · P2 ${caps([B[1].left[0], B[1].right[0]])} choose ${caps([B[1].up[0], B[1].down[0]])} OG/ALT ${caps([B[1].light[0]])} lock · Esc back`;
     if (this.show) {
-      this.show.set(0, ids[0], { toque: this.toques });
-      this.show.set(1, ids[1], { evil: mirror, toque: this.toques });
+      this.show.set(0, ids[0], { evil: eff[0], toque: this.toques });
+      this.show.set(1, ids[1], { evil: eff[1], toque: this.toques });
     }
   }
 
@@ -582,11 +656,13 @@ class App {
   }
 
   /* ── the fight ───────────────────────────────────────────────────────── */
-  startFight({ p1 = ROSTER[this.pick[0]], p2 = ROSTER[this.pick[1]], level = this.level, p1cpu = null, seed = null, net = null, versus = false } = {}) {
+  startFight({ p1 = ROSTER[this.pick[0]], p2 = ROSTER[this.pick[1]], level = this.level, p1cpu = null, seed = null, net = null, versus = false, alt = null } = {}) {
+    // OG / ALT: the seats' variants, the mirror rule applied (cosmetic: not in the sim)
+    alt = alt ? [!!alt[0], !!alt[1]] : resolveVariants([p1, p2], this.alt);
     if (this.show) { this.show.dispose(); this.show = null; }
     if (this.fight) this.fight.dispose();
     this.seed = seed ?? (((this.seed * 1103515245 + 12345) >>> 0) || 1);
-    this.last = { p1, p2, level, p1cpu, versus };
+    this.last = { p1, p2, level, p1cpu, versus, alt };
     this.endPractice();
     // versus on one keyboard: player 1 on the left half's keys, player 2 on the arrows and numpad
     versus = versus && !net;
@@ -594,7 +670,7 @@ class App {
     this.kb.setMap(versus ? toMap(this.bind[0]) : SOLO);
     this.kb2.setMap(toMap(this.bind[1]));
     this.kb2.enabled = versus;
-    const f = (this.fight = new Fight(this.stage, { p1, p2, seed: this.seed, cpu: versus ? [null, null] : [p1cpu, level], keyboard: this.kb, keyboard2: versus ? this.kb2 : null, toques: this.toques, net }));
+    const f = (this.fight = new Fight(this.stage, { p1, p2, seed: this.seed, cpu: versus ? [null, null] : [p1cpu, level], keyboard: this.kb, keyboard2: versus ? this.kb2 : null, toques: this.toques, net, alt }));
     f.fluffless = [0, 0];
     // (the state the match starts from: a test checks it's the fresh one, whatever practice came before)
     this.matchStart = { p1, p2, seed: this.seed, hash: hash(f.st) };
@@ -617,15 +693,16 @@ class App {
      fighter, any dummy) or in the online lobby while waiting for the other
      player. Local only: its own seed (never the app's match seed), nothing
      sent; thrown away when it ends. */
-  startPractice({ p1, p2, lobby = false } = {}) {
+  startPractice({ p1, p2, lobby = false, alt = null } = {}) {
     if (this.show) { this.show.dispose(); this.show = null; }
     if (this.fight) { this.fight.dispose(); this.fight = null; }
     if (!p2) p2 = ROSTER[(ROSTER.indexOf(p1) + 1) % ROSTER.length];
+    alt = alt ? [!!alt[0], !!alt[1]] : resolveVariants([p1, p2], this.alt);
     this.kb.setMap(SOLO);
     this.kb2.enabled = false;
     this.versus = false;
     const seed = ((Math.random() * 0x7fffffff) | 0) || 1;
-    const f = (this.fight = new Fight(this.stage, { p1, p2, seed, keyboard: this.kb, toques: this.toques, practice: this.practiceSettings }));
+    const f = (this.fight = new Fight(this.stage, { p1, p2, seed, keyboard: this.kb, toques: this.toques, practice: this.practiceSettings, alt }));
     f.onEvent = (e) => this._event(e);
     f.onTick = (st) => this._hud(st);
     this.practice = { lobby, p1, p2 };
@@ -633,7 +710,7 @@ class App {
     $('#bubbles').textContent = '';
     for (const c of $$('.combo')) c.classList.remove('on', 'amp');
     $('#n1').innerHTML = `${flagOf(p1)}<span>${f.name(0)}</span>`;
-    $('#n2').innerHTML = `<span>Dummy · ${FIGHTERS[p2].name}</span>${flagOf(p2)}`;
+    $('#n2').innerHTML = `<span>Dummy · ${f.name(1)}</span>${flagOf(p2)}`;
     $('#pn1').textContent = ''; $('#pn2').textContent = '';
     this._hudCache = {};
     this._hud(f.st);
@@ -641,6 +718,7 @@ class App {
     document.body.classList.toggle('lobby', lobby);
     this._prCache = {};
     this._paintDummy();
+    this._paintKeys();
     this._paintMoves(p1);
     if (!lobby) this.go('fight');
   }
@@ -663,6 +741,7 @@ class App {
     else if (k === 'KeyM') S.meter = !S.meter;
     else if (k === 'KeyX') this._practiceReset();
     else if (k === 'KeyH') document.body.classList.toggle('pr-hide');
+    else if (k === 'KeyK') { document.body.classList.toggle('pr-nokeys'); this._paintKeys(); }
     else return;
     this._paintDummy();
   }
@@ -689,6 +768,13 @@ class App {
       b.blur();
       this._paintDummy();
     };
+  }
+
+  /* the keyboard in the corner while practising (K hides / shows it): the
+     one-player keys, drawn from the live bindings like the pause card's */
+  _paintKeys() {
+    const on = !document.body.classList.contains('pr-nokeys');
+    $('#pr-keys').innerHTML = `<h5>Keys <small>K ${on ? 'hides' : 'shows'}</small></h5>${on ? `<div class="kb">${keyboardSVG([soloBinding()], { cols: 18.5, title: 'One-player keys' })}</div>` : ''}`;
   }
 
   _paintMoves(id) {

@@ -15,7 +15,7 @@ import { Dummy, practiceMatch, practiceAfter, ComboMeter, InputLog } from './pra
 export const TICK = 1 / 60;
 
 export class Fight {
-  constructor(stage, { p1, p2, seed = 1, cpu = [null, 'normal'], keyboard = null, keyboard2 = null, toques = false, net = null, practice = null }) {
+  constructor(stage, { p1, p2, seed = 1, cpu = [null, 'normal'], keyboard = null, keyboard2 = null, toques = false, net = null, practice = null, alt = null }) {
     this.stage = stage;
     // practice (src/practice.js): player 2 is the dummy, the state tended between ticks
     this.practice = practice;
@@ -25,11 +25,14 @@ export class Fight {
     this.session = net ? new Rollback(this.st, { local: net.local, send: net.send, onDesync: net.onDesync }) : null;
     if (net) cpu = [null, null];
     this.mirror = p1 === p2;
+    // OG / ALT (ui/variant.js): which seat wears the evil twin — cosmetic,
+    // never in the sim; by default a mirror match's second seat, as before
+    this.evil = alt ? [!!alt[0], !!alt[1]] : [false, this.mirror];
     this.cpu = cpu.map((lv, k) => (lv ? new CPU(k, lv, seed * 7 + k) : null));
     this.kb = keyboard;
     this.kb2 = practice || net ? null : keyboard2;     // versus on one keyboard: player 2's keys
-    this.plush = [new Plush(stage.scene, p1, { side: 0 }), new Plush(stage.scene, p2, { side: 1, evil: this.mirror })];
-    this.plush[1].monocle.visible = this.mirror;
+    this.plush = [new Plush(stage.scene, p1, { side: 0, evil: this.evil[0] }), new Plush(stage.scene, p2, { side: 1, evil: this.evil[1] })];
+    this.plush.forEach((p, k) => { p.monocle.visible = this.evil[k]; });
     for (const p of this.plush) p.toque.visible = toques;
     this.acc = 0;
     this.paused = false;
@@ -46,7 +49,7 @@ export class Fight {
 
   name(k) {
     const f = FIGHTERS[this.st.f[k].id];
-    return (this.mirror && k === 1 ? 'Evil ' : '') + f.name;
+    return (this.evil[k] ? 'Evil ' : '') + f.name;
   }
 
   /* one sim tick */

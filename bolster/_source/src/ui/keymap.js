@@ -79,12 +79,15 @@ const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 
 /* the SVG: bindings [p1, p2?]; wait = { p, a } while a key is being rebound;
    click: lit keys carry data-p / data-a so a card can rebind them */
-export function keyboardSVG(bindings, { wait = null, click = false, title = 'Keyboard controls' } = {}) {
+export function keyboardSVG(bindings, { wait = null, click = false, title = 'Keyboard controls', cols = 23 } = {}) {
+  // cols: how many key widths from the left are drawn (18.5: the main block
+  // and the arrows, no numpad — the compact practice panel)
   const U = 40, PAD = 10, GAP = 3;
-  const W = 23 * U + PAD * 2, H = 5 * U + PAD * 2;
+  const W = cols * U + PAD * 2, H = 5 * U + PAD * 2;
   const lit = litKeys(bindings);
   const parts = [];
   for (const k of KEYS) {
+    if (k.x >= cols) continue;
     const x = PAD + k.x * U + GAP / 2, y = PAD + k.y * U + GAP / 2, w = k.w * U - GAP, h = k.h * U - GAP;
     const L = lit.get(k.code);
     if (!L) {
@@ -109,7 +112,7 @@ export function keyboardSVG(bindings, { wait = null, click = false, title = 'Key
   // the three blocks' outlines
   const block = (x0, w) => `<rect x="${PAD + x0 * U - 5}" y="${PAD - 5}" width="${w * U + 10}" height="${5 * U + 10}" rx="9" class="blk"/>`;
   return `<svg class="kbsvg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}" xmlns="http://www.w3.org/2000/svg">`
-    + `<rect x="0" y="0" width="${W}" height="${H}" rx="12" class="base"/>${block(0, 15)}${block(15.5, 3)}${block(19, 4)}`
+    + `<rect x="0" y="0" width="${W}" height="${H}" rx="12" class="base"/>${block(0, 15)}${cols > 15.5 ? block(15.5, 3) : ''}${cols > 19 ? block(19, 4) : ''}`
     + parts.join('') + '</svg>';
 }
 

@@ -1,6 +1,6 @@
 /* The evil twins, each their own character (cosmetic only: nothing here
    reaches the sim). Evil Sebas (the rudo's mask) and Evil Johnny (the red
-   racquet, the cowl) keep the Sith looks of render/sith.js; these five are
+   racquet, black tennis whites) keep the Sith looks of render/sith.js; these five are
    built like the octopus is: the look is in the plush itself — its fur
    colours, the pile's length and lie, the printed pattern and the stitched
    lines in the atlases — and the few things it wears are felt, leather or
@@ -196,7 +196,7 @@ function skinMatrix(plush, part, u, v, up, out, lift = 0) {
 }
 
 /* the ring of a tube part at s (its centre, its axis, its mean radius) */
-function tubeRing(body, partName, s) {
+export function tubeRing(body, partName, s) {
   const P = body.parts.find((q) => q.name === partName);
   const j = Math.max(0, Math.min(P.AS - 1, Math.round(s * (P.AS - 1)))), AA = P.AA, pos = body.pos;
   const c = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3();

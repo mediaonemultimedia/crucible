@@ -31,9 +31,10 @@ import { makeRacquet, poseRacquet, makeStars, poseStars, shade } from '../../sha
 import { BipedPuppet, GiraffePuppet, OctopusPuppet, WolfPuppet, CrowPuppet, phaseOf } from './puppets.js';
 import { FIGHTERS } from '../fighters/index.js';
 import { Gloves, shaveCaps, cuffOnly } from './gloves.js';
-import { SITH, SITH_T, makeSithRacquet, makeHood, makeCloak, makeEyeGlow, makeEyePatch, Trail } from './sith.js';
+import { SITH, SITH_T, makeSithRacquet, makeEyeGlow, Trail } from './sith.js';
+import { makeSash, makeWingFeathers } from './attire.js';
 import { activeHits } from '../sim/sim.js';
-import { TWINS } from './twins.js';
+import { TWINS, tubeRing } from './twins.js';
 import { RQ } from '../../shared/grommet/athletes/leopard.game.js';
 
 export const SHELLS_EACH = 48;
@@ -49,7 +50,9 @@ export const LOOKS = {
   johnny: {
     build: buildLeopard, info: () => G.leopard, paint: 'leopard', Puppet: (s) => new BipedPuppet(s, 'tennis'), yaw: 0.85,
     colors: G.leopard.colors.golden,
-    evil: { ...G.leopard.colors.panther, cloth: '#2a2a30', trim: '#c9a23c' },
+    // the Sith's tennis whites: black piqué, red trim (cuffs, hem, the
+    // embroidered ball) and a red terry headband
+    evil: { ...G.leopard.colors.panther, cloth: '#211e25', trim: '#c4161f', band: '#c8121c' },
   },
   sumaura: {
     build: buildPandaSolo, info: () => G.panda, paint: 'panda', Puppet: (s) => new BipedPuppet(s, 'sumo'), yaw: 0.8,
@@ -74,6 +77,8 @@ export const LOOKS = {
     colors: { ...F_INFO.wolf.colors.grey, spot: '#14915a', nose: '#f4f1ea', cloth: '#ffffff', trim: '#ffffff' },
     evil: { ...F_INFO.wolf.colors.dusk, fur: '#4f515d', accent: '#2c2d36', under: '#b9b1a6', spot: '#151318', nose: '#d4102c', cloth: '#ffffff', trim: '#ffffff' },
     mask: (m, p, rig, evil) => paintLuchaMask(m, p, rig, { evil }), noMonocle: true,
+    // the evil twin's felt sash (render/attire.js), shoulder to hip
+    sash: { part: 'torso' },
   },
   // Grommet's crow with his felt beak; his evil twin an ash-grey crow in a
   // bandit's mask, wearing a stolen gold chain
@@ -82,6 +87,17 @@ export const LOOKS = {
     colors: G.crow.colors.crow,
     evil: { fur: '#7d7a86', under: '#8c8995', accent: '#86838f', spot: '#121115', nose: '#2a292f', cloth: '#2a292f', trim: '#2a292f', sheen: '#1e1e3a', beak: 1 },
     mask: (m, p, rig, evil) => { if (evil) paintBanditMask(m, p, rig); }, chain: true, noMonocle: true,
+    feathers: true,
+    // the wings' drawn shape (the stuffing's points unchanged): a folded
+    // wing — narrow at the shoulder, broad over the wrist, tapering to a
+    // point where the felt primaries take over; a little flatter
+    rig(rig) {
+      const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+      for (const ch of rig.arms) if (ch.kind === 'arm') {
+        ch.radius = (u) => Math.max(0.055, 0.16 + 0.15 * sm(0, 0.36, u) - 0.25 * sm(0.42, 1, u));
+        ch.flat = 0.26;
+      }
+    },
   },
 };
 
@@ -158,6 +174,7 @@ export class Plush {
     // Sebas's keep LOOKS[id].evil and the Sith layer
     const TW = (this.twinLook = evil ? TWINS[id] || null : null);
     const rig = (this.rig = L.build());
+    L.rig?.(rig);
     TW?.rig?.(rig);
     const soft = (this.soft = new SoftBody(rig));
     soft.params.stuffing = 0.5;
@@ -204,17 +221,13 @@ export class Plush {
     }
     const eyeMat = makeEyeMaterial(), eyeGeo = new THREE.SphereGeometry(1, 32, 22);
     this.eyes = [-1, 1].map((s) => { const m = new THREE.Mesh(eyeGeo, eyeMat); m.userData.side = s; group.add(m); return m; });
-    // the Sith twins (render/sith.js): Evil Johnny's red racquet, a cowl and
-    // a cloak, red eyes
+    // the Sith twins (render/sith.js): Evil Johnny's red racquet, red eyes
     this.sith = evil && !!SITH[id];
     if (rig.racquet) { this.racquet = this.sith ? makeSithRacquet() : makeRacquet(); group.add(this.racquet); }
     if (this.sith) {
-      const part = (n) => rig.parts.find((q) => q.name === n);
-      const head = part('head'), torso = part('torso');
-      this.hood = makeHood(head.r, 1.2); this.hood.visible = true; group.add(this.hood);
-      const top = torso.c[1] + torso.r[1] * (id === 'sebas' ? 0.85 : 0.7);
-      this.cloak = makeCloak(torso.r, top - 0.35); this.cloak.visible = true; group.add(this.cloak);
-      this.cloakAt = [0, top, torso.c[2]];
+      // (the cowl and cloak are gone: Johnny's dark side is in his kit —
+      // black tennis whites, a red headband — and Sebas wears a felt sash)
+      if (L.sash) { this.sash = makeSash(this, L.sash); group.add(this.sash.mesh); }
       this.eyeGlow = [makeEyeGlow(), makeEyeGlow()];
       for (const e of this.eyeGlow) group.add(e);
     }
@@ -226,6 +239,12 @@ export class Plush {
       this.beak.userData.color.value.set(c.nose);
       this.beakScale = c.beak || 1;
       group.add(this.beak);
+    }
+    if (L.feathers) {
+      // Zach's flight feathers, layered felt at each wingtip (render/attire.js)
+      const c = TW ? TW.colors : evil ? L.evil : L.colors;
+      this.wingFx = makeWingFeathers(this, { color: c.accent ?? c.fur, sheen: c.sheen, tubeRing });
+      group.add(this.wingFx.group);
     }
     if (L.chain && evil && !TW) { this.chain = makeGoldChain({ c: [0, 1.56, 0.06], rx: 0.64, rz: 0.62, link: 0.1, tip: 0.42 }); this.chain.visible = true; group.add(this.chain); }
     this.monocleOK = !L.noMonocle && !this.sith && !TW;
@@ -287,6 +306,9 @@ export class Plush {
     U.spot.value.set(c.spot ?? c.fur); U.nose.value.set(c.nose ?? '#333');
     U.sheen.value.set(c.sheen || '#000000');
     this.clothMat.uniforms.cloth.value.set(c.cloth ?? '#ffffff'); this.clothMat.uniforms.trim.value.set(c.trim ?? '#ffffff');
+    // (a headband of its own colour: the Sith Johnny's red one)
+    this.clothMat.uniforms.bandOn.value = c.band ? 1 : 0;
+    if (c.band) this.clothMat.uniforms.band.value.set(c.band);
   }
 
   /* a blow from the other side: the stuffing takes it */
@@ -388,8 +410,9 @@ export class Plush {
     if (this.groom.dirty) { this.groomTex.needsUpdate = true; this.groom.dirty = false; }
 
     if (this.racquet && P.rq) poseRacquet(this.racquet, P.rq);
-    if (this.sith) { SITH_T.value = Math.max(SITH_T.value, this.time); this._robe(); }
+    if (this.sith) { SITH_T.value = Math.max(SITH_T.value, this.time); this.sash?.update(); }
     this._trail(dt, F);
+    this.wingFx?.update();
     if (this.beak) poseBeak(this.beak, P.beakFrame(), [this.beakScale, 0.92 + 0.12 * this.beakScale]);
     if (this.chain) this._necklace();
     if (this.twinLook) SITH_T.value = Math.max(SITH_T.value, this.time);
@@ -446,25 +469,6 @@ export class Plush {
     T.update(dt);
   }
 
-  /* the cowl on the head, the cloak on the shoulders, the eyes' glow */
-  _robe() {
-    const soft = this.soft, x = soft.x, P = this.puppet;
-    const ix = P.cfg?.core || this.rig.head;
-    let cx = 0, cy = 0, cz = 0;
-    for (const i of ix) { cx += x[i * 3]; cy += x[i * 3 + 1]; cz += x[i * 3 + 2]; }
-    cx /= ix.length; cy /= ix.length; cz /= ix.length;
-    const head = this.rig.parts.find((p) => p.name === 'head');
-    const R = soft.cloudR[head ? head.cloud : 0] || soft.cloudR[0];
-    this._M.set(R[0], R[1], R[2], 0, R[3], R[4], R[5], 0, R[6], R[7], R[8], 0, 0, 0, 0, 1);
-    this.hood.position.set(cx, cy, cz);
-    this.hood.quaternion.setFromRotationMatrix(this._M);
-    const R0 = soft.cloudR[0];
-    const w = P.worldOf ? P.worldOf(this.cloakAt) : this.cloakAt;
-    this.cloak.position.set(w[0], w[1], w[2]);
-    this._M.set(R0[0], R0[1], R0[2], 0, R0[3], R0[4], R0[5], 0, R0[6], R0[7], R0[8], 0, 0, 0, 0, 1);
-    this.cloak.quaternion.setFromRotationMatrix(this._M);
-  }
-
   _eyes() {
     const ey = this.info.eyes, body = this.body, P = this.puppet;
     const part = body.parts.find((q) => q.name === (ey.part || 'head'));
@@ -489,22 +493,14 @@ export class Plush {
       e.scale.set(...ey.scale);
       this.eyePos.push({ p: e.position.clone(), n: N.clone(), q: e.quaternion.clone() });
     }
-    // the Sith's eyes: a red glow on each bead; Kevalanche's nearer one patched
+    // the Sith's eyes: a red glow on each bead
     if (this.eyeGlow) {
       const ey2 = this.info.eyes.scale, r = Math.max(ey2[0], ey2[1]);
-      let near = -1;
-      if (this.patch) { const w0 = this.eyes[0].getWorldPosition(new THREE.Vector3()), w1 = this.eyes[1].getWorldPosition(new THREE.Vector3()); near = w0.z > w1.z ? 0 : 1; }
       this.eyeGlow.forEach((gl, k) => {
         const E = this.eyePos[k];
-        gl.visible = k !== near;
         gl.position.copy(E.p).addScaledVector(E.n, r * 0.9);
         gl.quaternion.copy(E.q);
         gl.scale.setScalar(r * 4.2);
-        if (k === near) {
-          this.patch.position.copy(E.p).addScaledVector(E.n, r * 0.45);
-          this.patch.quaternion.copy(E.q);
-          this.patch.scale.setScalar(r);
-        }
       });
     }
     // the monocle over the eye nearer the camera (not for the two whose
