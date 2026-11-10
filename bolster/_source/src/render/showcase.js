@@ -109,3 +109,35 @@ export async function portraits(renderer, stage, ids) {
   rt.dispose();
   return out;
 }
+
+/* the VS card's portraits: the two picks as they stand on the select
+   screen's mat right now (so an evil twin comes out as the twin), each
+   framed head-and-shoulders from its own side. Drawn straight onto the
+   page's canvas and copied out in the same task (no GPU readback to wait
+   on), then the select scene is drawn back, so nothing shows; the next
+   frame is the fight's anyway. Returns [canvas|null, canvas|null]. */
+export function snapPicks(renderer, show) {
+  const stage = show.stage, W = 256, H = 320;
+  const src = renderer.domElement, cw = src.width, ch = src.height;
+  if (!cw || !ch) return [null, null];
+  const cam = new THREE.PerspectiveCamera(30, cw / ch, 0.1, 100);
+  // the portrait's frame: the middle of the canvas at the portrait's aspect
+  const sh = ch, sw = Math.min(cw, Math.round(ch * W / H)), sx = Math.round((cw - sw) / 2);
+  const out = [0, 1].map((k) => {
+    const p = show.slots[k];
+    if (!p) return null;
+    const [cy, d] = { k8e: [2.85, 9], rubberta: [1.3, 6.4], zach: [1.55, 5.2], sebas: [2.0, 6.6] }[p.id] || [2.05, 6.4];
+    const x = show.x[k], s = k ? -1 : 1;
+    cam.position.set(x + 1.6 * s, cy + 0.5, d);
+    cam.lookAt(x + 0.15 * s, cy, 0);
+    cam.updateMatrixWorld();
+    renderer.setRenderTarget(null);
+    renderer.render(stage.scene, cam);
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    c.getContext('2d').drawImage(src, sx, 0, sw, sh, 0, 0, W, H);
+    return c;
+  });
+  renderer.render(stage.scene, stage.camera);
+  return out;
+}

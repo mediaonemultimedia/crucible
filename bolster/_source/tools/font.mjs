@@ -9,10 +9,12 @@ import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { FIGHTERS } from '../src/fighters/index.js';
 import { SAYINGS } from '../src/ui/sayings.js';
+import { TAUNTS } from '../src/ui/taunt.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const lines = [...SAYINGS];
 for (const f of Object.values(FIGHTERS)) lines.push(f.catchphrase.main, f.catchphrase.egg, f.impatient);
+for (const L of Object.values(TAUNTS)) lines.push(...L);
 const chars = [...new Set(lines.join('') + ' ')].sort().join('');
 const src = path.join(root, 'node_modules/@fontsource/gochi-hand/files/gochi-hand-latin-400-normal.woff2');
 const out = path.join(root, 'src/assets/gochi-hand-subset.woff2');

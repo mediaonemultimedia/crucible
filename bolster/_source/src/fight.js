@@ -10,6 +10,7 @@ import { CPU } from './ai/cpu.js';
 import { Plush } from './render/plush.js';
 import { U } from './render/stage.js';
 import { Rollback } from './net/rollback.js';
+import { Taunter } from './ui/taunt.js';
 import { Dummy, practiceMatch, practiceAfter, ComboMeter, InputLog } from './practice.js';
 
 export const TICK = 1 / 60;
@@ -40,6 +41,10 @@ export class Fight {
     this.prevProj = new Map();
     this.onEvent = () => {};
     this.onTick = () => {};
+    // taunting captions (cosmetic): read-only on the state; online, confirmed ticks only
+    this.taunter = practice ? null : new Taunter();
+    this.onTaunt = () => {};
+    this.tauntTick = 0;
     this.speed = 1;          // (the K.O.'s slow motion is the sim's own: st.ks)
     this.lastInputs = [0, 0];
     this.override = null;
@@ -70,7 +75,24 @@ export class Fight {
       practiceAfter(st, this.practice, this.pmem);
     }
     for (const e of st.ev) this._fx(e);
+    this._taunt(st);
     this.onTick(st);
+  }
+
+  _taunt(st) {
+    const t = this.taunter?.observe(st);
+    if (t) this.onTaunt(t, this);
+  }
+
+  /* online: every tick that's now confirmed (both inputs known: final, the
+     same on both peers), in order, from the session's snapshots — read only */
+  _netTaunts() {
+    const S = this.session;
+    for (; this.tauntTick < S.confirmed; this.tauntTick++) {
+      const t = this.tauntTick + 1;
+      const s = t === S.frame ? S.st : S.stateAt(t);
+      if (s) this._taunt(s);
+    }
   }
 
   /* online: the local mask goes into the session, which may roll back and
@@ -81,6 +103,7 @@ export class Fight {
     const m = this.kb ? this.kb.sample() : 0;
     const ev = this.override ? S.advance(this.override(S.st)[S.local] ?? m) : S.advance(m);
     this.st = S.st;
+    if (this.taunter) this._netTaunts();
     if (!ev) return;
     this.prev = before;
     this.prevProj = projBefore;

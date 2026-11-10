@@ -181,7 +181,7 @@ export class Online {
     this.role = null;
     this.remoteName = '';
     const b = $('#win-screen .opt[data-act=select]');
-    if (b) b.textContent = 'Character select';
+    if (b) b.innerHTML = 'No <small>new fighters</small>';
   }
 
   _linked(link) {
@@ -303,7 +303,7 @@ export class Online {
     this.matchNo = m.n;
     const A = this.app, S0 = readStart(m);
     A.startFight({
-      p1: S0.p1, p2: S0.p2, seed: S0.seed, alt: S0.alt,
+      p1: S0.p1, p2: S0.p2, seed: S0.seed, alt: S0.alt, vs: true,
       net: { local: this.local, send: (p) => this.link?.send('in', { ...p, n: m.n }), onDesync: (d, st) => this.desync(d, st) },
     });
     const S = A.fight.session;
@@ -321,7 +321,7 @@ export class Online {
   winScreen() {
     if (!this.on) return;
     const b = $('#win-screen .opt[data-act=select]');
-    if (b) b.textContent = 'Leave';
+    if (b) b.innerHTML = 'No <small>leave</small>';
   }
 
   winAct(a) {

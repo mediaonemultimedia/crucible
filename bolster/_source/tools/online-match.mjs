@@ -134,6 +134,12 @@ const looks = await Promise.all([A, B].map((p) => p.evaluate(() => ({ evil: wind
 console.log('looks', JSON.stringify(looks));
 if (JSON.stringify(looks[0]) !== JSON.stringify(looks[1])) errs.push('the two pages draw different variants');
 if (ALT && !looks[0].evil[+ALT - 1]) errs.push(`seat ${ALT} is not ALT`);
+// the VS card is up on both (it never holds the sim: online it rides over the intro)
+const vsUp = await Promise.all([A, B].map((p) => p.evaluate(() => ({ on: !!window.__bolster.vs, txt: document.querySelector('#vs').innerText.replace(/\s+/g, ' ') }))));
+console.log('vs card', JSON.stringify(vsUp));
+if (!vsUp[0].on || !vsUp[1].on) errs.push('the VS card is not up on both pages');
+// taunting captions: recorded on each page (tick, seat, line) to compare at the end
+for (const p of [A, B]) await p.evaluate(() => { const f = window.__bolster.fight, o = f.onTaunt; window.__taunts = []; f.onTaunt = (t, F) => { window.__taunts.push(`${t.tick}:${t.p}:${t.kind}:${t.text}`); o(t, F); }; });
 // scripted inputs: a hard CPU on each side, each playing only its own fighter
 for (const [p, k] of [[A, 0], [B, 1]]) {
   await p.evaluate((k) => {
@@ -182,6 +188,12 @@ for (let n = 0; n < 4000; n++) {
   if (a.screen === 'win' && b.screen === 'win') break;
 }
 const [ea, eb] = await Promise.all([info(A), info(B)]);
+{
+  const T = await Promise.all([A, B].map((p) => p.evaluate(() => ({ t: window.__taunts, c: window.__bolster.fight.session.confirmed }))));
+  const upto = Math.min(T[0].c, T[1].c), cut = (L) => L.filter((x) => +x.split(':')[0] <= upto);
+  console.log('taunts', JSON.stringify(T.map((x) => x.t)));
+  if (JSON.stringify(cut(T[0].t)) !== JSON.stringify(cut(T[1].t))) errs.push('the two pages showed different taunts');
+}
 await both(1.0, 2);
 const winTxt = await Promise.all([A, B].map((p) => p.evaluate(() => ({ screen: window.__bolster.screen, eyebrow: document.querySelector('#win-eyebrow').textContent, name: document.querySelector('#win-name').textContent, line: window.__bolster.catchline, egg: window.__bolster.fight?.st.egg, fluff: window.__bolster.fight?.st.fluff, winner: window.__bolster.fight?.st.winner }))));
 console.log('winner screens', JSON.stringify(winTxt));

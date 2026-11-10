@@ -45,6 +45,52 @@ to the computer too; `seed=N` fixes the match seed; `toques=1`; `webgl` forces
 the WebGL 2 path; `hold` stops the free-running loop for scripted stepping;
 `boxes` draws the sim's hurt, limb, hit and shot boxes over the picture).
 
+## UI personality pass (bolster-ui)
+
+Cosmetic only: nothing reaches the sim, its hash, frame data, hitboxes,
+rollback or balance (`test/taunt.test.mjs` runs seeded and random input
+sequences with and without the taunt watcher: identical hashes).
+
+- **Pillow buttons** (every `.opt`): a soft plum cushion with a dashed
+  stitched seam, a sheen on top and a thicker bottom lip. The highlighted one
+  (keyboard or mouse: pointing at a pillow selects it, so there's only ever
+  one) puffs up a little with a neon rim; pressed, it squashes onto its lip
+  and springs back (60 ms in, 160 ms out; a keyboard press squashes it too).
+  Same labels, layout and keys. Danger (Reset leaderboard) glows pink.
+- **Taunting captions** (`ui/taunt.js`): the arena roasts a player who
+  mashes (presses on through the anti-mash lock-out: three light presses
+  inside one lock), spams one move (the same non-light move four times in a
+  row inside 6 s), turtles (4.5 s of unbroken guard) or whiffs a special
+  (nothing hit, blocked or grabbed 100 ticks after it began). 20 lines, all
+  under 40 characters, in a small cardboard bubble beside the player's head,
+  always under the HUD. Rare: one per player per 10 s, 7 s between any two,
+  a line never repeats in a match; ~1–3 in a whole CPU match. Not in
+  practice. The watcher only reads the state after each tick; **online** it
+  reads only *confirmed* ticks (both inputs known, from the rollback
+  session's snapshots), and the line comes from that state (tick, seat,
+  kind, the PRNG word — read, never drawn), so both peers show the same
+  caption on the same tick (checked in `test/taunt.test.mjs` over a lossy,
+  laggy link and by `tools/online-match.mjs` across two pages).
+- **VS card** (after character select — Vs Computer after the difficulty,
+  Versus, Online; not on Rematch or deep links; `novs` turns it off): the
+  two picks crossed in the middle in pink / mint frames, a big VS, the names,
+  OG + animal or ALT + the twin's title, and each named player's wins from
+  the leaderboard. The portraits are the picks as they stood on the select
+  mat (so twins are twins), drawn onto the page's canvas and copied out in
+  the same task (no readback wait). 1.5 s; any key or a click skips. Offline
+  the fight waits at tick 0 under it; online nothing waits — the sim runs
+  on under the card (it stands in for the 'Round 1' banner) and it's gone
+  after 1.05 s, before 'Fight!'.
+- **Loss moment:** on the match's `end`, the loser's side of the screen
+  drains to a desaturated red (a backdrop filter) and their plush slumps
+  (a partial deflate; a Fluffatality's full one is kept), then the winner
+  screen as before (quote, record, Fluffless / Fluffatality untouched). The
+  prompt is now **Rematch? YES / NO** in pillows (YES mint, NO pink; online
+  NO is *leave*).
+- Evidence: `node tools/ui-shots.mjs` → `shots/ui/` (buttons idle / hover /
+  pressed, four taunts, the VS card, the loss drain, the rematch prompt);
+  `node tools/online-match.mjs --lag 40 --out ui/online`.
+
 ## OG / ALT, practice keys, twin polish (bolster-polish)
 
 - **OG / ALT on character select** (`ui/variant.js`): every fighter can be
