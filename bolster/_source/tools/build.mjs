@@ -14,6 +14,8 @@ const result = await esbuild.build({
   target: ['es2020'],
   minify: true,
   legalComments: 'none',
+  // the SFX clips (src/audio/clips.js): inlined as base64 strings, decoded in the page
+  loader: { '.mp3': 'base64' },
   write: false,
   logLevel: 'info',
 });

@@ -25,6 +25,9 @@ import { SOLO, ACTIONS, toMap, rebind, loadBindings, saveBindings, resetBindings
 import { keyboardSVG, soloBinding, comboLine, strays } from './ui/keymap.js';
 import { TWIN_TITLE, resolveVariants, cpuAlt, VariantMemory } from './ui/variant.js';
 import { cleanName, nameKey, loadNames, useName, loadBoard, saveBoard, recordMatch, resetBoard, standings } from './ui/players.js';
+import { AudioEngine, renderOffline } from './audio/engine.js';
+import { CLIPS } from './audio/clips.js';
+import { SfxRouter } from './audio/sfxmap.js';
 import { LEFT as K_L, RIGHT as K_R, UP as K_U, DOWN as K_D, LIGHT as K_O, HEAVY as K_P, SPECIAL as K_S, BLOCK as K_E } from './sim/input.js';
 
 const $ = (s) => document.querySelector(s);
@@ -50,6 +53,7 @@ const CONTROLS = `
   <span><kbd>W</kbd> then <kbd>S</kbd>+<kbd>P</kbd></span><span>dive slam (in the air: an overhead — block it standing)</span>
   <span><kbd>Space</kbd></span><span>special (full meter)</span>
   <span><kbd>Esc</kbd></span><span>pause</span>
+  <span><kbd>M</kbd></span><span>sound on / off (music and volumes: the pause card)</span>
   <p class="tip">Don't just mash forward: block their heavy, then hit back — a light or a throw gets in first. Hitting them as they wind up is a COUNTER.</p>`;
 
 const flagOf = (id) => FLAGS[FIGHTERS[id].nation];
@@ -92,6 +96,10 @@ class App {
     this.backend = renderer.backend && renderer.backend.isWebGPUBackend ? 'WebGPU' : 'WebGL 2';
     this.errors = [];
     this.timers = [];
+    // sound (src/audio/): starts on the first key or click; presentation only
+    this.audio = new AudioEngine({ storage: LS, clips: CLIPS });
+    this.router = new SfxRouter();
+    this.audio.onChange(() => this._paintSound());
     this._controls();
     this._bindUI();
     this.resize();
@@ -131,6 +139,72 @@ class App {
     if (name === 'title' && !this.lineup) this.lineup = new Lineup(this.stage, ROSTER);
     if (name !== 'title' && this.lineup) { this.lineup.dispose(); this.lineup = null; }
     if (name !== 'select' && name !== 'diff' && this.show && name !== 'pause') { this.show.dispose(); this.show = null; }
+    this._music(name);
+  }
+
+  /* ── sound ───────────────────────────────────────────────────────────
+     The menus have their loop; a fight's starts on 'Fight!' (after the VS
+     sting and the round sting); the pause holds it; the K.O. ducks it; the
+     match ends on a jingle. Practice: the fight loop, low. */
+  _music(name) {
+    const A = this.audio;
+    A.pause(name === 'pause');
+    A.setPractice(!!this.practice && !this.practice.lobby);
+    if (['title', 'mode', 'names', 'board', 'select', 'diff', 'online'].includes(name)) { A.setIntense(false); A.music('menu'); }
+    if (name === 'fight' && this.practice && !this.practice.lobby) A.music('fight');
+  }
+
+  /* a sim event → its sounds (after the tick; rollback-safe: audio/sfxmap.js) */
+  _sfx(e, tick, n) {
+    for (const x of this.router.route(e, tick, n)) this.audio.play(x.id, x);
+  }
+
+  _swing(st) {
+    for (const x of this.router.whooshes(st)) this.audio.play(x.id, x);
+  }
+
+  /* the match is over: a win jingle, or the sad trombone (a draw, or the
+     player at this keyboard lost to the computer / online) */
+  _jingle(w) {
+    const f = this.fight;
+    let mine = w === 0 || w === 1;
+    if (mine && this.net.on) mine = w === this.net.local;
+    else if (mine && f && !f.cpu[0] && f.cpu[1]) mine = w === 0;
+    this.audio.sting(mine ? 'win' : 'lose');
+  }
+
+  /* the fight's tension: the last 15 s on the clock, or either under 25 % stuffing */
+  _tension(st) {
+    if (!this.fight || this.fight.practice) return;
+    const low = st.f.some((f) => f.hp > 0 && f.hp / FIGHTERS[f.id].health < 0.25);
+    this.audio.setIntense((st.phase === 'fight' || st.phase === 'ko') && (st.timer <= 15 * 60 || low));
+  }
+
+  /* M toggles the sound, unless M is a fight key right now (practice: the meter; a rebound versus key) */
+  _mBound() {
+    if (this.practice && (this.screen === 'fight' || this.screen === 'online')) return true;
+    if (this.mode === 'versus' && !this.net.on) return this.bind.some((b) => Object.values(b).some((codes) => codes.includes('KeyM')));
+    return false;
+  }
+
+  /* the corner speaker (menus) and the pause card's sound pillows */
+  _paintSound() {
+    const S = this.audio.settings;
+    const b = $('#sound');
+    if (b) { b.classList.toggle('off', S.muted); b.setAttribute('aria-pressed', String(S.muted)); b.title = S.muted ? 'Sound off (M)' : 'Sound on (M)'; }
+    const m = $('#pause-screen .opt[data-act=mute]');
+    if (m) m.innerHTML = `${S.muted ? 'Sound: off' : 'Sound: on'} <small>M</small>`;
+    for (const k of ['music', 'sfx']) {
+      const r = $(`#vol-${k}`);
+      if (r && +r.value !== S[k]) r.value = S[k];
+      const o = $(`#pause-screen .opt[data-act=${k}]`);
+      if (o) { o.style.setProperty('--v', `${S[k]}%`); o.querySelector('b').textContent = S[k]; o.classList.toggle('muted', S.muted); }
+    }
+  }
+
+  toggleMute() {
+    const m = this.audio.toggleMute();
+    if (!m) this.audio.ui('confirm');
   }
 
   _bindUI() {
@@ -148,10 +222,21 @@ class App {
     for (const b of $$('#win-screen .opt')) b.onclick = () => this._winAct(b.dataset.act);
     for (const b of $$('#board-screen .opt')) b.onclick = () => this._boardAct(b.dataset.act);
     // the mouse and the keyboard share one highlight: pointing at a pillow selects it
-    for (const b of $$('.opt')) b.addEventListener('pointerenter', () => { if (b.disabled) return; for (const o of b.parentNode.querySelectorAll(':scope > .opt')) o.classList.toggle('sel', o === b); });
+    for (const b of $$('.opt')) b.addEventListener('pointerenter', () => { if (b.disabled) return; if (!b.classList.contains('sel')) this.audio.ui('tick'); for (const o of b.parentNode.querySelectorAll(':scope > .opt')) o.classList.toggle('sel', o === b); });
+    // a pillow pressed (mouse or keyboard): the confirm blip (not the volume rows)
+    document.addEventListener('click', (e) => { const b = e.target.closest?.('.opt'); if (b && !b.disabled && !b.classList.contains('vol')) this.audio.ui('confirm'); }, true);
+    // sound: the corner speaker; the pause card's mute pillow and sliders
+    $('#sound').onclick = (e) => { e.stopPropagation(); this.toggleMute(); $('#sound').blur(); };
+    for (const k of ['music', 'sfx']) {
+      const r = $(`#vol-${k}`);
+      r.addEventListener('input', () => this.audio.set(k, +r.value));
+      r.addEventListener('change', () => { if (k === 'sfx') this.audio.play('hit-light', { gain: 0.8 }); r.blur(); });
+      r.addEventListener('click', (e) => e.stopPropagation());
+    }
+    this._paintSound();
     $('#title-screen').onclick = () => this.go('mode');
     addEventListener('keydown', (e) => this._key(e));
-    addEventListener('pointerdown', () => this._wake());
+    addEventListener('pointerdown', () => { this.audio.unlock(); this._wake(); });
   }
 
   _menuMove(sel, d) {
@@ -159,6 +244,7 @@ class App {
     let i = opts.findIndex((b) => b.classList.contains('sel'));
     i = (i + d + opts.length) % opts.length;
     opts.forEach((b, k) => b.classList.toggle('sel', k === i));
+    this.audio.ui('tick');
   }
 
   /* fire the highlighted button (a keyboard press squashes the pillow a beat) */
@@ -172,9 +258,12 @@ class App {
 
   _key(e) {
     const k = e.code;
+    this.audio.unlock();
     this._wake();
     if (this.remap) { e.preventDefault(); this._remapKey(k); return; }
     if (this.screen === 'names') { this._namesKey(e); return; }
+    // M: sound on / off (not where M is a fight key: practice's meter, a rebound versus key)
+    if (k === 'KeyM' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !this._mBound()) { this.toggleMute(); return; }
     if (this.vs) { if (!e.repeat) this._vsEnd(); e.preventDefault(); return; }
     const up = k === 'KeyW' || k === 'ArrowUp', down = k === 'KeyS' || k === 'ArrowDown';
     const left = k === 'KeyA' || k === 'ArrowLeft', right = k === 'KeyD' || k === 'ArrowRight';
@@ -231,6 +320,10 @@ class App {
     if (s === 'pause') {
       if (k === 'Escape') this.pause(false);
       else if (up || down) this._menuMove('#pause-screen .opt', up ? -1 : 1);
+      else if (left || right) {
+        const v = $('#pause-screen .opt.vol.sel');
+        if (v) { const key = v.dataset.act; this.audio.set(key, this.audio.settings[key] + (right ? 10 : -10)); if (key === 'sfx') this.audio.play('hit-light', { gain: 0.8 }); else this.audio.ui('tick'); }
+      }
       else if (ok) this._menuFire('#pause-screen .opt');
       return;
     }
@@ -283,6 +376,7 @@ class App {
      A seat's cursor lands on a fighter: the variant it last had there this
      session (the computer's seat, the first time: a seeded coin). */
   _setPick(k, i) {
+    if (this.pick[k] !== i && this.screen === 'select' && (!this.net.on || k === this.net.local)) this.audio.ui('tick');
     this.pick[k] = i;
     this.alt[k] = this._altFor(k, i);
   }
@@ -306,6 +400,7 @@ class App {
   }
 
   _setAlt(k, alt) {
+    if (this.alt[k] !== alt) this.audio.ui('tick');
     this.alt[k] = alt;
     this.altMem.set(k, ROSTER[this.pick[k]], alt);
     if (this.net.on) this.net.cursor();
@@ -353,6 +448,7 @@ class App {
   }
 
   _lock(seat = this.picking) {
+    this.audio.ui('confirm');
     if (this.mode === 'versus') {
       this.locked[seat] = true;
       this._paintSelect();
@@ -693,6 +789,11 @@ class App {
     f.fluffless = [0, 0];
     // (the state the match starts from: a test checks it's the fresh one, whatever practice came before)
     this.matchStart = { p1, p2, seed: this.seed, hash: hash(f.st) };
+    this.router.reset();
+    this.audio.setIntense(false);
+    this.audio.music(null);
+    f.onSfx = (e, t, n) => this._sfx(e, t, n);
+    f.onSwing = (st) => this._swing(st);
     f.onEvent = (e) => this._event(e);
     f.onTick = (st) => this._hud(st);
     f.onTaunt = (t) => this.taunt(t);
@@ -731,6 +832,7 @@ class App {
     card.className = 'on';
     document.body.classList.add('vs-on');
     card.onclick = () => this._vsEnd();
+    this.audio.sting('vs');
     const mine = (this._vsN = (this._vsN || 0) + 1);
     this.vs = { t: 0, dur: online ? 1.05 : 1.5, online, n: mine };
     if (!online) { f.paused = true; this.kb.clear(); this.kb2.clear(); }
@@ -769,6 +871,9 @@ class App {
     this.versus = false;
     const seed = ((Math.random() * 0x7fffffff) | 0) || 1;
     const f = (this.fight = new Fight(this.stage, { p1, p2, seed, keyboard: this.kb, toques: this.toques, practice: this.practiceSettings, alt }));
+    this.router.reset();
+    f.onSfx = (e, t, n) => this._sfx(e, t, n);
+    f.onSwing = (st) => this._swing(st);
     f.onEvent = (e) => this._event(e);
     f.onTick = (st) => this._hud(st);
     this.practice = { lobby, p1, p2 };
@@ -885,6 +990,7 @@ class App {
   }
 
   _pauseAct(a) {
+    if (a === 'mute') { this.toggleMute(); return; }
     if (a === 'resume') this.pause(false);
     if (a === 'select') { this.fight.dispose(); this.fight = null; this.go('select'); }
     if (a === 'title') { this.fight.dispose(); this.fight = null; this.go('title'); }
@@ -898,6 +1004,7 @@ class App {
   }
 
   _hud(st) {
+    this._tension(st);
     const C = this._hudCache || (this._hudCache = {});
     for (let k = 0; k < 2; k++) {
       const f = st.f[k], max = FIGHTERS[f.id].health;
@@ -990,6 +1097,11 @@ class App {
 
   _event(e) {
     const f = this.fight, st = f.st;
+    if (e.k === 'banner' && e.text === 'round' && !this.vs) this.audio.sting('round');
+    if (e.k === 'banner' && e.text === 'fight') this.audio.music('fight');
+    if (e.k === 'ko') this.audio.duck(0.22, 2.8);
+    if (e.k === 'round') this.audio.setIntense(false);
+    if (e.k === 'end') this._jingle(e.w);
     if (e.k === 'banner') {
       if (e.text === 'round' && this.vs) { /* the VS card is up (online): it stands in for 'Round 1' */ }
       else if (e.text === 'round') this.banner(st.wins[0] === 1 && st.wins[1] === 1 ? 'Final Round' : `Round ${e.n}`, '', 900);
@@ -1132,6 +1244,7 @@ class App {
 
   /* ── the loop ─────────────────────────────────────────────────────────── */
   frame(dt, draw = true) {
+    this.audio.pump();
     if (this.vs && (this.vs.t += dt) >= this.vs.dur) this._vsEnd();
     this._timers(this.fight?.paused ? 0 : dt);
     this.net.frame(dt);
@@ -1196,6 +1309,7 @@ async function start() {
   app.boxes = params.has('boxes');
   app.say = (text, x, y, o) => say($('#bubbles'), text, x, y, o);
   app.hash = hash;
+  app.renderAudio = (o) => renderOffline({ clips: CLIPS, ...o });   // captures (tools/audio-render.mjs)
   app.freshHash = (p1, p2, seed) => hash(createMatch({ p1, p2, seed }));   // tests: the match practice must not touch
   // portraits for the cards
   if (!params.has('noportraits')) { try { app.portraits = await portraits(renderer, app.stage, ROSTER); } catch (err) { console.warn('portraits', err); } }

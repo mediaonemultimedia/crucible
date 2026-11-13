@@ -250,6 +250,7 @@ export class Online {
   lock() {
     const A = this.app;
     if (A.locked[this.local]) return;
+    A.audio?.ui('confirm');
     A.locked[this.local] = true;
     this.send(selectMsg('lock', A.pick[this.local], A.alt[this.local]));
     A._paintSelect();

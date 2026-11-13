@@ -35,6 +35,10 @@ node tools/keys-shots.mjs         # the keyboard legend → shots/keys/
 node tools/twins-shots.mjs [--lineup] # the evil twins, roster line-ups → shots/twins/
 node tools/goon-shots.mjs [scene …]  # the hockey goon's evidence → shots/goon/
 node tools/goon-probe.mjs            # the goon's mullet in a CPU match: no clipping, no NaN
+node tools/audio-prep.mjs            # the SFX drafts → trimmed, normalised clips (src/assets/sfx)
+node tools/audio-check.mjs           # sound in the real page: gesture, mute, the match's SFX, pause, practice
+node tools/audio-render.mjs          # offline captures → shots/audio/*.mp3, with peak / gap / seam checks
+node tools/audio-fps.mjs             # the sound's CPU share per frame, the music scheduler's cost
 ```
 
 Headless tools use `CHROMIUM` (default `/opt/pw-browsers/chromium`) as the browser.
@@ -46,6 +50,80 @@ players on one keyboard; `screen=board` the leaderboard; `screen=names` the name
 to the computer too; `seed=N` fixes the match seed; `toques=1`; `webgl` forces
 the WebGL 2 path; `hold` stops the free-running loop for scripted stepping;
 `boxes` draws the sim's hurt, limb, hit and shot boxes over the picture).
+
+## Sound and music (bolster-audio)
+
+Presentation only: no sim, frame data, hit box, netcode or balance change
+(`test/audio.test.mjs`: the state hash is identical with the sound
+listening, for any input sequence). Everything is in `src/audio/`.
+
+- **Starts on the first key or click** (the browsers' autoplay rule): no
+  AudioContext before that, so no autoplay warning. A hidden tab suspends it.
+- **Mix:** music and SFX buses → a compressor → a limiter → out (no clipping
+  however many sounds pile up); at most 14 SFX voices (4 of one sound), the
+  oldest stolen with a 6 ms fade.
+- **SFX** (`sfxmap.js`, `engine.js`): the owner's drafts in
+  `assets/audio/` (AI SFX model; owner-approved) → `tools/audio-prep.mjs`:
+  trimmed to the sound, high-passed, faded in and out, peak-normalised,
+  mono 56 kb/s MP3 (decodeAudioData reads MP3 in every target browser,
+  Safari included; the decoded buffer's encoder delay is trimmed so a hit
+  lands on its frame) → `src/assets/sfx/`, inlined as base64 by the build
+  (~41 KB of clips). Levels from each clip's measured loudness (`MIX`).
+  **Used:** hit-light, hit-heavy, knockdown, land, jump, crowd-ooh,
+  feather-burst (a 2 s steady roar shaped into a burst). **Not used,
+  synthesised instead** (`synth.js`): whoosh (a ~50 Hz rumble — no swing on
+  laptop speakers), grab, block, ui-tick, ui-confirm (steady hiss 3–18 dB
+  over the floor, no event in it). A short sine thump sits under heavy hits.
+- **Events → sounds:** light / heavy hits (heavy: specials, signatures,
+  throws, amplified finishers, knockdowns, ≥ 62 damage), each play varied
+  ±6 % pitch and ±1.5 dB (from the tick: repeatable), a counter-hit louder
+  and lower; blocks; a whoosh on each attack's startup (light quieter,
+  one per swing, ≥ 7 ticks apart per player); the grab on a throw's
+  connect; knockdown on throw landings, knockdowns and the dive slam; jump
+  and land; the K.O. = heavy hit + feather burst, the crowd's *ooh* on the
+  K.O. itself (a confirmed flow event online). Menus: a tick on every
+  highlight move (keyboard, mouse, select grid, OG/ALT), a confirm on every
+  pillow pressed and every lock-in.
+- **Rollback-safe:** sounds are driven from sim events after the tick
+  (never inside it). Each is keyed (tick, kind, player, ordinal) and never
+  fires twice; an event a resimulation moved ≤ 2 ticks is the same sound.
+  Online the tick is read from the rollback session's log (or its snapshot
+  ring, for a tick confirmed in the same advance) — read only.
+- **Music, composed in code** (`music.js`: notes as data; `synth.js`: 25 % and
+  12.5 % pulse leads, triangle bass, noise / sine drums; a lookahead
+  sequencer on the AudioContext clock, 0.25 s ahead, a 25 ms timer plus
+  every frame). Original tunes:
+  - **Menu loop** — F major, 110 BPM, swung eighths, 16 bars (35 s); the
+    second half adds an arpeggio and a high answer.
+  - **Fight loop** — 150 BPM, 36 bars (58 s): A in D minor, B in F major (the
+    tune up an octave on the thin pulse, 16th arpeggios), a 4-bar
+    breakdown back to the top. **Tense** (the last 15 s, or either fighter
+    under 25 % stuffing): 7 % faster, 16th hats, the arpeggio under A too.
+  - **VS sting** (1.7 s), **round start** (two notes up and a crash),
+    **win jingle** (4.4 s, a rising fanfare to a top C), **lose jingle**
+    (a sagging muted-saw trombone, four notes down, the last one wobbling,
+    then a deflating bloop).
+  - Flow: menu loop on every menu; the VS card's sting; the round sting on
+    'Round N'; the fight loop on 'Fight!' (it carries on across rounds);
+    ducked under the K.O.; the win or lose jingle at the match's end (lose:
+    the player at this keyboard lost to the computer or online, or a draw).
+    The pause holds the music and picks up where it was. Practice: the
+    fight loop at 35 %.
+- **Controls:** the speaker in the top-right corner of every menu (click,
+  or **M** anywhere — except practice, where M is the meter, and versus if
+  a player rebound a key to M); on the pause card a *Sound: on/off* pillow
+  and **Music** / **SFX** volume pillows (drag, or ◀ ▶ on the highlighted
+  one). In the keyboard legend and the controls list. Settings in
+  `localStorage` (`pillowfight.audio.v1`; private mode: the session).
+- Tests: `test/audio.test.mjs` (the event map and variation; the dedupe;
+  whoosh rate limit; the state hash with the sound listening; an online
+  match over a laggy, lossy link where every real event sounds exactly once
+  on each peer; the music's lengths and sections; settings). Evidence:
+  `tools/audio-check.mjs` (the real page), `tools/audio-render.mjs` →
+  `shots/audio/*.mp3` (menu loop, fight A / B / seam / tense, the four
+  jingles, a 20 s CPU-v-CPU stretch with its SFX) and `captures.json`
+  (peak, RMS, longest quiet run, the seam), screenshots
+  `shots/audio/*.png`; `tools/audio-fps.mjs`.
 
 ## The hockey goon, refined (bolster-goon)
 

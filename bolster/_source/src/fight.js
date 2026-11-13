@@ -11,9 +11,11 @@ import { Plush } from './render/plush.js';
 import { U } from './render/stage.js';
 import { Rollback } from './net/rollback.js';
 import { Taunter } from './ui/taunt.js';
+import { ordinal, sessionTickOf } from './audio/sfxmap.js';
 import { Dummy, practiceMatch, practiceAfter, ComboMeter, InputLog } from './practice.js';
 
 export const TICK = 1 / 60;
+
 
 export class Fight {
   constructor(stage, { p1, p2, seed = 1, cpu = [null, 'normal'], keyboard = null, keyboard2 = null, toques = false, net = null, practice = null, alt = null }) {
@@ -41,6 +43,13 @@ export class Fight {
     this.prevProj = new Map();
     this.onEvent = () => {};
     this.onTick = () => {};
+    // sound (audio/sfxmap.js): each event with the tick it happened on and its
+    // ordinal there (same kind, same player); the state after each tick (swings).
+    // Read only, after the tick; online the tick comes from the session's log.
+    this.onSfx = () => {};
+    this.onSwing = () => {};
+    this.evTick = 0;
+    this.evN = 1;
     // taunting captions (cosmetic): read-only on the state; online, confirmed ticks only
     this.taunter = practice ? null : new Taunter();
     this.onTaunt = () => {};
@@ -74,7 +83,9 @@ export class Fight {
       for (const e of st.ev) this.combos.event(e);
       practiceAfter(st, this.practice, this.pmem);
     }
-    for (const e of st.ev) this._fx(e);
+    this.evTick = st.tick;
+    for (const e of st.ev) { this.evN = ordinal(st.ev, e); this._fx(e); }
+    this.onSwing(st, st.tick);
     this._taunt(st);
     this.onTick(st);
   }
@@ -101,6 +112,7 @@ export class Fight {
     const S = this.session, before = S.st.f.map((f) => ({ x: f.x, y: f.y }));
     const projBefore = new Map(S.st.proj.map((p) => [p.id, { x: p.x, y: p.y }]));
     const m = this.kb ? this.kb.sample() : 0;
+    this.flow0 = S.flowDone;
     const ev = this.override ? S.advance(this.override(S.st)[S.local] ?? m) : S.advance(m);
     this.st = S.st;
     if (this.taunter) this._netTaunts();
@@ -108,11 +120,17 @@ export class Fight {
     this.prev = before;
     this.prevProj = projBefore;
     this.lastInputs = S.local === 0 ? [m, S.lastRemote] : [S.lastRemote, m];
-    for (const e of ev) this._fx(e);
+    for (const e of ev) { this._evAt(e); this._fx(e); }
+    this.onSwing(this.st, this.st.tick);
     this.onTick(this.st);
   }
 
+  /* online: which tick an event came from (and its ordinal there), from the
+     session's own log — read only; a flow event already let go of: now */
+  _evAt(e) { [this.evTick, this.evN] = sessionTickOf(this.session, e, this.flow0); }
+
   _fx(e) {
+    this.onSfx(e, this.evTick, this.evN);
     const S = this.stage, st = this.st;
     if (e.k === 'hit' || e.k === 'block') {
       const x = e.x / U, y = e.y / U;
