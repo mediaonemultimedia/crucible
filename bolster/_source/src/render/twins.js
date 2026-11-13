@@ -6,8 +6,9 @@
    lines in the atlases — and the few things it wears are felt, leather or
    metal sewn to the soft body, carried by its points each frame:
 
-   - Kevalanche, hockey goon: a black bear (near-black brown, a tan
-     muzzle; the head's short fur and shape his OG's), a black eye (a
+   - Kevalanche, hockey goon: a bear in Edmonton navy and orange (navy
+     fur, an orange felt muzzle and ear insides; the head's short fur and
+     shape his OG's), a black eye (a
      bruised ring round the eye nearer the camera), one felt front tooth
      with a gap beside it, and plush hockey gloves in royal blue and orange
      (render/gloves.js).
@@ -233,18 +234,19 @@ function makeTooth() {
 }
 
 const KEV = {
-  // a black bear: near-black brown (warm enough to keep its shading and
-  // depth under the lights), a tan muzzle like a real black bear's; the
-  // bruise a lighter plum so it reads on the dark fur
-  colors: { fur: '#20100a', under: '#b98d63', accent: '#170d08', spot: '#8a5298', nose: '#120d0c', cloth: '#1f49b6', trim: '#ef6a1e' },
+  // Edmonton colours on a plush bear: fur a navy so deep it reads almost
+  // black (still blue enough to keep its shading and pile depth under the
+  // lights), ear insides and muzzle a soft, slightly muted felt orange, the
+  // nose dark; the bruise a lighter plum so it reads on the navy
+  colors: { fur: '#0f1f40', under: '#e2692c', accent: '#0b1a33', spot: '#9a5aa6', nose: '#0b0d14', cloth: '#1f49b6', trim: '#ef6a1e' },
   gloss: 0.4,
   // (the hockey gloves' felt: render/gloves.js, makeHockeyGlove)
   hockey: { blue: '#1f49b6', orange: '#ef6a1e', palm: '#c4b49b' },
   // the head is his OG's: the same shape and short pile (no haircut), only
-  // the colours are the black bear's. A black bear's chest and belly are
-  // dark too (just a hint left)
+  // the colours are navy and orange. The chest and belly stay navy (only the
+  // ear insides and the muzzle are orange)
   rig(rig) {
-    wrapGrid(rig, 'torso', 'under', (x) => x * 0.18);
+    wrapGrid(rig, 'torso', 'under', () => 0);
   },
   // the black eye: a bruise round the eye on the camera side as he faces
   // left (player 2's eye nearer us: u above the middle), the pile shorter
