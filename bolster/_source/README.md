@@ -83,8 +83,15 @@ the WebGL 2 path; `hold` stops the free-running loop for scripted stepping;
 - **Kevalanche ALT, no mullet:** the locks, their springs and their shader
   are gone (`Mullet`, `lockMat`, `tools/goon-probe.mjs`), and so is the
   haircut in the pile (the cropped top and sides, the long nape): his head
-  is his OG's shape and short fur, in the black bear's near-black with the
-  tan muzzle. The black eye and the felt tooth stay.
+  is his OG's shape and short fur. The black eye and the felt tooth stay.
+- **Kevalanche ALT in Edmonton colours** (`KEV.colors` in
+  `render/twins.js`): the fur a navy so deep it reads almost black
+  (`#0f1f40`, accent `#0b1a33`; blue enough to keep its shading and pile
+  depth under the lights), the ear insides and muzzle a slightly muted felt
+  orange (`#e2692c`), the nose dark (`#0b0d14`), the chest and belly navy
+  (no underside hint). The bruise is a lighter plum (`#9a5aa6`) so the black
+  eye reads on navy; the felt tooth stays cream. Colours only, no logos.
+  Evidence: `shots/fixes/goon/navy/` (before: `navy-before/`).
 - **Kevalanche ALT, hockey gloves rebuilt** (`makeHockeyGlove` in
   `render/gloves.js`): four separate fingers, each three padded rolls
   (sausages with a crease between, the little finger smaller) on little
@@ -188,7 +195,7 @@ Kevalanche's ALT only (his OG, every other fighter and the feel pass's
 animation are untouched). Render only: no sim, frame data, hit box, netcode
 or balance change; the golden hashes in `test/feel.test.mjs` still match.
 
-- **A black bear** (`render/twins.js`, `KEV.colors`): near-black brown fur
+- **A black bear** (superseded by the Edmonton recolour above; `render/twins.js`, `KEV.colors`): near-black brown fur
   (`#20100a`, warm enough to keep its shading and depth under the lights),
   a tan muzzle like a real black bear's, the chest and belly dark too (a
   hint of the old underside left). The fur's white strand highlights greyed
