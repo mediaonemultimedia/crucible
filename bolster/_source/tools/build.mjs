@@ -7,7 +7,15 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const src = path.join(root, 'src');
 const out = path.join(root, 'build');
 
+/* the sound effects (tools/sfx.mjs → assets/audio/game/*.mp3), inlined as
+   base64 into the bundle (src/audio/engine.js reads __PF_SFX__) */
+const sfxDir = path.join(root, 'assets/audio/game');
+const sfx = {};
+for (const f of fs.readdirSync(sfxDir).filter((n) => n.endsWith('.mp3')).sort()) sfx[f.slice(0, -4)] = fs.readFileSync(path.join(sfxDir, f)).toString('base64');
+const sfxKB = Object.values(sfx).reduce((a, s) => a + s.length, 0) / 1024;
+
 const result = await esbuild.build({
+  define: { __PF_SFX__: JSON.stringify(sfx) },
   entryPoints: [path.join(src, 'main.js')],
   bundle: true,
   format: 'iife',
@@ -109,6 +117,7 @@ const stunOk = /stun:stun\.l\.google\.com:19302/.test(js) && js.includes('0.peer
 const netCalls = [...js.matchAll(/\b(?:fetch|XMLHttpRequest|EventSource|WebSocket)\s*\(/g)].map((m) => m[0]);
 
 console.log(`\nbundle   ${(js.length / 1024).toFixed(1)} KB`);
+console.log(`sfx      ${Object.keys(sfx).length} clips, ${sfxKB.toFixed(1)} KB base64`);
 console.log(`final    ${(fs.statSync(dest).size / 1024).toFixed(1)} KB  -> ${dest}`);
 console.log(`fetched refs   ${fetched.length ? fetched.join(', ') : 'none'}`);
 console.log(`dynamic import ${dynImports.length ? dynImports.join(', ') : 'none'}`);

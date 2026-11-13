@@ -1,0 +1,104 @@
+{
+ "menu-loop": {
+  "seconds": 70.82,
+  "peak": -3.22,
+  "clipped": 0,
+  "rms": -16.7,
+  "longestGap": 0.02
+ },
+ "fight-loop": {
+  "seconds": 65,
+  "peak": -2.97,
+  "clipped": 0,
+  "rms": -15.2,
+  "longestGap": 0.02
+ },
+ "fight-boost": {
+  "seconds": 21,
+  "peak": -3.15,
+  "clipped": 0,
+  "rms": -15.4,
+  "longestGap": 0.02
+ },
+ "vs-sting": {
+  "seconds": 2.9,
+  "peak": -3.42,
+  "clipped": 0,
+  "rms": -17.3,
+  "longestGap": 0.02
+ },
+ "round-sting": {
+  "seconds": 1.6,
+  "peak": -3.52,
+  "clipped": 0,
+  "rms": -20.4,
+  "longestGap": 0.04
+ },
+ "win-sting": {
+  "seconds": 4.6,
+  "peak": -3.23,
+  "clipped": 0,
+  "rms": -15.5,
+  "longestGap": 0.06
+ },
+ "lose-sting": {
+  "seconds": 4.8,
+  "peak": -7.24,
+  "clipped": 0,
+  "rms": -17.4,
+  "longestGap": 0.02
+ },
+ "menu-seam": {
+  "seconds": 6,
+  "peak": -3.52,
+  "clipped": 0,
+  "rms": -16.7,
+  "longestGap": 0,
+  "seamJumpDb": 2.8,
+  "biggestBarJumpInsideDb": 3.7
+ },
+ "fight-seam": {
+  "seconds": 6,
+  "peak": -2.93,
+  "clipped": 0,
+  "rms": -15.7,
+  "longestGap": 0,
+  "seamJumpDb": 6.2,
+  "biggestBarJumpInsideDb": 5.7
+ },
+ "cpu-fight-20s": {
+  "seconds": 21,
+  "peak": -2.67,
+  "clipped": 0,
+  "rms": -15.1,
+  "longestGap": 0.09,
+  "sounds": {
+   "whoosh": 28,
+   "hit-light": 7,
+   "hit-heavy": 8,
+   "knockdown": 5,
+   "block": 5
+  },
+  "state": {
+   "phase": "fight",
+   "round": 1,
+   "wins": [
+    0,
+    0
+   ]
+  },
+  "appFrameMs": {
+   "mean": 10.93,
+   "worst": 36.8
+  }
+ },
+ "live": {
+  "cpu": {
+   "noSoundMs": 12.39,
+   "withSoundMs": 12.59,
+   "p95NoSound": 15.4,
+   "p95WithSound": 15.1,
+   "effects": 85
+  }
+ }
+}

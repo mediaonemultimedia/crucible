@@ -25,6 +25,7 @@ import { SOLO, ACTIONS, toMap, rebind, loadBindings, saveBindings, resetBindings
 import { keyboardSVG, soloBinding, comboLine, strays } from './ui/keymap.js';
 import { TWIN_TITLE, resolveVariants, cpuAlt, VariantMemory } from './ui/variant.js';
 import { cleanName, nameKey, loadNames, useName, loadBoard, saveBoard, recordMatch, resetBoard, standings } from './ui/players.js';
+import { AudioEngine } from './audio/engine.js';
 import { LEFT as K_L, RIGHT as K_R, UP as K_U, DOWN as K_D, LIGHT as K_O, HEAVY as K_P, SPECIAL as K_S, BLOCK as K_E } from './sim/input.js';
 
 const $ = (s) => document.querySelector(s);
@@ -50,8 +51,11 @@ const CONTROLS = `
   <span><kbd>W</kbd> then <kbd>S</kbd>+<kbd>P</kbd></span><span>dive slam (in the air: an overhead — block it standing)</span>
   <span><kbd>Space</kbd></span><span>special (full meter)</span>
   <span><kbd>Esc</kbd></span><span>pause</span>
+  <span><kbd>M</kbd></span><span>mute sound (practice: on the pause card)</span>
   <p class="tip">Don't just mash forward: block their heavy, then hit back — a light or a throw gets in first. Hitting them as they wind up is a COUNTER.</p>`;
 
+const MUTE_KEY = [{ code: 'KeyM', word: 'Mute' }];
+const MENU_SCREENS = new Set(['title', 'mode', 'names', 'board', 'online', 'select', 'diff']);
 const flagOf = (id) => FLAGS[FIGHTERS[id].nation];
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // this device's storage (names, the leaderboard, versus keys); none: this session only
@@ -92,6 +96,9 @@ class App {
     this.backend = renderer.backend && renderer.backend.isWebGPUBackend ? 'WebGPU' : 'WebGL 2';
     this.errors = [];
     this.timers = [];
+    // sound (audio/engine.js): nothing until the first key or click
+    this.audio = new AudioEngine({ store: LS });
+    this.audio.onChange(() => this._paintSound());
     this._controls();
     this._bindUI();
     this.resize();
@@ -131,7 +138,43 @@ class App {
     if (name === 'title' && !this.lineup) this.lineup = new Lineup(this.stage, ROSTER);
     if (name !== 'title' && this.lineup) { this.lineup.dispose(); this.lineup = null; }
     if (name !== 'select' && name !== 'diff' && this.show && name !== 'pause') { this.show.dispose(); this.show = null; }
+    // the menu loop on every menu screen (the fight's music is the fight's: startFight / _event)
+    if (MENU_SCREENS.has(name) && !(name === 'online' && this.practice?.lobby)) { this.audio.calm(); this.audio.music('menu'); }
+    this._paintSound();
   }
+
+  /* ── sound ─────────────────────────────────────────────────────────────
+     The mute switch (a speaker on the menus and the pause card; M) and the
+     Music / SFX sliders on the pause card; remembered on this device. */
+  _bindSound() {
+    for (const b of $$('.snd-mute')) b.addEventListener('click', (e) => { e.stopPropagation(); this.audio.unlock(); this.audio.toggleMute(); b.blur(); });
+    for (const r of $$('.snd-vol input')) {
+      r.addEventListener('input', () => { this.audio.unlock(); this.audio.set(r.dataset.k, r.value / 100); });
+      r.addEventListener('change', () => { if (r.dataset.k === 'sfx') this.audio.play({ id: 'ui-confirm' }); r.blur(); });
+      // the slider keeps ← / → to itself; anything else goes back to the menu
+      r.addEventListener('keydown', (e) => { if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') e.stopPropagation(); else r.blur(); });
+      for (const t of ['pointerdown', 'click']) r.addEventListener(t, (e) => e.stopPropagation());
+    }
+  }
+
+  _paintSound() {
+    const S = this.audio.settings;
+    for (const b of $$('.snd-mute')) {
+      b.classList.toggle('off', S.mute);
+      b.setAttribute('aria-pressed', String(S.mute));
+      b.setAttribute('aria-label', S.mute ? 'Sound off (M)' : 'Sound on (M)');
+      b.title = S.mute ? 'Sound off · M' : 'Sound on · M mutes';
+    }
+    for (const r of $$('.snd-vol input')) {
+      const v = Math.round(S[r.dataset.k] * 100);
+      if (+r.value !== v) r.value = v;
+      r.parentNode.style.setProperty('--v', `${v}%`);
+      r.parentNode.classList.toggle('muted', S.mute);
+    }
+  }
+
+  /* a menu sound: 'tick' (moved), 'back', or 'confirm' (chosen) */
+  ui(kind) { this.audio.play({ id: kind === 'confirm' ? 'ui-confirm' : 'ui-tick', gain: 1, rate: kind === 'back' ? 0.8 : 1 }); }
 
   _bindUI() {
     for (const b of $$('#mode-screen .opt')) b.onclick = () => {
@@ -148,10 +191,13 @@ class App {
     for (const b of $$('#win-screen .opt')) b.onclick = () => this._winAct(b.dataset.act);
     for (const b of $$('#board-screen .opt')) b.onclick = () => this._boardAct(b.dataset.act);
     // the mouse and the keyboard share one highlight: pointing at a pillow selects it
-    for (const b of $$('.opt')) b.addEventListener('pointerenter', () => { if (b.disabled) return; for (const o of b.parentNode.querySelectorAll(':scope > .opt')) o.classList.toggle('sel', o === b); });
-    $('#title-screen').onclick = () => this.go('mode');
+    for (const b of $$('.opt')) b.addEventListener('pointerenter', () => { if (b.disabled) return; if (!b.classList.contains('sel')) this.ui('tick'); for (const o of b.parentNode.querySelectorAll(':scope > .opt')) o.classList.toggle('sel', o === b); });
+    // a click on a pillow: the confirm sound (the keyboard's goes through _menuFire)
+    for (const b of $$('.opt')) b.addEventListener('click', (e) => { if (e.isTrusted && !b.disabled) this.ui('confirm'); });
+    $('#title-screen').onclick = () => { this.ui('confirm'); this.go('mode'); };
     addEventListener('keydown', (e) => this._key(e));
-    addEventListener('pointerdown', () => this._wake());
+    addEventListener('pointerdown', () => { this.audio.unlock(); this._wake(); });
+    this._bindSound();
   }
 
   _menuMove(sel, d) {
@@ -159,6 +205,7 @@ class App {
     let i = opts.findIndex((b) => b.classList.contains('sel'));
     i = (i + d + opts.length) % opts.length;
     opts.forEach((b, k) => b.classList.toggle('sel', k === i));
+    this.ui('tick');
   }
 
   /* fire the highlighted button (a keyboard press squashes the pillow a beat) */
@@ -167,21 +214,28 @@ class App {
     if (!b) return;
     b.classList.add('pressed');
     setTimeout(() => b.classList.toggle('pressed', false), 110);
+    this.ui('confirm');
     b.click();
   }
 
   _key(e) {
     const k = e.code;
+    this.audio.unlock();
     this._wake();
     if (this.remap) { e.preventDefault(); this._remapKey(k); return; }
     if (this.screen === 'names') { this._namesKey(e); return; }
     if (this.vs) { if (!e.repeat) this._vsEnd(); e.preventDefault(); return; }
+    // M mutes (not while practising: there M is the dummy's meter)
+    if (k === 'KeyM' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !(this.practice && (this.screen === 'fight' || this.screen === 'online'))) {
+      this.audio.toggleMute();
+      return;
+    }
     const up = k === 'KeyW' || k === 'ArrowUp', down = k === 'KeyS' || k === 'ArrowDown';
     const left = k === 'KeyA' || k === 'ArrowLeft', right = k === 'KeyD' || k === 'ArrowRight';
     const ok = k === 'KeyO' || k === 'Enter', back = k === 'KeyP' || k === 'Escape' || k === 'Backspace';
     const s = this.screen;
     if (e.repeat && (ok || back)) return;
-    if (s === 'title') { this.go('mode'); return; }
+    if (s === 'title') { this.ui('confirm'); this.go('mode'); return; }
     if (s === 'mode') {
       if (up || down) this._menuMove('#mode-screen .opt', up ? -1 : 1);
       else if (ok || k === 'Space') this._menuFire('#mode-screen .opt');
@@ -268,13 +322,14 @@ class App {
         if (this.net.on) { this.net.choose(i, true); return; }
         const k = seat(); if (this.locked[k]) return; this._setPick(k, i); this._lock(k);
       };
-      c.onmouseenter = () => { if (this.screen !== 'select') return; if (this.net.on) { this.net.choose(i, false); return; } const k = seat(); if (this.locked[k] || this.pick[k] === i) return; this._setPick(k, i); this._paintSelect(); };
+      c.onmouseenter = () => { if (this.screen !== 'select') return; if (this.net.on) { this.net.choose(i, false); return; } const k = seat(); if (this.locked[k] || this.pick[k] === i) return; this.ui('tick'); this._setPick(k, i); this._paintSelect(); };
       cards.appendChild(c);
     });
     this._paintSelect();
   }
 
   _cursor(d, k = this.picking) {
+    this.ui('tick');
     this._setPick(k, (this.pick[k] + d + ROSTER.length) % ROSTER.length);
     this._paintSelect();
   }
@@ -306,6 +361,7 @@ class App {
   }
 
   _setAlt(k, alt) {
+    if (this.alt[k] !== alt) this.ui('tick');
     this.alt[k] = alt;
     this.altMem.set(k, ROSTER[this.pick[k]], alt);
     if (this.net.on) this.net.cursor();
@@ -353,6 +409,7 @@ class App {
   }
 
   _lock(seat = this.picking) {
+    this.ui('confirm');
     if (this.mode === 'versus') {
       this.locked[seat] = true;
       this._paintSelect();
@@ -454,7 +511,7 @@ class App {
     const tag = (p) => `<span class="ptag p${p + 1}">${esc(vs ? (this.players[p] || `Player ${p + 1}`) : 'One player')}</span>`;
     const lost = vs ? strays(B, keyCap) : [];
     const wait = R ? `<span class="waitmsg">${esc(this.players[R.p] || `Player ${R.p + 1}`)}: press the new key for ${esc(ACTIONS.find((a) => a.id === R.a).label)} (Esc cancels)</span>` : '';
-    return `<div class="kb${vs ? ' two' : ''}"><div class="kbhead">${tag(0)}${vs ? tag(1) : ''}${wait}</div>${keyboardSVG(B, { wait: R, click: vs, title: vs ? 'Versus keys on one keyboard' : 'One-player keys' })}
+    return `<div class="kb${vs ? ' two' : ''}"><div class="kbhead">${tag(0)}${vs ? tag(1) : ''}${wait}</div>${keyboardSVG(B, { wait: R, click: vs, title: vs ? 'Versus keys on one keyboard' : 'One-player keys', extras: MUTE_KEY })}
       <div class="kbfoot">${comboLine()}${lost.map((x) => ` <button class="stray p${x.p + 1}" data-p="${x.p}" data-a="${x.a}">P${x.p + 1} ${esc(x.text)}</button>`).join('')}${vs ? '<span class="kbhint">Click a lit key to change it.<button class="rk">Reset keys</button></span>' : ''}</div></div>`;
   }
 
@@ -696,6 +753,10 @@ class App {
     f.onEvent = (e) => this._event(e);
     f.onTick = (st) => this._hud(st);
     f.onTaunt = (t) => this.taunt(t);
+    f.onSound = (cues) => this.audio.cues(cues);
+    // the music: quiet until 'Fight!' (the round's sting first; the VS card's before that)
+    this.audio.calm();
+    this.audio.music(null);
     this._drainOff(true);
     $('#banner').textContent = '';
     $('#bubbles').textContent = '';
@@ -707,7 +768,7 @@ class App {
     this._hud(f.st);
     this.go('fight');
     this._nag = [0, 0];
-    if (vs && !params.has('novs')) this._vsCard(f, snaps, alt);
+    if (vs && !params.has('novs')) { this._vsCard(f, snaps, alt); this.audio.sting('vs'); }
   }
 
   /* ── the VS card ──────────────────────────────────────────────────────
@@ -771,7 +832,11 @@ class App {
     const f = (this.fight = new Fight(this.stage, { p1, p2, seed, keyboard: this.kb, toques: this.toques, practice: this.practiceSettings, alt }));
     f.onEvent = (e) => this._event(e);
     f.onTick = (st) => this._hud(st);
+    f.onSound = (cues) => this.audio.cues(cues);
     this.practice = { lobby, p1, p2 };
+    // practice: the fight loop, low (the lobby keeps the menu's)
+    this.audio.calm();
+    if (!lobby) this.audio.music('fight', { level: 0.35 });
     $('#banner').textContent = '';
     $('#bubbles').textContent = '';
     for (const c of $$('.combo')) c.classList.remove('on', 'amp');
@@ -878,6 +943,7 @@ class App {
   pause(on) {
     if (!this.fight) return;
     this.fight.paused = on;
+    this.audio.pause(on);
     this.kb.clear();
     this.kb2.clear();
     if (on) this._controls();
@@ -886,8 +952,8 @@ class App {
 
   _pauseAct(a) {
     if (a === 'resume') this.pause(false);
-    if (a === 'select') { this.fight.dispose(); this.fight = null; this.go('select'); }
-    if (a === 'title') { this.fight.dispose(); this.fight = null; this.go('title'); }
+    if (a === 'select') { this.audio.pause(false); this.fight.dispose(); this.fight = null; this.go('select'); }
+    if (a === 'title') { this.audio.pause(false); this.fight.dispose(); this.fight = null; this.go('title'); }
   }
 
   _winAct(a) {
@@ -916,6 +982,8 @@ class App {
       const pips = $$(`#pips${k + 1} b`);
       pips.forEach((p, i) => p.classList.toggle('on', st.wins[k] > i));
     }
+    // the music's last stretch: the last 15 s, or someone under a quarter of their stuffing
+    if (!this.fight?.practice) this.audio.intense(st.phase === 'fight' && (st.timer <= 15 * 60 || st.f.some((g) => g.hp < FIGHTERS[g.id].health * 0.25)));
     const sec = this.fight?.practice ? '∞' : Math.ceil(st.timer / 60);
     if (C.t !== sec) { C.t = sec; $('#timer').textContent = sec; $('#timer').classList.toggle('low', sec <= 10); }
   }
@@ -994,7 +1062,12 @@ class App {
       if (e.text === 'round' && this.vs) { /* the VS card is up (online): it stands in for 'Round 1' */ }
       else if (e.text === 'round') this.banner(st.wins[0] === 1 && st.wins[1] === 1 ? 'Final Round' : `Round ${e.n}`, '', 900);
       else this.banner('Fight!', '', 800);
+      if (e.text === 'round' && !this.vs) this.audio.sting('round');
+      if (e.text === 'fight') { this.audio.duck(false); this.audio.music('fight'); }
     }
+    // the K.O. (or the clock): the music ducks under it till the next 'Fight!'
+    if (e.k === 'koflash' || e.k === 'time') this.audio.duck(true);
+    if (e.k === 'end') this.audio.sting(this._jingle(e.w), { stopLoop: true, then: 'menu' });
     if (e.k === 'round') { for (const p of f.plush) p.reset(); }
     if (e.k === 'hit') {
       if (e.n >= 2) this.combo(e.p, e.n, e.amp);
@@ -1030,6 +1103,17 @@ class App {
       this.later(1.8, () => dismiss(b));
     }
     if (e.k === 'end') { this._lossMoment(e.w); this.later(1.3, () => this._winner()); }
+  }
+
+  /* the jingle at the end of a match: a win if the player at this screen
+     won (vs Computer: player 1; online: this side; two people, or two
+     computers: someone won), the sad trombone if they lost or it's a draw */
+  _jingle(w) {
+    const f = this.fight;
+    if (w !== 0 && w !== 1) return 'lose';
+    if (this.net.on) return w === this.net.local ? 'win' : 'lose';
+    if (f?.cpu && f.cpu[1] && !f.cpu[0]) return w === 0 ? 'win' : 'lose';
+    return 'win';
   }
 
   /* the match is lost: the loser's side of the screen drains to a
@@ -1132,6 +1216,7 @@ class App {
 
   /* ── the loop ─────────────────────────────────────────────────────────── */
   frame(dt, draw = true) {
+    this.audio.pump();
     if (this.vs && (this.vs.t += dt) >= this.vs.dur) this._vsEnd();
     this._timers(this.fight?.paused ? 0 : dt);
     this.net.frame(dt);
@@ -1196,6 +1281,7 @@ async function start() {
   app.boxes = params.has('boxes');
   app.say = (text, x, y, o) => say($('#bubbles'), text, x, y, o);
   app.hash = hash;
+  app.AudioEngine = AudioEngine;      // (tools/audio-render.mjs: the same engine on an offline context)
   app.freshHash = (p1, p2, seed) => hash(createMatch({ p1, p2, seed }));   // tests: the match practice must not touch
   // portraits for the cards
   if (!params.has('noportraits')) { try { app.portraits = await portraits(renderer, app.stage, ROSTER); } catch (err) { console.warn('portraits', err); } }

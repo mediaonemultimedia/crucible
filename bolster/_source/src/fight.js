@@ -11,9 +11,11 @@ import { Plush } from './render/plush.js';
 import { U } from './render/stage.js';
 import { Rollback } from './net/rollback.js';
 import { Taunter } from './ui/taunt.js';
+import { soundsFor, SoundGate, Swings } from './audio/sfxmap.js';
 import { Dummy, practiceMatch, practiceAfter, ComboMeter, InputLog } from './practice.js';
 
 export const TICK = 1 / 60;
+const SWING_BACK = 12;       // online: ticks of snapshots read back for attack swings
 
 export class Fight {
   constructor(stage, { p1, p2, seed = 1, cpu = [null, 'normal'], keyboard = null, keyboard2 = null, toques = false, net = null, practice = null, alt = null }) {
@@ -49,6 +51,11 @@ export class Fight {
     this.lastInputs = [0, 0];
     this.override = null;
     this.focus = null;         // the winner screen: the camera on one spot
+    // sound (audio/sfxmap.js): read-only on the events and the state after
+    // the tick; online, once per event tick (a re-simulated tick never plays twice)
+    this.onSound = null;
+    this.soundGate = new SoundGate({ near: net ? 2 : 0 });
+    this.swings = new Swings();
     this._place(1);
   }
 
@@ -75,8 +82,28 @@ export class Fight {
       practiceAfter(st, this.practice, this.pmem);
     }
     for (const e of st.ev) this._fx(e);
+    this._sounds(st.ev, () => st.tick);
     this._taunt(st);
     this.onTick(st);
+  }
+
+  /* the sounds for a batch of events (and any attack that just started) */
+  _sounds(evs, tickOf) {
+    if (!this.onSound) return;
+    const out = [];
+    this.soundGate.flush();
+    for (const e of evs || []) if (this.soundGate.admit(e, tickOf(e))) for (const c of soundsFor(e, this.st)) out.push(c);
+    // online: the last few ticks' snapshots too (a remote attack learnt late, a re-simulated one)
+    const S = this.session;
+    if (S) for (let t = Math.max(1, S.frame - SWING_BACK); t < S.frame; t++) { const s = S.stateAt(t); if (s) for (const c of this.swings.read(s)) out.push(c); }
+    for (const c of this.swings.read(this.st)) out.push(c);
+    if (out.length) this.onSound(out, this);
+  }
+
+  /* online: the tick an event belongs to (the session's own log, read only) */
+  _evTick(e) {
+    for (const [t, list] of this.session.evLog) if (list.includes(e)) return t;
+    return this.session.frame;
   }
 
   _taunt(st) {
@@ -104,6 +131,7 @@ export class Fight {
     const ev = this.override ? S.advance(this.override(S.st)[S.local] ?? m) : S.advance(m);
     this.st = S.st;
     if (this.taunter) this._netTaunts();
+    this._sounds(ev, (e) => this._evTick(e));
     if (!ev) return;
     this.prev = before;
     this.prevProj = projBefore;

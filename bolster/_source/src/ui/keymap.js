@@ -79,7 +79,7 @@ const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 
 /* the SVG: bindings [p1, p2?]; wait = { p, a } while a key is being rebound;
    click: lit keys carry data-p / data-a so a card can rebind them */
-export function keyboardSVG(bindings, { wait = null, click = false, title = 'Keyboard controls', cols = 23 } = {}) {
+export function keyboardSVG(bindings, { wait = null, click = false, title = 'Keyboard controls', cols = 23, extras = [] } = {}) {
   // cols: how many key widths from the left are drawn (18.5: the main block
   // and the arrows, no numpad — the compact practice panel)
   const U = 40, PAD = 10, GAP = 3;
@@ -90,6 +90,16 @@ export function keyboardSVG(bindings, { wait = null, click = false, title = 'Key
     if (k.x >= cols) continue;
     const x = PAD + k.x * U + GAP / 2, y = PAD + k.y * U + GAP / 2, w = k.w * U - GAP, h = k.h * U - GAP;
     const L = lit.get(k.code);
+    // a key that isn't a player's (M: mute): drawn in the neutral colour, never 'lit'
+    const X = !L && extras.find((e) => e.code === k.code);
+    if (X) {
+      const x0 = PAD + k.x * U + GAP / 2, y0 = PAD + k.y * U + GAP / 2;
+      parts.push(`<g class="k sys" data-code="${k.code}"><title>${esc(`${X.word} (${k.cap})`)}</title>`
+        + `<rect x="${x0}" y="${y0}" width="${w}" height="${h}" rx="5" class="cap sys"/>`
+        + `<text x="${x0 + 5}" y="${y0 + 14}" class="cl on">${esc(k.cap)}</text>`
+        + `<text x="${x0 + w / 2}" y="${y0 + h - 6}" class="aw">${esc(X.word)}</text></g>`);
+      continue;
+    }
     if (!L) {
       parts.push(`<g class="k" data-code="${k.code}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="5" class="cap"/>`
         + (k.cap ? `<text x="${x + 5}" y="${y + 12}" class="cl">${esc(k.cap)}</text>` : '') + '</g>');
@@ -118,7 +128,7 @@ export function keyboardSVG(bindings, { wait = null, click = false, title = 'Key
 
 /* the combos under it; off-board keys and unbound actions listed */
 export function comboLine() {
-  return '<b>Throw</b> Light+Heavy · <b>Dash</b> double-tap Move · <b>Signature</b> Crouch+Heavy · <b>Dive slam</b> Crouch+Heavy in the air · <b>Low block</b> Crouch+Block';
+  return '<b>Throw</b> Light+Heavy · <b>Dash</b> double-tap Move · <b>Signature</b> Crouch+Heavy · <b>Dive slam</b> Crouch+Heavy in the air · <b>Low block</b> Crouch+Block · <b>Mute</b> M';
 }
 export function strays(bindings, keyCap) {
   const out = [];

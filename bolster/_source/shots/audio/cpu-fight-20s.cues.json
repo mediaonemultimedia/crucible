@@ -1,0 +1,214 @@
+[
+ {
+  "t": 1.967,
+  "id": "whoosh"
+ },
+ {
+  "t": 2.267,
+  "id": "whoosh"
+ },
+ {
+  "t": 2.333,
+  "id": "hit-light"
+ },
+ {
+  "t": 2.533,
+  "id": "whoosh"
+ },
+ {
+  "t": 2.6,
+  "id": "hit-light"
+ },
+ {
+  "t": 2.767,
+  "id": "whoosh"
+ },
+ {
+  "t": 3,
+  "id": "hit-heavy"
+ },
+ {
+  "t": 3.7,
+  "id": "knockdown"
+ },
+ {
+  "t": 3.85,
+  "id": "whoosh"
+ },
+ {
+  "t": 4.117,
+  "id": "whoosh"
+ },
+ {
+  "t": 4.95,
+  "id": "whoosh"
+ },
+ {
+  "t": 5.183,
+  "id": "hit-heavy"
+ },
+ {
+  "t": 5.95,
+  "id": "whoosh"
+ },
+ {
+  "t": 6.033,
+  "id": "block"
+ },
+ {
+  "t": 6.483,
+  "id": "whoosh"
+ },
+ {
+  "t": 6.717,
+  "id": "hit-heavy"
+ },
+ {
+  "t": 7.317,
+  "id": "knockdown"
+ },
+ {
+  "t": 7.45,
+  "id": "whoosh"
+ },
+ {
+  "t": 8.417,
+  "id": "whoosh"
+ },
+ {
+  "t": 8.65,
+  "id": "block"
+ },
+ {
+  "t": 9.05,
+  "id": "whoosh"
+ },
+ {
+  "t": 9.117,
+  "id": "hit-light"
+ },
+ {
+  "t": 9.283,
+  "id": "whoosh"
+ },
+ {
+  "t": 9.35,
+  "id": "hit-light"
+ },
+ {
+  "t": 9.517,
+  "id": "whoosh"
+ },
+ {
+  "t": 9.75,
+  "id": "hit-heavy"
+ },
+ {
+  "t": 10.45,
+  "id": "knockdown"
+ },
+ {
+  "t": 10.617,
+  "id": "whoosh"
+ },
+ {
+  "t": 11.2,
+  "id": "whoosh"
+ },
+ {
+  "t": 11.633,
+  "id": "whoosh"
+ },
+ {
+  "t": 11.867,
+  "id": "hit-heavy"
+ },
+ {
+  "t": 12.783,
+  "id": "whoosh"
+ },
+ {
+  "t": 12.85,
+  "id": "block"
+ },
+ {
+  "t": 13.25,
+  "id": "whoosh"
+ },
+ {
+  "t": 13.483,
+  "id": "block"
+ },
+ {
+  "t": 13.883,
+  "id": "whoosh"
+ },
+ {
+  "t": 14.083,
+  "id": "hit-heavy"
+ },
+ {
+  "t": 14.683,
+  "id": "knockdown"
+ },
+ {
+  "t": 15.033,
+  "id": "whoosh"
+ },
+ {
+  "t": 15.917,
+  "id": "whoosh"
+ },
+ {
+  "t": 16.117,
+  "id": "block"
+ },
+ {
+  "t": 16.433,
+  "id": "whoosh"
+ },
+ {
+  "t": 16.5,
+  "id": "hit-light"
+ },
+ {
+  "t": 16.667,
+  "id": "whoosh"
+ },
+ {
+  "t": 16.9,
+  "id": "hit-heavy"
+ },
+ {
+  "t": 17.6,
+  "id": "knockdown"
+ },
+ {
+  "t": 17.7,
+  "id": "whoosh"
+ },
+ {
+  "t": 18.717,
+  "id": "whoosh"
+ },
+ {
+  "t": 18.783,
+  "id": "hit-light"
+ },
+ {
+  "t": 18.95,
+  "id": "whoosh"
+ },
+ {
+  "t": 19.017,
+  "id": "hit-light"
+ },
+ {
+  "t": 19.183,
+  "id": "whoosh"
+ },
+ {
+  "t": 19.417,
+  "id": "hit-heavy"
+ }
+]

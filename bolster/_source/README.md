@@ -35,6 +35,9 @@ node tools/keys-shots.mjs         # the keyboard legend → shots/keys/
 node tools/twins-shots.mjs [--lineup] # the evil twins, roster line-ups → shots/twins/
 node tools/goon-shots.mjs [scene …]  # the hockey goon's evidence → shots/goon/
 node tools/goon-probe.mjs            # the goon's mullet in a CPU match: no clipping, no NaN
+node tools/sfx.mjs [--report]        # clean the draft SFX → assets/audio/game/*.mp3 (needs ffmpeg)
+node tools/audio-render.mjs [what …] # music, stings and a CPU fight rendered offline → shots/audio/*.wav + report.json
+node tools/audio-live.mjs            # the live page: unlock, mute, sliders, pause, CPU cost → shots/audio/*.png
 ```
 
 Headless tools use `CHROMIUM` (default `/opt/pw-browsers/chromium`) as the browser.
@@ -46,6 +49,85 @@ players on one keyboard; `screen=board` the leaderboard; `screen=names` the name
 to the computer too; `seed=N` fixes the match seed; `toques=1`; `webgl` forces
 the WebGL 2 path; `hold` stops the free-running loop for scripted stepping;
 `boxes` draws the sim's hurt, limb, hit and shot boxes over the picture).
+
+## Audio: sound effects and chiptune music (bolster-audio)
+
+Presentation only: sounds are driven from sim events *after* the tick and
+from the state read back (never inside the sim); no frame data, hit box,
+netcode or balance change (`test/audio.test.mjs` checks the hash is
+unchanged by the sound readers for random input sequences). Before this pass
+the game had no audio at all (the task brief mentioned a few synthesised
+blips; there were none in the source or the build).
+
+- **Sound effects** (`src/audio/sfxmap.js` → `src/audio/engine.js`). The
+  owner's 12 draft clips (`assets/audio/*.mp3`) were measured with ffmpeg
+  (envelope, noise floor, band energy) and cleaned by `node tools/sfx.mjs`
+  (high-pass for DC/sub-rumble, light denoise, cut to the sound, leading and
+  trailing quiet trimmed, 2 ms fade in / short fade out, the loudest 50 ms
+  levelled per kind, peak under −1 dBFS, MP3 64 kb/s mono — Safari decodes
+  it; an MP3's encoder delay is skipped at decode by finding the first
+  sound) → `assets/audio/game/*.mp3`, inlined by the build (73 KB base64).
+  - **Used:** hit-light, knockdown, land, jump, whoosh, feather-burst (given
+    a burst envelope: the draft is 2 s of flat noise), crowd-ooh (more a
+    murmur than an "ooh"; kept quiet), block (as a quiet texture under a
+    synthesised thud).
+  - **Unusable, synthesised instead** (`src/audio/synth.js`): **hit-heavy**
+    (only ~10 dB above its own hiss, no body: the heavy hit is the light
+    thump pitched down + a synthesised boom + smack), **grab**, **ui-tick**,
+    **ui-confirm** (near-silent noise, −50 to −60 dBFS). Every hit also gets
+    a short synthesised smack: the drafts' thumps sit near 50 Hz, which a
+    laptop speaker can't play.
+  - **Wiring:** light / heavy hits (specials, signatures, amplified,
+    knockdown and ≥ 70 damage are heavy; ±6 % pitch and ±10 % gain per play;
+    counter-hits louder and lower), blocks (also clashes and techs), whoosh
+    on a move's start (from the state; lights quieter and brighter, at most
+    one per fighter per 7 ticks), grab on a throw / command grab connecting,
+    knockdown on throw landings, hard landings, dive slams and the K.O.
+    bounce, jump / land, the K.O. hit = heavy + feather burst + crowd, a
+    Fluffatality's burst, shots leaving the hand and dashes (soft whoosh),
+    menu tick / confirm on the pillows and the select grid (cursor, OG/ALT,
+    lock). Stereo pan by position (±0.45).
+  - **Rollback:** online, the session already hands an event over once per
+    (tick, kind, player, ordinal), as the visual pops get it; the sound gate
+    keys sounds the same way (the tick read from the session's own event log)
+    and also drops the same kind for the same player one or two ticks away
+    (a re-simulation that moved it). Swings are keyed by the move's first
+    tick and read from the session's snapshots of the last 12 ticks too, so
+    a remote attack learnt late still whooshes, once. Test: two peers over a
+    120 ± 50 ms, 5 %-loss link play the same sounds as one sim of the true
+    inputs (nothing doubled).
+  - At most 14 effects at once (4 of one kind; the oldest gives way), into a
+    compressor used as a limiter.
+- **Music** (`src/audio/songs.js`, `src/audio/sequencer.js`): original
+  tunes written here as note data, played by a lookahead scheduler on the
+  AudioContext clock (25 % / 12.5 % / 50 % band-limited pulse waves, a
+  triangle bass, noise drums, swing). **Menu / select** 110 BPM, F major,
+  16 bars (35 s), swung, with a three-16ths echo on the lead. **Fight**
+  150 BPM, A minor, 40 bars (64 s): A (16) · B (16) · a breakdown (8); in
+  the last 15 s of the clock or with either player under 25 % stuffing it
+  plays 7 % faster with a boost layer (16th hats, an arpeggio, the lead
+  doubled an octave up). **VS sting** (2.4 s), **round start** (1 s),
+  **win** fanfare (3.9 s), **lose** (a sad trombone sliding down, then a
+  deflating bloop, 4.2 s). The loop ducks under the K.O. (till the next
+  "Fight!") and under every sting; the pause holds it where it is; after
+  the match jingle the menu loop comes back. Practice: the fight loop at
+  35 %.
+- **Controls:** no AudioContext until the first key or click (and only
+  inside a real user activation), so no autoplay warning. A speaker pillow
+  top right on the menus (click or **M**; struck through when muted) and a
+  Sound panel on the pause card (the speaker, **Music** and **SFX**
+  sliders). Saved in `localStorage` (`pillowfight.audio.v1`, try/catch).
+  M is on the keyboard legend (a neutral key) and the controls list; in
+  practice M stays the dummy's meter (mute from the pause card). The
+  context suspends while the tab is hidden.
+- **Evidence:** `node tools/audio-render.mjs` → `shots/audio/*.wav` (committed as 192 kb/s `*.mp3`; measured on the WAVs) (the
+  engine on an OfflineAudioContext: the menu loop ×2, the fight loop and its
+  A / B / breakdown cuts, the boost layer, each sting, both loop seams, and
+  a 20 s seeded CPU-vs-CPU match through the app on the game's own clock)
+  with `report.json` (peak, clipped samples, RMS, longest silent gap, seam
+  level change); `node tools/audio-live.mjs` (the live page: unlock, M,
+  sliders, persistence, practice level, pause, output level, CPU cost) →
+  `shots/audio/*.png`.
 
 ## The hockey goon, refined (bolster-goon)
 

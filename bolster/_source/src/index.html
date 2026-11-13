@@ -399,6 +399,9 @@ body.versus #select-screen .step{display:none}
 /* keyboard legend (ui/keymap.js) ---------------------------------------------- */
 .controls .kb{display:none}
 .kb .kbsvg{display:block;width:100%;height:auto}
+.kb g.sys .cap{fill:#6b5aa6;stroke:rgba(255,255,255,.45);stroke-width:1.2}
+.kb g.sys .cl.on{font:800 13px var(--sans);fill:#120d1f}
+.kb g.sys .aw{font:700 11px var(--cond);letter-spacing:0;fill:#120d1f;text-anchor:middle;text-transform:uppercase}
 .kb .base{fill:#120d1f;stroke:var(--line);stroke-width:1.5}
 .kb .blk{fill:none;stroke:#2c2347;stroke-width:1}
 .kb .cap{fill:#1d1730;stroke:#3a2f5c;stroke-width:1}
@@ -525,6 +528,47 @@ body.lobby #pr-in li:nth-child(n+10){display:none}
 body.lobby .pr-moves{bottom:16px}
 @media (max-height:700px){.pr-moves{grid-template-columns:repeat(4,auto)}}
 #netwait .box{display:flex;gap:12px;align-items:center;font-family:var(--cond);font-weight:700;font-size:20px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);background:rgba(29,22,48,.95);border:2px solid var(--violet);border-radius:4px;padding:18px 26px}
+
+/* sound: the speaker pillow (mute, M) in the corner of the menus and on the
+   pause card; the Music / SFX sliders on the pause card — a plush tube with
+   a stitched seam, filled in neon, and a little cushion to drag */
+.snd-mute{position:relative;width:46px;height:42px;padding:0;display:grid;place-items:center;cursor:pointer;color:var(--ink);
+  border:2px solid var(--line);border-radius:17px 15px 16px 14px / 15px 17px 14px 16px;
+  background:radial-gradient(90% 120% at 50% 30%,#3d3063 0%,#2c2249 50%,#1a1430 100%);
+  box-shadow:0 4px 0 -1px #0d0918,0 5px 0 0 rgba(155,92,255,.2),0 8px 12px -6px rgba(0,0,0,.6),inset 0 2px 0 rgba(255,255,255,.08),inset 0 -5px 8px rgba(10,6,20,.5);
+  transition:transform .16s cubic-bezier(.3,1.7,.5,1),border-color .12s,box-shadow .16s}
+.snd-mute::before{content:'';position:absolute;inset:4px;border:1.5px dashed rgba(205,190,255,.35);border-radius:12px 10px 11px 9px / 10px 12px 9px 11px;pointer-events:none}
+.snd-mute:hover,.snd-mute:focus-visible{border-color:var(--violet);transform:translateY(-1px) scale(1.04);outline:none;box-shadow:0 5px 0 -1px #0d0918,0 6px 0 0 rgba(155,92,255,.4),0 0 16px rgba(155,92,255,.4),inset 0 2px 0 rgba(255,255,255,.1),inset 0 -5px 8px rgba(10,6,20,.45)}
+.snd-mute:active{transform:translateY(3px) scale(1.04,.9);transition:transform .06s}
+.snd-mute svg{width:24px;height:24px;overflow:visible}
+.snd-mute .x{display:none}
+.snd-mute.off{border-color:rgba(255,59,107,.7)}
+.snd-mute.off .waves{display:none}
+.snd-mute.off .x{display:inline}
+.snd-mute.off svg{opacity:.8}
+#snd-corner{position:absolute;top:22px;right:26px;z-index:9;pointer-events:auto}
+body.fighting #snd-corner,body.practicing #snd-corner,body.vs-on #snd-corner{display:none}
+@media (max-width:720px){#snd-corner{top:14px;right:14px}}
+.snd{margin-top:8px;padding:12px 14px 6px;border:1.5px dashed rgba(205,190,255,.28);border-radius:20px 18px 19px 17px / 18px 20px 17px 19px;background:rgba(29,22,48,.55);display:flex;flex-direction:column;gap:6px}
+.snd-head{display:flex;align-items:center;gap:10px}
+.snd-head .eyebrow{flex:1}
+.snd-head kbd{font-family:var(--mono);font-size:10px;color:var(--dim);border:1px solid var(--line);border-radius:4px;padding:2px 5px}
+.snd-head .snd-mute{width:40px;height:36px}
+.snd-head .snd-mute svg{width:20px;height:20px}
+.snd-vol{display:grid;grid-template-columns:56px 1fr;align-items:center;gap:10px;--v:60%;--fill:var(--p1)}
+.snd-vol[data-k=sfx]{--fill:var(--p2)}
+.snd-vol > span{font-family:var(--cond);font-weight:700;font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink)}
+.snd-vol.muted{opacity:.55}
+.snd-vol input{-webkit-appearance:none;appearance:none;width:100%;height:26px;margin:0;background:transparent;cursor:pointer}
+.snd-vol input:focus{outline:none}
+.snd-vol input::-webkit-slider-runnable-track{height:12px;border-radius:8px;border:1.5px solid var(--line);
+  background:linear-gradient(90deg,var(--fill) 0,var(--fill) var(--v),#211a38 var(--v));box-shadow:inset 0 -3px 5px rgba(10,6,20,.45),inset 0 1px 0 rgba(255,255,255,.12)}
+.snd-vol input::-moz-range-track{height:12px;border-radius:8px;border:1.5px solid var(--line);background:#211a38;box-shadow:inset 0 -3px 5px rgba(10,6,20,.45)}
+.snd-vol input::-moz-range-progress{height:12px;border-radius:8px;background:var(--fill)}
+.snd-vol input::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:24px;height:20px;margin-top:-5.5px;border-radius:9px 8px 9px 8px / 8px 9px 8px 9px;
+  border:2px solid var(--violet);background:radial-gradient(90% 120% at 50% 30%,#5a4890 0%,#3a2c66 60%,#271d44 100%);box-shadow:0 3px 0 -1px #0d0918,0 0 10px rgba(155,92,255,.45),inset 0 1px 0 rgba(255,255,255,.18)}
+.snd-vol input::-moz-range-thumb{width:20px;height:16px;border-radius:8px;border:2px solid var(--violet);background:radial-gradient(90% 120% at 50% 30%,#5a4890 0%,#3a2c66 60%,#271d44 100%);box-shadow:0 3px 0 -1px #0d0918,0 0 10px rgba(155,92,255,.45)}
+.snd-vol input:hover::-webkit-slider-thumb,.snd-vol input:focus-visible::-webkit-slider-thumb{transform:scale(1.12)}
 </style>
 </head>
 <body>
@@ -537,6 +581,7 @@ body.lobby .pr-moves{bottom:16px}
     </div>
     <a class="ix" href="../" aria-label="Study 23 — open series index">No. 23</a>
   </div>
+  <button id="snd-corner" class="snd-mute" type="button" aria-pressed="false" aria-label="Sound on (M)" title="Sound on · M mutes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.2h3.6L12 5v14l-4.9-4.2H3.5z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><g class="waves" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15.2 9.2a4 4 0 0 1 0 5.6"/><path d="M17.9 6.6a7.6 7.6 0 0 1 0 10.8"/></g><g class="x" fill="none" stroke="#ff3b6b" stroke-width="2.2" stroke-linecap="round"><path d="M15.5 9.5l5 5M20.5 9.5l-5 5"/></g></svg></button>
 
   <section id="title-screen" class="screen on">
     <div class="big">
@@ -683,6 +728,11 @@ body.lobby .pr-moves{bottom:16px}
         <button class="opt sel" data-act="resume">Resume <small>Esc</small></button>
         <button class="opt" data-act="select">Character select</button>
         <button class="opt" data-act="title">Title</button>
+        <div class="snd" role="group" aria-label="Sound">
+          <div class="snd-head"><span class="eyebrow">Sound</span><kbd>M</kbd><button class="snd-mute" type="button" aria-pressed="false" aria-label="Sound on (M)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.2h3.6L12 5v14l-4.9-4.2H3.5z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><g class="waves" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15.2 9.2a4 4 0 0 1 0 5.6"/><path d="M17.9 6.6a7.6 7.6 0 0 1 0 10.8"/></g><g class="x" fill="none" stroke="#ff3b6b" stroke-width="2.2" stroke-linecap="round"><path d="M15.5 9.5l5 5M20.5 9.5l-5 5"/></g></svg></button></div>
+          <label class="snd-vol" data-k="music"><span>Music</span><input type="range" min="0" max="100" step="5" value="60" data-k="music" aria-label="Music volume"></label>
+          <label class="snd-vol" data-k="sfx"><span>SFX</span><input type="range" min="0" max="100" step="5" value="85" data-k="sfx" aria-label="Sound effects volume"></label>
+        </div>
       </div>
       <div class="controls" id="controls-pause"></div>
     </div>
