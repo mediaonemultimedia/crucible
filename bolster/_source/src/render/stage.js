@@ -119,6 +119,10 @@ export class Stage {
     this.extras = new Map();      // the roster 2 shots: caps, howls, crows
     this.pools = { cap: [], howl: [], crow: [] };
     this._initMoon();
+    // the arena itself (floor, wall, the effect pools): what a card portrait
+    // keeps in shot; anything added later (a fight's plush, the select
+    // mat's, the title's line-up) is hidden while one is taken
+    this.base = new Set(scene.children);
   }
 
   /* ── roster 2's shots ─────────────────────────────────────────────────── */

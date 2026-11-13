@@ -15,12 +15,14 @@ export class Showcase {
     this.slots = [null, null];
     this.ids = [null, null];
     this.x = [-2.7, 2.7];
+    this.age = [0, 0];       // seconds each slot's plush has stood (a fresh one settles first)
   }
 
   set(k, id, { evil = false, toque = false } = {}) {
     if (this.ids[k] === id && this.slots[k]?.evil === evil) { if (this.slots[k]) this.slots[k].toque.visible = toque; return; }
     this.slots[k]?.dispose(this.stage.scene);
     this.ids[k] = id;
+    this.age[k] = 0;
     this.slots[k] = id ? new Plush(this.stage.scene, id, { side: k, evil }) : null;
     if (this.slots[k]) { this.slots[k].monocle.visible = evil; this.slots[k].toque.visible = toque; }
   }
@@ -30,6 +32,7 @@ export class Showcase {
     for (let k = 0; k < 2; k++) {
       const p = this.slots[k];
       if (!p) continue;
+      this.age[k] += dt;
       const F = still(p.id, k ? -1 : 1, 'idle');
       p.update(dt, F, F, this.x[k], 0, this.x[1 - k], 0, false);
     }
@@ -82,7 +85,18 @@ export async function portraits(renderer, stage, ids) {
   const webgl = !renderer.backend.isWebGPUBackend;
   const shadowsWas = stage.floor.visible;
   for (const id of ids) {
+    // each portrait is of its own fighter alone: the page is live while
+    // these render (the title answers clicks), so the select mat's plush
+    // can already be standing in the scene — unposed, at x = 0, right where
+    // the portrait's fighter stands (that put Sumaura's face on Zach's card).
+    // Hide everything that isn't the arena or this fighter, for this render.
+    const before = new Set(stage.scene.children);
     const p = new Plush(stage.scene, id, { side: 0 });
+    const hidden = [];
+    for (const o of stage.scene.children) {
+      if (!before.has(o) || (stage.base && stage.base.has(o)) || !o.visible) continue;
+      o.visible = false; hidden.push(o);
+    }
     const F = still(id, 1);
     for (let i = 0; i < 30; i++) p.update(1 / 60, F, F, 0, 0, 3, 0, false);
     stage.paintShadows([p]);
@@ -94,6 +108,8 @@ export async function portraits(renderer, stage, ids) {
     renderer.setRenderTarget(rt);
     renderer.render(stage.scene, cam);
     renderer.setRenderTarget(null);
+    for (const o of hidden) o.visible = true;
+    p.dispose(stage.scene);      // (gone before the wait: nothing else ever draws him)
     const px = await renderer.readRenderTargetPixelsAsync(rt, 0, 0, W, H);
     const c = document.createElement('canvas');
     c.width = W; c.height = H;
@@ -102,7 +118,6 @@ export async function portraits(renderer, stage, ids) {
     img.data.set(unpackRows(px, W, H, { flip: webgl, stride: webgl ? W * 4 : Math.ceil(W * 4 / 256) * 256 }));
     g.putImageData(img, 0, 0);
     out[id] = c.toDataURL('image/png');
-    p.dispose(stage.scene);
     void box;
   }
   stage.floor.visible = shadowsWas;
@@ -117,27 +132,36 @@ export async function portraits(renderer, stage, ids) {
    on), then the select scene is drawn back, so nothing shows; the next
    frame is the fight's anyway. Returns [canvas|null, canvas|null]. */
 export function snapPicks(renderer, show) {
+  const src = renderer.domElement;
+  if (!src.width || !src.height) return [null, null];
+  const out = [0, 1].map((k) => snapSlot(renderer, show, k, false));
+  renderer.render(show.stage.scene, show.stage.camera);
+  return out;
+}
+
+/* one pick on the mat, framed as a card portrait (head and shoulders, from
+   its own side), drawn onto the page's canvas and copied out in the same
+   task. `restore` draws the select scene back afterwards. Also how a card
+   gets its evil twin's portrait: the first time the twin stands on the mat
+   (main.js, _snapTwins). Returns a canvas, or null. */
+export function snapSlot(renderer, show, k, restore = true) {
   const stage = show.stage, W = 256, H = 320;
   const src = renderer.domElement, cw = src.width, ch = src.height;
-  if (!cw || !ch) return [null, null];
+  const p = show.slots[k];
+  if (!cw || !ch || !p) return null;
   const cam = new THREE.PerspectiveCamera(30, cw / ch, 0.1, 100);
   // the portrait's frame: the middle of the canvas at the portrait's aspect
   const sh = ch, sw = Math.min(cw, Math.round(ch * W / H)), sx = Math.round((cw - sw) / 2);
-  const out = [0, 1].map((k) => {
-    const p = show.slots[k];
-    if (!p) return null;
-    const [cy, d] = { k8e: [2.85, 9], rubberta: [1.3, 6.4], zach: [1.55, 5.2], sebas: [2.0, 6.6] }[p.id] || [2.05, 6.4];
-    const x = show.x[k], s = k ? -1 : 1;
-    cam.position.set(x + 1.6 * s, cy + 0.5, d);
-    cam.lookAt(x + 0.15 * s, cy, 0);
-    cam.updateMatrixWorld();
-    renderer.setRenderTarget(null);
-    renderer.render(stage.scene, cam);
-    const c = document.createElement('canvas');
-    c.width = W; c.height = H;
-    c.getContext('2d').drawImage(src, sx, 0, sw, sh, 0, 0, W, H);
-    return c;
-  });
-  renderer.render(stage.scene, stage.camera);
-  return out;
+  const [cy, d] = { k8e: [2.85, 9], rubberta: [1.3, 6.4], zach: [1.55, 5.2], sebas: [2.0, 6.6] }[p.id] || [2.05, 6.4];
+  const x = show.x[k], s = k ? -1 : 1;
+  cam.position.set(x + 1.6 * s, cy + 0.5, d);
+  cam.lookAt(x + 0.15 * s, cy, 0);
+  cam.updateMatrixWorld();
+  renderer.setRenderTarget(null);
+  renderer.render(stage.scene, cam);
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  c.getContext('2d').drawImage(src, sx, 0, sw, sh, 0, 0, W, H);
+  if (restore) renderer.render(stage.scene, stage.camera);
+  return c;
 }

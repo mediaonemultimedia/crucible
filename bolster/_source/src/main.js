@@ -6,7 +6,7 @@
 
 import * as THREE from 'three/webgpu';
 import { makeRenderer, Stage } from './render/stage.js';
-import { Showcase, Lineup, portraits, snapPicks } from './render/showcase.js';
+import { Showcase, Lineup, portraits, snapPicks, snapSlot } from './render/showcase.js';
 import { Fight } from './fight.js';
 import { FEEL } from './render/feel.js';
 import { Keyboard } from './input/keyboard.js';
@@ -91,7 +91,8 @@ class App {
     this.eggKeys = '';
     this.idle = 0;
     this.seed = (params.get('seed') | 0) || ((Date.now() & 0xffff) + 1);
-    this.portraits = {};
+    this.portraits = {};           // id → the card's portrait (OG), rendered at start
+    this.twinPortraits = {};       // id → the evil twin's, snapped off the mat the first time it stands there
     this.net = new Online(this);
     this.backend = renderer.backend && renderer.backend.isWebGPUBackend ? 'WebGPU' : 'WebGL 2';
     this.errors = [];
@@ -351,7 +352,7 @@ class App {
       c.className = 'card';
       c.dataset.id = id;
       c.innerHTML = `<span class="zzz"><i>z</i><i>z</i><i>z</i></span><span class="flag">${flagOf(id)}</span><span class="lab">${f.name}</span>`;
-      if (this.portraits[id]) { const im = new Image(); im.alt = ''; im.src = this.portraits[id]; c.prepend(im); }
+      this._cardPortrait(c);
       // (versus: the mouse picks for whichever player hasn't locked in yet)
       const seat = () => (this.mode === 'versus' ? (this.locked[0] ? 1 : 0) : this.picking);
       c.onclick = (e) => {
@@ -365,6 +366,37 @@ class App {
       cards.appendChild(c);
     });
     this._paintSelect();
+  }
+
+  /* a card's portrait: its own fighter's, by the card's id (the portraits
+     arrive a few seconds after the page answers, so the select screen may
+     already be up: they're put into its cards then — see start()) */
+  _cardPortrait(c) {
+    const id = c.dataset.id, alt = c.classList.contains('alt');
+    const url = (alt && this.twinPortraits[id]) || this.portraits?.[id];
+    let im = c.querySelector(':scope > img');
+    if (!url) { im?.remove(); return; }
+    const v = alt && this.twinPortraits[id] ? 'alt' : 'og';
+    if (im && im.dataset.id === id && im.dataset.v === v) return;
+    if (!im) { im = new Image(); im.alt = ''; c.prepend(im); }
+    im.dataset.id = id; im.dataset.v = v; im.src = url;
+  }
+
+  /* a twin's card portrait: the first time an evil twin has stood on the
+     select mat long enough to settle, it's framed like a card portrait and
+     copied off the page's canvas (no readback, no extra plush to build) */
+  _snapTwins() {
+    const S = this.show;
+    if (!S || this.screen !== 'select' || this.toques) return;
+    for (let k = 0; k < 2; k++) {
+      const p = S.slots[k];
+      if (!p || !p.evil || this.twinPortraits[p.id] || S.age[k] < 0.45) continue;
+      let c = null;
+      try { c = snapSlot(this.renderer, S, k); } catch (err) { console.warn('twin portrait', err); }
+      if (!c) continue;
+      this.twinPortraits[p.id] = c.toDataURL('image/png');
+      for (const card of $$('#cards .card')) this._cardPortrait(card);
+    }
   }
 
   _cursor(d, k = this.picking) {
@@ -424,6 +456,7 @@ class App {
       const alt = on.length > 0 && on.every((k) => eff[k]);
       c.classList.toggle('alt', alt);
       c.querySelector('.lab').textContent = alt ? TWIN_TITLE[id] : FIGHTERS[id].name;
+      this._cardPortrait(c);
       if (!on.length) continue;
       const sw = on.map((k) => `<span class="ogalt p${k + 1}${this.locked[k] ? ' locked' : ''}" data-p="${k}"><b data-v="0" class="${eff[k] ? '' : 'on'}">OG</b><b data-v="1" class="${eff[k] ? 'on' : ''}">ALT</b></span>`).join('');
       c.insertAdjacentHTML('beforeend', `<span class="ogalts">${sw}</span>`);
@@ -839,7 +872,7 @@ class App {
     [0, 1].forEach((k) => {
       const fig = card.querySelector(`.pt.s${k + 1}`), id = f.st.f[k].id;
       if (snaps?.[k]) { snaps[k].className = 'in'; fig.appendChild(snaps[k]); return; }
-      const og = !alt[k] && this.portraits?.[id];     // (no snapshot: the card's portrait, OG only)
+      const og = (alt[k] ? this.twinPortraits[id] : this.portraits?.[id]) || null;   // (no snapshot: the card's portrait)
       if (og) { const im = new Image(); im.alt = ''; im.className = 'in'; im.src = og; fig.appendChild(im); }
     });
   }
@@ -1261,6 +1294,7 @@ class App {
     else if (this.lineup) this.lineup.frame(dt);
     else this.stage.frame(-2.7, 2.7, dt, innerWidth / innerHeight), this.stage.update(dt);
     if (draw) this.renderer.render(this.stage.scene, this.stage.camera);
+    if (draw && this.show && !this.fight) this._snapTwins();
     if (draw && this.boxes) this._boxes();
   }
 
@@ -1312,7 +1346,11 @@ async function start() {
   app.renderAudio = (o) => renderOffline({ clips: CLIPS, ...o });   // captures (tools/audio-render.mjs)
   app.freshHash = (p1, p2, seed) => hash(createMatch({ p1, p2, seed }));   // tests: the match practice must not touch
   // portraits for the cards
+  // (the title answers clicks meanwhile: whoever has already gone on stays
+  // where they are, and cards already on screen get theirs now)
   if (!params.has('noportraits')) { try { app.portraits = await portraits(renderer, app.stage, ROSTER); } catch (err) { console.warn('portraits', err); } }
+  for (const c of $$('#cards .card')) app._cardPortrait(c);
+  const moved = app.screen !== 'title';
   let last = performance.now();
   app.hold = params.has('hold');
   renderer.setAnimationLoop(() => {
@@ -1341,7 +1379,7 @@ async function start() {
   else if (params.get('screen') === 'board') app.showBoard();
   else if (params.get('screen') === 'names') { app.mode = params.get('mode') === 'versus' ? 'versus' : 'cpu'; app.askNames(app.mode === 'versus' ? 2 : 1, () => app.go('select')); }
   else if (params.get('practice') !== null) app.startPractice({ p1: fighterId(params.get('practice')) || ROSTER[0], p2: fighterId(params.get('dummy')) || null });
-  else app.go('title');
+  else if (!moved) app.go('title');
   document.body.classList.add('is-live');
 }
 
