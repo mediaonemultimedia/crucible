@@ -128,7 +128,7 @@ const logPath = path.join(out, 'fight-sfx.json');
 if (fs.existsSync(logPath)) {
   const L = JSON.parse(fs.readFileSync(logPath, 'utf8'));
   const fightOn = L.flow.find((f) => f.music === 'fight')?.tick ?? 0;
-  const duck = L.flow.find((f) => f.duck)?.tick ?? fightOn + 1200;
+  const duck = L.flow.find((f) => f.duck && f.duck < 0.3)?.tick ?? fightOn + 1200;   // the first K.O.
   const t0 = Math.max(fightOn - 30, duck - 16 * 60), secs = 20;
   const inWin = (tick) => tick >= t0 && tick < t0 + secs * 60;
   const sfx = L.sfx.filter((x) => inWin(x.tick)).map((x) => ({ id: x.id, gain: x.gain, rate: x.rate, delay: x.delay, t: (x.tick - t0) / 60 + 0.05 }));

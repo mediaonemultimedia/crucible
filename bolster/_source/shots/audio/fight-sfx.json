@@ -1,0 +1,2119 @@
+{
+ "sfx": [
+  {
+   "id": "whoosh-light",
+   "gain": 0.634,
+   "rate": 1.066,
+   "delay": 0,
+   "tick": 125
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.557,
+   "rate": 1.05,
+   "delay": 0,
+   "tick": 143
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.605,
+   "rate": 1.008,
+   "delay": 0,
+   "tick": 164
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.548,
+   "rate": 1.059,
+   "delay": 0,
+   "tick": 164
+  },
+  {
+   "id": "hit-light",
+   "gain": 0.993,
+   "rate": 1.044,
+   "delay": 0,
+   "tick": 169
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.629,
+   "rate": 0.991,
+   "delay": 0,
+   "tick": 180
+  },
+  {
+   "id": "hit-light",
+   "gain": 1.118,
+   "rate": 0.982,
+   "delay": 0,
+   "tick": 184
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.937,
+   "rate": 1.063,
+   "delay": 0,
+   "tick": 194
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.165,
+   "rate": 1.048,
+   "delay": 0,
+   "tick": 207
+  },
+  {
+   "id": "thump",
+   "gain": 1.398,
+   "rate": 1.048,
+   "delay": 0,
+   "tick": 207
+  },
+  {
+   "id": "knockdown",
+   "gain": 1.042,
+   "rate": 1.032,
+   "delay": 0,
+   "tick": 249
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.07,
+   "rate": 0.94,
+   "delay": 0,
+   "tick": 260
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 276
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.903,
+   "rate": 0.993,
+   "delay": 0,
+   "tick": 317
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.589,
+   "rate": 0.932,
+   "delay": 0,
+   "tick": 372
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.937,
+   "rate": 0.941,
+   "delay": 0,
+   "tick": 388
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.892,
+   "rate": 1.058,
+   "delay": 0,
+   "tick": 420
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 436
+  },
+  {
+   "id": "jump",
+   "gain": 1.095,
+   "rate": 1.04,
+   "delay": 0,
+   "tick": 447
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.894,
+   "rate": 0.938,
+   "delay": 0,
+   "tick": 472
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 0.853,
+   "rate": 1,
+   "delay": 0,
+   "tick": 479
+  },
+  {
+   "id": "thump",
+   "gain": 0.853,
+   "rate": 1,
+   "delay": 0,
+   "tick": 479
+  },
+  {
+   "id": "land",
+   "gain": 0.909,
+   "rate": 0.997,
+   "delay": 0,
+   "tick": 495
+  },
+  {
+   "id": "knockdown",
+   "gain": 1.15,
+   "rate": 0.94,
+   "delay": 0,
+   "tick": 495
+  },
+  {
+   "id": "thump",
+   "gain": 0.9,
+   "rate": 0.9,
+   "delay": 0,
+   "tick": 495
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.531,
+   "rate": 0.989,
+   "delay": 0,
+   "tick": 495
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.654,
+   "rate": 1.035,
+   "delay": 0,
+   "tick": 506
+  },
+  {
+   "id": "hit-light",
+   "gain": 1.138,
+   "rate": 0.963,
+   "delay": 0,
+   "tick": 510
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.565,
+   "rate": 0.968,
+   "delay": 0,
+   "tick": 520
+  },
+  {
+   "id": "hit-light",
+   "gain": 1.089,
+   "rate": 1.002,
+   "delay": 0,
+   "tick": 524
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.084,
+   "rate": 1.042,
+   "delay": 0,
+   "tick": 534
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.001,
+   "rate": 0.996,
+   "delay": 0,
+   "tick": 548
+  },
+  {
+   "id": "thump",
+   "gain": 1.202,
+   "rate": 0.996,
+   "delay": 0,
+   "tick": 548
+  },
+  {
+   "id": "knockdown",
+   "gain": 1.054,
+   "rate": 0.995,
+   "delay": 0,
+   "tick": 590
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.019,
+   "rate": 0.931,
+   "delay": 0,
+   "tick": 592
+  },
+  {
+   "id": "land",
+   "gain": 0.995,
+   "rate": 0.952,
+   "delay": 0,
+   "tick": 630
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.664,
+   "rate": 0.96,
+   "delay": 0,
+   "tick": 641
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.584,
+   "rate": 1.008,
+   "delay": 0,
+   "tick": 663
+  },
+  {
+   "id": "block",
+   "gain": 0.893,
+   "rate": 0.966,
+   "delay": 0,
+   "tick": 667
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.658,
+   "rate": 1.004,
+   "delay": 0,
+   "tick": 690
+  },
+  {
+   "id": "block",
+   "gain": 0.917,
+   "rate": 1.045,
+   "delay": 0,
+   "tick": 694
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.077,
+   "rate": 0.971,
+   "delay": 0,
+   "tick": 710
+  },
+  {
+   "id": "block",
+   "gain": 0.956,
+   "rate": 0.981,
+   "delay": 0,
+   "tick": 724
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.587,
+   "rate": 0.936,
+   "delay": 0,
+   "tick": 748
+  },
+  {
+   "id": "hit-light",
+   "gain": 0.932,
+   "rate": 1.037,
+   "delay": 0,
+   "tick": 752
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.545,
+   "rate": 1.009,
+   "delay": 0,
+   "tick": 772
+  },
+  {
+   "id": "hit-light",
+   "gain": 1.112,
+   "rate": 0.958,
+   "delay": 0,
+   "tick": 776
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.894,
+   "rate": 0.976,
+   "delay": 0,
+   "tick": 786
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.079,
+   "rate": 1.005,
+   "delay": 0,
+   "tick": 799
+  },
+  {
+   "id": "thump",
+   "gain": 1.294,
+   "rate": 1.005,
+   "delay": 0,
+   "tick": 799
+  },
+  {
+   "id": "knockdown",
+   "gain": 1.098,
+   "rate": 1.035,
+   "delay": 0,
+   "tick": 841
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.103,
+   "rate": 1.008,
+   "delay": 0,
+   "tick": 853
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 869
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.934,
+   "rate": 0.948,
+   "delay": 0,
+   "tick": 909
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.11,
+   "rate": 1.007,
+   "delay": 0,
+   "tick": 995
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.606,
+   "rate": 0.977,
+   "delay": 0,
+   "tick": 997
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 1011
+  },
+  {
+   "id": "block",
+   "gain": 1.06,
+   "rate": 1.046,
+   "delay": 0,
+   "tick": 1023
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.069,
+   "rate": 0.94,
+   "delay": 0,
+   "tick": 1042
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.541,
+   "rate": 1.031,
+   "delay": 0,
+   "tick": 1064
+  },
+  {
+   "id": "hit-light",
+   "gain": 0.879,
+   "rate": 1.031,
+   "delay": 0,
+   "tick": 1068
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.947,
+   "rate": 0.939,
+   "delay": 0,
+   "tick": 1078
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 0.979,
+   "rate": 1.053,
+   "delay": 0,
+   "tick": 1091
+  },
+  {
+   "id": "thump",
+   "gain": 1.175,
+   "rate": 1.053,
+   "delay": 0,
+   "tick": 1091
+  },
+  {
+   "id": "knockdown",
+   "gain": 1.095,
+   "rate": 0.98,
+   "delay": 0,
+   "tick": 1133
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.075,
+   "rate": 1.032,
+   "delay": 0,
+   "tick": 1137
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 1153
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.933,
+   "rate": 0.997,
+   "delay": 0,
+   "tick": 1222
+  },
+  {
+   "id": "block",
+   "gain": 0.946,
+   "rate": 1.01,
+   "delay": 0,
+   "tick": 1235
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.651,
+   "rate": 0.96,
+   "delay": 0,
+   "tick": 1259
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.099,
+   "rate": 1.042,
+   "delay": 0,
+   "tick": 1283
+  },
+  {
+   "id": "block",
+   "gain": 1.065,
+   "rate": 1.027,
+   "delay": 0,
+   "tick": 1296
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.671,
+   "rate": 0.994,
+   "delay": 0,
+   "tick": 1320
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.565,
+   "rate": 1.038,
+   "delay": 0,
+   "tick": 1333
+  },
+  {
+   "id": "block",
+   "gain": 0.882,
+   "rate": 0.974,
+   "delay": 0,
+   "tick": 1337
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.929,
+   "rate": 1.057,
+   "delay": 0,
+   "tick": 1350
+  },
+  {
+   "id": "block",
+   "gain": 1.043,
+   "rate": 0.966,
+   "delay": 0,
+   "tick": 1364
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.031,
+   "rate": 0.939,
+   "delay": 0,
+   "tick": 1388
+  },
+  {
+   "id": "block",
+   "gain": 1.018,
+   "rate": 1.03,
+   "delay": 0,
+   "tick": 1401
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.587,
+   "rate": 0.957,
+   "delay": 0,
+   "tick": 1429
+  },
+  {
+   "id": "hit-light",
+   "gain": 0.91,
+   "rate": 1.033,
+   "delay": 0,
+   "tick": 1433
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.657,
+   "rate": 0.951,
+   "delay": 0,
+   "tick": 1443
+  },
+  {
+   "id": "hit-light",
+   "gain": 0.871,
+   "rate": 0.975,
+   "delay": 0,
+   "tick": 1447
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.013,
+   "rate": 0.941,
+   "delay": 0,
+   "tick": 1457
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.317,
+   "rate": 0.979,
+   "delay": 0,
+   "tick": 1471
+  },
+  {
+   "id": "thump",
+   "gain": 1.58,
+   "rate": 0.979,
+   "delay": 0,
+   "tick": 1471
+  },
+  {
+   "id": "knockdown",
+   "gain": 0.975,
+   "rate": 1.047,
+   "delay": 0,
+   "tick": 1513
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.06,
+   "rate": 1.007,
+   "delay": 0,
+   "tick": 1541
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.937,
+   "rate": 1.023,
+   "delay": 0,
+   "tick": 1581
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 1591
+  },
+  {
+   "id": "jump",
+   "gain": 0.928,
+   "rate": 0.962,
+   "delay": 0,
+   "tick": 1595
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 0.947,
+   "rate": 0.983,
+   "delay": 0,
+   "tick": 1595
+  },
+  {
+   "id": "thump",
+   "gain": 0.947,
+   "rate": 0.983,
+   "delay": 0,
+   "tick": 1595
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 1608
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 1617
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 1626
+  },
+  {
+   "id": "knockdown",
+   "gain": 1.066,
+   "rate": 1.032,
+   "delay": 0,
+   "tick": 1629
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 1635
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.024,
+   "rate": 0.989,
+   "delay": 0,
+   "tick": 1677
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.899,
+   "rate": 1.007,
+   "delay": 0,
+   "tick": 1731
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.026,
+   "rate": 1.037,
+   "delay": 0,
+   "tick": 1738
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.053,
+   "rate": 0.952,
+   "delay": 0,
+   "tick": 1744
+  },
+  {
+   "id": "thump",
+   "gain": 1.053,
+   "rate": 0.952,
+   "delay": 0,
+   "tick": 1744
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.916,
+   "rate": 1.033,
+   "delay": 0,
+   "tick": 1788
+  },
+  {
+   "id": "block",
+   "gain": 0.984,
+   "rate": 0.968,
+   "delay": 0,
+   "tick": 1801
+  },
+  {
+   "id": "block",
+   "gain": 0.916,
+   "rate": 0.983,
+   "delay": 0,
+   "tick": 1808
+  },
+  {
+   "id": "block",
+   "gain": 1.073,
+   "rate": 1.038,
+   "delay": 0,
+   "tick": 1817
+  },
+  {
+   "id": "block",
+   "gain": 0.915,
+   "rate": 1.026,
+   "delay": 0,
+   "tick": 1826
+  },
+  {
+   "id": "block",
+   "gain": 1.037,
+   "rate": 0.961,
+   "delay": 0,
+   "tick": 1835
+  },
+  {
+   "id": "block",
+   "gain": 1.094,
+   "rate": 1,
+   "delay": 0,
+   "tick": 1844
+  },
+  {
+   "id": "block",
+   "gain": 0.9,
+   "rate": 0.992,
+   "delay": 0,
+   "tick": 1860
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.656,
+   "rate": 1.032,
+   "delay": 0,
+   "tick": 1885
+  },
+  {
+   "id": "hit-light",
+   "gain": 0.905,
+   "rate": 1.016,
+   "delay": 0,
+   "tick": 1889
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.928,
+   "rate": 0.948,
+   "delay": 0,
+   "tick": 1899
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.326,
+   "rate": 1.023,
+   "delay": 0,
+   "tick": 1912
+  },
+  {
+   "id": "thump",
+   "gain": 1.591,
+   "rate": 1.023,
+   "delay": 0,
+   "tick": 1912
+  },
+  {
+   "id": "knockdown",
+   "gain": 0.914,
+   "rate": 0.953,
+   "delay": 0,
+   "tick": 1954
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.994,
+   "rate": 1.025,
+   "delay": 0,
+   "tick": 1957
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 1973
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.048,
+   "rate": 1.068,
+   "delay": 0,
+   "tick": 2021
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 0.898,
+   "rate": 1.006,
+   "delay": 0,
+   "tick": 2035
+  },
+  {
+   "id": "thump",
+   "gain": 0.898,
+   "rate": 1.006,
+   "delay": 0,
+   "tick": 2035
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.942,
+   "rate": 0.988,
+   "delay": 0,
+   "tick": 2083
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.599,
+   "rate": 0.98,
+   "delay": 0,
+   "tick": 2088
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.101,
+   "rate": 0.988,
+   "delay": 0,
+   "tick": 2096
+  },
+  {
+   "id": "thump",
+   "gain": 1.101,
+   "rate": 0.988,
+   "delay": 0,
+   "tick": 2096
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.951,
+   "rate": 0.964,
+   "delay": 0,
+   "tick": 2135
+  },
+  {
+   "id": "block",
+   "gain": 0.956,
+   "rate": 0.968,
+   "delay": 0,
+   "tick": 2148
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.653,
+   "rate": 1.01,
+   "delay": 0,
+   "tick": 2195
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.583,
+   "rate": 0.974,
+   "delay": 0,
+   "tick": 2197
+  },
+  {
+   "id": "hit-light",
+   "gain": 1.253,
+   "rate": 0.867,
+   "delay": 0,
+   "tick": 2199
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.636,
+   "rate": 0.982,
+   "delay": 0,
+   "tick": 2211
+  },
+  {
+   "id": "hit-light",
+   "gain": 1.138,
+   "rate": 1.035,
+   "delay": 0,
+   "tick": 2215
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.079,
+   "rate": 1.016,
+   "delay": 0,
+   "tick": 2225
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.011,
+   "rate": 0.944,
+   "delay": 0,
+   "tick": 2238
+  },
+  {
+   "id": "thump",
+   "gain": 1.213,
+   "rate": 0.944,
+   "delay": 0,
+   "tick": 2238
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.3,
+   "rate": 0.88,
+   "delay": 0,
+   "tick": 2238
+  },
+  {
+   "id": "thump",
+   "gain": 1.3,
+   "rate": 0.85,
+   "delay": 0,
+   "tick": 2238
+  },
+  {
+   "id": "feather-burst",
+   "gain": 1,
+   "rate": 1,
+   "delay": 0.02,
+   "tick": 2238
+  },
+  {
+   "id": "crowd-ooh",
+   "gain": 0.95,
+   "rate": 1,
+   "delay": 0.12,
+   "tick": 2238
+  },
+  {
+   "id": "knockdown",
+   "gain": 1.2,
+   "rate": 0.9,
+   "delay": 0,
+   "tick": 2353
+  },
+  {
+   "id": "knockdown",
+   "gain": 1.032,
+   "rate": 1.036,
+   "delay": 0,
+   "tick": 2365
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.111,
+   "rate": 1.025,
+   "delay": 0,
+   "tick": 2589
+  },
+  {
+   "id": "jump",
+   "gain": 0.958,
+   "rate": 1.035,
+   "delay": 0,
+   "tick": 2600
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 2605
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.583,
+   "rate": 1.039,
+   "delay": 0,
+   "tick": 2621
+  },
+  {
+   "id": "hit-light",
+   "gain": 0.998,
+   "rate": 1.006,
+   "delay": 0,
+   "tick": 2633
+  },
+  {
+   "id": "land",
+   "gain": 0.993,
+   "rate": 1.019,
+   "delay": 0,
+   "tick": 2658
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.074,
+   "rate": 0.965,
+   "delay": 0,
+   "tick": 2662
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.074,
+   "rate": 0.954,
+   "delay": 0,
+   "tick": 2666
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.318,
+   "rate": 0.962,
+   "delay": 0,
+   "tick": 2676
+  },
+  {
+   "id": "thump",
+   "gain": 1.318,
+   "rate": 0.962,
+   "delay": 0,
+   "tick": 2676
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.9,
+   "rate": 0.963,
+   "delay": 0,
+   "tick": 2720
+  },
+  {
+   "id": "block",
+   "gain": 1.036,
+   "rate": 1.017,
+   "delay": 0,
+   "tick": 2734
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.532,
+   "rate": 0.934,
+   "delay": 0,
+   "tick": 2758
+  },
+  {
+   "id": "hit-light",
+   "gain": 0.938,
+   "rate": 0.965,
+   "delay": 0,
+   "tick": 2762
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.605,
+   "rate": 0.942,
+   "delay": 0,
+   "tick": 2772
+  },
+  {
+   "id": "hit-light",
+   "gain": 1.084,
+   "rate": 1.043,
+   "delay": 0,
+   "tick": 2776
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.072,
+   "rate": 0.961,
+   "delay": 0,
+   "tick": 2786
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.051,
+   "rate": 0.954,
+   "delay": 0,
+   "tick": 2799
+  },
+  {
+   "id": "thump",
+   "gain": 1.261,
+   "rate": 0.954,
+   "delay": 0,
+   "tick": 2799
+  },
+  {
+   "id": "knockdown",
+   "gain": 0.999,
+   "rate": 0.966,
+   "delay": 0,
+   "tick": 2841
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.97,
+   "rate": 1.058,
+   "delay": 0,
+   "tick": 2844
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 2854
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 2863
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 2872
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 2881
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 2890
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.127,
+   "rate": 0.914,
+   "delay": 0,
+   "tick": 2909
+  },
+  {
+   "id": "thump",
+   "gain": 1.127,
+   "rate": 0.914,
+   "delay": 0,
+   "tick": 2909
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.971,
+   "rate": 1.001,
+   "delay": 0,
+   "tick": 2940
+  },
+  {
+   "id": "knockdown",
+   "gain": 0.942,
+   "rate": 1.042,
+   "delay": 0,
+   "tick": 2942
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.582,
+   "rate": 0.955,
+   "delay": 0,
+   "tick": 3018
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.559,
+   "rate": 1.012,
+   "delay": 0,
+   "tick": 3045
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.948,
+   "rate": 1.061,
+   "delay": 0,
+   "tick": 3051
+  },
+  {
+   "id": "block",
+   "gain": 1.047,
+   "rate": 0.958,
+   "delay": 0,
+   "tick": 3064
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.589,
+   "rate": 0.997,
+   "delay": 0,
+   "tick": 3088
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.626,
+   "rate": 0.968,
+   "delay": 0,
+   "tick": 3108
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.615,
+   "rate": 1.04,
+   "delay": 0,
+   "tick": 3134
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.915,
+   "rate": 0.964,
+   "delay": 0,
+   "tick": 3152
+  },
+  {
+   "id": "block",
+   "gain": 1.066,
+   "rate": 0.995,
+   "delay": 0,
+   "tick": 3165
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.646,
+   "rate": 0.961,
+   "delay": 0,
+   "tick": 3228
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.949,
+   "rate": 1.033,
+   "delay": 0,
+   "tick": 3241
+  },
+  {
+   "id": "jump",
+   "gain": 0.963,
+   "rate": 0.959,
+   "delay": 0,
+   "tick": 3252
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 3257
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.113,
+   "rate": 1.032,
+   "delay": 0,
+   "tick": 3271
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.088,
+   "rate": 0.997,
+   "delay": 0,
+   "tick": 3278
+  },
+  {
+   "id": "thump",
+   "gain": 1.088,
+   "rate": 0.997,
+   "delay": 0,
+   "tick": 3278
+  },
+  {
+   "id": "land",
+   "gain": 1.081,
+   "rate": 1.039,
+   "delay": 0,
+   "tick": 3294
+  },
+  {
+   "id": "knockdown",
+   "gain": 1.15,
+   "rate": 0.94,
+   "delay": 0,
+   "tick": 3294
+  },
+  {
+   "id": "thump",
+   "gain": 0.9,
+   "rate": 0.9,
+   "delay": 0,
+   "tick": 3294
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.566,
+   "rate": 1.016,
+   "delay": 0,
+   "tick": 3294
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.042,
+   "rate": 0.934,
+   "delay": 0,
+   "tick": 3305
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.945,
+   "rate": 1.021,
+   "delay": 0,
+   "tick": 3309
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.274,
+   "rate": 0.954,
+   "delay": 0,
+   "tick": 3319
+  },
+  {
+   "id": "thump",
+   "gain": 1.274,
+   "rate": 0.954,
+   "delay": 0,
+   "tick": 3319
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.541,
+   "rate": 0.954,
+   "delay": 0,
+   "tick": 3364
+  },
+  {
+   "id": "hit-light",
+   "gain": 1.332,
+   "rate": 0.957,
+   "delay": 0,
+   "tick": 3369
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.542,
+   "rate": 1.059,
+   "delay": 0,
+   "tick": 3382
+  },
+  {
+   "id": "hit-light",
+   "gain": 0.89,
+   "rate": 0.956,
+   "delay": 0,
+   "tick": 3386
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.061,
+   "rate": 0.948,
+   "delay": 0,
+   "tick": 3396
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.084,
+   "rate": 0.996,
+   "delay": 0,
+   "tick": 3410
+  },
+  {
+   "id": "thump",
+   "gain": 1.301,
+   "rate": 0.996,
+   "delay": 0,
+   "tick": 3410
+  },
+  {
+   "id": "knockdown",
+   "gain": 1.061,
+   "rate": 1.001,
+   "delay": 0,
+   "tick": 3452
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.084,
+   "rate": 0.971,
+   "delay": 0,
+   "tick": 3458
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.998,
+   "rate": 1.008,
+   "delay": 0,
+   "tick": 3517
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 0.913,
+   "rate": 1.018,
+   "delay": 0,
+   "tick": 3530
+  },
+  {
+   "id": "thump",
+   "gain": 0.913,
+   "rate": 1.018,
+   "delay": 0,
+   "tick": 3530
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.579,
+   "rate": 0.974,
+   "delay": 0,
+   "tick": 3572
+  },
+  {
+   "id": "block",
+   "gain": 1.01,
+   "rate": 0.968,
+   "delay": 0,
+   "tick": 3576
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.962,
+   "rate": 0.933,
+   "delay": 0,
+   "tick": 3591
+  },
+  {
+   "id": "block",
+   "gain": 0.883,
+   "rate": 0.968,
+   "delay": 0,
+   "tick": 3604
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.65,
+   "rate": 1.004,
+   "delay": 0,
+   "tick": 3628
+  },
+  {
+   "id": "hit-light",
+   "gain": 0.969,
+   "rate": 1.018,
+   "delay": 0,
+   "tick": 3632
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.089,
+   "rate": 0.999,
+   "delay": 0,
+   "tick": 3650
+  },
+  {
+   "id": "block",
+   "gain": 0.943,
+   "rate": 1.01,
+   "delay": 0,
+   "tick": 3664
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.643,
+   "rate": 1.039,
+   "delay": 0,
+   "tick": 3688
+  },
+  {
+   "id": "hit-light",
+   "gain": 1.066,
+   "rate": 1.056,
+   "delay": 0,
+   "tick": 3692
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.908,
+   "rate": 0.948,
+   "delay": 0,
+   "tick": 3702
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.071,
+   "rate": 1.016,
+   "delay": 0,
+   "tick": 3715
+  },
+  {
+   "id": "thump",
+   "gain": 1.285,
+   "rate": 1.016,
+   "delay": 0,
+   "tick": 3715
+  },
+  {
+   "id": "knockdown",
+   "gain": 0.968,
+   "rate": 0.984,
+   "delay": 0,
+   "tick": 3757
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.1,
+   "rate": 0.935,
+   "delay": 0,
+   "tick": 3762
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.887,
+   "rate": 0.968,
+   "delay": 0,
+   "tick": 3817
+  },
+  {
+   "id": "block",
+   "gain": 1.054,
+   "rate": 0.976,
+   "delay": 0,
+   "tick": 3830
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.649,
+   "rate": 0.974,
+   "delay": 0,
+   "tick": 3868
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.612,
+   "rate": 0.974,
+   "delay": 0,
+   "tick": 3894
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.661,
+   "rate": 0.994,
+   "delay": 0,
+   "tick": 3906
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.929,
+   "rate": 0.991,
+   "delay": 0,
+   "tick": 3909
+  },
+  {
+   "id": "block",
+   "gain": 0.988,
+   "rate": 0.955,
+   "delay": 0,
+   "tick": 3922
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.618,
+   "rate": 1.042,
+   "delay": 0,
+   "tick": 3967
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.9,
+   "rate": 1.014,
+   "delay": 0,
+   "tick": 3976
+  },
+  {
+   "id": "block",
+   "gain": 1.017,
+   "rate": 0.963,
+   "delay": 0,
+   "tick": 3989
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.555,
+   "rate": 1.025,
+   "delay": 0,
+   "tick": 4013
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.011,
+   "rate": 1.047,
+   "delay": 0,
+   "tick": 4035
+  },
+  {
+   "id": "block",
+   "gain": 0.982,
+   "rate": 0.953,
+   "delay": 0,
+   "tick": 4048
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.533,
+   "rate": 1.063,
+   "delay": 0,
+   "tick": 4072
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.606,
+   "rate": 0.933,
+   "delay": 0,
+   "tick": 4099
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.97,
+   "rate": 0.947,
+   "delay": 0,
+   "tick": 4103
+  },
+  {
+   "id": "block",
+   "gain": 0.976,
+   "rate": 1.047,
+   "delay": 0,
+   "tick": 4117
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.658,
+   "rate": 1.064,
+   "delay": 0,
+   "tick": 4141
+  },
+  {
+   "id": "hit-light",
+   "gain": 0.928,
+   "rate": 1.009,
+   "delay": 0,
+   "tick": 4145
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.552,
+   "rate": 0.99,
+   "delay": 0,
+   "tick": 4155
+  },
+  {
+   "id": "hit-light",
+   "gain": 0.847,
+   "rate": 0.945,
+   "delay": 0,
+   "tick": 4159
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.929,
+   "rate": 1.043,
+   "delay": 0,
+   "tick": 4169
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.249,
+   "rate": 1.009,
+   "delay": 0,
+   "tick": 4182
+  },
+  {
+   "id": "thump",
+   "gain": 1.499,
+   "rate": 1.009,
+   "delay": 0,
+   "tick": 4182
+  },
+  {
+   "id": "knockdown",
+   "gain": 1.04,
+   "rate": 0.98,
+   "delay": 0,
+   "tick": 4224
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.914,
+   "rate": 0.947,
+   "delay": 0,
+   "tick": 4230
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 4246
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.532,
+   "rate": 0.935,
+   "delay": 0,
+   "tick": 4313
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.007,
+   "rate": 1.04,
+   "delay": 0,
+   "tick": 4318
+  },
+  {
+   "id": "block",
+   "gain": 0.885,
+   "rate": 0.985,
+   "delay": 0,
+   "tick": 4331
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.544,
+   "rate": 1.049,
+   "delay": 0,
+   "tick": 4355
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.11,
+   "rate": 1.037,
+   "delay": 0,
+   "tick": 4375
+  },
+  {
+   "id": "block",
+   "gain": 1.016,
+   "rate": 0.97,
+   "delay": 0,
+   "tick": 4389
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.554,
+   "rate": 0.991,
+   "delay": 0,
+   "tick": 4413
+  },
+  {
+   "id": "hit-light",
+   "gain": 0.959,
+   "rate": 0.953,
+   "delay": 0,
+   "tick": 4417
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.898,
+   "rate": 1.005,
+   "delay": 0,
+   "tick": 4427
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.157,
+   "rate": 0.966,
+   "delay": 0,
+   "tick": 4440
+  },
+  {
+   "id": "thump",
+   "gain": 1.389,
+   "rate": 0.966,
+   "delay": 0,
+   "tick": 4440
+  },
+  {
+   "id": "knockdown",
+   "gain": 1.049,
+   "rate": 1.046,
+   "delay": 0,
+   "tick": 4482
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.922,
+   "rate": 1.006,
+   "delay": 0,
+   "tick": 4483
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 4493
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 4502
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 4511
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 4520
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 4529
+  },
+  {
+   "id": "block",
+   "gain": 0.895,
+   "rate": 1.023,
+   "delay": 0,
+   "tick": 4550
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.892,
+   "rate": 1.024,
+   "delay": 0,
+   "tick": 4582
+  },
+  {
+   "id": "jump",
+   "gain": 1.023,
+   "rate": 1.011,
+   "delay": 0,
+   "tick": 4593
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.8,
+   "rate": 1.1,
+   "delay": 0,
+   "tick": 4598
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.642,
+   "rate": 1.047,
+   "delay": 0,
+   "tick": 4603
+  },
+  {
+   "id": "hit-light",
+   "gain": 0.923,
+   "rate": 0.974,
+   "delay": 0,
+   "tick": 4608
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 0.992,
+   "rate": 1.063,
+   "delay": 0,
+   "tick": 4638
+  },
+  {
+   "id": "land",
+   "gain": 1.055,
+   "rate": 1.042,
+   "delay": 0,
+   "tick": 4651
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.073,
+   "rate": 1.045,
+   "delay": 0,
+   "tick": 4651
+  },
+  {
+   "id": "thump",
+   "gain": 1.073,
+   "rate": 1.045,
+   "delay": 0,
+   "tick": 4651
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.036,
+   "rate": 0.984,
+   "delay": 0,
+   "tick": 4685
+  },
+  {
+   "id": "block",
+   "gain": 0.965,
+   "rate": 0.997,
+   "delay": 0,
+   "tick": 4699
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.628,
+   "rate": 0.972,
+   "delay": 0,
+   "tick": 4723
+  },
+  {
+   "id": "hit-light",
+   "gain": 1.11,
+   "rate": 0.996,
+   "delay": 0,
+   "tick": 4727
+  },
+  {
+   "id": "whoosh-light",
+   "gain": 0.577,
+   "rate": 0.939,
+   "delay": 0,
+   "tick": 4737
+  },
+  {
+   "id": "hit-light",
+   "gain": 1.138,
+   "rate": 0.946,
+   "delay": 0,
+   "tick": 4741
+  },
+  {
+   "id": "whoosh-heavy",
+   "gain": 1.082,
+   "rate": 1.064,
+   "delay": 0,
+   "tick": 4751
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.056,
+   "rate": 0.947,
+   "delay": 0,
+   "tick": 4764
+  },
+  {
+   "id": "thump",
+   "gain": 1.267,
+   "rate": 0.947,
+   "delay": 0,
+   "tick": 4764
+  },
+  {
+   "id": "hit-heavy",
+   "gain": 1.3,
+   "rate": 0.88,
+   "delay": 0,
+   "tick": 4764
+  },
+  {
+   "id": "thump",
+   "gain": 1.3,
+   "rate": 0.85,
+   "delay": 0,
+   "tick": 4764
+  },
+  {
+   "id": "feather-burst",
+   "gain": 1.15,
+   "rate": 1,
+   "delay": 0.02,
+   "tick": 4764
+  },
+  {
+   "id": "crowd-ooh",
+   "gain": 1.1,
+   "rate": 1,
+   "delay": 0.12,
+   "tick": 4764
+  },
+  {
+   "id": "knockdown",
+   "gain": 1.2,
+   "rate": 0.9,
+   "delay": 0,
+   "tick": 4915
+  },
+  {
+   "id": "knockdown",
+   "gain": 1.017,
+   "rate": 1.048,
+   "delay": 0,
+   "tick": 4931
+  }
+ ],
+ "flow": [
+  {
+   "sting": "round",
+   "tick": 1
+  },
+  {
+   "duck": 0.45,
+   "hold": 1.2,
+   "tick": 1
+  },
+  {
+   "music": "fight",
+   "tick": 70
+  },
+  {
+   "intense": true,
+   "tick": 1912
+  },
+  {
+   "duck": 0.22,
+   "hold": 2.8,
+   "tick": 2238
+  },
+  {
+   "intense": false,
+   "tick": 2238
+  },
+  {
+   "sting": "round",
+   "tick": 2479
+  },
+  {
+   "duck": 0.45,
+   "hold": 1.2,
+   "tick": 2479
+  },
+  {
+   "music": "fight",
+   "tick": 2548
+  },
+  {
+   "intense": true,
+   "tick": 4440
+  },
+  {
+   "duck": 0.22,
+   "hold": 2.8,
+   "tick": 4764
+  },
+  {
+   "intense": false,
+   "tick": 4764
+  },
+  {
+   "sting": "win",
+   "tick": 5044
+  }
+ ],
+ "counts": {
+  "sfx": 293,
+  "dropped": 0,
+  "stolen": 0
+ },
+ "winner": 1
+}
