@@ -7,11 +7,10 @@
    metal sewn to the soft body, carried by its points each frame:
 
    - Kevalanche, hockey goon: a black bear (near-black brown, a tan
-     muzzle) with a hockey mullet (the top and sides cropped, nine wavy
-     plush locks down the nape to the shoulders, tips flipped out, on
-     render-only springs), a black eye (a bruised ring round the eye nearer
-     the camera), one felt front tooth with a gap beside it, and plush
-     hockey gloves in royal blue and orange (render/gloves.js).
+     muzzle; the head's short fur and shape his OG's), a black eye (a
+     bruised ring round the eye nearer the camera), one felt front tooth
+     with a gap beside it, and plush hockey gloves in royal blue and orange
+     (render/gloves.js).
    - Rubberta, anglerfish: abyss-black flock with glowing photophores (the
      fur's spots lit from within), glowing rings round the eyes, a grimace
      of needle teeth embroidered in pale thread, and a lure: a felt stalk
@@ -33,7 +32,6 @@ import * as THREE from 'three/webgpu';
 import {
   Fn, uniform, attribute, float, vec2, vec3, vec4, positionLocal, normalWorld, normalLocal, cameraPosition, positionWorld,
   mix, smoothstep, clamp, normalize, dot, pow, abs, sin, fract, mx_noise_float, length, uv, varying, max,
-  instanceIndex, floor, Discard,
 } from 'three/tsl';
 import { shade } from '../../shared/grommet/props.js';
 import { extractRotation, quatToMat } from '../../shared/grommet/math.js';
@@ -234,204 +232,19 @@ function makeTooth() {
   return m;
 }
 
-/* the mullet: nine soft plush locks from the back of the head down the
-   nape to the shoulders, wavy (an S each, alternating), fat in the middle,
-   tapering, the tips flipped out. Each rides the head's own frame and
-   lags it on a render-only spring (the feel pass's approach): the lock's
-   tip is driven by its own acceleration (the strike, a hit, a landing, the
-   walk's bob and sway) and by gravity when the head tips (hit, K.O.), the
-   bend growing toward the tip. Every frame each lock is pushed out of the
-   torso and the head (ellipsoids padded for the fur), so it never clips
-   through his shoulders or back. Nothing reaches the sim. */
-const LOCK_N = 22, LOCK_R = 12, LOCK_SHELLS = 14, LOCK_PILE = 0.05;
-/* a lock's plush: the same idea as the body's shell fur (the lock drawn
-   LOCK_SHELLS times, each pushed out along the normal, cut to strands), its
-   strands in rows slanting round the lock so they spiral like a curl; dark
-   roots, frosted tips, a soft matte light */
-const hash2 = (p) => fract(sin(dot(p, vec2(127.1, 311.7))).mul(43758.5453));
-function lockMat(color) {
-  const m = new THREE.MeshBasicNodeMaterial();
-  const c = uniform(new THREE.Color(color));
-  const h = float(instanceIndex).div(LOCK_SHELLS - 1);
-  m.positionNode = positionLocal.add(normalLocal.mul(h.mul(LOCK_PILE)));
-  const vH = varying(h);
-  m.colorNode = Fn(() => {
-    const t = uv();
-    const q = vec2(t.x.mul(24).add(t.y.mul(8)), t.y.mul(48));
-    const cell = floor(q), f = fract(q);
-    const o = vec2(hash2(cell), hash2(cell.add(19.19))).mul(0.5).add(0.25);
-    const top = hash2(cell.add(7.7)).mul(0.45).add(0.55);
-    const rad = mix(float(0.62), float(0.16), vH.div(top));
-    Discard(vH.greaterThan(0.001).and(length(f.sub(o)).greaterThan(rad).or(vH.greaterThan(top))));
-    const N = normalize(normalWorld), V = normalize(cameraPosition.sub(positionWorld));
-    // the curl: broad strand grooves spiralling down the lock
-    const g = sin(t.x.mul(3).add(t.y.mul(2.4)).mul(Math.PI * 2)).mul(0.5).add(0.5);
-    const base = vec3(c).mul(hash2(cell.add(3.1)).mul(0.18).add(0.91))
-      .mul(mix(float(0.86), float(1.04), smoothstep(0.15, 0.85, g)))
-      .mul(mix(float(0.62), float(1.0), pow(vH, float(0.8))))
-      .toVar();
-    base.assign(mix(base, base.mul(1.2).add(0.03), smoothstep(0.7, 1.0, vH).mul(0.35)));
-    const rim = pow(float(1).sub(abs(dot(N, V))), float(3)).mul(vH);
-    return vec4(shade(base, N, { spec: 0.0, power: 10, wrap: 0.6 }).add(base.mul(1.2).add(0.04).mul(rim.mul(0.2))), 1);
-  })();
-  m.userData.color = c;
-  return m;
-}
-
-class Mullet {
-  constructor(plush, color) {
-    this.plush = plush;
-    this.head = new HeadFrame(plush);
-    const rig = plush.rig, H = gridOf(rig, 'head'), T = gridOf(rig, 'torso');
-    const c0 = this.head.c0;
-    // the body's frame (the soft body's cloud 0), its rest centre
-    const ix = rig.clouds[0].ix; this.b0 = [0, 0, 0];
-    for (const i of ix) for (let d = 0; d < 3; d++) this.b0[d] += rig.rest[i * 3 + d] / ix.length;
-    const pad = 0.13;
-    this.torso = { c: T.c.map((v, d) => v - this.b0[d]), r: T.r.map((v) => v + pad) };
-    this.skull = { c: H.c.map((v, d) => v - c0[d]), r: H.r.map((v) => v + 0.1) };
-    this.mat = lockMat(color);
-    this.group = new THREE.Group();
-    const [hx, hy, hz] = H.c, [rx, ry, rz] = H.r;
-    const DEF = [0, 0.27, -0.27, 0.54, -0.54, 0.81, -0.81, 1.08, -1.08].map((th, k) => [th, 1 - 0.3 * Math.pow(Math.abs(th) / 1.08, 1.5) + [0, -0.04, 0.03][k % 3], k % 2 ? 1 : -1]);
-    this.locks = DEF.map(([th, len, wv], k) => {
-      const d = [Math.sin(th), 0, -Math.cos(th)], side = [Math.cos(th), 0, Math.sin(th)];
-      const at = (rad, y, z = rad) => [hx + d[0] * rx * rad, y, hz + d[2] * rz * z];
-      // from under the crown down to the shoulders (the sides shorter)
-      const yTop = hy + ry * 0.5, yEnd = 1.86 + 0.32 * (1 - len) + 0.1 * Math.abs(th);
-      const F = [0, 0.2, 0.42, 0.6, 0.76, 0.9, 1.0], RAD = [0.88, 1.1, 1.13, 1.07, 1.07, 1.13, 1.27];
-      const WAVE = [0, 0.02, 0.05, -0.045, 0.045, 0.015, -0.03], LIFT = [0, 0, 0, 0, 0, 0.01, 0.06];
-      const ctrl = F.map((f, j) => {
-        const P = at(RAD[j], yTop + (yEnd - yTop) * f + LIFT[j], RAD[j] * 1.03);
-        // the wave: a lateral S, alternating lock to lock
-        const w = WAVE[j] * wv;
-        return new THREE.Vector3(P[0] + side[0] * w - c0[0], P[1] - c0[1], P[2] + side[2] * w - c0[2]);
-      });
-      const curve = new THREE.CatmullRomCurve3(ctrl, false, 'centripetal');
-      const rest = curve.getSpacedPoints(LOCK_N - 1);
-      const L = curve.getLength();
-      const geo = new THREE.InstancedBufferGeometry();
-      const pos = new Float32Array(LOCK_N * (LOCK_R + 1) * 3), uvs = [], idx = [];
-      for (let i = 0; i < LOCK_N; i++) for (let j = 0; j <= LOCK_R; j++) uvs.push(j / LOCK_R + k * 0.13, i / (LOCK_N - 1));
-      for (let i = 0; i < LOCK_N - 1; i++) for (let j = 0; j < LOCK_R; j++) { const a = i * (LOCK_R + 1) + j, b = a + LOCK_R + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
-      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-      geo.setIndex(idx);
-      geo.instanceCount = LOCK_SHELLS;
-      const mesh = new THREE.Mesh(geo, this.mat);
-      mesh.frustumCulled = false;
-      this.group.add(mesh);
-      const sc = 1 - 0.15 * Math.abs(th);
-      return {
-        rest, L, mesh, geo, pos, w: 0.17 * sc, dp: 0.09 * sc,
-        k: 95 + 14 * k, o: new THREE.Vector3(), v: new THREE.Vector3(), prev: null, pv: new THREE.Vector3(),
-        cur: rest.map(() => new THREE.Vector3()),
-      };
-    });
-    plush.group.add(this.group);
-    this._a = new THREE.Vector3(); this._b = new THREE.Vector3(); this._q = new THREE.Quaternion(); this._g = new THREE.Vector3();
-  }
-
-  /* push p out of an ellipsoid (centre c, radii r, both in a frame R, C) */
-  _out(p, E, R, C) {
-    const a = this._a.set(p.x - C[0], p.y - C[1], p.z - C[2]);
-    // into the frame (R is rest→now, so its transpose)
-    const lx = R[0] * a.x + R[3] * a.y + R[6] * a.z - E.c[0], ly = R[1] * a.x + R[4] * a.y + R[7] * a.z - E.c[1], lz = R[2] * a.x + R[5] * a.y + R[8] * a.z - E.c[2];
-    const qx = lx / E.r[0], qy = ly / E.r[1], qz = lz / E.r[2], q = Math.hypot(qx, qy, qz);
-    if (q >= 1 || q < 1e-6) return;
-    const f = 1 / q, nx = lx * f + E.c[0], ny = ly * f + E.c[1], nz = lz * f + E.c[2];
-    p.set(C[0] + R[0] * nx + R[1] * ny + R[2] * nz, C[1] + R[3] * nx + R[4] * ny + R[5] * nz, C[2] + R[6] * nx + R[7] * ny + R[8] * nz);
-  }
-
-  update(dt) {
-    const hf = this.head; hf.update();
-    const soft = this.plush.soft, BR = soft.cloudR[0], BC = soft.cloudC[0];
-    const HR = hf.R, HC = hf.c;
-    const grp = this.plush.group, q = this._q.copy(grp.quaternion), qi = q.clone().invert();
-    const h = Math.min(1 / 30, Math.max(0, dt || 0));
-    // the head's down, now, in the group's frame (gravity, for the droop)
-    const hd = this._g.set(-HR[1], -HR[4], -HR[7]);
-    for (const K of this.locks) {
-      const n = K.rest.length;
-      // the rigid lock: its rest curve in the head's frame
-      for (let i = 0; i < n; i++) hf.point([K.rest[i].x, K.rest[i].y, K.rest[i].z], K.cur[i]);
-      // its tip in the world (the stage carries the group), for the spring
-      const tip = this._b.copy(K.cur[n - 1]).applyQuaternion(q).add(grp.position);
-      if (h > 0) {
-        if (!K.prev) { K.prev = tip.clone(); K.pv.set(0, 0, 0); }
-        const vel = tip.clone().sub(K.prev).multiplyScalar(1 / h);
-        const acc = vel.clone().sub(K.pv).multiplyScalar(1 / h);
-        if (acc.length() > 90) acc.setLength(90);
-        if (vel.length() > 25) { vel.set(0, 0, 0); acc.set(0, 0, 0); K.o.set(0, 0, 0); K.v.set(0, 0, 0); }   // a teleport
-        K.prev.copy(tip); K.pv.copy(vel);
-        acc.applyQuaternion(qi);
-        // gravity: if the head has tipped, the lock hangs back toward down
-        const droop = new THREE.Vector3(hd.x, hd.y + 1, hd.z).multiplyScalar(-0.55 * K.L);
-        const kk = K.k, c = 2 * 0.28 * Math.sqrt(kk);
-        for (let s = 0, m = Math.max(1, Math.ceil(h * 240)); s < m; s++) {
-          const e = h / m;
-          K.v.x += (-kk * (K.o.x - droop.x) - c * K.v.x - acc.x * 0.55) * e;
-          K.v.y += (-kk * (K.o.y - droop.y) - c * K.v.y - acc.y * 0.55) * e;
-          K.v.z += (-kk * (K.o.z - droop.z) - c * K.v.z - acc.z * 0.55) * e;
-          K.o.addScaledVector(K.v, e);
-        }
-        const cap = 0.6 * K.L;
-        if (K.o.length() > cap) K.o.setLength(cap);
-      }
-      // bend: the offset grows toward the tip; then out of the torso and skull
-      for (let i = 0; i < n; i++) {
-        const t = i / (n - 1), p = K.cur[i];
-        p.addScaledVector(K.o, Math.pow(t, 1.6));
-        if (t > 0.12) {
-          this._out(p, this.torso, BR, BC);
-          if (t > 0.3) this._out(p, this.skull, HR, HC);
-        }
-      }
-      // the tube: width across (lateral), depth outward from the head
-      const pos = K.pos, Tn = new THREE.Vector3(), Nn = new THREE.Vector3(), Bn = new THREE.Vector3();
-      for (let i = 0; i < n; i++) {
-        const t = i / (n - 1), p = K.cur[i];
-        Tn.subVectors(K.cur[Math.min(n - 1, i + 1)], K.cur[Math.max(0, i - 1)]).normalize();
-        Nn.set(p.x - HC[0], (p.y - HC[1]) * 0.3, p.z - HC[2]);
-        Nn.addScaledVector(Tn, -Nn.dot(Tn)).normalize();
-        Bn.crossVectors(Tn, Nn);
-        // fat in the middle, tapering to a rounded flipped tip
-        const sh = (0.72 + 0.28 * smooth(0, 0.35, t)) * (1 - 0.45 * smooth(0.5, 1, t)) * Math.sqrt(Math.max(0, Math.min(1, (1 - t) * 5)));
-        const rw = K.w * sh, rd = K.dp * sh;
-        for (let j = 0; j <= LOCK_R; j++) {
-          const a = (j / LOCK_R) * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a), o = (i * (LOCK_R + 1) + j) * 3;
-          pos[o] = p.x + Nn.x * ca * rd + Bn.x * sa * rw;
-          pos[o + 1] = p.y + Nn.y * ca * rd + Bn.y * sa * rw;
-          pos[o + 2] = p.z + Nn.z * ca * rd + Bn.z * sa * rw;
-        }
-      }
-      K.geo.attributes.position.needsUpdate = true;
-      K.geo.computeVertexNormals();
-    }
-  }
-}
-
 const KEV = {
   // a black bear: near-black brown (warm enough to keep its shading and
   // depth under the lights), a tan muzzle like a real black bear's; the
   // bruise a lighter plum so it reads on the dark fur
   colors: { fur: '#20100a', under: '#b98d63', accent: '#170d08', spot: '#8a5298', nose: '#120d0c', cloth: '#1f49b6', trim: '#ef6a1e' },
   gloss: 0.4,
-  hockey: { blue: '#1f49b6', orange: '#ef6a1e', palm: '#ef6a1e' },
-  lock: '#231a15',
-  // the top and the sides cropped (business at the front); the back of the
-  // head and the nape a little longer and darker under the locks
+  // (the hockey gloves' felt: render/gloves.js, makeHockeyGlove)
+  hockey: { blue: '#1f49b6', orange: '#ef6a1e', palm: '#c4b49b' },
+  // the head is his OG's: the same shape and short pile (no haircut), only
+  // the colours are the black bear's. A black bear's chest and belly are
+  // dark too (just a hint left)
   rig(rig) {
-    const mul = (l) => smooth(-0.05, -0.45, l[2]) * smooth(0.55, 0.1, l[1]);
-    wrapGrid(rig, 'head', 'pile', (p, u, v, l) => {
-      const face = smooth(0.45, 0.85, l[2]);
-      const crop = (0.42 * smooth(0.2, 0.7, l[1]) + 0.28 * smooth(0.45, 0.9, Math.abs(l[0])) * smooth(0.3, -0.2, l[1])) * (1 - face);
-      return p * (1 - Math.min(0.55, crop)) * (1 - 0.55 * mul(l));
-    });
-    wrapGrid(rig, 'head', 'accent', (a, u, v, l) => Math.max(a, smooth(0.0, 0.55, mul(l))));
-    // a black bear's chest and belly are dark too (just a hint left)
     wrapGrid(rig, 'torso', 'under', (x) => x * 0.18);
-    wrapGrid(rig, 'torso', 'pile', (p, u, v, l) => p + 0.25 * smooth(0.55, 0.85, l[1]) * smooth(-0.1, -0.5, l[2]));
   },
   // the black eye: a bruise round the eye on the camera side as he faces
   // left (player 2's eye nearer us: u above the middle), the pile shorter
@@ -450,18 +263,15 @@ const KEV = {
   build(plush) {
     const tooth = makeTooth();
     plush.group.add(tooth);
-    const mullet = new Mullet(plush, KEV.lock);
     const up = new THREE.Vector3(), M = new THREE.Matrix4(), S = new THREE.Matrix4();
     return {
-      mullet,
-      update(dt) {
+      update() {
         const R = plush.soft.cloudR[0];
         up.set(R[1], R[4], R[7]);
         // just under the smile, left of centre: the gap is on the other side
         skinMatrix(plush, 'muzzle', 0.483, 0.6, up, M, -0.004);
         tooth.matrix.copy(M).multiply(S.makeScale(0.088, 0.088, 0.088));
         tooth.matrixWorldNeedsUpdate = true;
-        mullet.update(dt);
       },
     };
   },

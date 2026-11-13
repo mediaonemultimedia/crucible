@@ -453,7 +453,7 @@ export class Plush {
     if (this.chain) this._necklace();
     if (this.twinLook) SITH_T.value = Math.max(SITH_T.value, this.time);
     if ('toque' in P) P.toque = this.toque.visible;
-    this.gloves?.update(dt, P.gloveFx);
+    this.gloves?.update(dt, P.gloveFx, F?.act);
     P.headCentre(this.hc);
     poseStars(this.stars, this.hc, P.daze, this.time);
     this._eyes();

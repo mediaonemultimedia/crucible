@@ -2,9 +2,11 @@
 
      node tools/goon-shots.mjs [--html final.html] [--out shots/goon/after] [--q '&feel=old'] [scene …]
 
-   Scenes: head-front, head-back (three-quarter back: the mullet), gloves,
-   idle, heavy (mid heavy hook), hit, ko, walk (three frames), motion
-   (the locks through a heavy hook and a jump, every 4 frames), vs-og,
+   Scenes: head-front, head-back (three-quarter back), gloves, glove-views (one glove
+   close: front, side, three-quarter),
+   idle, heavy (mid heavy hook), block, hit, ko, walk (three frames),
+   motion (a heavy hook and a jump, every 4 frames; not in the default
+   set), vs-og,
    vs-rubberta. Player 1 is the goon (alt1=1). WebGL 2 on SwiftShader;
    prints console errors, exits 1 on any. */
 import { chromium } from 'playwright';
@@ -19,7 +21,7 @@ const html = path.resolve(opt('--html', path.join(root, 'final.html')));
 const out = path.resolve(opt('--out', path.join(root, 'shots', 'goon', 'after')));
 const Q = opt('--q', '');
 fs.mkdirSync(out, { recursive: true });
-const ALL = ['head-front', 'head-back', 'gloves', 'idle', 'heavy', 'hit', 'ko', 'walk', 'motion', 'vs-og', 'vs-rubberta'];
+const ALL = ['head-front', 'head-back', 'gloves', 'glove-views', 'idle', 'heavy', 'heavy-close', 'block', 'hit', 'ko', 'walk', 'vs-og', 'vs-rubberta'];
 const scenes = args.length ? args : ALL;
 
 const browser = await chromium.launch({
@@ -42,6 +44,11 @@ const PRE = `
   window.cam = (x, d = 11.5, ty = 1.8, fov = 26) => look(x, ty + 1.1, d, x, ty, 0, fov);
   window.press = (mask, side = 1, n = 2) => { let i = 0; F().override = () => { i++; const m = i <= n ? mask : 0; return side ? [0, m] : [m, 0]; }; };
   window.G = () => F().plush[0];
+  // a glove's centre in the world (k 0: his right), and a camera round it:
+  // az the angle about the vertical from the front (his facing side), el up
+  const V3 = B.stage.camera.position.constructor;
+  window.gpos = (k) => { const A = G().gloves.arms[k], m = A.glove.matrix.clone().premultiply(G().group.matrixWorld); const v = new V3(0, 0.25, 0).applyMatrix4(m); return v; };
+  window.orbit = (k, az, el, d = 3.2, fov = 30) => { const c = gpos(k), f = G().group.quaternion; const dir = new V3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)); look(c.x + dir.x * d, c.y + dir.y * d, c.z + dir.z * d, c.x, c.y, c.z, fov); };
   window.head = () => { const p = G(); const h = p.twin?.head || null; return h; };
 `;
 
@@ -71,6 +78,13 @@ for (const s of scenes) {
     await shot(s);
     await page.evaluate(`const x = G().group.position.x; look(x - 3.9, 3.0, -1.6, x, 2.4, 0, 26);`);
     await shot(s + '-2');
+  } else if (s === 'glove-views') {
+    // the lead glove alone, close: front (the knuckles at us), side (the thumb's side), three-quarter
+    await page.evaluate(`place(-1300, 1300); B.step(1.0, false);`);
+    for (const [n, az, el] of [['front', Math.PI / 2, 0.15], ['side', 0, 0.12], ['three-quarter', 0.8, 0.3]]) {
+      await page.evaluate(`orbit(1, ${az}, ${el});`);
+      await shot(`glove-${n}`);
+    }
   } else if (s === 'gloves') {
     await page.evaluate(`place(-1300, 1300); B.step(1.0, false); const x = G().group.position.x; look(x + 2.0, 2.6, 3.4, x + 0.6, 1.95, 0.2, 26);`);
     await shot(s);
@@ -79,6 +93,14 @@ for (const s of scenes) {
     await shot(s);
   } else if (s === 'heavy') {
     await page.evaluate(`place(-1200, 1200); B.step(0.3, false); press(32, 0); if (!until(() => ST().f[0].act === 'attack' && ST().f[0].t >= 15, 2)) throw new Error('no swing'); cam(G().group.position.x + 0.9, 9.5, 1.9);`);
+    await shot(s);
+  } else if (s === 'heavy-close') {
+    // the heavy hook at its strike, close on the punching glove: the fist closed
+    await page.evaluate(`place(-1200, 1200); B.step(0.3, false); press(32, 0); if (!until(() => ST().f[0].act === 'attack' && ST().f[0].t >= 13, 2)) throw new Error('no swing'); const p = gpos(0), q = gpos(1); const c = p.x > q.x ? p : q; look(c.x + 0.4, c.y + 0.5, c.z + 3.2, c.x, c.y, c.z, 34);`);
+    await shot(s);
+  } else if (s === 'block') {
+    // holding back while the octopus swings: the guard, the gloves up
+    await page.evaluate(`place(-1000, 1000); B.step(0.3, false); let i = 0; F().override = () => { i++; return [1, i < 3 ? 32 : 0]; }; until(() => ST().f[0].act === 'block' || ST().f[0].act === 'blockstun', 1.5); B.step(0.05, false); look(G().group.position.x + 2.6, 3.0, 5.2, G().group.position.x + 0.4, 2.0, 0, 30);`);
     await shot(s);
   } else if (s === 'hit') {
     await page.evaluate(`place(-900, 900); B.step(0.3, false); press(32, 1); until(() => ST().f[0].act === 'hit' || ST().f[0].act === 'stun' || (ST().f[0].hs|0) > 0, 2); B.step(0.06, false); cam(G().group.position.x + 0.6, 9.5, 1.9);`);
@@ -89,8 +111,8 @@ for (const s of scenes) {
     await page.evaluate(`look(G().group.position.x - 3, 3, 5, G().group.position.x, 0.9, 0, 30);`);
     await shot(s + '-2');
   } else if (s === 'motion') {
-    // the locks' secondary motion: a heavy hook and a jump's landing, every
-    // 4 frames, from behind his shoulder (one sheet each)
+    // a heavy hook and a jump's landing, every 4 frames, from behind his
+    // shoulder (one sheet each)
     for (const [name, mask] of [['heavy', 32], ['jump', 4]]) {
       await page.evaluate(`place(-1200, 1200); B.step(0.6, false); press(${mask}, 0);`);
       const tiles = [];

@@ -110,11 +110,8 @@ function makeGlove(mat, laceMat) {
 }
 
 /* ── the hockey goon's gloves (Kevalanche ALT) ─────────────────────────────
-   Chunky plush hockey gloves in the same frame and envelope as the boxing
-   glove (so his reach reads the same): four padded finger rolls curled
-   over the knuckles, each sewn in three puffs; a padded back of the hand;
-   an orange piping roll across the knuckle line; a contrasting palm; a
-   thick padded cuff roll at the wrist with an orange band. Felt plush, the
+   Plush hockey gloves in the same frame and envelope as the boxing glove
+   (so his reach reads the same): makeHockeyGlove below. Felt plush, the
    roster's material; colours only (no marks of any team). */
 
 /* plush felt: fine fibres, a fuzzy rim, a soft sheen */
@@ -160,54 +157,111 @@ export function tubeGeo(pts, rad, radial = 14, ref = new THREE.Vector3(0, 0, 1))
   return g;
 }
 
-const puff = (n, lo = 0.8) => (t) => { const e = Math.min(1, t * 9, (1 - t) * 9); return Math.sqrt(Math.max(0, e * (2 - e))) * (lo + (1 - lo) * Math.pow(Math.abs(Math.sin(Math.PI * n * t)), 0.45)); };
-
 /* built in true proportions (the unit is the glove's width scale; the
-   length scale is matched to it at rest, see HY), +y wrist → knuckles */
+   length scale is matched to it at rest, see HY), +y wrist → knuckles, +x
+   the thumb's side (mirrored per hand by pose()), +z the back of the hand.
+
+   A hockey glove, as one reads at a glance: a long flared gauntlet cuff up
+   the forearm, a thick padded back of the hand with a flex roll at the
+   wrist, four separate fingers each in three padded rolls (sausages with a
+   gap between, the outer two smaller), and a separate padded thumb that
+   wraps round the front of the fist. The fingers and the thumb are little
+   jointed chains: pose(curl) closes them from slightly open (rest) to a
+   fist (punching). Royal blue, orange trims (the cuff's band and its
+   rolled lip, a piping on the knuckle line), a tan-grey palm. */
+const FINGERS = [   // x (thumb side +), roll radius, three roll lengths
+  [0.27, 0.084, [0.175, 0.15, 0.13]],    // index
+  [0.09, 0.088, [0.185, 0.16, 0.14]],    // middle
+  [-0.09, 0.084, [0.175, 0.15, 0.13]],   // ring
+  [-0.266, 0.075, [0.15, 0.13, 0.115]],  // little
+];
+const OPEN = [0.3, 0.34, 0.24], FIST = [1.5, 1.55, 1.25];
+/* a padded roll: a sausage (a capsule, its ends a touch flattened) from
+   y = 0 to y = L, radius r across (x), d deep (z) */
+function rollGeo(L, r, d) {
+  const g = new THREE.CapsuleGeometry(1, 1, 6, 16);
+  const p = g.attributes.position, half = Math.max(0.001, L / 2 - r * 0.55);
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i), cap = Math.sign(y) * Math.max(0, Math.abs(y) - 0.5);   // the round ends
+    p.setXYZ(i, p.getX(i) * r, L / 2 + Math.sign(y) * half + cap * r * 0.8, p.getZ(i) * d);
+  }
+  g.computeVertexNormals();
+  return g;
+}
 function makeHockeyGlove(M) {
   const g = new THREE.Group();
-  const add = (geo, mat, pos, scl) => { const m = new THREE.Mesh(geo, mat); if (pos) m.position.set(...pos); if (scl) m.scale.set(...scl); g.add(m); return m; };
-  const ball = new THREE.SphereGeometry(1, 28, 20);
-  // the hand inside (fills between the pads); the palm in the contrast colour
-  add(ball, M.blue, [0, 0.29, 0.0], [0.35, 0.31, 0.31]);
-  add(ball, M.palm, [0, 0.27, -0.19], [0.27, 0.18, 0.09]);
-  // the back of the hand: a padded panel
-  add(ball, M.blue, [0, 0.19, 0.17], [0.35, 0.17, 0.13]);
-  // the thumb: two puffs up the thumb side, tip tucked toward the fingers;
-  // one mesh per side (the glove is mirrored for the other hand)
-  const thumbs = [1, -1].map((s) => {
-    const pts = new THREE.CatmullRomCurve3([[0.25, 0.04, 0.06], [0.35, 0.17, 0.03], [0.37, 0.32, -0.05], [0.3, 0.44, -0.15], [0.19, 0.48, -0.21]]
-      .map(([x, y, z]) => new THREE.Vector3(x * s, y, z))).getPoints(24);
-    const m = new THREE.Mesh(tubeGeo(pts, (t) => 0.105 * puff(2, 0.85)(t), 14, new THREE.Vector3(s, 0, 0)), M.blue);
-    g.add(m);
-    return m;
-  });
-  // four finger rolls over the knuckles, curling under to the palm, each in
-  // three puffs (the seams between them are the dips); the outer two a touch
-  // smaller and lower, like a hand
-  [[-0.252, 0.1, 0.9], [-0.084, 0.112, 1], [0.084, 0.112, 1], [0.25, 0.105, 0.95]].forEach(([x, r, k]) => {
+  const ball = new THREE.SphereGeometry(1, 24, 16);
+  const add = (geo, mat, pos, scl, parent = g) => { const m = new THREE.Mesh(geo, mat); if (pos) m.position.set(...pos); if (scl) m.scale.set(...scl); parent.add(m); return m; };
+  const ring = (R, r, pos, mat, parent = g, seg = 36) => { const m = add(new THREE.TorusGeometry(R, r, 10, seg), mat, pos, null, parent); m.rotation.x = Math.PI / 2; return m; };
+  // the hand: a core round the paw (it ends inside, at y ≈ 0.4–0.55), the
+  // palm side in tan-grey, a thick padded back
+  add(ball, M.blue, [0, 0.31, 0.0], [0.375, 0.29, 0.31]);
+  add(ball, M.palm, [0, 0.31, -0.15], [0.36, 0.28, 0.21]);
+  add(ball, M.blue, [0, 0.29, 0.1], [0.39, 0.27, 0.19]);
+  // inside the fist: the palm's leather where the fingers close over it
+  add(ball, M.palm, [0, 0.46, -0.16], [0.36, 0.17, 0.2]);
+  // a flex roll across the back at the wrist, and the orange piping on the
+  // knuckle line where the fingers meet the hand
+  const across = (y, z, r, bow, mat, w = 0.36) => {
     const pts = [];
-    for (let i = 0; i <= 30; i++) {
-      const a = 0.0 + (i / 30) * 2.65;
-      pts.push(new THREE.Vector3(x, 0.3 + 0.2 * k * Math.sin(a), 0.02 + 0.2 * k * Math.cos(a)));
-    }
-    add(tubeGeo(pts, (t) => r * puff(3, 0.78)(t), 14, new THREE.Vector3(1, 0, 0)), M.blue);
+    for (let i = 0; i <= 16; i++) { const t = i / 16, x = -w + 2 * w * t, e = (2 * t - 1) ** 2; pts.push(new THREE.Vector3(x, y - 0.02 * e, z - bow * e)); }
+    return add(tubeGeo(pts, (t) => r * Math.sqrt(Math.max(0, Math.min(1, t * 7, (1 - t) * 7))), 12, new THREE.Vector3(0, 1, 0)), mat);
+  };
+  across(0.1, 0.22, 0.08, 0.12, M.blue, 0.34);
+  across(0.53, 0.17, 0.042, 0.05, M.orange, 0.33);
+  // fingers: jointed chains of three rolls (a crease between rolls)
+  const fingers = FINGERS.map(([x, r, lens]) => {
+    const root = new THREE.Group(); root.position.set(x, 0.52, 0.02); g.add(root);
+    const joints = []; let parent = root;
+    lens.forEach((L, i) => {
+      const j = new THREE.Group(); if (i) j.position.y = lens[i - 1]; parent.add(j); joints.push(j);
+      const rr = r * (1 - 0.05 * i);
+      add(rollGeo(L + rr * 0.35, rr, rr * 1.04), M.blue, null, null, j);
+      parent = j;
+    });
+    return { root, joints, x };
   });
-  // an orange piping roll across the knuckle line, where fingers meet hand
-  const pipe = [];
-  for (let i = 0; i <= 16; i++) { const t = i / 16, x = -0.35 + 0.7 * t, e = (2 * t - 1) ** 2; pipe.push(new THREE.Vector3(x, 0.3 - 0.03 * e, 0.285 - 0.09 * e)); }
-  add(tubeGeo(pipe, (t) => 0.042 * Math.sqrt(Math.max(0, Math.min(1, t * 8, (1 - t) * 8))), 10, new THREE.Vector3(0, 1, 0)), M.orange);
-  // the cuff: a short padded bell (closed inside the arm, so no fur shows
-  // through), an orange band round it, a fat roll at the wrist
-  const prof = [[0.05, -0.34], [0.37, -0.335], [0.425, -0.3], [0.43, -0.2], [0.405, -0.06], [0.36, 0.06], [0.2, 0.08]].map(([r, y]) => new THREE.Vector2(r, y));
-  add(new THREE.LatheGeometry(new THREE.SplineCurve(prof).getPoints(18), 32), M.blue);
-  const ring = (R, r, y, mat) => { const m = add(new THREE.TorusGeometry(R, r, 12, 36), mat, [0, y, 0]); m.rotation.x = Math.PI / 2; return m; };
-  ring(0.37, 0.06, 0.04, M.blue);
-  ring(0.418, 0.036, -0.175, M.orange);
+  // the thumb: two fat rolls from the base of the palm on the thumb side,
+  // up and round the front of the fist
+  const tRoot = new THREE.Group(); g.add(tRoot);
+  // the thumb's base: a fat pad on the palm side (the paw stays inside it
+  // when the wrist rolls)
+  const thenar = add(ball, M.palm, null, [0.22, 0.24, 0.24]);
+  tRoot.rotation.order = 'ZXY';
+  const t1 = new THREE.Group(), t2 = new THREE.Group(); tRoot.add(t1); t1.add(t2); t2.position.y = 0.19;
+  add(rollGeo(0.23, 0.1, 0.095), M.blue, null, null, t1);
+  add(rollGeo(0.19, 0.092, 0.088), M.blue, null, null, t2);
+  // the gauntlet: a cuff flaring up the forearm, a rolled lip in orange, an
+  // orange band; closed inside the arm, so no fur shows through
+  const prof = [[0.05, -0.48], [0.28, -0.5], [0.4, -0.5], [0.43, -0.47], [0.415, -0.36], [0.385, -0.2], [0.35, -0.06], [0.33, 0.06], [0.15, 0.1]]
+    .map(([r, y]) => new THREE.Vector2(r, y));
+  add(new THREE.LatheGeometry(new THREE.SplineCurve(prof).getPoints(24), 36), M.blue);
+  ring(0.415, 0.045, [0, -0.47, 0], M.orange);
+  ring(0.4, 0.026, [0, -0.33, 0], M.orange);
   g.scale.set(1, 1, 0.9);
-  return { group: g, thumbs };
+
+  /* the fingers and thumb closed by `curl` (0 open … 1 a fist), the thumb
+     on the `side` (1: +x) */
+  const pose = (curl, side) => {
+    const c = Math.max(0, Math.min(1, curl));
+    for (const F of fingers) {
+      F.root.position.x = F.x * side;
+      F.root.rotation.z = -F.x * side * 0.22 * (1 - c);   // a little splay when open
+      F.joints.forEach((j, i) => { j.rotation.x = -(OPEN[i] + (FIST[i] - OPEN[i]) * c); });
+    }
+    thenar.position.set(0.16 * side, 0.33, -0.18);
+    tRoot.position.set(0.33 * side, 0.21, -0.2);
+    tRoot.rotation.z = side * (0.3 + 0.75 * c);
+    tRoot.rotation.x = -(0.45 + 0.5 * c);
+    t2.rotation.z = side * 0.6 * c;
+    t2.rotation.x = -0.3 * c;
+  };
+  pose(0.25, 1);
+  return { group: g, pose };
 }
-const HY = 1.7;   // the length scale × this ≈ the width scale at rest (true proportions)
+const HY = 1.7;
+const GRIP = { attack: 1, throw: 1, win: 1, guard: 0.75, blockstun: 0.75, crouch: 0.5, hitstun: 0.08, grabbed: 0.08, down: 0.05, ko: 0.05, lose: 0.1, getup: 0.3 };
+const smooth01 = (x) => { const t = Math.max(0, Math.min(1, x)); return t * t * (3 - 2 * t); };   // the length scale × this ≈ the width scale at rest (true proportions)
 
 export class Gloves {
   constructor(group, soft, rig, color, { tape = false, hockey = null } = {}) {
@@ -224,7 +278,8 @@ export class Gloves {
       if (this.hk) {
         const H = makeHockeyGlove(this.hk);
         A.glove = new THREE.Group(); A.glove.add(H.group);
-        A.mirror = (side) => { H.thumbs[0].visible = side > 0; H.thumbs[1].visible = side < 0; };
+        A.curl = 0.25;
+        A.mirror = (side) => H.pose(A.curl, side);
       } else {
         A.glove = makeGlove(this.mat, this.lace);
         const thumb = A.glove.children[1];
@@ -250,7 +305,7 @@ export class Gloves {
   /* fx (the feel pass, Kevalanche): per arm [R, L] a roll about the
      forearm (0 thumb up … 1 palm down) and a squash spring (contact); the
      glove's pointing lags its forearm on a soft spring (follow-through) */
-  update(dt = 0, fx = null) {
+  update(dt = 0, fx = null, act = '') {
     const W = this._w, T = this._t, X = this._x, Z = this._z;
     for (const A of this.arms) {
       const G = fx ? fx[A.inward === 1 ? 0 : 1] : null;   // (inward 1: his right arm)
@@ -274,7 +329,15 @@ export class Gloves {
       X.crossVectors(T, Z);
       // the thumb on the side toward the body's middle: mirrored per arm
       const side = X.x * A.inward >= 0 ? 1 : -1;
-      if (A.side !== side) { A.side = side; A.mirror(side); }
+      if (this.hk) {
+        // the hockey glove's hand, by what he's doing (the sim's act, read
+        // only): slightly open at rest, a fist to punch or grab, tight in
+        // the guard, loose when hit; closing as the wrist corkscrews too.
+        // fx may carry `grip` (0 open … 1 fist) to set it outright
+        const want = G?.grip ?? Math.max(GRIP[act] ?? 0.22, G ? smooth01((Math.abs(G.roll) - 0.12) / 0.5) : 0);
+        const c = A.curl + (want - A.curl) * Math.min(1, dt > 0 ? dt * 30 : 1);
+        if (Math.abs(c - A.curl) > 1e-3 || A.side !== side) { A.curl = c; A.side = side; A.mirror(side); }
+      } else if (A.side !== side) { A.side = side; A.mirror(side); }
       let L = reach + A.r * 1.3;            // over the end of the paw
       let k = (A.r * 1.9) / 0.45;           // knuckles ~1.4× the old glove's width
       if (G) {

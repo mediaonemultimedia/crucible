@@ -34,11 +34,11 @@ node tools/versus-shots.mjs      # versus on one keyboard, names, the leaderboar
 node tools/keys-shots.mjs         # the keyboard legend → shots/keys/
 node tools/twins-shots.mjs [--lineup] # the evil twins, roster line-ups → shots/twins/
 node tools/goon-shots.mjs [scene …]  # the hockey goon's evidence → shots/goon/
-node tools/goon-probe.mjs            # the goon's mullet in a CPU match: no clipping, no NaN
 node tools/audio-prep.mjs            # the SFX drafts → trimmed, normalised clips (src/assets/sfx)
 node tools/audio-check.mjs           # sound in the real page: gesture, mute, the match's SFX, pause, practice
 node tools/audio-render.mjs          # offline captures → shots/audio/*.mp3, with peak / gap / seam checks
 node tools/audio-fps.mjs             # the sound's CPU share per frame, the music scheduler's cost
+node tools/fixes-shots.mjs           # the select grid OG / ALT, every card portrait → shots/fixes/
 ```
 
 Headless tools use `CHROMIUM` (default `/opt/pw-browsers/chromium`) as the browser.
@@ -50,6 +50,60 @@ players on one keyboard; `screen=board` the leaderboard; `screen=names` the name
 to the computer too; `seed=N` fixes the match seed; `toques=1`; `webgl` forces
 the WebGL 2 path; `hold` stops the free-running loop for scripted stepping;
 `boxes` draws the sim's hurt, limb, hit and shot boxes over the picture).
+
+## Fixes: card portraits, the goon's head and gloves (bolster-fixes)
+
+- **The wrong portrait on a card** (Zach Sparrow's card showing Sumaura's
+  face). Root cause: the seven card portraits are rendered at start-up, one
+  fighter at a time at x = 0 in the stage's scene, a GPU readback awaited
+  between each — and the title answers clicks the whole time. A player who
+  went straight on to character select got the select mat's plush built
+  into that same scene, unposed (the animation loop hadn't started), at
+  x = 0: inside every portrait rendered after that. Zach, small and last,
+  came out as whoever stood on the mat (a big panda in front of him). Then
+  start-up sent the player back to the title, and the next select screen
+  showed the spoiled portraits. Fixed at both ends: each portrait is taken
+  with everything but the arena and its own fighter hidden
+  (`render/showcase.js`, `Stage.base`), and the fighter is gone before the
+  readback wait; start-up no longer yanks a player who has moved on back to
+  the title, and cards already on screen get their portraits when they
+  arrive (`_cardPortrait`, by the card's own id).
+- **Twins' card portraits:** a card switched to ALT now shows the evil
+  twin, not the OG. Each twin is framed off the select mat the first time it
+  has stood there ~0.45 s (`snapSlot`, copied off the page's canvas in the
+  same task: no readback, no extra plush to build), kept for the session,
+  and used by the VS card too. Until then the card shows the OG.
+- `test/portraits.test.mjs` (headless Chromium, on `final.html`; skipped
+  without it): page A takes the portraits untouched; page B races to select
+  with Sumaura on the mat; each of B's portraits must match A's for its own
+  fighter (and be nearer it than any other). Then Vs Computer (every card
+  OG → ALT → OG → ALT), the computer's seat, Practice and Versus (both
+  seats), the mirror flip and back from a match: every card's picture is
+  its own fighter's, in the variant it shows. No console errors.
+- **Kevalanche ALT, no mullet:** the locks, their springs and their shader
+  are gone (`Mullet`, `lockMat`, `tools/goon-probe.mjs`), and so is the
+  haircut in the pile (the cropped top and sides, the long nape): his head
+  is his OG's shape and short fur, in the black bear's near-black with the
+  tan muzzle. The black eye and the felt tooth stay.
+- **Kevalanche ALT, hockey gloves rebuilt** (`makeHockeyGlove` in
+  `render/gloves.js`): four separate fingers, each three padded rolls
+  (sausages with a crease between, the little finger smaller) on little
+  joints, and a separate two-roll thumb that wraps round the front of the
+  fist; a thick padded back with a flex roll at the wrist; a long flared
+  gauntlet cuff with a rolled orange lip and an orange band; an orange
+  piping on the knuckle line; a tan-grey palm and thumb pad. Royal blue,
+  colours only. The hand closes by what he's doing (the sim's `act`, read
+  only): slightly open at rest, a fist to punch or throw, tight in the
+  guard, loose when hit; the wrist's corkscrew closes it too, and the feel
+  pass's fx may set `grip` (0…1) outright (for new grabs). Same frame as
+  before (the lag, the corkscrew, the contact squash), the fist the same
+  size and reach. OG Kevalanche and every other fighter are untouched;
+  render only (the golden hashes still match).
+- Evidence: `shots/fixes/` (`select-og`, `select-alt`, `select-versus`,
+  `select-practice`, `cards`), `shots/fixes/goon/{before,after}/` (`node
+  tools/goon-shots.mjs`; the new `glove-views` and `heavy-close`, `block`
+  scenes: the glove front, side and three-quarter, a heavy hook's strike,
+  the guard).
 
 ## Sound and music (bolster-audio)
 
@@ -126,6 +180,9 @@ listening, for any input sequence). Everything is in `src/audio/`.
   `shots/audio/*.png`; `tools/audio-fps.mjs`.
 
 ## The hockey goon, refined (bolster-goon)
+
+(The mullet and the first hockey gloves below were replaced in
+bolster-fixes, above.)
 
 Kevalanche's ALT only (his OG, every other fighter and the feel pass's
 animation are untouched). Render only: no sim, frame data, hit box, netcode
@@ -379,7 +436,7 @@ pattern and stitching in the atlases); the few worn things are felt,
 leather or metal riding the soft body's points each frame.
 
 - **Kevalanche, hockey goon:** (refined in bolster-goon, above) a black
-  bear with a tan muzzle; a hockey mullet of plush locks; a bruised black
+  bear with a tan muzzle (no mullet since bolster-fixes); a bruised black
   eye; plush hockey gloves in royal blue and orange; one felt front tooth
   with a gap. The Sith cowl, cloak and patch are gone.
 - **Rubberta, anglerfish:** abyss-black flock, glowing photophores (a `glow`
