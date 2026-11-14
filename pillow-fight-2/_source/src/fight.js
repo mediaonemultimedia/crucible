@@ -45,6 +45,7 @@ export class Fight {
       p.toque.visible = false;
       return p;
     });
+    this.tall = Math.max(...[p1, p2].map((id) => (id === 'k8e' ? 5.2 : FIGHTERS[id].hurt.stand.h / 1000)));
     this.acc = 0;
     this.paused = false;
     this.prev = this.st.f.map((f) => ({ x: f.x, y: f.y, z: f.z }));
@@ -196,7 +197,7 @@ export class Fight {
     }
     this.focus = focus || this.winFocus || null;
     const extra = this.arena.projectiles(st.proj, a, this.prevProj);
-    this.arena.frame(P[0], P[1], dt || 0.016, innerWidth / innerHeight, this.focus);
+    this.arena.frame(P[0], P[1], dt || 0.016, innerWidth / innerHeight, this.focus, this.tall);
     this.arena.paintShadows(this.plush, extra);
     this.arena.update(dt * slow);
   }

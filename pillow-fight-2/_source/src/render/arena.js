@@ -577,15 +577,17 @@ export class Arena {
      circle (eased, never snapping), pulls back as they part, rises for a
      hop. `focus`: { x, y, z, d, low, az? } — the K.O. and ring-out shots
      (lower, closer, slower); `push` (0…1): a super move's push-in.       */
-  frame(A, B, dt, aspect, focus = null) {
+  frame(A, B, dt, aspect, focus = null, tall = 3) {
     const C = this.cam;
     const mx = (A[0] + B[0]) / 2, mz = (A[2] + B[2]) / 2;
     const lx = B[0] - A[0], lz = B[2] - A[2];
     const sep = Math.hypot(lx, lz);
     let az = sep > 0.05 ? Math.atan2(-lz, lx) : C.az;
     const narrow = aspect < 1.2;
-    let want = Math.max(narrow ? 17 : 11.5, Math.min(narrow ? 30 : 22, 8.6 + sep * (narrow ? 1.6 : 1.12)));
-    let tx = mx, tz = mz, ty = 1.7 + Math.max(0, Math.max(A[1], B[1]) - 0.8) * 0.5, h = 3.4;
+    // (tall: the taller fighter's height — K8-E's neck needs the room)
+    const ex = Math.max(0, tall - 3.2);
+    let want = Math.max(narrow ? 17 : 12.5, Math.min(narrow ? 30 : 22, 9.4 + sep * (narrow ? 1.6 : 1.12))) + ex * 2.2;
+    let tx = mx, tz = mz, ty = 1.8 + ex * 0.45 + Math.max(0, Math.max(A[1], B[1]) - 0.8) * 0.5, h = 3.2;
     let k = Math.min(1, dt * 4), ka = Math.min(1, dt * 2.6);
     if (focus) {
       tx = focus.x; tz = focus.z; ty = focus.y; want = focus.d; h = focus.h ?? 1.6;
