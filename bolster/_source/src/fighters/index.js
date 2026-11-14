@@ -12,6 +12,7 @@
    hit's `from`; recovery is what's left after the last hit's `to`.        */
 
 export const MAX_METER = 1000;
+export const TOSS = 28;               // a throw's hold: the toss (and the hit) on this tick
 
 const hit = (from, to, box, dmg, o = {}) => ({
   from, to, box, dmg, level: 'mid', hitstun: 16, blockstun: 11, push: 34, bpush: 0, kd: 0, chip: 0, pause: 8, ...o,
@@ -54,8 +55,10 @@ function normals({ tDmg = 100, lReach, hReach, cReach, lDmg = 40, hDmg = 85, cDm
     diveLand: move({ total: 30, impact: 10, hits: [hit(0, 2, { x: -1100, y: 0, w: 2200 + 400, h: 700 }, 45, { level: 'high', hitstun: 18, blockstun: 12, push: 44, pause: 9 })] }),
     // the throw: a grab inside `near` of touching, a hold (the victim can
     // tech it), the toss — knockdown, unblockable, no combo after it
+    // (the throws pass: the toss a little later — the animations need it —
+    // the same 20 ticks of recovery after it; it goes to the roomier side)
     throw: move({ kind: 'throw', total: 30, grab: { from: 4, to: 6, near: 520, hold: 'throwHold', throw: 1 } }),
-    throwHold: move({ kind: 'throw', total: 44, hits: [hit(24, 24, null, tDmg, { auto: 1, level: 'unblockable', kd: 1, toss: 1, push: 0, pause: 10 })] }),
+    throwHold: move({ kind: 'throw', total: TOSS + 20, hits: [hit(TOSS, TOSS, null, tDmg, { auto: 1, level: 'unblockable', kd: 1, toss: 1, push: 0, pause: 10 })] }),
   };
 }
 
@@ -86,7 +89,7 @@ export const FIGHTERS = {
           .concat([hit(48, 52, { x: 200, y: 1300, w: 1500, h: 1600 }, 95, { kd: 1, push: 70, pause: 16, chip: 12 })]),
       }),
     },
-    signatureName: 'Glacier Uppercut', specialName: 'Avalanche Rush', diveName: 'Double-Fist Hammer', throwName: 'Clinch & Shove',
+    signatureName: 'Glacier Uppercut', specialName: 'Avalanche Rush', diveName: 'Double-Fist Hammer', throwName: 'Jersey Pull', throwBackName: 'Bear-Hug Suplex',
     catchphrase: { main: 'Knocked out cold.', egg: 'You just lost to a pillow.' },
     impatient: 'Not yet, bud.',
   },
@@ -112,7 +115,7 @@ export const FIGHTERS = {
           .concat([hit(64, 64, null, 90, { auto: 1, level: 'unblockable', kd: 1, push: 80, pause: 16 })]),
       }),
     },
-    signatureName: 'Tentacle Sweep', specialName: 'Abraço', diveName: 'Tentacle Splat', throwName: 'Wrap & Fling',
+    signatureName: 'Tentacle Sweep', specialName: 'Abraço', diveName: 'Tentacle Splat', throwName: 'Wrap & Fling', throwBackName: 'Spin Cycle',
     catchphrase: { main: 'Eight arms, zero chances.', egg: 'Tentacle-ly speaking… you lost.' },
     impatient: 'Calma!',
   },
@@ -133,7 +136,7 @@ export const FIGHTERS = {
         spawn: [10, 19, 28, 37, 46].map((at, k) => ({ at, proj: { kind: 'ball', dx: 900, y: 1500 + (k % 2) * 900, vx: 160, vy: 0, box: { w: 420, h: 420 }, dmg: 52, level: 'mid', life: 130, hitstun: 22, blockstun: 12, push: 20, chip: 4, kd: k === 4 ? 1 : 0, special: 1 } })),
       }),
     },
-    signatureName: 'Serve', specialName: 'Match Point', diveName: 'Overhead Smash', throwName: 'Racquet Hook',
+    signatureName: 'Serve', specialName: 'Match Point', diveName: 'Overhead Smash', throwName: 'Racquet Serve', throwBackName: 'Backhand',
     catchphrase: { main: 'Game, set, match… sorry \'bout that.', egg: 'My mom has a better backhand, and she\'s a house cat.' },
     impatient: 'Nog niet!',
   },
@@ -157,7 +160,7 @@ export const FIGHTERS = {
           .concat([hit(58, 76, { x: -400, y: -600, w: 1700, h: 1500 }, 125, { level: 'high', kd: 1, push: 60, pause: 18, chip: 14, landing: 1 })]),
       }),
     },
-    signatureName: 'Bamboo Headbutt', specialName: 'Hundred Paw Slap → Royal Squash', diveName: 'Belly-Flop', throwName: 'Push-Out',
+    signatureName: 'Bamboo Headbutt', specialName: 'Hundred Paw Slap → Royal Squash', diveName: 'Belly-Flop', throwName: 'Belly Bump', throwBackName: 'Uwatenage',
     catchphrase: { main: 'Right. That\'s you squashed.', egg: 'Blimey, you look absolutely cream crackered.' },
     impatient: 'Patience, love.',
   },
@@ -178,7 +181,7 @@ export const FIGHTERS = {
         hits: [hit(30, 40, { abs: 1, x: -800, y: 0, w: 1600, h: 4200 }, 230, { level: 'high', kd: 1, hitstun: 30, blockstun: 20, push: 40, pause: 18, chip: 24 })],
       }),
     },
-    signatureName: 'Ring Toss', specialName: 'Sky Neck', diveName: 'Neck Chop', throwName: 'Neck Swing',
+    signatureName: 'Ring Toss', specialName: 'Sky Neck', diveName: 'Neck Chop', throwName: 'Scruff Flick', throwBackName: 'Catapult',
     catchphrase: { main: 'Heads up next time, eh.', egg: 'I can see your house from up here. It\'s sad, eh.' },
     impatient: 'Not yet, bud.',
   },
@@ -208,7 +211,7 @@ export const FIGHTERS = {
         spawn: [{ at: 20, proj: { kind: 'howl', dx: 700, y: 500, vx: 150, vy: 0, box: { w: 900, h: 1000 }, dmg: 165, level: 'low', life: 120, hitstun: 30, blockstun: 16, push: 50, chip: 14, kd: 1, special: 1, pause: 14 } }],
       }),
     },
-    signatureName: 'Lobo Slide', specialName: 'Aullido de la Luna', diveName: 'Moonsault', throwName: 'Huracanrana',
+    signatureName: 'Lobo Slide', specialName: 'Aullido de la Luna', diveName: 'Moonsault', throwName: 'Huracanrana', throwBackName: 'German Suplex',
     catchphrase: { main: 'Rápido next time, bitch!', egg: 'Who\'s the perra now, huh?' },
     impatient: 'Espérate! Not yet!',
   },
@@ -236,7 +239,7 @@ export const FIGHTERS = {
         spawn: [600, 1700, 2500, 1100, 2100, 800, 1500].map((y, k) => ({ at: 10 + k * 4, proj: { kind: 'crow', dx: -1200, y, vx: 210, vy: 0, box: { w: 700, h: 600 }, dmg: 34, level: 'mid', life: 140, hitstun: 22, blockstun: 10, push: 14, chip: 4, kd: k === 6 ? 1 : 0, special: 1, pause: 6 } })),
       }),
     },
-    signatureName: 'Bottle Cap Flick', specialName: 'Murder Most Fowl', diveName: 'Dive Bomb', throwName: 'Peck & Toss',
+    signatureName: 'Bottle Cap Flick', specialName: 'Murder Most Fowl', diveName: 'Dive Bomb', throwName: 'Peck & Toss', throwBackName: 'Judo Roll',
     catchphrase: { main: 'Finders keepers, loser.', egg: 'Arre yaar, my mother-in-law hits harder than you.' },
     impatient: 'Not yet, bud.',
   },

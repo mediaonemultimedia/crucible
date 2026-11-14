@@ -32,13 +32,14 @@ import { TAP } from '../sim/sim.js';
    how often it jumps a shot coming at it; dash: how often an approach is
    a dash; combo: how often it chains on contact (`confirm`: only on a hit);
    tech / techT: chance and reaction (ticks) to escape a throw; throwP:
-   how often it throws someone guarding up close; bpunish: how often it
+   how often it throws someone guarding up close; throwNear: how often
+   it throws anyone it is crowding (the throws pass); bpunish: how often it
    hits back after blocking an unsafe move; read: how much it adapts to an
    opponent who never stops swinging (guards more, so it can punish) */
 export const LEVELS = {
-  easy:   { read: 0.2, combo: 0.12, confirm: 0, tech: 0.1, techT: 9, throwP: 0.05, bpunish: 0.1, dive: 0.05, delay: 24, think: 12, block: 0.12, guess: 0.5, aa: 0.08, punish: 0.05, special: 0.25, aggro: 0.3, jump: 0.04, whiffy: 0.45, shotCd: 320, shotP: 0.15, zone: 0.25, approach: 0.5, leap: 0.15, dash: 0.25 },
-  normal: { read: 1, combo: 0.85, confirm: 0, tech: 0.4, techT: 6, throwP: 0.25, bpunish: 0.6, dive: 0.1, delay: 14, think: 6,  block: 0.5,  guess: 0.75, aa: 0.4, punish: 0.35, special: 0.6, aggro: 0.5, jump: 0.06, whiffy: 0.2, shotCd: 180, shotP: 0.3, zone: 0.4, approach: 0.7, leap: 0.4, dash: 0.45 },
-  hard:   { read: 1.2, combo: 0.9, confirm: 1, tech: 0.75, techT: 3, throwP: 0.4, bpunish: 0.9, dive: 0.3, delay: 7,  think: 3,  block: 0.88, guess: 0.95, aa: 0.8, punish: 0.85, special: 0.95, aggro: 0.6, jump: 0.05, whiffy: 0.04, shotCd: 140, shotP: 0.4, zone: 0.6, approach: 0.8, leap: 0.75, dash: 0.6, space: 0.7 },
+  easy:   { read: 0.2, combo: 0.12, confirm: 0, tech: 0.1, techT: 9, throwP: 0.05, throwNear: 0.12, bpunish: 0.1, dive: 0.05, delay: 24, think: 12, block: 0.12, guess: 0.5, aa: 0.08, punish: 0.05, special: 0.25, aggro: 0.3, jump: 0.04, whiffy: 0.45, shotCd: 320, shotP: 0.15, zone: 0.25, approach: 0.5, leap: 0.15, dash: 0.25 },
+  normal: { read: 1, combo: 0.85, confirm: 0, tech: 0.4, techT: 6, throwP: 0.25, throwNear: 0.16, bpunish: 0.6, dive: 0.1, delay: 14, think: 6,  block: 0.5,  guess: 0.75, aa: 0.4, punish: 0.35, special: 0.6, aggro: 0.5, jump: 0.06, whiffy: 0.2, shotCd: 180, shotP: 0.3, zone: 0.4, approach: 0.7, leap: 0.4, dash: 0.45 },
+  hard:   { read: 1.2, combo: 0.9, confirm: 1, tech: 0.75, techT: 3, throwP: 0.4, throwNear: 0.2, bpunish: 0.9, dive: 0.3, delay: 7,  think: 3,  block: 0.88, guess: 0.95, aa: 0.8, punish: 0.85, special: 0.95, aggro: 0.6, jump: 0.05, whiffy: 0.04, shotCd: 140, shotP: 0.4, zone: 0.6, approach: 0.8, leap: 0.75, dash: 0.6, space: 0.7 },
 };
 
 const reach = (m) => reachOf(m);
@@ -255,6 +256,8 @@ export class CPU {
         hold = this.guard(o);
       } else if (dist <= throwR && !o.air && (o.act === 'guard' || o.act === 'idle' || o.act === 'crouch') && this.chance(this.L.throwP)) {
         press = LIGHT | HEAVY;                               // they're turtling: throw them
+      } else if (dist <= throwR && !o.air && o.act !== 'attack' && o.act !== 'down' && o.act !== 'getup' && this.chance(this.L.throwNear)) {
+        press = LIGHT | HEAVY;                               // crowding it: a throw (to the open side) buys room
       } else if (dist <= poke && this.chance(this.L.aggro + 0.2)) {
         // against someone swinging all the time, up close: the quick light
         // (it beats a heavy's wind-up — a counter-hit), not a heavy of its own

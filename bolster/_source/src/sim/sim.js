@@ -40,6 +40,14 @@ export const HANG_V = 70;            // |vy| under this at the top of a jump: th
 export const DIVE_HANG = 6;          // a dive slam: hangs this long, then drops
 export const THROW_GAP = 2;          // O and P count as together this many ticks apart
 export const TECH = 12;              // a throw can be escaped (O+P) this many ticks into the hold
+// the throw's toss (the throws pass): the victim leaves the thrower's hands
+// THROW_OUT units out on the side he's thrown to, THROW_UP up, flies, bounces
+// once (soft) and is down
+export const THROW_OUT = 1300;
+export const THROW_UP = 900;
+export const THROW_VX = 104;
+export const THROW_VY = 150;
+export const THROW_BOUNCE = 72;
 export const CANCEL = 9;             // a chain/cancel is taken up to this many ticks after the last active frame
 export const LOCK = 26;              // a third light in a string: no more lights for this long
 export const STRING = 20;            // lights this close together count as one string
@@ -68,6 +76,9 @@ function newFighter(id, side) {
     jmp: 0, jd: 0, dl: 0,
     blk: 0, lt: -99, ht: -99, ok: 0, ch: 0, lc: 0, lk: 0, it: 99, rep: 0, lmv: '', rt: -999,
     kx: 0, ky: 0, kvx: 0, kvy: 0, kb: 0, kr: 0, kdir: 0,
+    // a throw: the side of the stage it goes to (±1, 0 none; on the thrower),
+    // and a soft bounce still to come (on the one thrown)
+    td: 0, bn: 0,
   };
 }
 
@@ -179,7 +190,7 @@ const GROUND_FREE = { idle: 1, walkF: 1, walkB: 1, crouch: 1, guard: 1 };
 function startMove(st, k, name, chain = 0) {
   const f = st.f[k];
   f.ch = chain ? f.ch + 1 : 0;
-  f.act = 'attack'; f.mv = name; f.t = 0; f.hm = 0; f.stop = 0; f.ok = 0;
+  f.act = 'attack'; f.mv = name; f.t = 0; f.hm = 0; f.stop = 0; f.ok = 0; f.td = 0;
   f.bl = f.bh = 0;
   const m = FIGHTERS[f.id].moves[name];
   if (m.lite) {
@@ -331,17 +342,29 @@ function attackTick(st, k, f, o, D) {
     if (m.grab.throw && o.act === 'attack' && o.mv === 'throw' && o.t >= m.grab.from && grabbable(o, f, m.grab)) return tech(st, k);
     f.mv = m.grab.hold; f.t = 0; f.hm = 0;
     o.act = 'grabbed'; o.t = 0; o.vx = 0; o.pv = 0; o.stun = 0; o.combo = 0;
-    st.ev.push({ k: 'grab', p: k, throw: m.grab.throw ? 1 : 0 });
+    // a throw goes to the side of the stage with more room (forward if it's
+    // in front of him, over the shoulder if it's behind; a tie: forward)
+    f.td = m.grab.throw ? throwDir(f, o) : 0;
+    st.ev.push({ k: 'grab', p: k, throw: m.grab.throw ? 1 : 0, back: f.td && f.td !== f.face ? 1 : 0 });
     return;
   }
   if ((f.mv === 'specialHold' || f.mv === 'throwHold') && o.act === 'grabbed') {
     // the victim is drawn in and held in front of the arms
-    const want = f.x + f.face * (f.mv === 'throwHold' ? 1300 : 1500);
+    const want = clampX(f.x + f.face * (f.mv === 'throwHold' ? THROW_OUT : 1500));
     o.x += tdiv(want - o.x, 4);
   }
   if (t >= m.total + (f.hm ? 0 : m.whiffLag)) {
     f.act = f.air ? 'jump' : 'idle'; f.t = 0; f.mv = ''; f.aired = f.air ? 1 : 0;
   }
+}
+
+const clampX = (x) => Math.max(-STAGE, Math.min(STAGE, x));
+
+/* which way a throw goes: toward the wall further from the throw point
+   (the middle of the two of them); dead centre, the way he faces */
+export function throwDir(f, o) {
+  const mid = (f.x + o.x) >> 1;
+  return mid < 0 ? 1 : mid > 0 ? -1 : f.face;
 }
 
 function grabbable(f, o, g) {
@@ -403,6 +426,10 @@ function land(st, k, f) {
       f.mv = 'diveLand'; f.t = 0; f.hm = f.hm ? 1 : 0;
     } else if (m.air) { f.act = 'idle'; f.t = 0; f.mv = ''; }
     f.vx = 0;
+  } else if (f.act === 'down' && f.bn) {
+    // thrown: one soft bounce off the mat, then down
+    f.bn = 0; f.air = 1; f.vy = THROW_BOUNCE; f.vx = tdiv(f.vx, 2);
+    st.ev.push({ k: 'bounce', p: k, x: f.x });
   } else if (f.act === 'down') { f.stun = DOWN_T; f.vx = 0; }
   else if (f.act === 'ko') f.vx = 0;
   else f.vx = 0;
@@ -554,6 +581,7 @@ function startupOf(f) {
    o: { special, at, kind, fin (a combo's finisher), mv, lite } */
 function land_hit(st, a, h, dir, o) {
   const att = st.f[a], d = st.f[1 - a], { special, at, kind } = o;
+  if (h.toss && att.td) dir = att.td;           // a throw goes where it was aimed
   const corner = Math.abs(d.x) > STAGE - 700 && sgn(d.x) === dir;
   if (canBlock(d, h.level)) {
     d.act = 'blockstun'; d.stun = h.blockstun; d.t = 0; d.vx = 0;
@@ -596,7 +624,14 @@ function land_hit(st, a, h, dir, o) {
   d.meter = Math.min(MAX_METER, d.meter + tdiv(dmg * 35, 100));
   st.pause = Math.max(st.pause, h.pause + (amp ? 4 : 0) + (ctr ? 2 : 0));
   st.ev.push({ k: 'hit', p: a, x: at[0], y: at[1], dmg, kind, sp: special ? 1 : 0, kd: h.kd || amp ? 1 : 0, n: d.combo, amp, ctr, thr: h.toss ? 1 : 0 });
+  if (h.toss && att.td && d.act === 'grabbed') {
+    // a throw: let go of out on the side it goes to (behind him on an
+    // over-the-shoulder throw: the two swap sides), up off the floor, then
+    // a long flight and a soft bounce — space for the thrower
+    d.x = clampX(att.x + att.td * THROW_OUT); d.y = THROW_UP;
+  }
   if (d.hp === 0) {
+    d.bn = 0;
     d.act = 'ko'; d.t = 0; d.air = 1; d.vy = 0; d.vx = 0; d.pv = 0; d.kdir = dir;
     if (!st.ko) st.ko = special ? 'special' : 'normal';
     return 'hit';
@@ -606,6 +641,7 @@ function land_hit(st, a, h, dir, o) {
     // a throw's toss and an amplified finisher send him further
     const big = h.toss || amp;
     d.act = 'down'; d.t = 0; d.air = 1; d.vy = big ? 165 : 140; d.vx = (big ? 78 : 48) * dir; d.stun = 0; d.pv = 0;
+    if (h.toss && att.td) { d.vy = THROW_VY; d.vx = THROW_VX * dir; d.bn = 1; }
   } else {
     d.act = 'hitstun'; d.stun = h.hitstun + (ctr ? 8 : 0); d.t = 0; d.vx = 0; d.pv = h.push * dir;
     // the attacker drifts back a little too (all of it in the corner)

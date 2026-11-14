@@ -28,24 +28,27 @@ function play(p1, p2, seed, ticks, { random = false, onTick = null } = {}) {
   return hash(st);
 }
 
-/* recorded with the sim as it was before the feel pass (bolster-source @ 2b8c479) */
+/* recorded with the sim as it was before the feel pass (bolster-source @ 2b8c479);
+   re-recorded deliberately by the throws pass (bolster-throws), which changes
+   the sim: the toss at tick 28, the throw to the open side, the flight, the
+   bounce, two new fighter fields (td, bn) and the CPU's close-range throws */
 const GOLDEN = {
-  'kevalanche:kevalanche:11:cpu': 686157200,
-  'kevalanche:kevalanche:12:rnd': 1525362313,
-  'kevalanche:rubberta:11:cpu': 2044242159,
-  'kevalanche:rubberta:12:rnd': 2046609616,
-  'kevalanche:johnny:11:cpu': 1675428574,
-  'kevalanche:johnny:12:rnd': 3232020266,
-  'kevalanche:sumaura:11:cpu': 3202807706,
-  'kevalanche:sumaura:12:rnd': 1508415709,
-  'kevalanche:k8e:11:cpu': 1175875927,
-  'kevalanche:k8e:12:rnd': 1694887189,
-  'kevalanche:sebas:11:cpu': 442970070,
-  'kevalanche:sebas:12:rnd': 1064779989,
-  'kevalanche:zach:11:cpu': 3760462518,
-  'kevalanche:zach:12:rnd': 1272041948,
-  'johnny:kevalanche:13:cpu': 3768130729,
-  'sumaura:zach:14:rnd': 3195573986,
+  'kevalanche:kevalanche:11:cpu': 3043854604,
+  'kevalanche:kevalanche:12:rnd': 3209649137,
+  'kevalanche:rubberta:11:cpu': 1318034153,
+  'kevalanche:rubberta:12:rnd': 209646376,
+  'kevalanche:johnny:11:cpu': 703345262,
+  'kevalanche:johnny:12:rnd': 1471645978,
+  'kevalanche:sumaura:11:cpu': 1169322864,
+  'kevalanche:sumaura:12:rnd': 4179146869,
+  'kevalanche:k8e:11:cpu': 2338436664,
+  'kevalanche:k8e:12:rnd': 523721933,
+  'kevalanche:sebas:11:cpu': 1412553893,
+  'kevalanche:sebas:12:rnd': 1395170341,
+  'kevalanche:zach:11:cpu': 3415544539,
+  'kevalanche:zach:12:rnd': 2849453428,
+  'johnny:kevalanche:13:cpu': 2587881209,
+  'sumaura:zach:14:rnd': 4263736923,
 };
 
 test('the sim hash for every input sequence is the same as before the feel pass', () => {
