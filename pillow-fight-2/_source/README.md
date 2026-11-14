@@ -22,7 +22,7 @@ node tools/peek.mjs out.png '?hold&webgl' '__pf2.step(30)'   # one headless scre
 STAGE 1 of 2, in progress. Milestones (pushed after each):
 
 1. [x] Arena + camera: the mattress ring, the bedroom set, the orbiting camera, two fighters.
-2. [ ] 3D movement + ring-outs, deterministic tests.
+2. [x] 3D movement + ring-outs, deterministic tests (`test/sim.test.mjs`, 17 tests).
 3. [ ] Combat core in 3D.
 4. [ ] All 7 fighters.
 5. [ ] CPU, modes, HUD, select, audio, title.

@@ -70,7 +70,7 @@ export const SLOW = 25;
 export const KO_AFTER = 90;
 
 const sgn = (v) => (v > 0 ? 1 : v < 0 ? -1 : 0);
-const tdiv = (a, b) => Math.trunc(a / b);
+const tdiv = (a, b) => Math.trunc(a / b) + 0;   // (+ 0: never a −0 in the state)
 export const isqrt = (n) => (n <= 0 ? 0 : Math.floor(Math.sqrt(n)));
 const clampI = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -467,9 +467,10 @@ function move(st, k) {
   // circling and sidestepping keep the distance: back onto the circle
   if ((f.act === 'side' || f.act === 'circle') && !f.air) {
     const o = st.f[1 - k], r = f.sr;
-    if (r > 0) {
-      const [ux, uz] = unit(f.x - o.x, f.z - o.z, -f.fx, -f.fz);
-      f.x = o.x + tdiv(ux * r, ONE); f.z = o.z + tdiv(uz * r, ONE);
+    const dx = f.x - o.x, dz = f.z - o.z, l = Math.round(Math.sqrt(dx * dx + dz * dz));
+    if (r > 0 && l > 8) {
+      // (rounded, not truncated: no slow spiral inward)
+      f.x = o.x + Math.round((dx * r) / l) + 0; f.z = o.z + Math.round((dz * r) / l) + 0;
     }
   }
   edge(f);
