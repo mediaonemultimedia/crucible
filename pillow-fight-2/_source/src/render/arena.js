@@ -602,8 +602,12 @@ export class Arena {
       tx = lerp(tx, C.pushAt[0], 0.45 * C.push); tz = lerp(tz, C.pushAt[2], 0.45 * C.push);
     }
     if (!C.ready) { C.az = az; C.d = want; C.mx = tx; C.mz = tz; C.my = ty; C.h = h; C.ready = true; }
-    // the azimuth: the short way round, eased; as fast as needed when they cross over
-    C.az += angDiff(C.az, az) * ka;
+    // the azimuth: the short way round, eased — lazily for a small turn (a
+    // sidestep reads as a step into the screen before the camera comes
+    // round), briskly for a big one (a cross-over, a long circle)
+    const da = angDiff(C.az, az);
+    if (!focus) ka = Math.min(1, dt * (0.8 + 3.2 * Math.max(0, Math.abs(da) - 0.5)));
+    C.az += da * ka;
     if (want > C.d + 0.8 && !focus) C.d += (want - C.d) * Math.min(1, dt * 10);
     C.d += (want - C.d) * k;
     C.mx += (tx - C.mx) * k; C.mz += (tz - C.mz) * k; C.my += (ty - C.my) * k;
