@@ -17,7 +17,10 @@ npm test                         # node --test test/*.test.mjs  (sim, combat, AI
 npm run build                    # → final.html (self-contained; fails on any network reference)
 node tools/check.mjs             # the release checks in the real page (menus, CPU match, versus, practice, frame cost)
 node tools/shots.mjs [scene …]   # evidence → shots/pf2/ (ring-overview, sidestep, ringout, select, …)
-node tools/peek.mjs out.png '?hold&webgl' '__pf2.step(1)'   # one screenshot
+node tools/peek.mjs out.png '?hold&webgl' '__pf2.step(1)'   # one screenshot (HTML=path to use another build)
+node tools/online-match.mjs [--minutes 3.5] [--lag 30]       # two pages online over the loopback, CPUs, hashes compared
+node tools/throws-shots.mjs                                  # every throw, both directions → shots/throws/
+node tools/build.mjs --out other.html                        # build elsewhere
 ```
 
 Deep links: `final.html?p1=kevalanche&p2=rubberta&cpu=hard` (a fight),
@@ -26,16 +29,51 @@ Deep links: `final.html?p1=kevalanche&p2=rubberta&cpu=hard` (a fight),
 twins), `seed=N`, `hold` (no free-running loop; tools step `__pf2`),
 `webgl` (force WebGL 2), `noportraits` (skip the card portraits).
 
-## Status — stage 1 of 2
+## Status — stage 2 of 2
 
-| # | Milestone | State |
+| # | Stage 2 item | State |
 |---|---|---|
-| 1 | Arena + camera | done |
-| 2 | 3D movement, ring edge, ring-outs, deterministic tests | done |
-| 3 | Combat core in 3D | done |
-| 4 | All 7 fighters ported with movesets | done (data + puppets; see known issues) |
-| 5 | CPU, modes, HUD, select, audio, title | done |
-| 6 | Build + release | see the PR / `pf2-release` |
+| 1 | Stage 1 leftovers (throw placeholder, Online greyed, build gate's STUN check) | done |
+| 2 | Online: PeerJS share link + rollback (PF1's `net/`), shared select, rematch, quiet-opponent wait | done — `test/net.test.mjs` (incl. 4 min CPU loopback over a lossy link), `tools/online-match.mjs` (two pages, 3.5+ min in sync) |
+| 3 | Throws: forward + over-the-shoulder for all 7, auto direction toward the roomier side | done — PF1's throw paths in the thrower's 3D frame (`render/throws.js`), poses, jersey, acrobatics; `tools/throws-shots.mjs` |
+| 4 | Cinematics: ring-out slow-mo + feathers, K.O. cam, super camera cuts, round-1 intro sweep + name cards, win pose to camera | done |
+| 5 | Feel: ledge teeter, fair ring-outs, CPU sidesteps + ring-out play | done (sidestep / tracking numbers kept: see below) |
+| 6 | Practice: frame-data move list (tracking / linear tags), live frame readout, ring-out drill | done |
+
+### Stage 2 additions
+- **Online** (`src/online.js`, `src/net/`): Online → Host a match → a share
+  link (`?room=CODE`, peer id `pillowfight2-CODE`); the friend opens it and
+  both land on the shared select (host = P1 pink, guest = P2 mint). The host
+  sends the seed and both picks; the sim runs in PF1's GGPO-style rollback
+  (2 ticks delay, 8 predicted, hashes swapped every second). `?net=local`
+  is a no-network BroadcastChannel loopback for tests (`&lag=MS`). No
+  request is made until Online is picked or a room link opened.
+- **Throws** (`render/throws.js`, `render/jersey.js`, puppets / feel /
+  plush patches from PF1's throws pass): the sim holds the victim at
+  `throwOut` in front, tosses at `TOSS` (28) from the release point on the
+  chosen side (`throwUp`), one soft bounce. Kevalanche: Jersey Pull /
+  Bear-Hug Suplex. K8-E: Neck Flick / Catapult. Zach: Peck & Toss / Judo
+  Roll. Sumaura: Belly Bump / Overarm Hip Throw. Sebas: Huracanrana /
+  German Suplex. Rubberta: Tentacle Fling / Spin Cycle. Johnny: Racquet
+  Serve / Backhand. The camera holds its line through a throw (an
+  over-the-shoulder throw swaps sides; the camera doesn't swing round).
+- **The ledge** (sim): pushed into the edge by a blow, a block or a
+  knockdown, a fighter **teeters** (`tt`, LEDGE! pop, a rock over the lip)
+  for 50 ticks once free, or until 1.4 units back in. A heavy / spin /
+  knockdown only rings out a teetering fighter — or on a counter-hit, a
+  special or a combo finisher. So the first big blow at the edge is the
+  warning: sidestep or dash off the lip. The CPU does both sides of it.
+- **Cinematics**: the special cuts to a close-up from the front, then a low
+  wide shot from behind the shoulder; round 1 opens with a sweep past each
+  fighter with a name card; the winner turns square to the camera; a
+  ring-out bursts feathers that drift down through its slow motion.
+- **Practice**: the panel lists each move's startup, block advantage and
+  how it travels (**tracking** / **linear** / shot / throw); hitting or
+  blocking the dummy prints the measured frame advantage; **5** starts the
+  ring-out drill (dummy on the back edge, a counter of ring-outs).
+- Sidestep vs tracking: kept as stage 1 tuned it — sidestep 18 ticks
+  (attackable from 12) beats every linear move; the spin (18f, −18 on
+  block) and Rubberta's Tentacle Sweep catch it but lose to a block.
 
 ## Controls
 
@@ -158,7 +196,7 @@ sidesteppers, circles off the edge and goes for ring-out heavies.
   (each player's keys move only their own fighter), practice, per-frame
   JS cost; zero console errors, zero network requests.
 
-## Next (stage 2)
+## Stage 1's next list (most now done above)
 1. **Online** (PF1's PeerJS rollback): copy `bolster/_source/src/net/`
    (`link.js`, `rollback.js`) and `online.js`; the sim is already
    rollback-shaped (`clone`, `hash`, input masks, events after the tick,
