@@ -40,11 +40,12 @@ export const HANG_V = 70;            // |vy| under this at the top of a jump: th
 export const DIVE_HANG = 6;          // a dive slam: hangs this long, then drops
 export const THROW_GAP = 2;          // O and P count as together this many ticks apart
 export const TECH = 12;              // a throw can be escaped (O+P) this many ticks into the hold
-// the throw's toss (the throws pass): the victim leaves the thrower's hands
-// THROW_OUT units out on the side he's thrown to, THROW_UP up, flies, bounces
-// once (soft) and is down
-export const THROW_OUT = 1300;
-export const THROW_UP = 900;
+// the throw's toss (the throws pass): the victim is held, and let go of,
+// just past touching (throwOut: the two push boxes' half-widths + THROW_OUT)
+// on the side he's thrown to, at the thrower's own release height for that
+// throw (FIGHTERS[id].throwUp: [forward, back]), flies, bounces once (soft)
+// and is down
+export const THROW_OUT = 150;
 export const THROW_VX = 104;
 export const THROW_VY = 150;
 export const THROW_BOUNCE = 72;
@@ -350,7 +351,7 @@ function attackTick(st, k, f, o, D) {
   }
   if ((f.mv === 'specialHold' || f.mv === 'throwHold') && o.act === 'grabbed') {
     // the victim is drawn in and held in front of the arms
-    const want = clampX(f.x + f.face * (f.mv === 'throwHold' ? THROW_OUT : 1500));
+    const want = clampX(f.x + f.face * (f.mv === 'throwHold' ? throwOut(f, o) : 1500));
     o.x += tdiv(want - o.x, 4);
   }
   if (t >= m.total + (f.hm ? 0 : m.whiffLag)) {
@@ -359,6 +360,9 @@ function attackTick(st, k, f, o, D) {
 }
 
 const clampX = (x) => Math.max(-STAGE, Math.min(STAGE, x));
+
+/* how far in front (or behind) a thrown fighter is held and let go of */
+export const throwOut = (f, o) => ((FIGHTERS[f.id].push.w + FIGHTERS[o.id].push.w) >> 1) + THROW_OUT;
 
 /* which way a throw goes: toward the wall further from the throw point
    (the middle of the two of them); dead centre, the way he faces */
@@ -623,12 +627,12 @@ function land_hit(st, a, h, dir, o) {
   if (amp) att.meter = Math.min(MAX_METER, att.meter + 50 + 40 * Math.min(att.ch, 2));
   d.meter = Math.min(MAX_METER, d.meter + tdiv(dmg * 35, 100));
   st.pause = Math.max(st.pause, h.pause + (amp ? 4 : 0) + (ctr ? 2 : 0));
-  st.ev.push({ k: 'hit', p: a, x: at[0], y: at[1], dmg, kind, sp: special ? 1 : 0, kd: h.kd || amp ? 1 : 0, n: d.combo, amp, ctr, thr: h.toss ? 1 : 0 });
+  st.ev.push({ k: 'hit', p: a, x: at[0], y: at[1], dmg, kind, sp: special ? 1 : 0, kd: h.kd || amp ? 1 : 0, n: d.combo, amp, ctr, thr: h.toss ? 1 : 0, back: h.toss && att.td && att.td !== att.face ? 1 : 0 });
   if (h.toss && att.td && d.act === 'grabbed') {
     // a throw: let go of out on the side it goes to (behind him on an
     // over-the-shoulder throw: the two swap sides), up off the floor, then
     // a long flight and a soft bounce — space for the thrower
-    d.x = clampX(att.x + att.td * THROW_OUT); d.y = THROW_UP;
+    d.x = clampX(att.x + att.td * throwOut(att, d)); d.y = FIGHTERS[att.id].throwUp[att.td === att.face ? 0 : 1];
   }
   if (d.hp === 0) {
     d.bn = 0;

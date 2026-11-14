@@ -31,7 +31,7 @@ import { racquetFrame } from '../../shared/grommet/athletes/leopard.game.js';
 import { CROW } from '../../shared/grommet/athletes/crow.rig.js';
 import { BEAK_OPEN } from '../../shared/grommet/athletes/crow.game.js';
 import { extractRotation, quatToMat } from '../../shared/grommet/math.js';
-import { FIGHTERS } from '../fighters/index.js';
+import { FIGHTERS, TOSS } from '../fighters/index.js';
 
 const norm = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
 const mix = (a, b, t) => a + (b - a) * t;
@@ -66,6 +66,22 @@ const FightMixin = (Base) => class extends Base {
     this.fallen = 0;
     this.threat = false;          // the other one is swinging (block pose)
     this.reachK = 0;              // Sky Neck: how much further the neck has to go
+  }
+
+  /* plush-frame vector → fight frame [side, up, fwd] */
+  tf(v) {
+    const a = this.aim, d = this.side;
+    return [v[0] * d[0] + v[2] * d[2], v[1], v[0] * a[0] + v[2] * a[2]];
+  }
+
+  /* a throw (render/throws.js): from a point of his own (plush frame) to the
+     grab point, nudged `off` in the fight frame [side, up, fwd]: the
+     direction there (fight frame, unit) and how far it is */
+  reachGrip(from, off = [0, 0, 0], to = null) {
+    const g = to || this.grip.G, o = this.fv(off[0], 0, off[2]);
+    const v = this.tf([g[0] + o[0] - from[0], g[1] + off[1] - from[1], g[2] + o[2] - from[2]]);
+    const l = Math.hypot(v[0], v[1], v[2]) || 1;
+    return { d: [v[0] / l, v[1] / l, v[2] / l], l };
   }
 
   /* fight-frame vector [side, up, fwd] → plush frame */
@@ -205,7 +221,16 @@ export class BipedPuppet extends FightMixin(Athlete) {
       if (F.down) { R = [0.2, 0.2, 0.9]; L = [-0.15, 0.25, 0.9]; lean = [0.3, 0, 0]; }
     }
     if (act === 'hitstun') { const s = clamp(1 - F.t / 14, 0, 1); R = [-0.8, 0.2, -0.2]; L = [0.8, 0.3, -0.1]; lean = [-0.35 * s, 0, 0.1 * s]; k = 400; }
-    if (act === 'grabbed') { R = [-0.3, 0.9, 0.2]; L = [0.3, 0.9, 0.2]; lean = [-0.15, 0, Math.sin(this.time * 30) * 0.1]; k = 500; }
+    if (act === 'grabbed') {
+      const wg = Math.sin(this.time * 30) * 0.1, wf = Math.sin(this.time * 23);
+      R = [-0.3, 0.9, 0.2]; L = [0.3, 0.9, 0.2]; lean = [-0.15, 0, wg]; k = 500;
+      // held for a throw (render/throws.js): the jersey over his head (arms
+      // forced straight up, head ducked, flailing blind); hugged (arms pinned
+      // out over the hug); hanging by the scruff (limp, legs kicking)
+      if (this.held === 'smother') { R = [-0.18 + 0.12 * wf, 1, 0.12]; L = [0.18 - 0.12 * wf, 1, 0.12]; lean = [0.5, 0.08 * wf, wg * 1.5]; k = 900; }
+      else if (this.held === 'hug') { R = [-0.7, 0.45 + 0.2 * wf, 0.3]; L = [0.7, 0.45 - 0.2 * wf, 0.3]; lean = [-0.12, 0, wg]; }
+      else if (this.held === 'dangle') { R = [-0.3, -0.8, 0.35 + 0.25 * wf]; L = [0.3, -0.8, 0.35 - 0.25 * wf]; lean = [0.08, 0, wg]; k = 300; }
+    }
     if (act === 'win') {
       // a fist pumped at the sky, one then the other
       const w = Math.sin(this.time * TAU * 1.1);
@@ -297,8 +322,10 @@ export class BipedPuppet extends FightMixin(Athlete) {
       const r = smooth(0, 4, t) * (1 - smooth(9, 24, t));
       R = mix3(R, [-0.22, 0.4, 1], r); L = mix3(L, [0.22, 0.4, 1], r); lean = [0.35 * r, 0, 0]; k = 1200;
       if (st === 'tennis') wrist = mix(0.9, 1.6, r);
+    } else if (mv === 'throwHold' && (this.grip || this.throwT != null)) {
+      ({ R, L, lean, k, wrist } = this._throwHold(F, ph, R, L, lean, k, wrist));
     } else if (mv === 'throwHold') {
-      // the throw itself (the toss lands at frame 24), then back to guard
+      // (the old throw, with no hold to read: tests posing from the bare sim)
       const toss = smooth(19, 25, t), rec = smooth(28, 44, t);
       if (st === 'boxer') {
         // Kevalanche: the clinch — both gloves wrapped round him, a shake —
@@ -361,6 +388,106 @@ export class BipedPuppet extends FightMixin(Athlete) {
       }
     }
     return { R, L, lean, k, wrist };
+  }
+
+  /* the throws (render/throws.js): the hands on the grab point while he's
+     held — the arms aimed at it, stretched to it (never past 1.35) — each
+     fighter's forward and back throw; after the toss, the follow-through and
+     back to guard. `this.grip` is the hold this frame (null once he's gone). */
+  _throwHold(F, ph, R, L, lean, k, wrist) {
+    const st = this.style, t = this.throwT ?? ph.t, g = this.grip, back = !!this.throwBack, T = TOSS;
+    const rec = smooth(T + 3, T + 18, t);
+    const both = (spread = 0.26, off = [0, 0, 0], cap = 1.35, to = null) => {
+      const a = this.reachGrip(this.reachR.root, [off[0] - spread, off[1], off[2]], to);
+      const b = this.reachGrip(this.reachL.root, [off[0] + spread, off[1], off[2]], to);
+      R = a.d; L = b.d;
+      this.tS = [clamp((a.l - this.reachR.tipR) / this.reachR.len, 1, cap), clamp((b.l - this.reachL.tipR) / this.reachL.len, 1, cap)];
+    };
+    k = 1100;
+    if (st === 'tennis') {
+      // Johnny: the racquet (right hand) hooked round the back of his neck
+      const rq = (cap = 1.3, to = null) => {
+        const a = this.reachGrip(this.reachR.root, [0.1, 0, -0.15], to);
+        R = a.d; this.tS = [clamp((a.l - this.reachR.tipR - 0.75) / this.reachR.len, 1, cap), 1];
+      };
+      if (!back) {
+        // the hook, the toss (up like a ball, off the left hand), the serve
+        if (g && t < 11) { rq(); const b = this.reachGrip(this.reachL.root, [0.25, -0.35, 0]); L = b.d; wrist = 1.6; lean = [0.15, 0.2, 0]; }
+        else if (t < 21) {
+          const u = smooth(11, 16, t);
+          L = mix3([0.3, 0.35, 0.9], [0.1, 1, 0.25], u);
+          R = mix3([-0.5, 0.5, 0.4], [-0.45, 1, -0.55], smooth(14, 20, t)); wrist = mix(1.6, 1.9, u); this.tS = [1, 1];
+          lean = [mix(0.1, -0.25, u), mix(0.2, -0.3, u), 0];
+        } else {
+          // the serve: up and over, through him at the toss, and down across
+          const sw = smooth(21.5, 25.5, t);
+          if (g && t < T) { rq(1.2, g.C); R = mix3([-0.45, 1, -0.55], R, smooth(21.5, 24.5, t)); }
+          else R = mix3([-0.2, 0.6, 1], [0.25, -0.35, 1], smooth(T, T + 6, t));
+          wrist = mix(1.9, 0.15, sw); L = mix3([0.1, 1, 0.25], [0.5, 0.1, 0.6], sw);
+          lean = [mix(-0.25, 0.45, sw), mix(-0.3, 0.5, sw), 0];
+        }
+      } else {
+        // the backhand: hooked, wound across the body, swung over the
+        // shoulder (the racquet with him, a low arc), the follow-through
+        if (g) { rq(1.35); wrist = mix(1.5, 1.2, smooth(12, 22, t)); }
+        else { R = mix3([-0.4, 0.7, -0.8], [-0.9, 0.2, -0.3], smooth(T, T + 8, t)); wrist = 0.6; this.tS = [1, 1]; }
+        L = g && t < 13 ? this.reachGrip(this.reachL.root, [0.25, -0.35, 0]).d : mix3([0.5, 0.3, 0.6], [0.85, 0.35, 0.1], smooth(13, 22, t));
+        lean = [mix(0.15, -0.2, smooth(16, 26, t)), mix(0.45, -0.9, smooth(12, 26, t)), 0];
+      }
+    } else if (st === 'sumo') {
+      if (!back) {
+        // the belly bump: hands on his shoulders, pulled into the belly, a
+        // rear back — then the thrust: the hands thrown wide, the belly does it
+        const rearB = smooth(13, 19, t) * (1 - smooth(19.5, 22, t)), thrust = smooth(19.5, 22.5, t);
+        if (g && t < 21) both(0.3, [0, 0.1, 0]);
+        else { R = [-0.95, 0.35, 0.25]; L = [0.95, 0.35, 0.25]; this.tS = [1, 1]; }
+        lean = [mix(mix(0.15, -0.45, rearB), 0.55, thrust * (1 - smooth(T, T + 10, t))), 0, 0];
+        if (thrust > 0 && !this._bump) { this._bump = 1; this._belly(5.5); }
+        if (t < 10) this._bump = 0;
+      } else {
+        // uwatenage: the belt, chest to chest, then the heave over the hip:
+        // the near hand stays on the belt and goes over with him
+        if (g) {
+          both(0.28, [0, 0, 0]);
+          if (t > 19) L = mix3(L, [0.9, 0.3, -0.3], smooth(19, 24, t));
+        } else { R = mix3([-0.3, 0.5, -0.8], READY.sumo.R, rec); L = [0.9, 0.3, -0.3]; this.tS = [1, 1]; }
+        lean = [mix(0.2, 0.5, smooth(18, 26, t)), mix(0.15, -1.0, smooth(16, 27, t)), 0];
+      }
+    } else if (st === 'lucha') {
+      // Sebas: the huracanrana (paws round his head, the flip) / the German
+      // suplex (a waist lock, held through the bridge)
+      if (g) both(back ? 0.34 : 0.2, back ? [0, -0.05, 0.1] : [0, 0.05, 0]);
+      else { R = [-0.7, 0.4, -0.2]; L = [0.7, 0.4, -0.2]; this.tS = [1, 1]; }
+      lean = back ? [mix(0.15, -0.5, smooth(12, 22, t)), 0, 0] : [mix(0.2, -0.3, smooth(12, 26, t)), 0, 0];
+    } else if (st === 'thief') {
+      // Zach: wings clamped round him; the forward toss flings them up and
+      // out; the judo roll keeps hold all the way over
+      if (g && (back || t < 23)) both(0.4, [0, back ? 0.1 : 0, 0], 1.25);
+      else if (g) { const u = smooth(23, T, t); both(0.4, [0, -0.35 * (1 - u), 0], 1.25); R = mix3(R, [-0.8, 0.7, 0.5], u); L = mix3(L, [0.8, 0.7, 0.5], u); }
+      else { R = mix3([-0.9, 0.7, 0.3], READY.thief.R, rec); L = mix3([0.9, 0.7, 0.3], READY.thief.L, rec); this.tS = [1, 1]; }
+      lean = back ? [0.55 * smooth(3, 10, t) * (1 - smooth(T, T + 8, t)), 0, 0] : [mix(0.3, -0.15, smooth(19, 25, t)), 0, 0];
+    } else {
+      // the old Kevalanche (?feel=old): both gloves on him, the same throws
+      if (g) both(back ? 0.36 : 0.18);
+      else { R = [-0.35, 0.8, 0.5]; L = [0.35, 0.8, 0.5]; this.tS = [1, 1]; }
+      lean = back ? [mix(0.1, -0.5, smooth(13, 23, t)), 0, 0] : [mix(0.1, 0.4, smooth(22, 26, t)), 0, 0];
+    }
+    if (!g && rec) {
+      const r0 = READY[st];
+      R = mix3(R, r0.R, rec); L = mix3(L, r0.L, rec); lean = mix3(lean, [r0.lean, 0, 0], rec);
+      this.tS = [mix(this.tS[0], 1, rec), mix(this.tS[1], 1, rec)];
+    }
+    return { R, L, lean, k, wrist };
+  }
+
+  /* a shove through the belly (Sumaura's belly bump): the front of the body
+     kicked forward, the back of it a little after — squash and stretch */
+  _belly(v) {
+    const rest = this.rig.rest, c0 = this.c0, a = this.aim;
+    this.shove([a[0] * v, 0.6, a[2] * v], (i) => {
+      const y = rest[i * 3 + 1], f = (rest[i * 3] - c0[0]) * a[0] + (rest[i * 3 + 2] - c0[2]) * a[2];
+      return y > 0.6 && y < 2.2 ? clamp(f / 0.6, 0, 1) * (1 - Math.abs(y - 1.35) / 0.9) : 0;
+    });
   }
 
   _think(dt) {
@@ -504,7 +631,38 @@ export class GiraffePuppet extends FightMixin(Athlete) {
     if (act === 'jump') { T.nx = 0.5; T.head = 0.3; }
     if (act === 'win') { T.nx = -0.1; T.head = -0.3 + Math.sin(this.time * 7) * 0.2; }
     if (act === 'lose') { T.nx = 1.2; T.head = 0.6; }
-    if (act === 'grabbed') { T.nx = -0.3; T.head = -0.5 + Math.sin(this.time * 25) * 0.2; T.k = 500; }
+    if (act === 'grabbed') {
+      T.nx = -0.3; T.head = -0.5 + Math.sin(this.time * 25) * 0.2; T.k = 500;
+      // held for a throw: under the jersey (the neck ducked, the head shaking);
+      // dangling by the scruff (the neck limp, swinging)
+      if (this.held === 'smother') { T.nx = 0.85 + Math.sin(this.time * 23) * 0.15; T.head = 0.7; T.k = 700; }
+      else if (this.held === 'dangle') { T.nx = 0.35 + Math.sin(this.time * 9) * 0.25; T.head = 0.4; T.k = 300; }
+    }
+    if (ph && F.mv === 'throwHold' && (this.grip || this.throwT != null)) {
+      // K8-E's throws: her mouth on his scruff — the neck turned and stretched
+      // so the head sits just over the grab point, tipped down to bite — and
+      // it carries him (the forward flick, the catapult up and over her back)
+      const t = this.throwT ?? ph.t, g = this.grip, back = !!this.throwBack;
+      if (!this._hr) {
+        const R = this.rig.rest; this._hr = [0, 0, 0];
+        for (const i of this.cfg.skull) for (let d = 0; d < 3; d++) this._hr[d] += R[i * 3 + d] / this.cfg.skull.length;
+      }
+      const pv = this.pivotRest;
+      if (g) {
+        const r0 = this.tf([this._hr[0] - pv[0], this._hr[1] - pv[1], this._hr[2] - pv[2]]);
+        const v = this.tf([g.G[0] - pv[0], g.G[1] + 0.34 - pv[1], g.G[2] - pv[2]]);
+        T.nx = Math.atan2(v[2], v[1]) - Math.atan2(r0[2], r0[1]);
+        T.stretch = clamp(Math.hypot(v[2], v[1]) / Math.hypot(r0[2], r0[1]), 0.9, 3.2);
+        T.head = 0.55; T.curl = 0; T.k = 1500;
+        T.lean = [back ? -0.18 * smooth(12, 24, t) : 0.08, 0];
+      } else {
+        const rec = smooth(TOSS, TOSS + 16, t);
+        T.nx = mix(back ? -0.9 : 1.3, 0.15, rec); T.head = mix(back ? -0.4 : 0.3, 0, rec); T.stretch = mix(1.25, 1, rec); T.k = 700;
+      }
+      this.targets = T;
+      this.fallTarget = 0;
+      return;
+    }
     if (ph) {
       const t = ph.t, o = ph.out, w = ph.wind;
       T.k = 700;
@@ -686,8 +844,9 @@ export class OctopusPuppet extends FightMixin(class {}) {
       const w = Math.sin(this.time * TAU * 1.5);
       plan.push({ a: front[0], t: at(-1.2, 3.2 + w * 0.3, 0.3), k: 0.18 }, { a: front[1], t: at(1.2, 3.2 - w * 0.3, 0.3), k: 0.18 });
     }
-    if (act === 'grabbed') { squash = 0.3; sway = Math.sin(this.time * 30) * 0.8; }
+    if (act === 'grabbed') { squash = this.held === 'smother' ? 0.45 : 0.3; sway = Math.sin(this.time * 30) * 0.8; }
     if (act === 'ko' || act === 'down') { squash = 0.6; sway = 0; }
+    if (!(ph && F.mv === 'throwHold')) this._wrap = null;
     if (act === 'lose') squash = 0.4;
     if (ph) {
       const t = ph.t, o = ph.out;
@@ -744,6 +903,30 @@ export class OctopusPuppet extends FightMixin(class {}) {
         if (r > 0.05) {
           plan.push({ a: front[0], t: at(-0.4, 1.7, mix(1.5, 2.6, r)), k: 0.55 * r });
           plan.push({ a: front[1], t: at(0.4, 1.7, mix(1.5, 2.6, r)), k: 0.55 * r });
+        }
+      } else if (F.mv === 'throwHold' && (this.grip || this.throwT != null)) {
+        // Rubberta's throws: four tentacles (picked at the grab, then kept)
+        // wrapped round his middle and squeezing; they carry him (hoisted and
+        // whipped forward / swung round her in the spin cycle) and let go at
+        // the toss, two trailing after him
+        const tt = this.throwT ?? t, g = this.grip;
+        if (g) {
+          if (!this._wrap) {
+            const v = [g.C[0] - c[0], 0, g.C[2] - c[2]], l = Math.hypot(v[0], v[2]) || 1;
+            this._wrap = this.armsToward([v[0] / l, 0, v[2] / l], 4);
+          }
+          const C = g.C, sq = 0.5 + 0.5 * Math.sin(tt * 0.8), r = (g.r + 0.15) * mix(1, 0.8, sq);
+          // a ring round him across the line from her to him
+          const d = [C[0] - c[0], 0, C[2] - c[2]], dl = Math.hypot(d[0], d[2]) || 1;
+          const sx = d[2] / dl, sz = -d[0] / dl;
+          this._wrap.forEach((a, j) => {
+            const th = (j / 4) * TAU + 0.5;
+            plan.push({ a, t: [C[0] + sx * Math.cos(th) * r, C[1] + Math.sin(th) * r * 1.15, C[2] + sz * Math.cos(th) * r], k: 0.42 });
+          });
+          squash = -0.2 * smooth(10, 20, tt); sway = 0;
+        } else if (this._wrap && tt < TOSS + 8) {
+          const away = this.throwBack ? -1 : 1;
+          this._wrap.slice(0, 2).forEach((a, j) => plan.push({ a, t: at(j ? 0.8 : -0.8, 2.4, away * 3.2), k: 0.4 * (1 - smooth(TOSS, TOSS + 8, tt)) }));
         }
       } else if (F.mv === 'throwHold') {
         // Rubberta: four tentacles wrapped round him and squeezing, then
@@ -877,7 +1060,7 @@ export class WolfPuppet extends BipedPuppet {
       lean = [mix(-0.2, 0.9, d), 0, 0];
       if (rec) { R = mix3(R, READY.lucha.R, rec); L = mix3(L, READY.lucha.L, rec); lean = mix3(lean, [READY.lucha.lean, 0, 0], rec); }
       k = 1100;
-    } else if (mv === 'throwHold') {
+    } else if (mv === 'throwHold' && !this.grip && this.throwT == null) {
       // the huracanrana: paws round his neck, a hop and a backflip that
       // takes him over too — flung off the bottom of it
       const flip = smooth(12, 26, t), rec = smooth(28, 44, t);
@@ -975,10 +1158,10 @@ export class CrowPuppet extends BipedPuppet {
       const fire = smooth(ph.first - 4, ph.first, t) * (t <= ph.last ? 1 : ph.out);
       this.tPeck = (mv === 'heavy' ? 0.55 : 0.75) * fire; this.tBeak = 0.8 * fire * (1 - smooth(ph.last, ph.last + 4, t));
     }
-    if (mv === 'throwHold') {
-      // the pecks: four quick ones, then the toss
-      const pk = t < 22 ? Math.max(0, Math.sin(t * 0.75)) : 0;
-      this.tPeck = 0.5 * pk; this.tBeak = 0.9 * pk;
+    if (mv === 'throwHold' && !this.throwBack) {
+      // the pecks: four big ones, then the toss
+      const pk = t < 18 ? Math.max(0, Math.sin((t - 2.5) * Math.PI / 3)) : 0;
+      this.tPeck = 0.75 * pk; this.tBeak = 0.95 * pk;
     }
     if (mv === 'signature') this.tBeak = 0.25 * smooth(12, 16, t) * (1 - smooth(22, 30, t));
     if (mv === 'special') this.tBeak = smooth(2, 8, t) * (1 - smooth(40, 60, t));
@@ -1011,7 +1194,7 @@ export class CrowPuppet extends BipedPuppet {
       const d = mv === 'diveLand' ? 1 - smooth(8, 26, t) : smooth(3, 8, t);
       R = mix3(READY.thief.R, [-0.35, 0.15, -1], d); L = mix3(READY.thief.L, [0.35, 0.15, -1], d);
       lean = [0.5 * d, 0, 0]; k = 1100;
-    } else if (mv === 'throwHold') {
+    } else if (mv === 'throwHold' && !this.grip && this.throwT == null) {
       // grab, peck peck peck, toss: wings clamp him, then fling
       const toss = smooth(19, 25, t), rec = smooth(28, 44, t);
       R = mix3([-0.25, 0.4, 1], [-0.9, 0.5, 0.3], toss); L = mix3([0.25, 0.4, 1], [0.9, 0.5, 0.3], toss);

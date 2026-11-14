@@ -76,6 +76,8 @@ export function soundsFor(e, tick = 0) {
       if (e.amp) gain *= 1.15;
       const out = [{ id: heavy ? 'hit-heavy' : 'hit-light', gain, rate, delay: 0 }];
       if (heavy) out.push({ id: 'thump', gain: gain * (e.amp ? 1.2 : 1), rate, delay: 0 });
+      // a throw's toss: the grab's squeeze letting go and a big whoosh as he flies
+      if (e.thr) out.push({ id: 'grab', gain: 0.8, rate: e.back ? 0.85 : 1.05, delay: 0 }, { id: 'whoosh-heavy', gain: 1, rate: e.back ? 0.9 : 1, delay: 0.03 });
       return out;
     }
     case 'block': return [{ id: 'block', ...vary(tick, p + 3, 0.05, 0.12), delay: 0 }];
@@ -88,6 +90,9 @@ export function soundsFor(e, tick = 0) {
       ? [{ id: 'knockdown', ...vary(tick, p + 11, 0.05, 0.1), delay: 0 }]
       : [{ id: 'land', ...vary(tick, p + 13, 0.05, 0.1), delay: 0 }];
     case 'slam': return [{ id: 'knockdown', gain: 1.15, rate: 0.94, delay: 0 }, { id: 'thump', gain: 0.9, rate: 0.9, delay: 0 }];
+    // a thrown plush's first touch of the mat: a soft knockdown thud (the
+    // landing after it is the usual hard 'land')
+    case 'bounce': return [{ id: 'knockdown', gain: 0.85, rate: 1.08, delay: 0 }];
     case 'kobounce': return [{ id: 'knockdown', gain: 1.2, rate: 0.9, delay: 0 }];
     // the K.O. hit: the big hit and the stuffing bursting out; the crowd
     // comes on the K.O. itself (a flow event: confirmed online)

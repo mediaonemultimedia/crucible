@@ -48,7 +48,7 @@ const CONTROLS = `
   <span><kbd>P</kbd></span><span>heavy attack — long reach; punishable if blocked</span>
   <span><kbd>S</kbd>+<kbd>O</kbd></span><span>low attack</span>
   <span><kbd>S</kbd>+<kbd>P</kbd></span><span>signature move</span>
-  <span class="new"><kbd>O</kbd>+<kbd>P</kbd></span><span class="new">throw (close) — beats a block; O+P as you're grabbed escapes</span>
+  <span class="new"><kbd>O</kbd>+<kbd>P</kbd></span><span class="new">throw = Light+Heavy (throws toward the open side) — close; beats a block; O+P as you're grabbed escapes</span>
   <span class="new"><kbd>O</kbd> <kbd>O</kbd> <kbd>P</kbd></span><span class="new">combo — chain as each hit lands; the last one's amplified</span>
   <span><kbd>W</kbd> then <kbd>S</kbd>+<kbd>P</kbd></span><span>dive slam (in the air: an overhead — block it standing)</span>
   <span><kbd>Space</kbd></span><span>special (full meter)</span>
@@ -985,7 +985,7 @@ class App {
     const f = FIGHTERS[id], k = (...ks) => ks.map((x) => `<kbd>${x}</kbd>`).join('+');
     $('#pr-moves').innerHTML = `<h5>${f.name} — moves <small>Esc pause · X reset</small></h5>
       <span>${k('O')} light</span><span>${k('P')} heavy</span><span>${k('S', 'O')} low</span><span>${k('S', 'P')} ${f.signatureName}</span><span>${k('Space')} ${f.specialName}</span>
-      <span><kbd>W</kbd> then ${k('S', 'P')} ${f.diveName}</span><span>${k('O', 'P')} ${f.throwName}</span><span>${k('E')} / ${k('S', 'E')} block</span><span><kbd>D</kbd><kbd>D</kbd> · <kbd>A</kbd><kbd>A</kbd> dash</span>
+      <span><kbd>W</kbd> then ${k('S', 'P')} ${f.diveName}</span><span class="thr">Throw = ${k('O', 'P')} Light+Heavy (throws toward the open side): ${f.throwName} forward, ${f.throwBackName} back</span><span>${k('E')} / ${k('S', 'E')} block</span><span><kbd>D</kbd><kbd>D</kbd> · <kbd>A</kbd><kbd>A</kbd> dash</span>
       <span class="bnb"><kbd>O</kbd> → <kbd>O</kbd> → <kbd>P</kbd> bread &amp; butter</span>`;
   }
 
@@ -1006,10 +1006,11 @@ class App {
       };
       $('#pr-in').innerHTML = rows.map((r, j) => `<li style="--k:${j}"><b>${Math.min(99, r.t)}</b>${ic(r.m)}</li>`).join('');
     }
-    const c = f.combos.last, ck = c ? `${c.hits}|${c.dmg}|${c.amp}|${c.ctr}|${f.combos.best}` : '';
+    const c = f.combos.last, ck = c ? `${c.hits}|${c.dmg}|${c.amp}|${c.ctr}|${c.thr}|${f.combos.best}` : '';
     if (C.combo !== ck) {
       C.combo = ck;
-      $('#pr-combo').innerHTML = c ? `<b>${c.hits}</b> hit${c.hits > 1 ? 's' : ''} · <b>${c.dmg}</b> damage${c.amp ? '<em>AMPLIFIED!</em>' : ''}${c.ctr ? '<i>COUNTER</i>' : ''}<span class="best">best ${f.combos.best} damage</span>` : 'Land a hit — O, O, P';
+      const F = FIGHTERS[f.st.f[0].id], tn = c?.thr ? `${c.thr === 'back' ? 'Back throw' : 'Forward throw'} — ${c.thr === 'back' ? F.throwBackName : F.throwName}` : '';
+      $('#pr-combo').innerHTML = c ? `${tn ? `<i class="thr">${tn}</i> · ` : ''}<b>${c.hits}</b> hit${c.hits > 1 ? 's' : ''} · <b>${c.dmg}</b> damage${c.amp ? '<em>AMPLIFIED!</em>' : ''}${c.ctr ? '<i>COUNTER</i>' : ''}<span class="best">best ${f.combos.best} damage</span>` : 'Land a hit — O, O, P';
     }
   }
 
@@ -1144,8 +1145,9 @@ class App {
     if (e.k === 'hit') {
       if (e.n >= 2) this.combo(e.p, e.n, e.amp);
       if (e.ctr) this.pop('COUNTER', e.x, e.y, e.p ? 'p2' : 'p1');
+      if (e.thr) { const v = st.f[1 - e.p]; this.pop('THROW!', v.x, v.y + 2000, `${e.p ? 'p2' : 'p1'} thr`); }
     }
-    if (e.k === 'tech') this.pop('TECH', e.x, e.y, 'tech');
+    if (e.k === 'tech') this.pop('BREAK!', e.x, e.y, 'tech');
     // the K.O.: the white flash on contact; the launch, the slow motion and
     // the bounce are the sim's (fight.js shows them); then the banner
     if (e.k === 'koapex' && st.fluff && st.f[e.p].act === 'ko' && !this._fluffed) {

@@ -6,7 +6,7 @@
    bounce, a knockdown, no guaranteed follow-up. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createMatch, stepInPlace, clone, hash, hurtBox, throwDir, TECH, STAGE, THROW_OUT, DOWN_T } from '../src/sim/sim.js';
+import { createMatch, stepInPlace, clone, hash, hurtBox, throwDir, throwOut, TECH, STAGE, DOWN_T } from '../src/sim/sim.js';
 import { LIGHT, HEAVY, BLOCK } from '../src/sim/input.js';
 import { FIGHTERS, ROSTER, TOSS } from '../src/fighters/index.js';
 import { CPU } from '../src/ai/cpu.js';
@@ -64,7 +64,7 @@ test('back throw: carries him over the shoulder — the two swap sides', () => {
     const r = throwAt(a, 'johnny', 3000, 1);
     assert.equal(r.grab.back, 1, `${a}: a back throw`);
     assert.equal(Math.sign(r.rel.vx - r.rel.tx), -1, `${a}: let go of behind him`);
-    assert.equal(Math.abs(r.rel.vx - r.rel.tx), THROW_OUT, `${a}: out by THROW_OUT`);
+    assert.equal(Math.abs(r.rel.vx - r.rel.tx), throwOut(r.st.f[0], r.st.f[1]), `${a}: let go of just past touching`);
     assert.ok(r.rel.vy > 0, `${a}: up off the floor`);
     assert.ok(r.st.f[1].x < r.st.f[0].x, `${a}: sides swapped`);
     // and once he's free again he turns round to face the one he threw

@@ -97,6 +97,8 @@ export class ComboMeter {
     if (e.n === 1 || !this.cur) this.cur = { hits: 0, dmg: 0, amp: 0, ctr: 0 };
     const c = this.cur;
     c.hits = e.n; c.dmg += e.dmg; if (e.amp) c.amp = 1; if (e.ctr) c.ctr = 1;
+    // a throw: which one landed (the sim picks it: toward the open side)
+    if (e.thr) c.thr = e.back ? 'back' : 'forward';
     this.last = c;
     this.best = Math.max(this.best, c.dmg);
   }

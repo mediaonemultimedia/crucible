@@ -13,6 +13,8 @@ import { Rollback } from './net/rollback.js';
 import { Taunter } from './ui/taunt.js';
 import { ordinal, sessionTickOf } from './audio/sfxmap.js';
 import { Dummy, practiceMatch, practiceAfter, ComboMeter, InputLog } from './practice.js';
+import { carry, throwerAcro, landSpin, SHAPE } from './render/throws.js';
+import { TOSS } from './fighters/index.js';
 
 export const TICK = 1 / 60;
 
@@ -132,6 +134,18 @@ export class Fight {
   _fx(e) {
     this.onSfx(e, this.evTick, this.evN);
     const S = this.stage, st = this.st;
+    if (e.k === 'hit' && e.thr) {
+      // the toss: the thrown one is drawn from where he's let go of (no
+      // sweep from the hold), his spin carried on through the flight
+      const v = st.f[1 - e.p], t = st.f[e.p];
+      this.prev[1 - e.p] = { x: v.x, y: v.y };
+      const ls = landSpin(t, v), D = FIGHTERS[v.id];
+      const fl = (v.vy + Math.sqrt(v.vy * v.vy + 2 * D.grav * v.y)) / D.grav;
+      this.plush[1 - e.p].thrown = { from: -t.face * ls.from, to: -t.face * ls.to, n: fl, id: v.id };
+      this.plush[e.p].tossed?.(e);
+    }
+    if (e.k === 'grab' && e.throw) this.plush[e.p].grabbed?.(e);
+    if (e.k === 'bounce') { const x = st.f[e.p].x / U; for (const d of [-1, 1]) S.tufts(x + d * 0.35, 0.1, 5, 0.7, d); S.shake(0.2); this.plush[e.p].hit(60, 0, 0); }
     if (e.k === 'hit' || e.k === 'block') {
       const x = e.x / U, y = e.y / U;
       const victim = this.plush[1 - e.p], dir = Math.sign(st.f[1 - e.p].x - st.f[e.p].x) || 1;
@@ -210,6 +224,7 @@ export class Fight {
     const koSeq = st.phase === 'ko' && st.kt < st.kn;
     const slow = koSeq ? st.ks / 100 : 1;
     const P = st.f.map((f, k) => ({ x: (this.prev[k].x + (f.x - this.prev[k].x) * a) / U, y: (this.prev[k].y + (f.y - this.prev[k].y) * a) / U }));
+    this._throws(st, P, a);
     for (let k = 0; k < 2; k++) {
       const F = st.f[k], O = st.f[1 - k];
       const threat = O.act === 'attack' || st.proj.some((p) => p.o !== k);
@@ -217,6 +232,7 @@ export class Fight {
       this.plush[k].simPause = st.pause;
       this.plush[k].update(Math.min(dt, 0.05) * slow, F, O, P[k].x, P[k].y, P[1 - k].x, P[1 - k].y, threat);
     }
+    for (let k = 0; k < 2; k++) this.plush[k].afterThrow?.(this.plush[1 - k]);
     if (koSeq) {
       const L = st.f.map((f, k) => (f.act === 'ko' ? k : -1)).filter((k) => k >= 0);
       const k = L.length === 1 ? L[0] : -1;
@@ -229,6 +245,40 @@ export class Fight {
     this.stage.frame(P[0].x, P[1].x, dt || 0.016, innerWidth / innerHeight, this.focus, Math.max(P[0].y, P[1].y));
     this.stage.paintShadows(this.plush, extra);
     this.stage.update(dt * slow);
+  }
+
+  /* the throws (render/throws.js): the one being thrown is drawn on the
+     throw's path — his middle, his spin — rather than where the sim holds
+     him, and the thrower gets the grab point to reach for and his own turn.
+     Positions in P are replaced for both (the thrower aims at the victim). */
+  _throws(st, P, a) {
+    for (let k = 0; k < 2; k++) {
+      const F = st.f[k], O = st.f[1 - k], pl = this.plush[k];
+      pl.hold = null; pl.grip = null; pl.throwAcro = null; pl.throwT = null;
+      if (F.act === 'attack' && F.mv === 'throwHold' && F.td) {
+        const t = Math.max(0, F.t - 1 + (st.pause > 0 ? 1 : a));
+        const ac = throwerAcro(F, t);
+        if (ac) pl.throwAcro = { a: -F.face * ac.a, h: ac.h, y: ac.y || 0, yaw: -F.face * (ac.yaw || 0) };
+        pl.throwT = t;
+      }
+    }
+    for (let k = 0; k < 2; k++) {
+      const V = st.f[k], O = st.f[1 - k];
+      if (!(V.act === 'grabbed' && O.act === 'attack' && O.mv === 'throwHold' && O.td)) continue;
+      const t = Math.max(0, O.t - 1 + (st.pause > 0 ? 1 : a));
+      const c = carry(O, V, t), fw = O.face, ox = P[1 - k].x, oy = P[1 - k].y;
+      const mid = SHAPE[V.id].mid;
+      // eased in from where the sim had him at the grab
+      const w = Math.min(1, t / 4), e = w * w * (3 - 2 * w);
+      const cx = ox + fw * c.C[0], cy = oy + c.C[1];
+      const hx = P[k].x + (cx - P[k].x) * e, hy = P[k].y + mid + (cy - P[k].y - mid) * e;
+      this.plush[k].hold = { x: hx, y: hy - mid, z: c.z * e, a: -fw * c.a * e, h: mid, yaw: -fw * c.yaw, pose: c.pose, t };
+      this.plush[1 - k].grip = {
+        G: [ox + fw * c.G[0], oy + c.G[1], c.z], C: [hx, hy, c.z * e], r: c.c.r, t, back: c.back, id: V.id, a: -fw * c.a,
+        top: [hx - Math.sin(-fw * c.a) * c.c.up, hy + Math.cos(-fw * c.a) * c.c.up, c.z],
+      };
+      P[k] = { x: hx, y: hy - mid };
+    }
   }
 
   dispose() { for (const p of this.plush) p.dispose(this.stage.scene); this.stage.projectiles([], 0, null); }
