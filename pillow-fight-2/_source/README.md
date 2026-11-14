@@ -29,7 +29,7 @@ Deep links: `final.html?p1=kevalanche&p2=rubberta&cpu=hard` (a fight),
 twins), `seed=N`, `hold` (no free-running loop; tools step `__pf2`),
 `webgl` (force WebGL 2), `noportraits` (skip the card portraits).
 
-## Status — stage 2 of 2
+## Status — stage 2 of 2 (shipped: PR #47, merged and deployed)
 
 | # | Stage 2 item | State |
 |---|---|---|
