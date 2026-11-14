@@ -38,6 +38,8 @@ import { makeSash, makeWingFeathers } from './attire.js';
 import { activeHits } from '../sim/sim.js';
 import { TWINS, tubeRing } from './twins.js';
 import { RQ } from '../../shared/grommet/athletes/leopard.game.js';
+import { reachDown, SHAPE } from './throws.js';
+import { makeJersey } from './jersey.js';
 
 export const SHELLS_EACH = 48;
 
@@ -276,6 +278,8 @@ export class Plush {
     group.add(this.monocle);
     this.twin = TW?.build ? TW.build(this) : null;
     scene.add(group);
+    // Kevalanche's jersey pull: the felt jersey (render/jersey.js), the ALT's in his colours
+    if (id === 'kevalanche') { this.jersey = makeJersey(evil); this.jersey.visible = false; scene.add(this.jersey); }
     // the swing trail: red for an evil twin, a cool blue-white for the original
     this.trail = new Trail(scene, evil ? 'red' : 'blue', rig.racquet ? { width: 0.32, life: 0.22 } : {});
     this.hist = [];                 // the last few frames of the soft body (and where the group was)
@@ -360,7 +364,11 @@ export class Plush {
     this.yaw.v += (k * diff - 2 * Math.sqrt(k) * this.yaw.v) * dt;
     this.yaw.x += this.yaw.v * dt;
     const c = Math.cos(this.yaw.x), s = Math.sin(this.yaw.x);
-    const [nx, ny, nz] = A;
+    // a throw (fight.js): the one held is drawn on the throw's path — his
+    // middle, his spin about the thrower's cross axis — not where the sim holds him
+    const H = this.hold, TA = this.throwAcro;
+    const [nx, ny, nz] = H ? H.pos : A;
+    this.puppet.held = H && F.act === 'grabbed' ? H.pose : null;
     if (dt > 0) {
       const vx = (nx - this.pos.x) / dt, vy = (ny - this.pos.y) / dt, vz = (nz - this.pos.z) / dt;
       if (this.lastVel && dt < 0.1) {
@@ -374,16 +382,29 @@ export class Plush {
       this.lastVel = [vx, vy, vz];
     }
     this.pos.set(nx, ny, nz);
-    const ac = F.act === 'ko' ? null : this.puppet.acro?.(F);
+    // the thrower's own turn (a suplex's arch, a roll, a flip); the held one's
+    // spin on the path; after the toss his spin carried on through the
+    // flight so he comes down the right way up
+    const TH = F.act === 'down' && this.thrown ? this.thrown : null;
+    if (F.act !== 'down') this.thrown = null;
+    const ac = F.act === 'ko' ? null : TA || (F.act === 'attack' && F.mv === 'throwHold' ? null : this.puppet.acro?.(F));
     this._lift = 0;
     let axis = null;
     if (F.act === 'ko' && F.kb < 1 && (F.kfx || F.kfz)) {
       this._spin = -(F.kr / 1000) * Math.PI * 2; this._spinH = 1.5;
       this._axis = [-F.kfz, F.kfx];
-    } else if (ac) { this._spin = ac.a; this._spinH = ac.h; this._lift = ac.y || 0; this._axis = free ? [0, 1] : [-F.fz, F.fx]; }
+    } else if (H) { this._spin = H.a; this._spinH = H.h; this._axis = H.axis; }
+    else if (TH) {
+      const u = Math.min(1, (F.t + (this.frac ?? 1)) / Math.max(4, TH.n)), e = 1 - (1 - u) * (1 - u);
+      this._spin = TH.from + (TH.to - TH.from) * e; this._spinH = SHAPE[this.id].mid; this._axis = TH.axis;
+      // (never through the mat while he's still turning over)
+      this._lift = Math.max(0, reachDown(this.id, this._spin) - SHAPE[this.id].mid - ny);
+      if (u >= 1) this.thrown = null;
+    } else if (TA) { this._spin = TA.a; this._spinH = TA.h; this._lift = TA.y || 0; this._axis = TA.axis; }
+    else if (ac) { this._spin = ac.a; this._spinH = ac.h; this._lift = ac.y || 0; this._axis = free ? [0, 1] : [-F.fz, F.fx]; }
     else { const w = Math.atan2(Math.sin(this._spin || 0), Math.cos(this._spin || 0)); this._spin = w * Math.max(0, 1 - dt * 10); if (Math.abs(this._spin) < 0.01) this._spin = 0; }
     if (this._axis) { const l = Math.hypot(...this._axis) || 1; axis = this._q3a.set(this._axis[0] / l, 0, this._axis[1] / l); }
-    this._qy.setFromAxisAngle(this._Y, this.yaw.x + (this.yawExtra || 0));
+    this._qy.setFromAxisAngle(this._Y, this.yaw.x + (this.yawExtra || 0) + (H ? H.yaw : 0) + (TA ? TA.yaw : 0));
     if ((this._spin || this._lift) && axis) {
       const h = this._spinH ?? 1.5, a = this._spin || 0;
       this._qt.setFromAxisAngle(axis, a);
@@ -431,6 +452,9 @@ export class Plush {
     let dx = B[0] - nx, dz = B[2] - nz;
     const dl = Math.hypot(dx, dz) || 1;
     if (free) { dx = Math.sign(dx) || F.face; dz = 0; } else { dx /= dl; dz /= dl; }
+    // (a throw: the frame stays the way he faced at the grab — the one he
+    // carries over his shoulder doesn't turn him round)
+    if (!free && ((F.act === 'attack' && F.mv === 'throwHold') || H)) { dx = F.fx / 1024; dz = F.fz / 1024; }
     P.aim = [dx * c - dz * s, 0, dx * s + dz * c];
     P.side = [P.aim[2], 0, -P.aim[0]];
     const oppHead = this._X.set(B[0], B[1] + 2.4, B[2]);
@@ -442,6 +466,13 @@ export class Plush {
     // (the feel pass, Kevalanche: where the render is between two sim ticks,
     // and whether the sim's hit-pause is holding — render only)
     if ('frac' in P) { P.frac = this.frac ?? 1; P.freeze = this.simPause || 0; }
+    // a throw: the grab point and the victim's middle in the plush's own frame
+    if (this.grip) {
+      const q = this.grip, L = (w) => { const v = this._X.set(w[0], w[1], w[2]); if (g.parent) g.parent.localToWorld(v); g.worldToLocal(v); return [v.x, v.y, v.z]; };
+      P.grip = { G: L(q.G), C: L(q.C), top: L(q.top), r: q.r, t: q.t, back: q.back, id: q.id };
+    } else P.grip = null;
+    P.throwT = F.act === 'attack' && F.mv === 'throwHold' ? this.throwT : null;
+    P.throwBack = F.act === 'attack' && F.mv === 'throwHold' && F.td < 0;
     P.perform(F, phaseOf(F));
 
     // the soft body, on its own fixed clock
@@ -588,6 +619,68 @@ export class Plush {
     this.toque.scale.setScalar(hr * 1.05);
   }
 
+  /* the middle of the head and its turn, in the world (the jersey pull) */
+  headWorld(pos, quat) {
+    const soft = this.soft, x = soft.x;
+    const head = this.rig.parts?.find((p) => p.name === 'head');
+    const ix = this.puppet.cfg?.core || this.rig.head;
+    let cx = 0, cy = 0, cz = 0;
+    for (const i of ix) { cx += x[i * 3]; cy += x[i * 3 + 1]; cz += x[i * 3 + 2]; }
+    pos.set(cx / ix.length, cy / ix.length, cz / ix.length).applyMatrix4(this.group.matrixWorld);
+    const R = soft.cloudR[head ? head.cloud : 0] || soft.cloudR[0];
+    this._M.set(R[0], R[1], R[2], 0, R[3], R[4], R[5], 0, R[6], R[7], R[8], 0, 0, 0, 0, 1);
+    this._M.premultiply(new THREE.Matrix4().extractRotation(this.group.matrixWorld));
+    quat.setFromRotationMatrix(this._M);
+    return head ? Math.max(head.r[0], head.r[2]) : 0.6;
+  }
+
+  /* after both plush are posed this frame: the jersey pull's jersey — up
+     over the victim's head, then left in Kevalanche's fists and tossed back
+     over his shoulder (PF1's, with the world's directions taken from his
+     own frame, since the bedroom turns) */
+  afterThrow(V) {
+    const J = this.jersey;
+    if (!J) return;
+    const P = this.puppet, F = P.F, t = this.throwT;
+    if (F && F.act === 'attack' && F.mv === 'throwHold' && !P.throwBack && t != null) this._jt = t;
+    else if (!(F && F.act === 'attack' && F.mv === 'throwHold')) this._jt = null;
+    const jt = this._jt;
+    if (jt == null || jt < 0.5) { J.visible = false; return; }
+    J.visible = true;
+    const W = this._jw || (this._jw = { p: new THREE.Vector3(), q: new THREE.Quaternion(), f: new THREE.Vector3(), up: new THREE.Vector3(), q2: new THREE.Quaternion(), bk: new THREE.Vector3(), ax: new THREE.Vector3() });
+    const sm = (a, b, x) => { const u = Math.max(0, Math.min(1, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
+    const T = 28;
+    const fist = (ch) => { const i = ch.idx[ch.idx.length - 1]; return new THREE.Vector3(this.soft.x[i * 3], this.soft.x[i * 3 + 1], this.soft.x[i * 3 + 2]).applyMatrix4(this.group.matrixWorld); };
+    const arms = this.rig.arms, cfg = P.cfg;
+    W.f.copy(fist(arms[cfg.armR])).add(fist(arms[cfg.armL])).multiplyScalar(0.5);
+    if (jt < T && V.puppet.F?.act === 'grabbed') {
+      const hr = V.headWorld(W.p, W.q);
+      W.up.set(0, 1, 0).applyQuaternion(W.q);
+      const up = sm(0.5, 6, jt);
+      W.p.addScaledVector(W.up, hr * (-1.9 + 2.02 * up));
+      const wob = Math.sin(jt * 1.9) * 0.06 * sm(4, 6, jt) * (1 - sm(18, 22, jt));
+      J.position.copy(W.p);
+      J.quaternion.copy(W.q);
+      const s = hr * 1.28;
+      J.scale.set(s * (1 + wob), s * (0.7 + 0.3 * up) * (1 - wob * 0.6), s * (1 + wob));
+      this._jp = J.position.clone(); this._jq = J.quaternion.clone(); this._js = s;
+    } else {
+      const a = jt - T, toss = sm(7, 20, a);
+      const k = sm(0, 3, a);
+      // his back, in the world (local +z is his facing), and the cross axis
+      W.bk.set(0, 0, -1).transformDirection(this.group.matrixWorld); W.bk.y = 0; W.bk.normalize();
+      W.ax.set(-W.bk.z, 0, W.bk.x);
+      W.p.copy(this._jp || W.f).lerp(W.f, k);
+      W.p.addScaledVector(W.bk, 2.6 * toss); W.p.y += 1.6 * Math.sin(Math.PI * toss) + 0.2 * toss;
+      J.position.copy(W.p);
+      W.q2.setFromAxisAngle(W.ax, 5 * toss + Math.PI * k);
+      J.quaternion.copy(this._jq || W.q).slerp(W.q2, k);
+      const s = (this._js || 0.8) * (1 - sm(12, 20, a)) * (1 - 0.15 * k);
+      J.scale.setScalar(Math.max(1e-3, s));
+      if (s < 0.01) J.visible = false;
+    }
+  }
+
   /* back to the mark for a new round */
   reset() {
     this.soft.reset();
@@ -597,6 +690,8 @@ export class Plush {
     this.deflate = 0;
     this.deflateTarget = 0;
     this._spin = 0;
+    this.thrown = null; this.hold = null; this.grip = null; this.throwAcro = null; this._jt = null;
+    if (this.jersey) this.jersey.visible = false;
     this.group.rotation.z = 0;
     this.group.visible = true;
     this.trail.clear();
@@ -605,6 +700,7 @@ export class Plush {
 
   dispose(scene) {
     scene.remove(this.group);
+    if (this.jersey) { scene.remove(this.jersey); this.jersey.removeFromParent(); }
     this.trail.dispose(scene);
     this.body.dispose?.();
     this.cloth?.dispose?.();

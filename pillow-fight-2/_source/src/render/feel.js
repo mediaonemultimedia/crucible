@@ -39,6 +39,8 @@
 import { BipedPuppet } from './puppets.js';
 import { clamp, spring, TAU } from '../../shared/grommet/athletes/game.js';
 
+import { TOSS } from '../fighters/index.js';
+
 export const FEEL = { old: false };
 
 const mix = (a, b, t) => a + (b - a) * t;
@@ -165,7 +167,15 @@ export class BoxerFeel extends BipedPuppet {
       T.pitch = 0.1 - 0.6 * s; T.chest = 0.35 * s * (this.lead === 'L' ? 1 : -1); T.sink = 0.2 + 0.45 * s; T.roll = 0.12 * s;
       T.lead = [0.75, 0.25, 0.4]; T.rear = [0.7, 0.1, 0.3]; T.leadB = 0.4; T.rearB = 0.5; T.k = 380; T.z = 0.45; T.kh = 500; T.kc = 500;
     }
-    if (act === 'grabbed') { T.lead = [0.3, 0.9, 0.2]; T.rear = [0.3, 0.9, 0.2]; T.leadB = 0.3; T.rearB = 0.3; T.pitch = -0.15; T.roll = Math.sin(t * 30) * 0.1; T.k = 600; }
+    if (act === 'grabbed') {
+      T.lead = [0.3, 0.9, 0.2]; T.rear = [0.3, 0.9, 0.2]; T.leadB = 0.3; T.rearB = 0.3; T.pitch = -0.15; T.roll = Math.sin(t * 30) * 0.1; T.k = 600;
+      // held for a throw (render/throws.js): smothered under a jersey (arms
+      // forced up, head ducked, flailing), hugged (arms pinned out), dangling
+      const wf = Math.sin(t * 23);
+      if (this.held === 'smother') { T.lead = [0.15 + 0.1 * wf, 1, 0.1]; T.rear = [0.15 - 0.1 * wf, 1, 0.1]; T.leadB = 0.15; T.rearB = 0.15; T.pitch = 0.5; T.hip = 0.12 * wf; T.k = 900; }
+      else if (this.held === 'hug') { T.lead = [0.75, 0.45 + 0.2 * wf, 0.25]; T.rear = [0.75, 0.45 - 0.2 * wf, 0.25]; T.leadB = 0.5; T.rearB = 0.5; }
+      else if (this.held === 'dangle') { T.lead = [0.3, -0.8, 0.35 + 0.25 * wf]; T.rear = [0.3, -0.8, 0.35 - 0.25 * wf]; T.leadB = 0.2; T.rearB = 0.2; T.pitch = 0.08; T.k = 300; }
+    }
     if (act === 'down' || act === 'ko') { T.lead = [0.6, -0.6, 0.3]; T.rear = [0.6, -0.7, 0.2]; T.leadB = 0.2; T.rearB = 0.2; T.sink = 0.3; T.k = 120; T.z = 0.5; }
     if (act === 'win') {
       const w = Math.sin(t * TAU * 1.1);
@@ -189,6 +199,60 @@ export class BoxerFeel extends BipedPuppet {
     if (!this.wasAir && air) this._kick(this.ears, [0, -1.8, 0]);
     this.wasAir = air;
     this.lastMove = ph ? `${F.mv}` : '';
+  }
+
+  /* Kevalanche's throws (render/throws.js). Forward, the hockey-fight
+     jersey pull: the fists ride the jersey up from his chest over his head,
+     the bear rattles him blind under it, hauls him up — and flips him away;
+     the jersey stays in the fists, and goes over his shoulder. Back, the
+     bear-hug suplex: both arms round his middle, a lift, the back arched
+     (the plush's own turn, throws.js) and over. */
+  _throws(t0, T, lead, once, punchKick) {
+    const t = this.throwT ?? t0, g = this.grip, back = !!this.throwBack;
+    const arm = (A) => (A === 'R' ? this.reachR : this.reachL);
+    const aimArm = (A, spread, off, to, cap = 1.35) => {
+      const c = arm(A), r = this.reachGrip(c.root, [off[0] + (A === 'R' ? -spread : spread), off[1], off[2]], to);
+      return { v: this._side(A, r.d), s: clamp((r.l - c.tipR) / c.len, 1, cap) };
+    };
+    const set = (A, v, b, s) => { if (A === lead) { T.lead = v; T.leadB = b; T.sLead = s; } else { T.rear = v; T.rearB = b; T.sRear = s; } };
+    T.hint = { lead: 'in', rear: 'in' };
+    if (!back) {
+      if (g) {
+        const up = sstep(0.5, 6, t);
+        const to = [mix(g.C[0], g.G[0], up), mix(g.C[1] - 0.35, g.G[1] + 0.05, up), mix(g.C[2], g.G[2], up)];
+        for (const A of ['R', 'L']) { const a = aimArm(A, 0.2, [0, 0, -0.12], to); set(A, a.v, 0.3, a.s); }
+        const sh = Math.sin(t * 1.7) * sstep(5, 7, t) * (1 - sstep(17, 19, t));
+        const haul = sstep(18, 22, t) * (1 - sstep(22, 25, t)), flip = easeIn(22.5, 26, t);
+        T.hip = 0.25 * sh; T.chest = 0.32 * sh; T.roll = 0.07 * sh;
+        T.pitch = mix(mix(0.18, -0.3, haul), 0.5, flip); T.sink = mix(mix(0.25, 0.55, haul), 0.05, flip);
+        T.k = 2400; T.kb = 2000; T.kc = 900; T.kh = 900;
+        if (once('yank', 1)) { punchKick('R', 1.4); punchKick('L', 1.4); }
+        if (once('flip', 23)) { punchKick('R', 2.6); punchKick('L', 2.6); this.sink.v -= 6; }
+      } else {
+        // the jersey left in his fists, a look at it — then over his shoulder
+        const a = t - TOSS, toss = easeIn(6, 11, a), rec = sstep(11, 20, a);
+        T.lead = mix3([0.12, 0.5, 0.9], [0.35, 1, -0.4], toss); T.rear = mix3([0.12, 0.45, 0.9], [0.5, 0.25, 0.6], toss);
+        T.leadB = 0.35; T.rearB = 0.6; T.sLead = T.sRear = 1;
+        T.chest = -0.45 * toss; T.hip = -0.2 * toss; T.pitch = mix(0.35, -0.15, toss); T.sink = 0.15; T.k = 1400; T.kb = 1200;
+        if (once('jtoss', TOSS + 8)) punchKick(lead, 1.8);
+        if (rec) {
+          T.lead = mix3(T.lead, GUARD.lead, rec); T.rear = mix3(T.rear, GUARD.rear, rec); T.leadB = mix(T.leadB, GUARD.leadB, rec); T.rearB = mix(T.rearB, GUARD.rearB, rec);
+          T.chest = mix(T.chest, 0, rec); T.hip = mix(T.hip, 0, rec); T.pitch = mix(T.pitch, GUARD.pitch, rec); T.k = 300; T.z = 0.5;
+        }
+      }
+    } else if (g) {
+      for (const A of ['R', 'L']) { const a = aimArm(A, 0.45, [0, 0, 0.2], g.C, 1.3); set(A, a.v, 0.9, a.s); }
+      const lift = sstep(6, 12, t), arch = sstep(12, 23, t);
+      T.pitch = mix(mix(0.25, 0, lift), -0.5, arch); T.sink = mix(0.3 + 0.3 * lift, 0.15, arch);
+      T.k = 1800; T.kb = 1500; T.kc = 600; T.kh = 600;
+      if (once('hug', 2)) this._kick(this.belly, [0, -1.6, 0]);
+    } else {
+      const a = t - TOSS, rec = sstep(2, 18, a);
+      T.lead = mix3([0.6, 0.85, -0.2], GUARD.lead, rec); T.rear = mix3([0.6, 0.8, -0.2], GUARD.rear, rec);
+      T.leadB = mix(0.3, GUARD.leadB, rec); T.rearB = mix(0.3, GUARD.rearB, rec); T.sLead = T.sRear = 1;
+      T.pitch = mix(-0.6, GUARD.pitch, rec); T.sink = mix(0.25, 0.12, rec); T.k = 400; T.z = 0.5;
+      if (once('slamB', TOSS)) { this.sink.v += 8; this._kick(this.belly, [0, -2.5, 0]); }
+    }
   }
 
   /* the beats of one move: where he is in its startup / active / recovery */
@@ -305,6 +369,8 @@ export class BoxerFeel extends BipedPuppet {
       T.lead = mix3(GUARD.lead, [0.2, 0.35, 1], r); T.rear = mix3(GUARD.rear, [0.2, 0.35, 1], r);
       T.leadB = mix(1.05, 0.3, r); T.rearB = mix(1.45, 0.3, r); T.hint = { lead: 'in', rear: 'in' };
       T.pitch = mix(0.12, 0.4, r); T.sink = mix(0.2, 0.35, r); T.k = r > 0 && t < 9 ? 3000 : 400;
+    } else if (mv === 'throwHold' && (this.grip || this.throwT != null)) {
+      this._throws(t, T, lead, once, punchKick);
     } else if (mv === 'throwHold') {
       // the clinch (both gloves wrapped round him, a shake), a dip and a
       // half-turn back — then the two-handed shove, the hips through it

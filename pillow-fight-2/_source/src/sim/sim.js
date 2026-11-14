@@ -52,6 +52,14 @@ export const HANG_V = 70;
 export const DIVE_HANG = 6;
 export const THROW_GAP = 2;
 export const TECH = 12;
+// the throw's toss (PF1's throws pass, in 3D): the victim is held, and let
+// go of, just past touching (throwOut) on the side he's thrown to — ahead,
+// or behind the thrower over his shoulder — at the thrower's release height
+// (FIGHTERS[id].throwUp: [forward, back]); a flight, one soft bounce, down
+export const THROW_OUT = 150;
+export const THROW_VX = 104;
+export const THROW_VY = 150;
+export const THROW_BOUNCE = 72;
 export const CANCEL = 9;
 export const LOCK = 26;
 export const STRING = 20;
@@ -95,7 +103,7 @@ function newFighter(id, side) {
     combo: 0, taken: 0, nag: 0,
     tf: 0, tb: 0, hf: 0, hb: 0, dash: 0, db: 0, dd: 0,
     ss: 0, sb: 0, sd: 0, sr: 0,              // sidestep: asked (dir, buffer), doing (dir), radius
-    jmp: 0, jd: 0, dl: 0, ro: 0, out: 0, td: 1,
+    jmp: 0, jd: 0, dl: 0, ro: 0, out: 0, td: 1, bn: 0,
     lt: -99, ht: -99, ok: 0, ch: 0, lc: 0, lk: 0, it: 99, rep: 0, lmv: '', rt: -999,
     kx: 0, kz: 0, ky: 0, kvx: 0, kvz: 0, kvy: 0, kb: 0, kr: 0, kfx: 0, kfz: 0, kfl: 0,
   };
@@ -411,7 +419,7 @@ function attackTick(st, k, f, o, D) {
     return;
   }
   if ((f.mv === 'specialHold' || f.mv === 'throwHold') && o.act === 'grabbed') {
-    const r = f.mv === 'throwHold' ? 1300 : 1500;
+    const r = f.mv === 'throwHold' ? throwOut(f, o) : 1500;
     const wx = f.x + tdiv(f.fx * r, ONE), wz = f.z + tdiv(f.fz * r, ONE);
     o.x += tdiv(wx - o.x, 4); o.z += tdiv(wz - o.z, 4);
   }
@@ -419,6 +427,9 @@ function attackTick(st, k, f, o, D) {
     f.act = f.air ? 'jump' : 'idle'; f.t = 0; f.mv = ''; f.aired = f.air ? 1 : 0;
   }
 }
+
+/* how far in front (or behind) a thrown fighter is held and let go of */
+export const throwOut = (f, o) => ((FIGHTERS[f.id].push.w + FIGHTERS[o.id].push.w) >> 1) + THROW_OUT;
 
 /* where o stands in f's frame: along f's facing, and across it */
 function local(f, o) {
@@ -496,6 +507,10 @@ function land(st, k, f) {
       f.mv = 'diveLand'; f.t = 0; f.hm = f.hm ? 1 : 0;
     } else if (m.air) { f.act = 'idle'; f.t = 0; f.mv = ''; }
     f.vx = 0; f.vz = 0;
+  } else if (f.act === 'down' && f.bn) {
+    // thrown: one soft bounce off the mat, then down
+    f.bn = 0; f.air = 1; f.vy = THROW_BOUNCE; f.vx = tdiv(f.vx, 2); f.vz = tdiv(f.vz, 2);
+    st.ev.push({ k: 'bounce', p: k, x: f.x, z: f.z });
   } else if (f.act === 'down') { f.stun = DOWN_T; f.vx = 0; f.vz = 0; }
   else { f.vx = 0; f.vz = 0; }
 }
@@ -634,9 +649,12 @@ function strike(st) {
     let dx = f.fx, dz = f.fz;
     if (c.h.toss) {
       dx = f.fx * f.td; dz = f.fz * f.td;
-      if (f.td < 0) {
-        // over the shoulder: he lands behind the thrower
-        o.x = f.x - tdiv(f.fx * 1300, ONE); o.z = f.z - tdiv(f.fz * 1300, ONE); edge(o);
+      if (o.act === 'grabbed') {
+        // let go of out on the side it goes to (behind him over the shoulder:
+        // the two swap sides), up off the mat at the release height
+        const r = throwOut(f, o) * f.td;
+        o.x = f.x + tdiv(f.fx * r, ONE); o.z = f.z + tdiv(f.fz * r, ONE); edge(o);
+        o.y = FIGHTERS[f.id].throwUp[f.td > 0 ? 0 : 1];
       }
     }
     const power = !m.lite && m.kind !== 'throw';
@@ -705,6 +723,7 @@ function landHit(st, a, h, dx, dz, o) {
   st.pause = Math.max(st.pause, h.pause + (amp ? 4 : 0) + (ctr ? 2 : 0) + (edgeKO ? 3 : 0));
   st.ev.push({ k: 'hit', p: a, x: at[0], y: at[1], z: at[2], dmg, kind, sp: special ? 1 : 0, kd: h.kd || amp || edgeKO ? 1 : 0, n: d.combo, amp, ctr, thr: h.toss ? 1 : 0, edge: edgeKO ? 1 : 0 });
   if (d.hp === 0) {
+    d.bn = 0;
     d.act = 'ko'; d.t = 0; d.air = 1; d.vy = 0; d.vx = 0; d.vz = 0; d.px = 0; d.pz = 0; d.kfx = dx; d.kfz = dz;
     d.ro = h.toss ? 0 : 1;
     if (!st.ko) st.ko = special ? 'special' : 'normal';
@@ -718,9 +737,12 @@ function landHit(st, a, h, dx, dz, o) {
     // ring-out power: not a throw's toss, not a light
     d.ro = o.power && !h.toss ? 1 : 0;
     if (h.toss) {
-      // a throw never throws him off: shorten the toss to the room there is
+      // a long flight and a soft bounce — and never off the bed: the toss
+      // shortened to the room there is (the edge holds him anyway)
+      const g = FIGHTERS[d.id].grav, n = tdiv(THROW_VY + isqrt(THROW_VY * THROW_VY + 2 * g * d.y), g) + tdiv(THROW_BOUNCE, g);
       const r2 = roomAlong(d.x, d.z, dx, dz) - 900;
-      if (r2 < 78 * 30) { const v = Math.max(0, tdiv(r2, 30)); [d.vx, d.vz] = vec(dx, dz, v); }
+      const v = Math.max(0, Math.min(THROW_VX, tdiv(r2, Math.max(1, n))));
+      d.vy = THROW_VY; [d.vx, d.vz] = vec(dx, dz, v); d.bn = 1;
     }
   } else {
     d.act = 'hitstun'; d.stun = h.hitstun + (ctr ? 8 : 0); d.t = 0; d.vx = 0; d.vz = 0;

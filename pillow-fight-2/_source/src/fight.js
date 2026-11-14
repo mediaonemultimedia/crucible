@@ -5,7 +5,8 @@
    shakes, camera moments; the UI gets them through `onEvent`, the sound
    through `onSfx`. Nothing here writes to the sim's state.              */
 
-import { createMatch, stepInPlace, RING } from './sim/sim.js';
+import { createMatch, stepInPlace, RING, lineOf } from './sim/sim.js';
+import { carry, throwerAcro, landSpin, SHAPE } from './render/throws.js';
 import { FIGHTERS } from './fighters/index.js';
 import { CPU } from './ai/cpu.js';
 import { Plush } from './render/plush.js';
@@ -107,6 +108,19 @@ export class Fight {
   _fx(e) {
     this.onSfx(e, this.evTick, this.evN);
     const S = this.arena, st = this.st;
+    if (e.k === 'hit' && e.thr) {
+      // the toss: the thrown one is drawn from where he's let go of (no
+      // sweep from the hold), his spin carried on through the flight
+      const v = st.f[1 - e.p], t = st.f[e.p];
+      this.prev[1 - e.p] = { x: v.x, y: v.y, z: v.z };
+      const ls = landSpin(t, v), g = FIGHTERS[v.id].grav;
+      const fl = (v.vy + Math.sqrt(v.vy * v.vy + 2 * g * Math.max(0, v.y))) / g;
+      this.plush[1 - e.p].thrown = { from: -ls.from, to: -ls.to, n: fl, axis: [-t.fz, t.fx], id: v.id };
+    }
+    if (e.k === 'bounce') {
+      for (const d of [-1, 1]) S.tufts(e.x / U + d * 0.35, 0.1, e.z / U, 5, 0.7, [d, 0]);
+      S.shake(0.2); this.plush[e.p].hit(60, 0, 0);
+    }
     if (e.k === 'hit' || e.k === 'block') {
       const x = e.x / U, y = e.y / U, z = e.z / U;
       const att = st.f[e.p], victim = this.plush[1 - e.p];
@@ -190,6 +204,7 @@ export class Fight {
     const koSeq = st.phase === 'ko' && st.kt < st.kn;
     const slow = koSeq ? st.ks / 100 : 1;
     const P = this.positions(a);
+    const V = this._throws(st, P, a);
     for (let k = 0; k < 2; k++) {
       const F = st.f[k], O = st.f[1 - k], pl = this.plush[k];
       const threat = O.act === 'attack' || st.proj.some((p) => p.o !== k);
@@ -202,8 +217,12 @@ export class Fight {
       // (render only) turned a little toward the camera, as PF1 did, so the faces read
       const yf = Math.atan2(F.fx, F.fz), az = this.arena.cam.az;
       pl.yawCheat = Math.max(-0.5, Math.min(0.5, Math.atan2(Math.sin(az - yf), Math.cos(az - yf)) * 0.32));
-      pl.update(Math.min(dt, 0.05) * slow, puppetView(F), O, P[k], P[1 - k], threat);
+      const view = puppetView(F);
+      if (V[k]) { view.fx = V[k][0]; view.fz = V[k][1]; pl.yawCheat = 0; }
+      if (F.act === 'attack' && F.mv === 'throwHold') pl.yawCheat = 0;
+      pl.update(Math.min(dt, 0.05) * slow, view, O, P[k], P[1 - k], threat);
     }
+    for (let k = 0; k < 2; k++) this.plush[k].afterThrow?.(this.plush[1 - k]);
     let focus = null;
     if (koSeq) {
       const L = st.f.map((f, k) => (f.act === 'ko' ? k : -1)).filter((k) => k >= 0);
@@ -221,9 +240,66 @@ export class Fight {
     }
     this.focus = focus || this.winFocus || null;
     const extra = this.arena.projectiles(st.proj, a, this.prevProj);
-    this.arena.frame(P[0], P[1], dt || 0.016, innerWidth / innerHeight, this.focus, this.tall);
+    // a throw: the camera keeps the line it had at the grab (an over-the-
+    // shoulder throw swaps their sides; the camera doesn't swing round),
+    // centred on the two of them, until the thrown one is up again
+    let C0 = P[0], C1 = P[1];
+    const thr = st.f.findIndex((f) => f.act === 'attack' && f.mv === 'throwHold');
+    const flying = st.f.some((f) => f.act === 'down' || f.act === 'getup');
+    if (thr >= 0 && !this.camLock) this.camLock = { h: [(this.prev[1].x - this.prev[0].x) / 2 / U, (this.prev[1].z - this.prev[0].z) / 2 / U] };
+    else if (thr < 0 && !flying) this.camLock = null;
+    if (this.camLock && !koSeq) {
+      const m = [(P[0][0] + P[1][0]) / 2, (P[0][2] + P[1][2]) / 2], h = this.camLock.h;
+      C0 = [m[0] - h[0], P[0][1], m[1] - h[1]]; C1 = [m[0] + h[0], P[1][1], m[1] + h[1]];
+    }
+    this.arena.frame(C0, C1, dt || 0.016, innerWidth / innerHeight, this.focus, this.tall);
     this.arena.paintShadows(this.plush, extra);
     this.arena.update(dt * slow);
+  }
+
+  /* the throws (render/throws.js, PF1's paths in the thrower's own frame):
+     the one being thrown is drawn on the throw's path — his middle, his
+     spin about the thrower's cross axis — rather than where the sim holds
+     him; the thrower gets the grab point to reach for and his own turn.
+     The sideways part of a path (Rubberta's spin cycle) swings toward the
+     camera. P is updated for the held one; returns, per plush, a facing to
+     draw him with (the held one squarely toward the thrower) or null. */
+  _throws(st, P, a) {
+    const V = [null, null];
+    const L = lineOf(st);
+    for (let k = 0; k < 2; k++) {
+      const pl = this.plush[k];
+      pl.hold = null; pl.grip = null; pl.throwAcro = null; pl.throwT = null;
+    }
+    for (let k = 0; k < 2; k++) {
+      const F = st.f[k], O = st.f[1 - k], pl = this.plush[k];
+      if (!(F.act === 'attack' && F.mv === 'throwHold' && F.td)) continue;
+      const t = Math.max(0, F.t - 1 + (st.pause > 0 ? 1 : a));
+      const fx = F.fx / 1024, fz = F.fz / 1024;
+      let lx = -fz, lz = fx;
+      const sg = lx * -L.ix + lz * -L.iz >= 0 ? 1 : -1;
+      lx *= sg; lz *= sg;
+      const axis = [-fz, fx];
+      const ac = throwerAcro(F, t);
+      if (ac) pl.throwAcro = { a: -ac.a, h: ac.h, y: ac.y || 0, yaw: -sg * (ac.yaw || 0), axis };
+      pl.throwT = t;
+      if (O.act !== 'grabbed') continue;
+      const c = carry(F, O, t), T = P[k], mid = SHAPE[O.id].mid;
+      const w = Math.min(1, t / 4), e = w * w * (3 - 2 * w);
+      const at = (f, u, z) => [T[0] + fx * f + lx * z, T[1] + u, T[2] + fz * f + lz * z];
+      const C = at(c.C[0], c.C[1], c.z);
+      const p0 = P[1 - k];
+      const H = [p0[0] + (C[0] - p0[0]) * e, p0[1] + mid + (C[1] - p0[1] - mid) * e, p0[2] + (C[2] - p0[2]) * e];
+      this.plush[1 - k].hold = { pos: [H[0], H[1] - mid, H[2]], a: -c.a * e, axis, h: mid, yaw: -sg * c.yaw, pose: c.pose, t };
+      const up = c.c.up;
+      pl.grip = {
+        G: at(c.G[0], c.G[1], c.z), C: H, r: c.c.r, t, back: c.back, id: O.id,
+        top: [H[0] + fx * Math.sin(c.a) * up, H[1] + Math.cos(c.a) * up, H[2] + fz * Math.sin(c.a) * up],
+      };
+      P[1 - k] = [H[0], H[1] - mid, H[2]];
+      V[1 - k] = [-F.fx, -F.fz];
+    }
+    return V;
   }
 
   dispose() {
