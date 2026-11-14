@@ -23,7 +23,7 @@ STAGE 1 of 2, in progress. Milestones (pushed after each):
 
 1. [x] Arena + camera: the mattress ring, the bedroom set, the orbiting camera, two fighters.
 2. [x] 3D movement + ring-outs, deterministic tests (`test/sim.test.mjs`, 17 tests).
-3. [ ] Combat core in 3D.
+3. [x] Combat core in 3D: hit volumes in the attacker's frame (linear vs tracking), block / low block, hitstun, knockdown, throws (more-room rule, tech), meter + specials, the K.O. and ring-out cinematics (`test/combat.test.mjs`).
 4. [ ] All 7 fighters.
 5. [ ] CPU, modes, HUD, select, audio, title.
 6. [ ] Build + release.

@@ -21,10 +21,12 @@
    differ: a likelihood, not a guarantee). Either player can rebind
    any key on the versus controls card (saved on this device).          */
 
-import { LEFT, RIGHT, UP, DOWN, LIGHT, HEAVY, SPECIAL, BLOCK } from '../sim/input.js';
+import { LEFT, RIGHT, UP, DOWN, LIGHT, HEAVY, SPECIAL, BLOCK, JUMP, CROUCH } from '../sim/input.js';
 
+/* PF2: PF1's keys, with W / S now the sidestep (tap) and the circle (hold);
+   the hop and the crouch get keys of their own: Q and Left Shift (C too). */
 export const SOLO = {
-  KeyA: LEFT, KeyD: RIGHT, KeyW: UP, KeyS: DOWN, KeyO: LIGHT, KeyP: HEAVY, Space: SPECIAL, KeyE: BLOCK,
+  KeyA: LEFT, KeyD: RIGHT, KeyW: UP, KeyS: DOWN, KeyO: LIGHT, KeyP: HEAVY, Space: SPECIAL, KeyE: BLOCK, KeyQ: JUMP, ShiftLeft: CROUCH, KeyC: CROUCH,
   ArrowLeft: LEFT, ArrowRight: RIGHT, ArrowUp: UP, ArrowDown: DOWN,
 };
 
@@ -32,8 +34,10 @@ export const SOLO = {
 export const ACTIONS = [
   { id: 'left', bit: LEFT, label: 'back / walk' },
   { id: 'right', bit: RIGHT, label: 'forward / walk' },
-  { id: 'up', bit: UP, label: 'jump' },
-  { id: 'down', bit: DOWN, label: 'crouch' },
+  { id: 'up', bit: UP, label: 'sidestep in / circle' },
+  { id: 'down', bit: DOWN, label: 'sidestep out / circle' },
+  { id: 'jump', bit: JUMP, label: 'hop' },
+  { id: 'crouch', bit: CROUCH, label: 'crouch' },
   { id: 'light', bit: LIGHT, label: 'light' },
   { id: 'heavy', bit: HEAVY, label: 'heavy' },
   { id: 'block', bit: BLOCK, label: 'block' },
@@ -42,8 +46,8 @@ export const ACTIONS = [
 
 /* the versus defaults: action → keys (the first is the one shown) */
 export const VERSUS_DEFAULT = [
-  { left: ['KeyA'], right: ['KeyD'], up: ['KeyW'], down: ['KeyS'], light: ['KeyG'], heavy: ['KeyH'], block: ['KeyE'], special: ['Space'] },
-  { left: ['ArrowLeft'], right: ['ArrowRight'], up: ['ArrowUp'], down: ['ArrowDown'], light: ['Numpad4'], heavy: ['Numpad5'], block: ['Numpad6'], special: ['Numpad0', 'NumpadEnter'] },
+  { left: ['KeyA'], right: ['KeyD'], up: ['KeyW'], down: ['KeyS'], jump: ['KeyQ'], crouch: ['ShiftLeft'], light: ['KeyG'], heavy: ['KeyH'], block: ['KeyE'], special: ['Space'] },
+  { left: ['ArrowLeft'], right: ['ArrowRight'], up: ['ArrowUp'], down: ['ArrowDown'], jump: ['Numpad8'], crouch: ['Numpad2'], light: ['Numpad4'], heavy: ['Numpad5'], block: ['Numpad6'], special: ['Numpad0', 'NumpadEnter'] },
 ];
 
 /* keys the game keeps for itself in versus (pause, the menus' confirm) */
@@ -73,7 +77,7 @@ export function rebind(bindings, k, action, code) {
 }
 
 /* saved bindings, or the defaults (anything broken: the defaults) */
-const KEY = 'pillowfight.versusKeys.v1';
+const KEY = 'pillowfight2.versusKeys.v1';
 export function loadBindings(storage) {
   try {
     const v = JSON.parse(storage?.getItem(KEY) || 'null');

@@ -50,8 +50,8 @@ export const KEYS = [
 export const KEY_AT = Object.fromEntries(KEYS.map((k) => [k.code, k]));
 
 /* the word on a lit cap */
-export const ACTION_WORD = { left: 'Move', right: 'Move', up: 'Jump', down: 'Crouch', light: 'Light', heavy: 'Heavy', block: 'Block', special: 'Special' };
-const ARROW = { left: '◀', right: '▶' };
+export const ACTION_WORD = { left: 'Move', right: 'Move', up: 'Side', down: 'Side', jump: 'Hop', crouch: 'Crouch', light: 'Light', heavy: 'Heavy', block: 'Block', special: 'Special' };
+const ARROW = { left: '◀', right: '▶', up: '▲', down: '▼' };
 
 /* the one-player layout as a binding (action → codes), from SOLO's mask map */
 export function soloBinding() {
@@ -118,7 +118,7 @@ export function keyboardSVG(bindings, { wait = null, click = false, title = 'Key
 
 /* the combos under it; off-board keys and unbound actions listed */
 export function comboLine() {
-  return '<b>Throw</b> Light+Heavy · <b>Dash</b> double-tap Move · <b>Signature</b> Crouch+Heavy · <b>Dive slam</b> Crouch+Heavy in the air · <b>Low block</b> Crouch+Block · <b>Mute</b> M';
+  return '<b>Sidestep</b> tap Side (hold: circle) · <b>Spin</b> Back+Heavy (tracks a sidestep) · <b>Throw</b> Light+Heavy · <b>Dash</b> double-tap Move · <b>Signature</b> Crouch+Heavy · <b>Dive slam</b> Crouch+Heavy in the air · <b>Low block</b> Crouch+Block · <b>Mute</b> M';
 }
 export function strays(bindings, keyCap) {
   const out = [];
