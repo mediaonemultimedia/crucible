@@ -622,7 +622,7 @@ body.practicing #practice-panel{display:block}
       <button class="opt sel" data-mode="cpu">Vs Computer <small>1 player</small></button>
       <button class="opt" data-mode="versus">Versus <small>2 players · 1 keyboard</small></button>
       <button class="opt" data-mode="practice">Practice <small>a dummy and the move list</small></button>
-      <button class="opt" disabled data-mode="online">Online <small>coming in the next update</small></button>
+      <button class="opt" data-mode="online">Online <small>play a friend · share a link</small></button>
       <div class="hintline">W / S choose · O or Enter to go</div>
     </div>
   </section>
@@ -679,6 +679,34 @@ body.practicing #practice-panel{display:block}
   <div id="flash"></div>
   <div id="banner"></div>
 
+  <section id="online-screen" class="screen" data-state="menu">
+    <div class="menu">
+      <h2>Online</h2>
+      <div class="ol ol-menu">
+        <button class="opt sel" data-act="host">Host a match <small>you're player 1</small></button>
+        <button class="opt" data-act="back">Back</button>
+        <div class="hintline">Host, then send your friend the link</div>
+      </div>
+      <div class="ol ol-hosting">
+        <div class="olnote">Send this link to your friend</div>
+        <div class="code" id="ol-code">·····</div>
+        <div class="linkrow"><input id="ol-link" readonly value="" aria-label="share link"><button class="opt small sel" data-act="copy" id="ol-copy">Copy link</button></div>
+        <div class="olnote wait"><span class="spin"></span><span id="ol-wait">Waiting for your friend to open it…</span></div>
+        <button class="opt" data-act="cancel">Cancel</button>
+        <div class="olnote prnote"><kbd>C</kbd> copy link · <kbd>Esc</kbd> leave</div>
+      </div>
+      <div class="ol ol-joining">
+        <div class="olnote big"><span class="spin"></span><span id="ol-joinmsg">Joining the match…</span></div>
+        <button class="opt" data-act="cancel">Cancel</button>
+      </div>
+      <div class="ol ol-error">
+        <div class="olnote err" id="ol-err">Connection failed</div>
+        <button class="opt sel" data-act="retry">Try again</button>
+        <button class="opt" data-act="cpu">Play vs Computer</button>
+      </div>
+    </div>
+  </section>
+
   <section id="pause-screen" class="screen">
     <div class="menu">
       <div class="col">
@@ -710,5 +738,7 @@ body.practicing #practice-panel{display:block}
   <div id="toast"></div>
 </div>
 <!--BUNDLE-->
+  <div id="net" aria-live="polite"></div>
+  <div id="netwait"><div class="box"><span class="spin"></span><span id="netwait-msg">Waiting for opponent (10s)</span></div></div>
 </body>
 </html>

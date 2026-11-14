@@ -123,7 +123,7 @@ if (fetched.length) fail.push('page fetches external resources');
 if (dynImports.length) fail.push('page has dynamic imports');
 if (urlLiterals.length) fail.push(`script contains absolute URLs: ${urlLiterals.join(', ')}`);
 if (netLiterals.length) fail.push(`script names network hosts outside the online allowlist: ${netLiterals.join(', ')}`);
-if (false && !stunOk) fail.push('online: the broker / STUN configuration is missing');
+if (!stunOk) fail.push('online: the broker / STUN configuration is missing');
 if (fail.length) {
   console.error(`\nNOT SELF-CONTAINED\n  ${fail.join('\n  ')}`);
   process.exit(1);

@@ -25,6 +25,7 @@ import { CLIPS } from './audio/clips.js';
 import { SfxRouter } from './audio/sfxmap.js';
 import { CPU } from './ai/cpu.js';
 import { LEFT, RIGHT, UP, DOWN, LIGHT, HEAVY, SPECIAL, BLOCK, JUMP, CROUCH } from './sim/input.js';
+import { Online } from './online.js';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -63,6 +64,7 @@ class App {
     this.router = new SfxRouter();
     this.audio.onChange(() => this._paintSound());
     this.dummyMode = 'stand';
+    this.net = new Online(this);
     this._bindUI();
     this.resize();
     addEventListener('resize', () => this.resize());
@@ -92,7 +94,7 @@ class App {
     const A = this.audio;
     A.pause(name === 'pause');
     A.setPractice(!!this.fight?.practice);
-    if (['title', 'mode', 'select', 'diff'].includes(name)) { A.setIntense(false); A.music('menu'); }
+    if (['title', 'mode', 'select', 'diff', 'online'].includes(name)) { A.setIntense(false); A.music('menu'); }
     if (name === 'fight' && this.fight?.practice) A.music('fight');
   }
 
@@ -116,10 +118,12 @@ class App {
   _bindUI() {
     for (const b of $$('#mode-screen .opt')) b.onclick = () => {
       if (b.disabled) return;
+      if (b.dataset.mode === 'online') { this.mode = 'cpu'; this.net.menu(); return; }
       this.mode = b.dataset.mode;
       this.go('select');
     };
     for (const b of $$('#diff-screen .opt')) b.onclick = () => { this.level = b.dataset.level; this.startFight({ vs: true }); };
+    for (const b of $$('#online-screen .opt')) b.onclick = () => this.net.act(b.dataset.act);
     for (const b of $$('#pause-screen .opt')) b.onclick = () => this._pauseAct(b.dataset.act);
     for (const b of $$('#win-screen .opt')) b.onclick = () => this._winAct(b.dataset.act);
     for (const b of $$('.opt')) b.addEventListener('pointerenter', () => { if (b.disabled) return; if (!b.classList.contains('sel')) this.audio.ui('tick'); for (const o of b.parentNode.querySelectorAll(':scope > .opt')) o.classList.toggle('sel', o === b); });
@@ -165,12 +169,22 @@ class App {
         else if (ok) this._menuFire('#mode-screen .opt');
         else if (c === 'Escape') this.go('title');
         return;
+      case 'online': {
+        const st = $('#online-screen').dataset.state;
+        if (c === 'KeyC' && st === 'hosting') { this.net.copy(); return; }
+        if (up || down) this._menuMove(`#online-screen .ol-${st} .opt`, up ? -1 : 1);
+        else if (ok) this._menuFire(`#online-screen .ol-${st} .opt`);
+        else if (c === 'Escape') this.net.act(st === 'menu' ? 'back' : 'cancel');
+        return;
+      }
       case 'diff':
         if (up || down) this._menuMove('#diff-screen .opt', up ? -1 : 1);
         else if (ok) this._menuFire('#diff-screen .opt');
         else if (back) { this.locked[1] = false; this.picking = 1; this.go('select'); }
         return;
-      case 'select': return this._selectKey(e, { up, down, left, right, ok, back });
+      case 'select':
+        if (this.net.on) return this.net.selectKey(e, { up, down, left, right, ok, back });
+        return this._selectKey(e, { up, down, left, right, ok, back });
       case 'pause':
         if (c === 'Escape') this.pause(false);
         else if (up || down) this._menuMove('#pause-screen .col > .opt, #pause-screen .snd > .opt', up ? -1 : 1);
@@ -178,11 +192,12 @@ class App {
         else if (ok) this._menuFire('#pause-screen .col > .opt, #pause-screen .snd > .opt');
         return;
       case 'win':
+        if (this.net.on && c === 'Escape') { this._winAct('select'); return; }
         if (left || right || up || down) this._menuMove('#win-screen .opt', 1);
         else if (ok) this._menuFire('#win-screen .opt');
         return;
       case 'fight':
-        if (c === 'Escape' && !e.repeat) { this.pause(true); return; }
+        if (c === 'Escape' && !e.repeat && !this.net.on) { this.pause(true); return; }
         if (this.fight?.practice && !e.repeat) {
           const dm = { Digit1: 'stand', Digit2: 'block', Digit3: 'sidestep', Digit4: 'cpu' }[c];
           if (dm) { this.dummyMode = dm; this._paintPractice(); }
@@ -209,8 +224,8 @@ class App {
       c.innerHTML = `<span class="flag">${flagOf(id)}</span><span class="lab">${f.name}</span>`;
       this._cardPortrait(c);
       const seat = () => (this.mode === 'versus' ? (this.locked[0] ? 1 : 0) : this.picking);
-      c.onclick = () => { const k = seat(); if (this.locked[k]) return; this.pick[k] = i; this._lock(k); };
-      c.onmouseenter = () => { const k = seat(); if (this.locked[k] || this.pick[k] === i) return; this.pick[k] = i; this.audio.ui('tick'); this._paintSelect(); };
+      c.onclick = () => { if (this.net.on) { this.net.choose(i, true); return; } const k = seat(); if (this.locked[k]) return; this.pick[k] = i; this._lock(k); };
+      c.onmouseenter = () => { if (this.net.on) { if (!this.locked[this.net.local] && this.pick[this.net.local] !== i) { this.net.choose(i, false); this.audio.ui('tick'); } return; } const k = seat(); if (this.locked[k] || this.pick[k] === i) return; this.pick[k] = i; this.audio.ui('tick'); this._paintSelect(); };
       cards.appendChild(c);
     });
     this._legend();
@@ -271,7 +286,8 @@ class App {
 
   _paintSelect() {
     const ids = this.pick.map((i) => ROSTER[i]);
-    const two = this.mode === 'versus' || this.picking === 1 || this.locked[1];
+    const online = this.net.on;
+    const two = this.mode === 'versus' || online || this.picking === 1 || this.locked[1];
     for (const c of $$('.card')) {
       const i = ROSTER.indexOf(c.dataset.id);
       c.classList.toggle('c1', i === this.pick[0]);
@@ -288,7 +304,7 @@ class App {
       P.querySelector('.an').innerHTML = `${esc(f.animal)} · ${esc(f.style)}${evil ? `<br><b style="color:#ff6b6b">ALT</b> ${esc(TWIN_TITLE[id] || '')}` : ' · <b>OG</b>'}`;
       P.querySelector('.moves').innerHTML = `<b>Shift+P</b> ${esc(f.signatureName)}<br><b>Space</b> ${esc(f.specialName)}<br><b>←+P</b> Spin (tracking)`;
     };
-    plate('.plate.p1', 0, this.mode === 'versus' || this.picking === 0);
+    plate('.plate.p1', 0, this.mode === 'versus' || online || this.picking === 0);
     $('.plate.p2').style.display = two ? '' : 'none';
     if (two) plate('.plate.p2', 1, true);
     $('.plate.p1 .who').textContent = 'Player 1';
@@ -301,20 +317,21 @@ class App {
       $('#select-step').textContent = this.picking === 0 ? (pr ? 'Practice — pick your fighter' : 'Pick for Player 1') : (pr ? 'Pick the practice dummy' : 'Pick the Computer’s fighter');
       $('#select-hint').textContent = `${this.picking === 0 ? 'Player 1' : pr ? 'Dummy' : 'Computer'} — A / D to choose, W / S for OG or ALT, O to pick${this.picking ? ', P to go back' : ''}`;
     }
+    if (online) this.net.paintSelect();
     if (this.table) { this.table.set(0, ids[0], this.alt[0]); this.table.set(1, two ? ids[1] : null, this.alt[1]); }
   }
 
   /* ── the fight ─────────────────────────────────────────────────────── */
-  startFight({ p1 = ROSTER[this.pick[0]], p2 = ROSTER[this.pick[1]], level = this.level, p1cpu = null, seed = null, vs = false } = {}) {
+  startFight({ p1 = ROSTER[this.pick[0]], p2 = ROSTER[this.pick[1]], level = this.level, p1cpu = null, seed = null, vs = false, net = null } = {}) {
     if (this.table) { this.table.dispose(); this.table = null; }
     if (this.fight) { this.fight.dispose(); this.fight = null; }
-    const versus = this.mode === 'versus';
+    const versus = this.mode === 'versus' && !net;
     this.kb.setMap(versus ? toMap(this.bind[0]) : SOLO);
     this.kb2.enabled = versus;
     this.kb2.setMap(toMap(this.bind[1]));
     const s = seed || (this.seed = (this.seed * 1103515245 + 12345) & 0x7fffffff) || 1;
-    const f = (this.fight = new Fight(this.arena, { p1, p2, seed: s, cpu: [p1cpu, versus ? null : level], keyboard: this.kb, keyboard2: versus ? this.kb2 : null, alt: this.alt }));
-    this.last = { p1, p2, level, p1cpu };
+    const f = (this.fight = new Fight(this.arena, { p1, p2, seed: s, cpu: net ? [null, null] : [p1cpu, versus ? null : level], keyboard: this.kb, keyboard2: versus ? this.kb2 : null, alt: this.alt, net }));
+    this.last = net ? null : { p1, p2, level, p1cpu };
     this._legend();
     f.onEvent = (e) => this._event(e);
     f.onTick = (st) => this._hud(st);
@@ -322,8 +339,8 @@ class App {
     f.onSwing = (st) => this._swing(st);
     this.router.reset?.();
     $('#pn1').textContent = f.name(0); $('#pn2').textContent = f.name(1);
-    $('#n1').textContent = versus ? 'Player 1' : p1cpu ? `CPU · ${p1cpu}` : 'Player 1';
-    $('#n2').textContent = versus ? 'Player 2' : `CPU · ${level}`;
+    $('#n1').textContent = net ? this.net.label(0) : versus ? 'Player 1' : p1cpu ? `CPU · ${p1cpu}` : 'Player 1';
+    $('#n2').textContent = net ? this.net.label(1) : versus ? 'Player 2' : `CPU · ${level}`;
     this._hudCache = null;
     this._hud(f.st);
     this.go('fight');
@@ -336,7 +353,7 @@ class App {
     const side = (k) => {
       const id = f.st.f[k].id, F = FIGHTERS[id];
       const ti = f.evil[k] ? `<b>ALT</b>${esc(TWIN_TITLE[id] || '')}` : `<b>OG</b>${esc(F.animal)}`;
-      return { pt: `<figure class="pt s${k + 1}"></figure>`, tag: `<div class="tag s${k + 1}"><span class="ti">${ti}</span><span class="nm">${esc(f.name(k))}</span><span class="who">${k === 0 ? 'Player 1' : this.mode === 'versus' ? 'Player 2' : `Computer · ${this.level}`}</span></div>` };
+      return { pt: `<figure class="pt s${k + 1}"></figure>`, tag: `<div class="tag s${k + 1}"><span class="ti">${ti}</span><span class="nm">${esc(f.name(k))}</span><span class="who">${f.session ? this.net.label(k) : k === 0 ? 'Player 1' : this.mode === 'versus' ? 'Player 2' : `Computer · ${this.level}`}</span></div>` };
     };
     const A = side(0), B = side(1);
     card.innerHTML = `<div class="bg b1"></div><div class="bg b2"></div><div class="seam"></div>${A.pt}${B.pt}<div class="mid">VS</div>${A.tag}${B.tag}<div class="skip">Any key to skip</div>`;
@@ -344,8 +361,10 @@ class App {
     document.body.classList.add('vs-on');
     card.onclick = () => this._vsEnd();
     this.audio.sting('vs');
-    this.vs = { t: 0, dur: 1.6 };
-    f.paused = true; this.kb.clear(); this.kb2.clear();
+    // online the sim never holds for the card (both peers run the intro under it)
+    this.vs = { t: 0, dur: f.session ? 1.1 : 1.6, online: !!f.session };
+    if (!f.session) f.paused = true;
+    this.kb.clear(); this.kb2.clear();
     [0, 1].forEach((k) => {
       const src = this.portraits[f.st.f[k].id];
       if (src) { const im = new Image(); im.alt = ''; im.className = 'in'; im.src = src; card.querySelector(`.pt.s${k + 1}`).appendChild(im); }
@@ -357,7 +376,7 @@ class App {
     if (!this.vs) { if (now) card.className = ''; return; }
     this.vs = null;
     document.body.classList.toggle('vs-on', false);
-    if (this.fight && this.screen === 'fight') { this.fight.paused = false; this.kb.clear(); this.kb2.clear(); }
+    if (this.fight && this.screen === 'fight' && !this.fight.session) { this.fight.paused = false; this.kb.clear(); this.kb2.clear(); }
     if (now) { card.className = ''; return; }
     card.className = 'out';
     setTimeout(() => { if (!this.vs) card.className = ''; }, 200);
@@ -419,7 +438,7 @@ class App {
   }
 
   pause(on) {
-    if (!this.fight) return;
+    if (!this.fight || this.fight.session) return;
     this.fight.paused = on;
     this.kb.clear(); this.kb2.clear();
     this.go(on ? 'pause' : 'fight');
@@ -432,6 +451,7 @@ class App {
   }
   _winAct(a) {
     $('#bubbles').textContent = '';
+    if (this.net.on) { this.net.winAct(a); return; }
     if (a === 'rematch' && this.last) this.startFight({ ...this.last, vs: true });
     else this.go('select');
   }
@@ -599,7 +619,8 @@ class App {
     this.go('win');
     $('#win-record').textContent = '';
     if (w === 2) { $('#win-eyebrow').textContent = 'No winner'; $('#win-name').textContent = 'Draw'; return; }
-    $('#win-eyebrow').textContent = `Pillow Fight 2 · ${f.cpu[w] ? (f.cpu[0] && f.cpu[1] ? `CPU ${w + 1} wins` : 'The computer wins') : `Player ${w + 1} wins`}`;
+    this.net.winScreen();
+    $('#win-eyebrow').textContent = `Pillow Fight 2 · ${f.session ? `Player ${w + 1} wins${w === this.net.local ? ' — that’s you' : ''}` : f.cpu[w] ? (f.cpu[0] && f.cpu[1] ? `CPU ${w + 1} wins` : 'The computer wins') : `Player ${w + 1} wins`}`;
     $('#win-name').innerHTML = `${esc(f.name(w))} wins`;
     const id = st.f[w].id, line = st.egg ? FIGHTERS[id].catchphrase.egg : FIGHTERS[id].catchphrase.main;
     // the camera comes round to the winner, close, from the front
@@ -619,6 +640,7 @@ class App {
   /* ── the loop ─────────────────────────────────────────────────────── */
   frame(dt, draw = true) {
     this.audio.pump();
+    this.net.frame(dt);
     if (this.vs && (this.vs.t += dt) >= this.vs.dur) this._vsEnd();
     this._timers(this.fight?.paused ? 0 : dt);
     if (this.fight && this.screen !== 'select' && this.screen !== 'diff') {
@@ -657,6 +679,7 @@ async function start() {
   app.hash = hash;
   app.createMatch = createMatch;
   app.cpuFor = (k, level, seed) => new CPU(k, level, seed);
+  app.ROSTER = ROSTER;
   app.renderAudio = (o) => renderOffline({ clips: CLIPS, ...o });
   if (!params.has('noportraits')) { try { app.portraits = await portraits(renderer, app.arena, ROSTER); } catch (err) { console.warn('portraits', err); } }
   for (const c of $$('#cards .card')) app._cardPortrait(c);
@@ -677,6 +700,7 @@ async function start() {
     app.alt = [params.get('alt1') === '1', params.get('alt2') === '1'];
     app.startFight({ p1, p2, level: params.get('cpu') || 'normal', p1cpu: params.get('p1cpu'), seed: (params.get('seed') | 0) || null });
   } else if (params.get('practice') !== null) app.startPractice({ p1: fighterId(params.get('practice')) || ROSTER[0], p2: fighterId(params.get('dummy')) || ROSTER[1] });
+  else if (params.get('room')) app.net.joinRoom(params.get('room'));
   else if (params.get('screen') === 'select') { app.mode = params.get('mode') || 'cpu'; app.go('select'); }
   else if (app.screen === 'title') app.go('title');
   document.body.classList.add('is-live');

@@ -10,7 +10,8 @@ import { FIGHTERS } from './fighters/index.js';
 import { CPU } from './ai/cpu.js';
 import { Plush } from './render/plush.js';
 import { U, BED_H } from './render/arena.js';
-import { ordinal } from './audio/sfxmap.js';
+import { ordinal, sessionTickOf } from './audio/sfxmap.js';
+import { Rollback } from './net/rollback.js';
 
 export const TICK = 1 / 60;
 
@@ -27,10 +28,13 @@ export function puppetView(F) {
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 export class Fight {
-  constructor(arena, { p1, p2, seed = 1, cpu = [null, 'normal'], keyboard = null, keyboard2 = null, practice = null, alt = null, dummy = null }) {
+  constructor(arena, { p1, p2, seed = 1, cpu = [null, 'normal'], keyboard = null, keyboard2 = null, practice = null, alt = null, dummy = null, net = null }) {
     this.arena = arena;
     this.practice = practice;
     this.st = createMatch({ p1, p2, seed });
+    // online: the sim runs inside a rollback session; this side's keyboard is player `net.local`
+    this.session = net ? new Rollback(this.st, { local: net.local, send: net.send, onDesync: net.onDesync }) : null;
+    if (net) { cpu = [null, null]; keyboard2 = null; }
     if (practice) { this.st.phase = 'fight'; this.st.pt = 0; this.st.timer = 99 * 60; }
     this.mirror = p1 === p2;
     this.evil = alt ? [!!alt[0], !!alt[1]] : [false, this.mirror];
@@ -65,6 +69,7 @@ export class Fight {
   name(k) { return (this.evil[k] ? 'Evil ' : '') + FIGHTERS[this.st.f[k].id].name; }
 
   tick() {
+    if (this.session) return this._netTick();
     const st = this.st;
     this.prev = st.f.map((f) => ({ x: f.x, y: f.y, z: f.z }));
     this.prevProj = new Map(st.proj.map((p) => [p.id, { x: p.x, y: p.y, z: p.z }]));
@@ -78,6 +83,25 @@ export class Fight {
     for (const e of st.ev) { this.evN = ordinal(st.ev, e); this._fx(e); }
     this.onSwing(st, st.tick);
     this.onTick(st);
+  }
+
+  /* online: the local mask goes into the session, which may roll back and
+     resimulate; it hands back each event once */
+  _netTick() {
+    const S = this.session, before = S.st.f.map((f) => ({ x: f.x, y: f.y, z: f.z }));
+    const projBefore = new Map(S.st.proj.map((p) => [p.id, { x: p.x, y: p.y, z: p.z }]));
+    let m = this.kb ? this.kb.sample() : 0;
+    if (this.override) { const o = this.override(S.st)[S.local]; if (o !== null && o !== undefined) m = o; }
+    const flow0 = S.flowDone;
+    const ev = S.advance(m);
+    this.st = S.st;
+    if (!ev) return;
+    this.prev = before;
+    this.prevProj = projBefore;
+    this.lastInputs = S.local === 0 ? [m, S.lastRemote] : [S.lastRemote, m];
+    for (const e of ev) { [this.evTick, this.evN] = sessionTickOf(S, e, flow0); this._fx(e); }
+    this.onSwing(this.st, this.st.tick);
+    this.onTick(this.st);
   }
 
   _fx(e) {
