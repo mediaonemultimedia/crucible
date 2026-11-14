@@ -54,24 +54,24 @@ const CH = {
     // the hockey-fight jersey pull: the jersey yanked up over his head (arms
     // forced up, head ducked, smothered, flailing blind) — then flipped away
     f: {
-      keys: (c) => [[0, c.D, c.mid, 0], [4, c.D - 0.2, c.mid + 0.05, -0.3], [9, c.D - 0.15, c.mid, -0.5], [15, c.D - 0.2, c.mid + 0.1, -0.4],
-        [20, c.D - 0.35, c.mid + 0.55, -0.75], [24, c.D + 0.05, c.rel + c.mid + 0.7, 0.6], [T, c.D, c.rel + c.mid, 1.9]],
+      keys: (c) => [[0, c.D, c.mid, 0], [4, c.D - 0.2, c.mid + 0.05, -0.15], [9, c.D - 0.15, c.mid, -0.25], [15, c.D - 0.2, c.mid + 0.1, -0.2],
+        [20, c.D - 0.35, c.mid + 0.55, -0.45], [24, c.D + 0.05, c.rel + c.mid + 0.7, 0.6], [T, c.D, c.rel + c.mid, 1.9]],
       grip: (c) => [0.05, c.up + 0.05], pose: 'smother', wob: [3, 19, 0.16],
       acro: (t) => ({ a: -0.22 * smooth(16, 21, t) * (1 - smooth(21, 25, t)) + 0.18 * smooth(22, 26, t) * (1 - smooth(30, 42, t)), h: 0.2, y: 0 }),
     },
     // the bear-hug suplex: hugged in, lifted, the back arched — over and behind
     b: {
       keys: (c) => [[0, c.D, c.mid, 0], [6, c.D - 0.4, c.mid + 0.1, -0.08], [12, c.D - 0.42, c.mid + 0.5, -0.15], [17, c.D - 0.7, c.mid + 1.2, -0.6],
-        [21, 0.05, c.ht + 0.55 + c.r * 0.5, -1.55], [25, -c.D + 0.25, c.ht + 0.1, -2.5], [T, -c.D, c.rel + c.mid, -2.95]],
+        [21, 0.05, c.ht + 0.55 + c.r * 0.5, -1.55], [25, -c.D + 0.15, c.ht + 0.35, -2.5], [T, -c.D, c.rel + c.mid, -2.95]],
       grip: (c) => [-c.r * 0.55, 0.05], pose: 'hug', wob: [2, 10, 0.08],
-      acro: (t) => ({ a: -0.75 * smooth(13, 23, t) * (1 - smooth(29, 42, t)), h: 0.25, y: 0 }),
+      acro: (t) => ({ a: -0.5 * smooth(13, 23, t) * (1 - smooth(29, 42, t)), h: 0.25, y: 0 }),
     },
   },
   k8e: {
     // a dip of the long neck, the scruff in her mouth — a neck swing and a flick
     f: {
       keys: (c) => [[0, c.D, c.mid, 0], [6, c.D, c.mid + 0.15, -0.12], [12, c.D + 0.1, c.mid + 1.0, 0.05], [16, c.D + 0.05, c.mid + 1.15, -0.1],
-        [22, c.D - 0.45, c.mid + 1.35, -0.5], [T, c.D, c.rel + c.mid, 1.35]],
+        [22, c.D - 0.12, c.mid + 1.35, -0.4], [T, c.D, c.rel + c.mid, 1.35]],
       grip: (c) => [c.hw * 0.35, c.up * 0.78], pose: 'dangle', wob: [8, 20, 0.1],
     },
     // the catapult: the mouth grab, then right up and over her own back
@@ -130,7 +130,7 @@ const CH = {
       keys: (c) => [[0, c.D, c.mid, 0], [8, c.D - 0.4, c.mid + 0.05, 0], [13, c.D - 0.45, c.mid + 0.4, -0.15], [19, c.D - 0.65, c.mid + 1.35, -0.9],
         [23, -0.25, c.ht - 0.4 + c.r * 0.4, -2.0], [T, -c.D, c.rel + c.mid, -2.85]],
       grip: (c) => [-c.hw * 0.5, -0.1], pose: 'hug', wob: [2, 8, 0.06],
-      acro: (t) => ({ a: -1.45 * smooth(14, 25, t) * (1 - smooth(32, 46, t)), h: 0.35, y: 0 }),
+      acro: (t) => ({ a: -0.8 * smooth(14, 25, t) * (1 - smooth(32, 46, t)), h: 0.35, y: 0 }),
     },
   },
   rubberta: {
@@ -233,6 +233,10 @@ export function carry(F, O, t) {
   const min = c.rt + c.r - 0.3;
   const dx = f - tc[0], dy = u - tc[1], dz = z, d = Math.hypot(dx, dy, dz);
   if (d < min && d > 1e-6 && t < T - 0.5) { const s = min / d; f = tc[0] + dx * s; u = tc[1] + dy * s; z = dz * s; }
+  // turned over him (a back throw's arc): over his head, not through it
+  const tTop = th + (c.ht - th) * Math.cos(ta) + (ac ? ac.y : 0);
+  const over = (1 - smooth(0.55 * (c.rt + c.hw), c.rt + c.hw, Math.abs(f - tc[0]))) * smooth(0.6, 1.2, Math.abs(a));
+  if (t < T - 0.5) u += Math.max(0, tTop + reachDown(O.id, a) - 0.3 - u) * over;
   // and out of the mat
   u = Math.max(u, reachDown(O.id, a) + 0.03);
   const g = C.grip(c), G = turn(g, a);

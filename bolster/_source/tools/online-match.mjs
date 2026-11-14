@@ -141,11 +141,15 @@ if (!vsUp[0].on || !vsUp[1].on) errs.push('the VS card is not up on both pages')
 // taunting captions: recorded on each page (tick, seat, line) to compare at the end
 for (const p of [A, B]) await p.evaluate(() => { const f = window.__bolster.fight, o = f.onTaunt; window.__taunts = []; f.onTaunt = (t, F) => { window.__taunts.push(`${t.tick}:${t.p}:${t.kind}:${t.text}`); o(t, F); }; });
 // scripted inputs: a hard CPU on each side, each playing only its own fighter
+const lv = arg('cpu', 'hard');
 for (const [p, k] of [[A, 0], [B, 1]]) {
-  await p.evaluate((k) => {
-    const B = window.__bolster, c = B.cpuFor(k, 'hard', 11 + k);
+  await p.evaluate(([k, lv]) => {
+    const B = window.__bolster, c = B.cpuFor(k, lv, 11 + k);
     B.fight.override = (st) => (k === 0 ? [c.input(st), null] : [null, c.input(st)]);
-  }, k);
+    // the throws (bolster-throws): tosses seen on this page, forward / back
+    const f = B.fight, o = f.onEvent; window.__thr = { f: 0, b: 0, tech: 0 };
+    f.onEvent = (e, F) => { if (e.k === 'hit' && e.thr) window.__thr[e.back ? 'b' : 'f']++; if (e.k === 'tech') window.__thr.tech++; o(e, F); };
+  }, [k, lv]);
 }
 
 /* step both, a few ticks at a time, alternately; ask each where it is */
@@ -188,6 +192,7 @@ for (let n = 0; n < 4000; n++) {
   if (a.screen === 'win' && b.screen === 'win') break;
 }
 const [ea, eb] = await Promise.all([info(A), info(B)]);
+console.log('throws seen', JSON.stringify(await Promise.all([A, B].map((p) => p.evaluate(() => window.__thr)))));
 {
   const T = await Promise.all([A, B].map((p) => p.evaluate(() => ({ t: window.__taunts, c: window.__bolster.fight.session.confirmed }))));
   const upto = Math.min(T[0].c, T[1].c), cut = (L) => L.filter((x) => +x.split(':')[0] <= upto);

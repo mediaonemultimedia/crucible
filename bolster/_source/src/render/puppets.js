@@ -458,7 +458,7 @@ export class BipedPuppet extends FightMixin(Athlete) {
       // suplex (a waist lock, held through the bridge)
       if (g) both(back ? 0.34 : 0.2, back ? [0, -0.05, 0.1] : [0, 0.05, 0]);
       else { R = [-0.7, 0.4, -0.2]; L = [0.7, 0.4, -0.2]; this.tS = [1, 1]; }
-      lean = back ? [mix(0.15, -0.5, smooth(12, 22, t)), 0, 0] : [mix(0.2, -0.3, smooth(12, 26, t)), 0, 0];
+      lean = back ? [mix(0.15, -0.3, smooth(12, 22, t)), 0, 0] : [mix(0.2, -0.3, smooth(12, 26, t)), 0, 0];
     } else if (st === 'thief') {
       // Zach: wings clamped round him; the forward toss flings them up and
       // out; the judo roll keeps hold all the way over

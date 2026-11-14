@@ -243,7 +243,7 @@ export class BoxerFeel extends BipedPuppet {
     } else if (g) {
       for (const A of ['R', 'L']) { const a = aimArm(A, 0.45, [0, 0, 0.2], g.C, 1.3); set(A, a.v, 0.9, a.s); }
       const lift = sstep(6, 12, t), arch = sstep(12, 23, t);
-      T.pitch = mix(mix(0.25, 0, lift), -0.75, arch); T.sink = mix(0.3 + 0.3 * lift, 0.15, arch);
+      T.pitch = mix(mix(0.25, 0, lift), -0.5, arch); T.sink = mix(0.3 + 0.3 * lift, 0.15, arch);
       T.k = 1800; T.kb = 1500; T.kc = 600; T.kh = 600;
       if (once('hug', 2)) this._kick(this.belly, [0, -1.6, 0]);
     } else {

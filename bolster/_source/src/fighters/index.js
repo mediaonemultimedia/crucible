@@ -211,7 +211,7 @@ export const FIGHTERS = {
         spawn: [{ at: 20, proj: { kind: 'howl', dx: 700, y: 500, vx: 150, vy: 0, box: { w: 900, h: 1000 }, dmg: 165, level: 'low', life: 120, hitstun: 30, blockstun: 16, push: 50, chip: 14, kd: 1, special: 1, pause: 14 } }],
       }),
     },
-    signatureName: 'Lobo Slide', specialName: 'Aullido de la Luna', diveName: 'Moonsault', throwName: 'Huracanrana', throwBackName: 'German Suplex', throwUp: [900, 900],
+    signatureName: 'Lobo Slide', specialName: 'Aullido de la Luna', diveName: 'Moonsault', throwName: 'Huracanrana', throwBackName: 'German Suplex', throwUp: [900, 2100],
     catchphrase: { main: 'Rápido next time, bitch!', egg: 'Who\'s the perra now, huh?' },
     impatient: 'Espérate! Not yet!',
   },
