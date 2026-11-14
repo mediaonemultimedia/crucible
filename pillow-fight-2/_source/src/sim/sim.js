@@ -69,6 +69,8 @@ export const SIDE_T = 18;            // a sidestep's length (ticks)
 export const SIDE_V = [0, 60, 120, 160, 170, 170, 165, 155, 140, 125, 110, 90, 70, 50, 34, 20, 10, 0];
 export const SIDE_FREE = 12;         // a sidestep can be attacked out of from here on
 export const CIRCLE_V = 44;          // the circling walk, per tick
+export const TEETER = 50;            // pushed into the edge: teetering on the lip this long (once free)
+export const TEETER_SAFE = 1400;     // ...or until this far back in from the edge
 export const EDGE_KO = 1500;         // a heavy blow this close to the edge (behind him) knocks him over it
 export const KO_SEQ = { freeze: 6, slow: 90, ramp: 18, len: 150, g: 26, vy: 439, vx: 95, spin: 28, banner: 128 };
 export const KO_FINAL = { freeze: 6, slow: 120, ramp: 24, len: 190, g: 22, vy: 495, vx: 110, spin: 36, banner: 166 };
@@ -103,7 +105,7 @@ function newFighter(id, side) {
     combo: 0, taken: 0, nag: 0,
     tf: 0, tb: 0, hf: 0, hb: 0, dash: 0, db: 0, dd: 0,
     ss: 0, sb: 0, sd: 0, sr: 0,              // sidestep: asked (dir, buffer), doing (dir), radius
-    jmp: 0, jd: 0, dl: 0, ro: 0, out: 0, td: 1, bn: 0,
+    jmp: 0, jd: 0, dl: 0, ro: 0, out: 0, td: 1, bn: 0, tt: 0,
     lt: -99, ht: -99, ok: 0, ch: 0, lc: 0, lk: 0, it: 99, rep: 0, lmv: '', rt: -999,
     kx: 0, kz: 0, ky: 0, kvx: 0, kvz: 0, kvy: 0, kb: 0, kr: 0, kfx: 0, kfz: 0, kfl: 0,
   };
@@ -261,6 +263,11 @@ function think(st, k, L) {
   if (f.inv > 0) f.inv--;
   if (f.lk > 0) f.lk--;
   if (f.act === 'attack') f.it = 0; else if (f.it < 99) f.it++;
+  // the teeter: it wears off once he's free to act — or back in off the lip
+  if (f.tt > 0 && !f.air && (GROUND_FREE[f.act] || f.act === 'side' || f.act === 'attack' || f.act === 'dash')) {
+    f.tt--;
+    if (RING - Math.max(Math.abs(f.x), Math.abs(f.z)) > TEETER_SAFE) f.tt = 0;
+  }
   // a sidestep's tail can be attacked (or blocked) out of
   const sideFree = f.act === 'side' && f.t >= SIDE_FREE;
   if ((GROUND_FREE[f.act] || sideFree) && !f.air) {
@@ -484,8 +491,17 @@ function move(st, k) {
       f.x = o.x + Math.round((dx * r) / l) + 0; f.z = o.z + Math.round((dz * r) / l) + 0;
     }
   }
+  const bx = f.x, bz = f.z;
   edge(f);
+  // pushed into the edge (a blow, a block, a knockdown): teetering on the
+  // lip — the warning. Only a teetering fighter can be knocked off by a
+  // plain heavy (a counter-hit, a special or a combo finisher still can)
+  if ((bx !== f.x || bz !== f.z) && (!f.air || f.act === 'down') && TEETERS[f.act]) {
+    if (!f.tt) st.ev.push({ k: 'teeter', p: k, x: f.x, z: f.z });
+    f.tt = TEETER;
+  }
 }
+const TEETERS = { hitstun: 1, blockstun: 1, down: 1, getup: 1 };
 
 /* the ring's edge: anyone who isn't flying off it (a knockdown with ring-out
    power) stops at it */
@@ -719,7 +735,10 @@ function landHit(st, a, h, dx, dz, o) {
   if (amp) att.meter = Math.min(MAX_METER, att.meter + 50 + 40 * Math.min(att.ch, 2));
   d.meter = Math.min(MAX_METER, d.meter + tdiv(dmg * 35, 100));
   // a heavy blow with his back to the edge: over he goes
-  const edgeKO = o.power && !h.toss && room < EDGE_KO && d.act !== 'grabbed';
+  // ring-out power needs the warning first: he's teetering, or it's a
+  // counter-hit, a special or a combo's finisher
+  const warned = d.tt > 0 || ctr || special || amp;
+  const edgeKO = o.power && warned && !h.toss && room < EDGE_KO && d.act !== 'grabbed';
   st.pause = Math.max(st.pause, h.pause + (amp ? 4 : 0) + (ctr ? 2 : 0) + (edgeKO ? 3 : 0));
   st.ev.push({ k: 'hit', p: a, x: at[0], y: at[1], z: at[2], dmg, kind, sp: special ? 1 : 0, kd: h.kd || amp || edgeKO ? 1 : 0, n: d.combo, amp, ctr, thr: h.toss ? 1 : 0, edge: edgeKO ? 1 : 0 });
   if (d.hp === 0) {
@@ -735,7 +754,7 @@ function landHit(st, a, h, dx, dz, o) {
     d.act = 'down'; d.t = 0; d.air = 1; d.vy = big ? 165 : 140; d.stun = 0; d.px = 0; d.pz = 0;
     [d.vx, d.vz] = vec(dx, dz, edgeKO ? 95 : big ? 78 : 48);
     // ring-out power: not a throw's toss, not a light
-    d.ro = o.power && !h.toss ? 1 : 0;
+    d.ro = o.power && warned && !h.toss ? 1 : 0;
     if (h.toss) {
       // a long flight and a soft bounce — and never off the bed: the toss
       // shortened to the room there is (the edge holds him anyway)

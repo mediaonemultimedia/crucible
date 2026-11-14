@@ -12,7 +12,7 @@ const errs = [];
 page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
 page.on('pageerror', (e) => errs.push('pageerror: ' + e.message));
 page.on('request', (r) => { if (!/^(file|data|blob):/.test(r.url())) errs.push('NETWORK ' + r.url()); });
-await page.goto('file://' + path.join(root, 'final.html') + q);
+await page.goto('file://' + (process.env.HTML || path.join(root, 'final.html')) + q);
 await page.waitForFunction(() => window.__pf2, null, { timeout: 120000 });
 if (run) { const r = await page.evaluate(run); if (r !== undefined) console.log('result:', JSON.stringify(r)); }
 await page.waitForTimeout(300);

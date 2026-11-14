@@ -59,6 +59,9 @@ export class Fight {
     this.onTick = () => {};
     this.onSfx = () => {};
     this.onSwing = () => {};
+    this.onIntro = () => {};
+    // the round-1 intro sweep (a name card per fighter): not in practice
+    this.intro = practice ? null : { t: 0, k: -1 };
     this.evTick = 0; this.evN = 1;
     this.lastInputs = [0, 0];
     this.override = null;
@@ -159,8 +162,11 @@ export class Fight {
       this.plush[e.p].hit(140, 1, 0);
     }
     if (e.k === 'ringout') {
+      // over the lip: a burst of feathers that drifts down through the slow motion
       const f = st.f[e.p];
       S.tufts(f.x / U, 0.2, f.z / U, 12, 1.2, [f.vx / 60 || 0, f.vz / 60 || 0], 10);
+      S.tufts(f.x / U, 1.6, f.z / U, 6, 1.7, [f.vx / 60 || 0, f.vz / 60 || 0], 46);
+      this.superCut = null;
       this.koAz = S.cam.az;
     }
     if (e.k === 'slam') {
@@ -176,6 +182,7 @@ export class Fight {
     if (e.k === 'special') {
       const f = st.f[e.p];
       S.pushIn([f.x / U, 1.6, f.z / U], 1.0);
+      this.superCut = { k: e.p, t: 0, cut: -1, s: e.p ? -1 : 1 };
       if (f.id === 'sebas') S.moonAt(f.x / U - f.fx / 400, f.z / U - f.fz / 400);
       if (f.id === 'zach') S.shake(0.3);
     }
@@ -216,7 +223,15 @@ export class Fight {
       pl.hop = F.act === 'side' ? 0.28 * Math.sin(Math.PI * Math.min(1, (F.t + a) / 18)) : 0;
       // (render only) turned a little toward the camera, as PF1 did, so the faces read
       const yf = Math.atan2(F.fx, F.fz), az = this.arena.cam.az;
-      pl.yawCheat = Math.max(-0.5, Math.min(0.5, Math.atan2(Math.sin(az - yf), Math.cos(az - yf)) * 0.32));
+      const toCam = Math.atan2(Math.sin(az - yf), Math.cos(az - yf));
+      pl.yawCheat = Math.max(-0.5, Math.min(0.5, toCam * 0.32));
+      // the win pose: square to the camera (and the name card's close-ups)
+      if (F.act === 'win' || (this.intro && this.intro.k === k)) pl.yawCheat = toCam * (F.act === 'win' ? 0.92 : 0.6);
+      // the ledge: teetering on the lip (render: a rock out over the edge)
+      if (F.tt > 0 && !F.air && (F.act === 'idle' || F.act === 'hitstun' || F.act === 'blockstun' || F.act === 'guard' || F.act === 'crouch' || F.act === 'walkB' || F.act === 'walkF')) {
+        const ox = Math.abs(F.x) >= Math.abs(F.z) ? Math.sign(F.x) : 0, oz = ox ? 0 : Math.sign(F.z);
+        pl.lean = { axis: [-oz, ox], k: Math.min(1, F.tt / 12) };
+      } else pl.lean = null;
       const view = puppetView(F);
       if (V[k]) { view.fx = V[k][0]; view.fz = V[k][1]; pl.yawCheat = 0; }
       if (F.act === 'attack' && F.mv === 'throwHold') pl.yawCheat = 0;
@@ -236,6 +251,30 @@ export class Fight {
       } else {
         // the K.O. cam: in close on the one flying, orbiting slowly
         focus = { x: p[0], y: Math.max(1.6, p[1] + 1.1), z: p[2], d: st.kf ? 8.5 : 9.5, h: 0.8, az: this.koAz + 0.5 + t * 0.35 };
+      }
+    }
+    // the super's camera cuts: a close-up on the one doing it, from the
+    // front, then a cut to a low wide shot from behind his shoulder
+    if (!focus && this.superCut) {
+      const S = this.superCut, F = st.f[S.k], p = P[S.k], yf = Math.atan2(F.fx, F.fz);
+      S.t += dt;
+      const cut = S.t < 0.42 ? 0 : S.t < 1.0 ? 1 : 2;
+      if (cut !== S.cut) { S.cut = cut; this.arena.cam.ready = false; }
+      if (cut === 0) focus = { x: p[0], y: p[1] + 2.0, z: p[2], d: 7, h: 0.6, az: yf + 0.55 * S.s };
+      else if (cut === 1) focus = { x: (P[0][0] + P[1][0]) / 2, y: 1.2, z: (P[0][2] + P[1][2]) / 2, d: 12.5, h: 0.15, az: yf + Math.PI - 0.6 * S.s };
+      else this.superCut = null;
+      if (st.phase !== 'fight') this.superCut = null;
+    }
+    // round 1's intro: a sweep past each of them (a name card each), then out
+    if (!focus && this.intro) {
+      const I = this.intro, k = I.k;
+      I.t += dt;
+      if (st.phase !== 'intro' || I.t > 2.1) { this.intro = null; this.onIntro(null); this.arena.cam.ready = false; }
+      else {
+        const nk = I.t < 1.0 ? 0 : 1;
+        if (nk !== k) { I.k = nk; this.arena.cam.ready = false; this.onIntro(nk); }
+        const F = st.f[I.k], p = P[I.k], yf = Math.atan2(F.fx, F.fz), u = (I.t % 1.0);
+        focus = { x: p[0], y: p[1] + (F.id === 'k8e' ? 3.1 : 2.0), z: p[2], d: 7.5 - u * 1.2, h: 0.5, az: yf + (I.k ? -1 : 1) * (0.75 - u * 0.5) };
       }
     }
     this.focus = focus || this.winFocus || null;

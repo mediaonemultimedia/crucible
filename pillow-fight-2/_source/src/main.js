@@ -34,6 +34,22 @@ const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const LS = (() => { try { const s = window.localStorage; s.getItem('x'); return s; } catch { return null; } })();
 const flagOf = (id) => FLAGS[FIGHTERS[id].nation];
 
+/* frame data for a move: startup, active, recovery, on block, and how it
+   travels — tracking (circular: catches a sidestep), linear (a sidestep
+   beats it), a shot (flies its own line: sidestep it), a throw */
+export function frameData(id, name) {
+  const m = FIGHTERS[id].moves[name];
+  if (!m) return null;
+  const tag = m.kind === 'throw' ? 'throw' : m.circ || m.hits.some((h) => h.W >= 2000) ? 'tracking' : m.spawn.length && !m.hits.length ? 'shot' : 'linear';
+  if (m.grab) return { tag, start: m.grab.from, active: m.grab.to - m.grab.from + 1, rec: m.total - m.grab.to, blk: null };
+  const h0 = m.hits[0], hN = m.hits[m.hits.length - 1];
+  if (!h0) { const at = m.spawn[0]?.at ?? 0; return { tag, start: at, active: 1, rec: m.total - at, blk: null }; }
+  const rec = m.total - hN.to;
+  return { tag, start: h0.from, active: hN.to - h0.from + 1, rec, blk: hN.level === 'unblockable' ? null : hN.blockstun - rec };
+}
+const MOVE_ROWS = [['O', 'light', 'Light (chains)'], ['P', 'heavy', 'Heavy (lunge)'], ['← + P', 'sweep', 'Spin'], ['Shift + O', 'lowLight', 'Low light'],
+  ['Shift + P', 'signature', null], ['Space', 'special', null], ['O + P', 'throw', null]];
+
 /* the move list (practice, the select plates) */
 export function moveList(id) {
   const f = FIGHTERS[id];
@@ -88,6 +104,7 @@ class App {
     document.body.dataset.screen = name;
     if (['title', 'mode'].includes(name)) $('#bubbles').textContent = '';
     if (name !== 'fight' && name !== 'win' && name !== 'pause') this._drainOff(true);
+    if (name !== 'fight') $('#namecard').className = '';
     if (name === 'select') this._enterSelect();
     if (name !== 'select' && name !== 'diff' && name !== 'pause' && this.table) { this.table.dispose(); this.table = null; }
     if ((name === 'title' || name === 'mode') && this.fight) { this.fight.dispose(); this.fight = null; }
@@ -199,8 +216,8 @@ class App {
       case 'fight':
         if (c === 'Escape' && !e.repeat && !this.net.on) { this.pause(true); return; }
         if (this.fight?.practice && !e.repeat) {
-          const dm = { Digit1: 'stand', Digit2: 'block', Digit3: 'sidestep', Digit4: 'cpu' }[c];
-          if (dm) { this.dummyMode = dm; this._paintPractice(); }
+          const dm = { Digit1: 'stand', Digit2: 'block', Digit3: 'sidestep', Digit4: 'cpu', Digit5: 'drill' }[c];
+          if (dm) { this.dummyMode = dm; if (dm === 'drill') { this.drillN = 0; this._practiceReset(); } this._paintPractice(); }
           if (c === 'KeyR') this._practiceReset();
         }
     }
@@ -337,6 +354,7 @@ class App {
     f.onTick = (st) => this._hud(st);
     f.onSfx = (e, t, n) => this._sfx(e, t, n);
     f.onSwing = (st) => this._swing(st);
+    f.onIntro = (k) => this._nameCard(f, k);
     this.router.reset?.();
     $('#pn1').textContent = f.name(0); $('#pn2').textContent = f.name(1);
     $('#n1').textContent = net ? this.net.label(0) : versus ? 'Player 1' : p1cpu ? `CPU · ${p1cpu}` : 'Player 1';
@@ -371,6 +389,15 @@ class App {
     });
   }
 
+  /* the round-1 intro's name card: who's on screen, their animal and style */
+  _nameCard(f, k) {
+    const el = $('#namecard');
+    if (k === null || k === undefined || !f || f !== this.fight) { el.className = ''; return; }
+    const id = f.st.f[k].id, F = FIGHTERS[id];
+    el.innerHTML = `<span class="who">${k === 0 ? 'Player 1' : f.session ? 'Player 2' : this.mode === 'versus' ? 'Player 2' : 'Computer'}</span><b>${esc(f.name(k))}</b><span class="an">${flagOf(id)} ${esc(F.animal)} · ${esc(F.style)}</span>`;
+    el.className = `on s${k + 1}`;
+  }
+
   _vsEnd(now = false) {
     const card = $('#vs');
     if (!this.vs) { if (now) card.className = ''; return; }
@@ -394,10 +421,36 @@ class App {
       if (this.dummyMode === 'cpu') return cpu.input(st);
       if (this.dummyMode === 'block') return BLOCK | (o.act === 'attack' && FIGHTERS[o.id].moves[o.mv]?.low ? CROUCH : 0);
       if (this.dummyMode === 'sidestep') return o.act === 'attack' && o.t === 2 ? (st.tick & 1 ? UP : DOWN) : 0;
+      if (this.dummyMode === 'drill') return f.act === 'idle' && o.act === 'attack' && FIGHTERS[o.id].moves[o.mv]?.lite ? BLOCK : 0;
       return 0;
     };
+    // the frame readout: when one of P1's moves touches the dummy, the tick
+    // each of them is free again — the difference is the advantage
+    const fr = { on: null };
+    const free = (f) => ['idle', 'walkF', 'walkB', 'crouch', 'guard', 'circle'].includes(f.act) && !f.air;
     const practice = {
       after: (st) => {
+        const [a, d] = st.f;
+        for (const e of st.ev) {
+          if ((e.k === 'hit' || e.k === 'block') && e.p === 0 && a.act === 'attack') {
+            const fd = frameData(a.id, a.mv);
+            fr.on = { mv: a.mv, k: e.k, fd, af: null, df: null, t: st.tick };
+          }
+          if (e.k === 'ringout' && e.p === 1 && this.dummyMode === 'drill') { this.drillN = (this.drillN || 0) + 1; const el = $('#pr-ro'); if (el) el.textContent = this.drillN; }
+        }
+        if (fr.on) {
+          if (fr.on.af === null && free(a)) fr.on.af = st.tick;
+          if (fr.on.df === null && free(d)) fr.on.df = st.tick;
+          if (fr.on.af !== null && fr.on.df !== null) {
+            const adv = fr.on.df - fr.on.af, o = fr.on;
+            const nm = { light: 'Light', heavy: 'Heavy', sweep: 'Spin', lowLight: 'Low light', signature: FIGHTERS[a.id].signatureName, special: FIGHTERS[a.id].specialName }[o.mv] || o.mv;
+            this._frameLine = `<b>${esc(nm)}</b> · ${o.fd ? `startup ${o.fd.start}f · ${o.fd.tag}` : ''} · on ${o.k}: <b class="${adv >= 0 ? 'plus' : 'minus'}">${adv > 0 ? '+' : ''}${adv}</b>`;
+            const el = $('#pr-frames'); if (el) el.innerHTML = this._frameLine;
+            fr.on = null;
+          } else if (st.tick - fr.on.t > 240) fr.on = null;
+        }
+        // a K.O. or a ring-out in practice: a moment to watch it, then back on the marks
+        if (st.f.some((f) => f.act === 'ringout' || f.act === 'ko')) { fr.down = (fr.down || 0) + 1; if (fr.down > 100) { fr.down = 0; this.later(0, () => this._practiceReset()); } } else fr.down = 0;
         for (const f of st.f) {
           if (st.tick % 120 === 0 && f.act !== 'attack') f.meter = MAX_METER;
           if (f.hp < FIGHTERS[f.id].health * 0.3 && f.act === 'idle') f.hp = FIGHTERS[f.id].health;
@@ -421,8 +474,12 @@ class App {
   }
 
   _practiceReset() {
+    if (!this.fight) return;
     const st = this.fight.st;
-    st.f.forEach((f, k) => { f.x = k ? 2300 : -2300; f.z = 0; f.y = 0; f.vx = f.vz = f.vy = f.px = f.pz = 0; f.act = 'idle'; f.air = 0; f.hp = FIGHTERS[f.id].health; f.meter = MAX_METER; });
+    // (the ring-out drill: the dummy near the edge, P1 in front of him)
+    const dr = this.dummyMode === 'drill';
+    st.f.forEach((f, k) => { f.x = dr ? (k ? 0 : 2000) : k ? 2300 : -2300; f.z = dr ? (k ? -7150 : -7150) : 0; f.y = 0; f.vx = f.vz = f.vy = f.px = f.pz = 0; f.act = 'idle'; f.t = 0; f.mv = ''; f.air = 0; f.ro = 0; f.out = 0; f.tt = 0; f.bn = 0; f.stun = 0; f.hp = FIGHTERS[f.id].health; f.meter = MAX_METER; if (dr) { f.x = 0; f.z = k ? -7150 : -5150; f.fx = 0; f.fz = k ? 1024 : -1024; } else { f.fx = k ? -1024 : 1024; f.fz = 0; } });
+    st.phase = 'fight'; st.ko = ''; st.kt = 0; st.kn = 0; st.ks = 100;
     st.proj = [];
     this.fight.prev = st.f.map((f) => ({ x: f.x, y: f.y, z: f.z }));
   }
@@ -431,9 +488,17 @@ class App {
     const f = this.fight;
     if (!f?.practice) return;
     const id = f.st.f[0].id;
-    const dm = [['1', 'stand', 'Stand'], ['2', 'block', 'Block all'], ['3', 'sidestep', 'Sidestep'], ['4', 'cpu', 'CPU']];
-    $('#practice-panel').innerHTML = `<h5>Dummy</h5><div class="dm">${dm.map(([k, m, l]) => `<b class="${this.dummyMode === m ? 'on' : ''}">${k} ${l}</b>`).join('')}</div>
-      <h5 style="margin-top:10px">${esc(FIGHTERS[id].name)} — moves</h5><div class="ml">${moveList(id).map(([k, v]) => `<b>${esc(k)}</b> <span>${esc(v)}</span>`).join('<br>')}</div>
+    const dm = [['1', 'stand', 'Stand'], ['2', 'block', 'Block all'], ['3', 'sidestep', 'Sidestep'], ['4', 'cpu', 'CPU'], ['5', 'drill', 'Ring-out drill']];
+    const F = FIGHTERS[id];
+    const name = (mv, l) => l || (mv === 'signature' ? F.signatureName : mv === 'special' ? F.specialName : `${F.throwName} / ${F.throwBackName}`);
+    const sg = (v) => (v === null ? '—' : v > 0 ? `+${v}` : `${v}`);
+    const rows = MOVE_ROWS.map(([k, mv, l]) => { const d = frameData(id, mv); return `<tr><td><b>${esc(k)}</b></td><td>${esc(name(mv, l))}</td><td><i class="tg ${d.tag}">${d.tag}</i></td><td>${d.start}</td><td>${sg(d.blk)}</td></tr>`; }).join('');
+    const drill = this.dummyMode === 'drill' ? `<div class="drill">Ring-out drill: put the dummy on the lip (a heavy pushes him onto it — LEDGE!), then a second heavy sends him off. Ring-outs: <b id="pr-ro">${this.drillN || 0}</b></div>` : '';
+    $('#practice-panel').innerHTML = `<h5>Dummy</h5><div class="dm">${dm.map(([k, m, l]) => `<b class="${this.dummyMode === m ? 'on' : ''}">${k} ${l}</b>`).join('')}</div>${drill}
+      <h5 style="margin-top:10px">${esc(F.name)} — moves</h5>
+      <table class="fd"><tr><th>key</th><th>move</th><th>travels</th><th>start</th><th>block</th></tr>${rows}</table>
+      <div class="ml" style="margin-top:4px"><b>W / S</b> sidestep (beats linear) · hold: circle · <b>Q</b> hop · <b>→→</b> dash</div>
+      <h5 style="margin-top:10px">Frames</h5><div id="pr-frames" class="frames">${this._frameLine || 'Hit or block the dummy: the frame advantage shows here.'}</div>
       <div style="margin-top:8px;color:var(--dim)">R reset · Esc pause · meter refills</div>`;
   }
 
@@ -569,6 +634,7 @@ class App {
       if (e.edge) this.pop('EDGE!', e.x, e.y, e.z, e.p ? 'p2' : 'p1');
     }
     if (e.k === 'tech') this.pop('TECH', e.x, e.y, e.z, 'tech');
+    if (e.k === 'teeter') { const f = st.f[e.p]; this.pop('LEDGE!', f.x, 2600, f.z, e.p ? 'p2' : 'p1'); }
     if (e.k === 'ringout') this.banner('Ring Out!', 'ringout', 2400);
     if (e.k === 'koapex' && st.fluff && st.f[e.p].act === 'ko' && !this._fluffed) {
       this._fluffed = true;

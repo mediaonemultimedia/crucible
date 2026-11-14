@@ -86,6 +86,8 @@ export class CPU {
     // ── the ring ──────────────────────────────────────────────────────────
     const [ux, uz] = unit(o.x - f.x, o.z - f.z, f.fx, f.fz);
     const myRoom = roomAlong(f.x, f.z, -ux, -uz), oRoom = roomAlong(o.x, o.z, ux, uz);
+    // teetering on the lip: off it now (a sidestep along the edge, or a dash back in)
+    if (f.tt > 0 && this.chance(L.edge)) return this.chance(60) ? this._do([[this.chance(50) ? UP : DOWN, 1], [0, 4]]) : this._do([[fwdBit, 1], [0, 2], [fwdBit, 1], [0, 8]]);
     if (myRoom < 2200 && this.chance(L.edge)) {
       // off the edge: a sidestep then circle, or a dash in past them
       const s = this.chance(50) ? UP : DOWN;
@@ -112,7 +114,10 @@ export class CPU {
       if (r === 1 && myRoom > 3000) return this._do([[backBit, 10]]);
       return this._do([[this.chance(50) ? UP : DOWN, 1], [0, 6]]);
     }
-    // the other one's back to the edge: the ring-out heavy
+    // the other one teetering on the lip: the ring-out heavy (or the spin if he
+    // sidesteps out); back to the edge: a heavy to push him onto the lip
+    if (o.tt > 0 && d < hReach + 300 && this.chance(L.edge)) return this._do([[o.act === 'side' ? HEAVY | backBit : HEAVY, 1], [0, 30]]);
+    if (o.tt > 0 && d < hReach + 1500 && this.chance(L.edge)) return this._do([[fwdBit, 1], [0, 2], [fwdBit, 1], [0, 4]]);
     if (oRoom < 1600 && d < hReach && this.chance(L.edge)) return this._do([[HEAVY, 1], [0, 30]]);
     // a sidestepper: the spin
     if ((o.act === 'side' || o.act === 'circle' || this.sideSeen > 2) && d < sReach + 200 && this.chance(L.sweep)) {

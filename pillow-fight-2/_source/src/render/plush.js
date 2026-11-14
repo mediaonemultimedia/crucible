@@ -402,6 +402,11 @@ export class Plush {
       if (u >= 1) this.thrown = null;
     } else if (TA) { this._spin = TA.a; this._spinH = TA.h; this._lift = TA.y || 0; this._axis = TA.axis; }
     else if (ac) { this._spin = ac.a; this._spinH = ac.h; this._lift = ac.y || 0; this._axis = free ? [0, 1] : [-F.fz, F.fx]; }
+    else if (this.lean) {
+      // teetering on the lip: rocking out over the edge and back, arms going
+      const Ln = this.lean, w = 0.13 + 0.09 * Math.sin(this.time * 10.5);
+      this._spin += (-w * Ln.k - (this._spin || 0)) * Math.min(1, dt * 14); this._spinH = 0.05; this._axis = Ln.axis;
+    }
     else { const w = Math.atan2(Math.sin(this._spin || 0), Math.cos(this._spin || 0)); this._spin = w * Math.max(0, 1 - dt * 10); if (Math.abs(this._spin) < 0.01) this._spin = 0; }
     if (this._axis) { const l = Math.hypot(...this._axis) || 1; axis = this._q3a.set(this._axis[0] / l, 0, this._axis[1] / l); }
     this._qy.setFromAxisAngle(this._Y, this.yaw.x + (this.yawExtra || 0) + (H ? H.yaw : 0) + (TA ? TA.yaw : 0));

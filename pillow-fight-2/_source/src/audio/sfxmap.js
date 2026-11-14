@@ -94,6 +94,8 @@ export function soundsFor(e, tick = 0) {
     case 'koflash': return [{ id: 'hit-heavy', gain: 1.3, rate: 0.88, delay: 0 }, { id: 'thump', gain: 1.3, rate: 0.85, delay: 0 }, { id: 'feather-burst', gain: e.final ? 1.15 : 1, rate: 1, delay: 0.02 }];
     // PF2: off the bed — the crowd's gasp, a whoosh as he goes over, the thud on the carpet comes with the bounce
     case 'ringout': return [{ id: 'whoosh-heavy', gain: 1.2, rate: 0.8, delay: 0 }, { id: 'crowd-ooh', gain: 1.1, rate: 1.05, delay: 0.05 }];
+    case 'teeter': return [{ id: 'crowd-ooh', gain: 0.7, rate: 1.25, delay: 0 }, { id: 'whoosh-light', gain: 0.35, rate: 0.7, delay: 0.02 }];
+    case 'bounce': return [{ id: 'land', gain: 0.8, rate: 1.1, delay: 0 }];
     case 'side': return [{ id: 'whoosh-light', gain: 0.45, rate: 1.3, delay: 0 }];
     case 'ko': return [{ id: 'crowd-ooh', gain: e.final ? 1.1 : 0.95, rate: 1, delay: 0.12 }];
     default: return [];

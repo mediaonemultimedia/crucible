@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { createMatch, stepInPlace, clone, hash, RING, EDGE, BED, isqrt, unit, roomAlong } from '../src/sim/sim.js';
+import { createMatch, stepInPlace, clone, hash, RING, EDGE, BED, isqrt, unit, roomAlong, TEETER } from '../src/sim/sim.js';
 import { LEFT, RIGHT, UP, DOWN, LIGHT, HEAVY, SPECIAL, BLOCK, JUMP, CROUCH } from '../src/sim/input.js';
 import { FIGHTERS, ROSTER } from '../src/fighters/index.js';
 
@@ -147,10 +147,24 @@ test('the edge stops a walk; nobody walks off', () => {
   assert.equal(st.phase, 'fight');
 });
 
-test('a heavy with his back to the edge is a ring-out; the round is lost', () => {
+test('the ledge: the first heavy at the edge only leaves him teetering (a chance); stepping in clears it', () => {
   const st = fight();
   place(st, 1, RING - EDGE, 0); place(st, 0, RING - EDGE - 2000, 0);
   st.f[0].fx = 1024; st.f[0].fz = 0;
+  run(st, 1, HEAVY);
+  let out = false, teeter = false;
+  for (let i = 0; i < 40; i++) { stepInPlace(st, 0, 0); if (st.ev.some((e) => e.k === 'ringout')) out = true; if (st.ev.some((e) => e.k === 'teeter')) teeter = true; }
+  assert.ok(!out, 'no ring-out without the warning');
+  assert.ok(teeter && st.f[1].tt > 0, 'teetering');
+  // he walks back in off the lip (LEFT is forward for player 2): safe again
+  for (let i = 0; i < 60; i++) stepInPlace(st, 0, LEFT);
+  assert.equal(st.f[1].tt, 0, 'off the lip, the teeter is gone');
+});
+
+test('a heavy on a teetering fighter is a ring-out; the round is lost', () => {
+  const st = fight();
+  place(st, 1, RING - EDGE, 0); place(st, 0, RING - EDGE - 2000, 0);
+  st.f[0].fx = 1024; st.f[0].fz = 0; st.f[1].tt = TEETER;
   run(st, 1, HEAVY);
   let out = false;
   for (let i = 0; i < 400 && st.phase !== 'intro'; i++) { stepInPlace(st, 0, 0); if (st.ev.some((e) => e.k === 'ringout')) out = true; }
@@ -221,7 +235,7 @@ test('a whole CPU-free match ends (K.O. or time) with a winner', () => {
 test('the carpet: a ring-out lands on it, below the bed', () => {
   const st = fight();
   place(st, 1, RING - EDGE, 0); place(st, 0, RING - EDGE - 2000, 0);
-  st.f[0].fx = 1024; st.f[0].fz = 0;
+  st.f[0].fx = 1024; st.f[0].fz = 0; st.f[1].tt = TEETER;
   run(st, 1, HEAVY);
   let low = 0;
   for (let i = 0; i < 300 && st.phase !== 'intro'; i++) { stepInPlace(st, 0, 0); low = Math.min(low, st.f[1].y); }

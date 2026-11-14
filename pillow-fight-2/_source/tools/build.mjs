@@ -48,7 +48,8 @@ const logo = fs.readFileSync(path.join(root, 'assets/pillow-fight-logo.webp')).t
 html = html.replace('__LOGO__', () => `data:image/webp;base64,${logo}`);
 
 const final = html.replace('<!--BUNDLE-->', () => `<script>\n${js}\n</script>`);
-const dest = path.join(root, 'final.html');
+const oi = process.argv.indexOf('--out');
+const dest = oi > 0 ? path.resolve(process.argv[oi + 1]) : path.join(root, 'final.html');
 fs.writeFileSync(dest, final);
 
 /* ── self-containment gate ────────────────────────────────────────────────
