@@ -355,6 +355,7 @@ class App {
     f.onSfx = (e, t, n) => this._sfx(e, t, n);
     f.onSwing = (st) => this._swing(st);
     f.onIntro = (k) => this._nameCard(f, k);
+    if (f.intro && f.intro.k >= 0) this._nameCard(f, f.intro.k);
     this.router.reset?.();
     $('#pn1').textContent = f.name(0); $('#pn2').textContent = f.name(1);
     $('#n1').textContent = net ? this.net.label(0) : versus ? 'Player 1' : p1cpu ? `CPU · ${p1cpu}` : 'Player 1';

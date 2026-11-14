@@ -257,7 +257,7 @@ export class Fight {
     // front, then a cut to a low wide shot from behind his shoulder
     if (!focus && this.superCut) {
       const S = this.superCut, F = st.f[S.k], p = P[S.k], yf = Math.atan2(F.fx, F.fz);
-      S.t += dt;
+      S.t += Math.min(dt, 0.05);
       const cut = S.t < 0.42 ? 0 : S.t < 1.0 ? 1 : 2;
       if (cut !== S.cut) { S.cut = cut; this.arena.cam.ready = false; }
       if (cut === 0) focus = { x: p[0], y: p[1] + 2.0, z: p[2], d: 7, h: 0.6, az: yf + 0.55 * S.s };
@@ -268,13 +268,17 @@ export class Fight {
     // round 1's intro: a sweep past each of them (a name card each), then out
     if (!focus && this.intro) {
       const I = this.intro, k = I.k;
-      I.t += dt;
+      I.t += Math.min(dt, 0.05);
       if (st.phase !== 'intro' || I.t > 2.1) { this.intro = null; this.onIntro(null); this.arena.cam.ready = false; }
       else {
         const nk = I.t < 1.0 ? 0 : 1;
         if (nk !== k) { I.k = nk; this.arena.cam.ready = false; this.onIntro(nk); }
         const F = st.f[I.k], p = P[I.k], yf = Math.atan2(F.fx, F.fz), u = (I.t % 1.0);
-        focus = { x: p[0], y: p[1] + (F.id === 'k8e' ? 3.1 : 2.0), z: p[2], d: 7.5 - u * 1.2, h: 0.5, az: yf + (I.k ? -1 : 1) * (0.75 - u * 0.5) };
+        // a three-quarter view from the camera's side of the line (never from
+        // between them, where the other one would fill the shot), drifting round
+        if (I.s === undefined) { const d = Math.atan2(Math.sin(this.arena.cam.az - yf), Math.cos(this.arena.cam.az - yf)); I.s = d >= 0 ? 1 : -1; }
+        const side = I.k === 0 ? I.s : -I.s;
+        focus = { x: p[0], y: p[1] + (F.id === 'k8e' ? 3.1 : 1.9), z: p[2], d: 7.2 - u * 1.0, h: 0.45, az: yf + side * (1.05 - u * 0.3) };
       }
     }
     this.focus = focus || this.winFocus || null;
