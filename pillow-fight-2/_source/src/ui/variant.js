@@ -5,6 +5,7 @@
    without a browser.                                                     */
 
 import { makeRng } from '../sim/rng.js';
+import { ROSTER } from '../fighters/index.js';
 
 /* the twins' titles, shown on the card and the plate when ALT is up */
 export const TWIN_TITLE = {
@@ -54,4 +55,18 @@ export class VariantMemory {
   get(k, id) { return !!this.m[k][id]; }
   has(k, id) { return id in this.m[k]; }
   set(k, id, alt) { this.m[k][id] = !!alt; }
+}
+
+/* the select grid: 14 slots, the 7 OGs (0–6) over their 7 ALT twins (7–13) */
+const N = ROSTER.length;
+export const slotId = (s) => ROSTER[s % N];
+export const slotAlt = (s) => s >= N;
+/* a step on the grid from slot s: dx along the row (wraps), dy flips the row;
+   `taken(slot)` (the other seat's locked card) is stepped over */
+export function stepSlot(s, dx, dy, taken = () => false) {
+  let i = s % N, r = s >= N ? 1 : 0;
+  if (dy) r = 1 - r;
+  if (dx) i = (i + dx + N) % N;
+  for (let n = 0; n < N && taken(r * N + i); n++) i = (i + (dx || 1) + N) % N;
+  return r * N + i;
 }

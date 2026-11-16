@@ -12,7 +12,7 @@
 
 import { host, join, roomCode, cleanRoom } from './net/link.js';
 import { ROSTER } from './fighters/index.js';
-import { selectMsg, readSelect, startMsg, readStart, resolveVariants } from './ui/variant.js';
+import { selectMsg, readSelect, startMsg, readStart, resolveVariants, stepSlot } from './ui/variant.js';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -199,7 +199,7 @@ export class Online {
     A.go('select');
     A.picking = this.local;
     A.locked = [false, false];
-    if (A.pick[0] === A.pick[1]) A.pick[1] = (A.pick[0] + 1) % ROSTER.length;
+    if (A.slot(0) === A.slot(1)) A._setSlot(1, stepSlot(A.slot(1), 1, 0));
     this.cursor();
     A._paintSelect();
   }
@@ -213,15 +213,15 @@ export class Online {
       if (back && !this.starting) { A.locked[L] = false; this.send({ t: 'unlock' }); A._paintSelect(); }
       return;
     }
-    if (left || right) { this.choose((A.pick[L] + (left ? -1 : 1) + ROSTER.length) % ROSTER.length, false); A.audio.ui('tick'); return; }
-    if (up || down) { A.alt[L] = !A.alt[L]; this.cursor(); A._paintSelect(); A.audio.ui('tick'); return; }
+    if (left || right || up || down) { this.choose(stepSlot(A.slot(L), left ? -1 : right ? 1 : 0, up || down ? 1 : 0, (s) => A._taken(L, s)), false); A.audio.ui('tick'); return; }
     if (ok && !e.repeat) this.lock();
   }
 
-  choose(i, lock) {
+  /* a grid slot (0–6 OG, 7–13 ALT): the fighter and its variant */
+  choose(slot, lock) {
     const A = this.app;
-    if (A.locked[this.local]) return;
-    A.pick[this.local] = i;
+    if (A.locked[this.local] || A._taken(this.local, slot)) return;
+    A._setSlot(this.local, slot);
     this.cursor();
     A._paintSelect();
     if (lock) this.lock();
@@ -229,7 +229,7 @@ export class Online {
 
   lock() {
     const A = this.app;
-    if (A.locked[this.local]) return;
+    if (A.locked[this.local] || A._taken(this.local, A.slot(this.local))) return;
     A.audio.ui('confirm');
     A.locked[this.local] = true;
     this.send(selectMsg('lock', A.pick[this.local], A.alt[this.local]));
@@ -252,18 +252,19 @@ export class Online {
   label(k) { return k === this.local ? `Player ${k + 1} · you` : `Player ${k + 1}`; }
   paintSelect() {
     const A = this.app, L = this.local, R = this.remote;
+    const s0 = A.slot(0), s1 = A.slot(1);
     for (const c of $$('.card')) {
       c.querySelectorAll('.tag').forEach((t) => t.remove());
-      const i = ROSTER.indexOf(c.dataset.id);
-      if (i === A.pick[0]) c.insertAdjacentHTML('beforeend', `<span class="tag t1">${L === 0 ? 'YOU' : 'P1'}</span>`);
-      if (i === A.pick[1]) c.insertAdjacentHTML('beforeend', `<span class="tag t2">${L === 1 ? 'YOU' : 'P2'}</span>`);
+      const i = +c.dataset.slot;
+      if (i === s0) c.insertAdjacentHTML('beforeend', `<span class="tag t1">${L === 0 ? 'YOU' : 'P1'}</span>`);
+      if (i === s1) c.insertAdjacentHTML('beforeend', `<span class="tag t2">${L === 1 ? 'YOU' : 'P2'}</span>`);
     }
     $('.plate.p1 .who').textContent = this.label(0);
     $('.plate.p2 .who').textContent = this.label(1);
     $('#select-step').textContent = A.locked[L]
       ? (A.locked[R] ? 'Both locked in — fight!' : `Locked in — waiting for Player ${R + 1}…`)
       : `Online · you’re Player ${L + 1} (${L === 0 ? 'pink' : 'mint'}) — pick your fighter`;
-    $('#select-hint').textContent = A.locked[L] ? 'P to change your mind · Esc to leave' : 'A / D to choose · W / S for OG or ALT · O to lock in · Esc to leave';
+    $('#select-hint').textContent = A.locked[L] ? 'P to change your mind · Esc to leave' : 'Arrows / W A S D to choose (OG on top, ALT below) · O to lock in · Esc to leave';
   }
 
   leave() { this.teardown(); this._forgetRoom(); this.app.mode = 'cpu'; this.app.go('mode'); }

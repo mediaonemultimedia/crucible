@@ -57,7 +57,7 @@ const SCENES = {
     run: `toFight(); F().cpu = [null, null]; place(0, -1100, 0); place(1, 1100, 0); ST().f[0].meter = 1000;
       script((i) => [i === 1 ? ${SP} : 0, 0]); A.step(0.45)`,
   },
-  'select': { q: '?hold&webgl&screen=select', wait: 'Object.keys(A.portraits).length === 7', run: `A.go('select'); A._lock(0); A.pick[1] = 2; A._paintSelect(); A.step(1.6)` },
+  'select': { q: '?hold&webgl&screen=select', wait: 'Object.keys(A.portraits).length === 14', run: `A.go('select'); A._setSlot(0, 7); A._lock(0); A._setSlot(1, 11); A._paintSelect(); A.step(1.6)` },
   'title': { q: '?hold&webgl&noportraits', run: `A.step(1)` },
   'ko': {
     q: fq('k8e', 'zach'),

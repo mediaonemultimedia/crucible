@@ -41,10 +41,17 @@ const key = (p, code, ms = 40) => p.evaluate(async ([c, t]) => {
   const at = async () => trail.push(await p.evaluate(() => __pf2.screen));
   await at(); await key(p, 'KeyO'); await at();          // title → mode
   await key(p, 'KeyO'); await at();                       // Vs Computer → select
-  await key(p, 'KeyD'); await key(p, 'KeyO');             // P1: Rubberta
-  await key(p, 'KeyD'); await key(p, 'KeyD'); await key(p, 'KeyO'); await at();   // CPU: K8-E (the cursor starts one past P1's) → difficulty
+  const cards = await p.evaluate(() => document.querySelectorAll('#cards .card').length);
+  if (cards !== 14) problems.push(`select: ${cards} cards (want 7 OG + 7 ALT)`);
+  await key(p, 'KeyD'); await key(p, 'KeyS'); await key(p, 'KeyO');   // P1: down to the ALT row: Evil Rubberta
+  await key(p, 'KeyD'); await key(p, 'KeyD'); await key(p, 'KeyW');   // CPU: from OG Rubberta → Sumaura → up/down: Evil Sumaura
+  // the quilt shows the highlighted cards, for both seats
+  const quilt = await p.evaluate(() => { const A = __pf2, T = A.table; return { slots: [A.slot(0), A.slot(1)], ids: T.ids.slice(), evil: T.slots.map((x) => x && x.evil), hi: [...document.querySelectorAll('.card.c1, .card.c2')].map((c) => c.dataset.slot + c.className.replace(/.*\b(c[12])\b.*/, ':$1')) }; });
+  results.selectQuilt = quilt;
+  if (quilt.slots.join() !== '8,10' || quilt.ids.join() !== 'rubberta,sumaura' || quilt.evil.join() !== 'true,true') problems.push(`select quilt: ${JSON.stringify(quilt)}`);
+  await key(p, 'KeyO'); await at();   // → difficulty
   await key(p, 'KeyS'); await key(p, 'KeyO'); await at(); // Hard → fight
-  const r = await p.evaluate(() => { __pf2._vsEnd(true); __pf2.step(4, false); const f = __pf2.fight; return { p: f.st.f.map((x) => x.id), cpu: f.cpu.map((c) => c && c.level), phase: f.st.phase }; });
+  const r = await p.evaluate(() => { __pf2._vsEnd(true); __pf2.step(4, false); const f = __pf2.fight; return { p: f.st.f.map((x) => x.id), cpu: f.cpu.map((c) => c && c.level), evil: f.plush.map((x) => x.evil), phase: f.st.phase }; });
   // the player walks in, sidesteps, hits
   // (the computer held still a moment, so its blows don't stop the walk)
   // (and both put back on their marks: the CPU may have knocked P1 down or into the edge)
@@ -53,7 +60,7 @@ const key = (p, code, ms = 40) => p.evaluate(async ([c, t]) => {
   const after = await p.evaluate(() => { const f = __pf2.fight.st.f[0]; return [f.x, f.z, f.act]; });
   results.menus = { trail, ...r, moved: [before, after] };
   if (trail.join() !== 'title,mode,select,diff,fight') problems.push(`menus: ${trail}`);
-  if (r.p.join() !== 'rubberta,k8e' || r.cpu[1] !== 'hard' || r.cpu[0]) problems.push(`menus: ${JSON.stringify(r)}`);
+  if (r.p.join() !== 'rubberta,sumaura' || r.cpu[1] !== 'hard' || r.cpu[0] || r.evil.join() !== 'true,true') problems.push(`menus: ${JSON.stringify(r)}`);
   if (Math.hypot(after[0] - before[0], after[1] - before[1]) < 300) problems.push('menus: player 1 did not move');
   await p.screenshot({ path: path.join(root, 'shots/check-menus-fight.png'), timeout: 240000 });
   await p.close();

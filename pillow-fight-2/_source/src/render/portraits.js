@@ -9,8 +9,10 @@ import { unpackRows } from './readback.js';
 
 export const still = (id, fx = 1024, fz = 0, act = 'idle') => ({ id, act, face: 1, fx, fz, x: 0, y: 0, z: 0, t: 0, mv: '', back: 0, down: 0, kr: 0, kb: 0 });
 
-/* {id: dataURL} for every id */
-export async function portraits(renderer, arena, ids) {
+/* {key: dataURL}: an id (the OG) or `${id}:alt` (the evil twin) for every
+   entry; each fighter rendered alone, in the same frame, OG or ALT */
+export const portraitKey = (id, alt) => (alt ? `${id}:alt` : id);
+export async function portraits(renderer, arena, ids, { alt = false, onEach = null } = {}) {
   const W = 256, H = 320;
   const rt = new THREE.RenderTarget(W, H, { samples: 4 });
   rt.texture.colorSpace = THREE.SRGBColorSpace;
@@ -25,8 +27,9 @@ export async function portraits(renderer, arena, ids) {
       if (o === arena.world || arena.base.has(o) || !o.visible) continue;
       o.visible = false; hidden.push(o);
     }
-    const p = new Plush(arena.scene, id, { side: 0 });
+    const p = new Plush(arena.scene, id, { side: 0, evil: alt });
     arena.add(p.group);
+    p.monocle.visible = alt; p.toque.visible = false;
     const F = still(id, 0, 1024);
     for (let i = 0; i < 30; i++) p.update(1 / 60, F, F, [0, 0, 0], [0, 0, 3], false);
     arena.paintShadows([p]);
@@ -45,7 +48,9 @@ export async function portraits(renderer, arena, ids) {
     const img = g.createImageData(W, H);
     img.data.set(unpackRows(px, W, H, { flip: webgl, stride: webgl ? W * 4 : Math.ceil(W * 4 / 256) * 256 }));
     g.putImageData(img, 0, 0);
-    out[id] = c.toDataURL('image/png');
+    const key = portraitKey(id, alt);
+    out[key] = c.toDataURL('image/png');
+    onEach?.(key, out[key]);
   }
   rt.dispose();
   return out;

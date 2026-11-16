@@ -573,12 +573,28 @@ body.lobby .pr-moves{bottom:16px}
 @keyframes twoPuff{0%,100%{transform:rotate(-8deg) scale(1)}50%{transform:rotate(-6deg) scale(1.05,0.96)}}
 .subtitle{margin-top:-6px;font-family:var(--cond);font-weight:700;font-style:italic;letter-spacing:.55em;font-size:clamp(14px,1.8vw,22px);color:#fff;text-transform:uppercase;
   text-shadow:0 0 10px rgba(63,240,200,.9),0 0 26px rgba(63,240,200,.5)}
-.cards{perspective:900px;gap:6px;bottom:26px}
+.cards{flex-direction:column;align-items:center;gap:8px;bottom:18px;--cw:clamp(64px,8vw,112px)}
+.cards .row{display:flex;gap:6px;perspective:900px}
+.cards .card{width:var(--cw)}
+.card .lab{padding:4px 3px 4px 21px;font-size:clamp(8.5px,.86vw,12px);line-height:1.12;white-space:normal;text-overflow:clip}
+.card .lab b,.card .lab i{display:block;overflow:hidden;font-weight:700}
+.card .lab b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow-wrap:anywhere}
+.card .lab i{white-space:nowrap;text-overflow:ellipsis}
+.card .lab i{font-style:normal;font-size:.8em;letter-spacing:.06em;color:var(--dim)}
+.card .lab .flag{left:4px;top:50%;bottom:auto;transform:translateY(-50%);width:14px;height:10px}
+.card .vt{position:absolute;left:50%;top:5px;transform:translateX(-50%);font-family:var(--cond);font-weight:700;font-size:10px;letter-spacing:.14em;padding:0 5px;border-radius:2px;background:rgba(18,13,31,.75);color:#cdb6ff}
+.card.alt{background:radial-gradient(120% 90% at 50% 20%,#3a1622,#1a0f1c)}
+.card.alt .vt{background:#c41a2a;color:#fff;text-shadow:0 0 6px rgba(255,80,80,.8)}
+.card.alt .lab{color:#ffd0d6}
+.card.alt .lab i{color:#ff8a8a}
+.card .tag{font-size:10.5px;top:4px;padding:0 4px}
+.card.c1 .vt,.card.c2 .vt{display:none}
+#select-screen .step{bottom:18px;right:1.6vw;max-width:15vw;white-space:normal;line-height:1.35;font-size:12px;letter-spacing:.14em;text-align:center}
 .card{transform:rotateY(var(--ry,0deg)) translateZ(var(--tz,0px));transform-style:preserve-3d}
 .card:hover{transform:rotateY(var(--ry,0deg)) translateZ(calc(var(--tz,0px) + 20px)) translateY(-6px)}
 .card.c1,.card.c2{transform:rotateY(var(--ry,0deg)) translateZ(calc(var(--tz,0px) + 36px)) translateY(-10px)}
 #select-screen .plate{top:max(18%,170px)}
-.legend{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(clamp(84px,9.6vw,136px) * 4 / 3 + 40px);width:min(600px,62vw);opacity:.93}
+.legend{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(clamp(64px,8vw,112px) * 8 / 3 + 40px);width:min(470px,46vw);opacity:.9}
 .legend.vs{width:min(760px,80vw)}
 #title-screen .press-wrap{background:radial-gradient(ellipse at 50% 60%,rgba(18,13,31,.82),rgba(18,13,31,0) 70%);padding:20px 60px}
 .legend .kbsvg{width:100%;height:auto}
