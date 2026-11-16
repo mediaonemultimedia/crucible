@@ -18,7 +18,7 @@ npm run build                    # → final.html (self-contained; fails on any 
 node tools/check.mjs             # the release checks in the real page (menus, CPU match, versus, practice, frame cost)
 node tools/shots.mjs [scene …]   # evidence → shots/pf2/ (ring-overview, sidestep, ringout, select, …)
 node tools/peek.mjs out.png '?hold&webgl' '__pf2.step(1)'   # one screenshot (HTML=path to use another build)
-node tools/online-match.mjs [--minutes 3.5] [--lag 30]       # two pages online over the loopback, CPUs, hashes compared
+node tools/online-match.mjs [--minutes 3.5] [--lag 30]       # two pages online over the loopback, OG + ALT picks, CPUs, hashes compared
 node tools/throws-shots.mjs                                  # every throw, both directions → shots/throws/
 node tools/build.mjs --out other.html                        # build elsewhere
 ```
@@ -162,10 +162,19 @@ pause card draw the keyboard legend (`ui/keymap.js`).
   shadows were invisible. Noted here, PF1 untouched.)
 
 ### UI (`src/main.js`, `src/index.html`)
-Title ("PILLOW FIGHT" logo + a puffy neon **2**, subtitle **Lights Out**),
+Title (the owner's **Pillow Fight II** logo, `assets/pillow-fight-2-logo.webp`,
+inlined once as CSS `--logo` from the 1200 px q0.82 copy
+`assets/pillow-fight-2-logo-1200.webp`; it slams in once the room has drawn,
+with a flash, a shake of the title and the 3D room, a light sweep masked to
+the chrome and shards, shard glints, an idle float and shimmer; subtitle
+**Lights Out**; the logo also tops the pause card and sits bottom-left on the
+winner screen),
 modes (vs Computer, Versus, Practice; Online greyed: stage 2), character
-select (PF1's portraits on a curved card arc; the picks stand on the quilt
-on a turntable; OG / ALT with W / S), difficulty, the VS card, HUD (STUFFING,
+select (**14 cards**: the 7 OGs on top, their 7 ALT twins below, each its
+own portrait rendered from its own model in PF1's framing, `id` / `id:alt`
+keys; arrows / WASD move on the grid, up / down change row; the other
+seat's locked card is stepped over, so the fighter on the quilt is always
+the highlighted card's; the picks stand on the quilt on a turntable), difficulty, the VS card, HUD (STUFFING,
 timer 60 s, round pips, SPECIAL meters, combos, COUNTER / EDGE! pops,
 Ring Out / K.O. banners), pause with sound settings and the key legend,
 winner close-up with the catchphrase bubble and a rematch. Practice: dummy
@@ -179,6 +188,8 @@ time, crouch-blocks lows, punishes blocked moves, throws blockers, spins
 sidesteppers, circles off the edge and goes for ring-out heavies.
 
 ## Tests and checks
+- `test/select.test.mjs` (4): the 14-slot grid (OG over ALT), steps,
+  the locked card skipped, no variant flip between different cards.
 - `test/sim.test.mjs` (17): no clock / random / trig in the sim; same
   inputs → same hash; clone + resimulate from a snapshot; integer state;
   walk, dash, sidestep (distance kept), circling, hop, crouch; sidestep

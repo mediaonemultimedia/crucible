@@ -62,14 +62,16 @@ await B.screenshot({ path: path.join(out, '2-joining-guest.jpg'), type: 'jpeg', 
 await B.waitForFunction(() => __pf2.screen === 'select', null, { timeout: 30000 });
 await A.waitForFunction(() => __pf2.screen === 'select', null, { timeout: 30000 });
 
-const PAIRS = [['kevalanche', 'k8e'], ['rubberta', 'sebas'], ['zach', 'sumaura'], ['johnny', 'kevalanche']];
+// [fighter, ALT?] per seat: the ALT cards too (the variant rides the select and start messages)
+const PAIRS = [[['kevalanche', 1], ['k8e', 0]], [['rubberta', 0], ['sebas', 1]], [['zach', 1], ['sumaura', 1]], [['johnny', 0], ['kevalanche', 1]]];
 const ROSTER = await A.evaluate(() => __pf2.ROSTER);
 let played = 0, matches = 0, checked = 0;
 while (played < MIN * 3600) {
   const [p1, p2] = PAIRS[matches % PAIRS.length];
-  for (const [P, k, id] of [[A, 0, p1], [B, 1, p2]]) {
+  for (const [P, k, [id, alt]] of [[A, 0, p1], [B, 1, p2]]) {
     const cur = await P.evaluate((k) => __pf2.pick[k], k);
     for (let i = cur; i !== ROSTER.indexOf(id); i = (i + 1) % ROSTER.length) await P.keyboard.press('KeyD');
+    if (await P.evaluate((k) => __pf2.alt[k], k) !== !!alt) await P.keyboard.press('KeyS');
   }
   for (let i = 0; i < 3; i++) { await step(A, 0.1); await step(B, 0.1); }
   if (matches === 0) await shot('3-select');
@@ -78,6 +80,12 @@ while (played < MIN * 3600) {
   await B.keyboard.press('KeyO');
   for (let i = 0; i < 20 && !(await A.evaluate(() => !!__pf2.fight?.session)) ; i++) { await step(A, 0.1); await step(B, 0.1); }
   for (let i = 0; i < 20 && !(await B.evaluate(() => !!__pf2.fight?.session)) ; i++) { await step(A, 0.1); await step(B, 0.1); }
+  // both pages drew the picked cards: the fighter and its variant, on both seats
+  const want = [p1, p2].map(([id, alt]) => `${id}${alt ? ':alt' : ''}`).join();
+  for (const P of [A, B]) {
+    const got = await P.evaluate(() => __pf2.fight.plush.map((p) => `${p.id}${p.evil ? ':alt' : ''}`).join());
+    if (got !== want) errs.push(`match ${matches + 1}: drew ${got}, picked ${want}`);
+  }
   // CPUs take the keyboards' place (each side only its own player)
   for (const [P, k] of [[A, 0], [B, 1]]) {
     await P.evaluate(([k, s]) => { const c = __pf2.cpuFor(k, k ? 'normal' : 'hard', s); __pf2.fight.override = (st) => (k ? [null, c.input(st)] : [c.input(st), null]); }, [k, 100 + matches]);
@@ -90,7 +98,7 @@ while (played < MIN * 3600) {
     if (shotMid && s[0].f > 1500) { shotMid = false; await shot('5-mid-fight'); }
     if (s[0].ph === 'end' && s[1].ph === 'end' && s[0].scr === 'win' && s[1].scr === 'win') {
       played += Math.min(s[0].f, s[1].f); checked += Math.min(s[0].c, s[1].c);
-      console.log(`match ${matches + 1}: ${p1} v ${p2}, ${s[0].f} ticks, hash checks ${s[0].c}/${s[1].c}, played ${(played / 3600).toFixed(2)} min`);
+      console.log(`match ${matches + 1}: ${p1.join(':')} v ${p2.join(':')}, ${s[0].f} ticks, hash checks ${s[0].c}/${s[1].c}, played ${(played / 3600).toFixed(2)} min`);
       break;
     }
     if (n === 899) errs.push(`match ${matches + 1} did not finish: ${JSON.stringify(s)}`);
