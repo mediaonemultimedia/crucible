@@ -42,9 +42,11 @@ const face = `/* Bubble lettering: a subset of Gochi Hand, Copyright (c) 2011 HT
 @font-face{font-family:"Bolster Condensed";src:url(data:font/woff2;base64,${cond}) format("woff2");font-weight:700;font-display:block}`;
 html = html.replace('/*FONTFACE*/', () => face);
 
-/* the Pillow Fight logo (the owner's artwork, transparent WebP), inlined */
-if (!html.includes('__LOGO__')) throw new Error('index.html is missing the __LOGO__ marker');
-const logo = fs.readFileSync(path.join(root, 'assets/pillow-fight-logo.webp')).toString('base64');
+/* the Pillow Fight II logo (the owner's artwork, transparent WebP), inlined
+   once as the CSS custom property --logo: assets/pillow-fight-2-logo-1200.webp
+   is assets/pillow-fight-2-logo.webp at 1200 px, WebP q 0.82 (~176 KB) */
+if (html.split('__LOGO__').length !== 2) throw new Error('index.html must have exactly one __LOGO__ marker');
+const logo = fs.readFileSync(path.join(root, 'assets/pillow-fight-2-logo-1200.webp')).toString('base64');
 html = html.replace('__LOGO__', () => `data:image/webp;base64,${logo}`);
 
 const final = html.replace('<!--BUNDLE-->', () => `<script>\n${js}\n</script>`);

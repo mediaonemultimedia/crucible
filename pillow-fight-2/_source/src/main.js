@@ -97,13 +97,19 @@ class App {
 
   resize() { this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); this.renderer.setSize(innerWidth, innerHeight, false); }
 
+  /* the title logo's impact (0.53 s into its slam): the room shakes with it */
+  slam() { this.later(0.56, () => this.screen === 'title' && this.arena.shake(0.55)); }
+
   go(name) {
+    const from = this.screen;
     this.screen = name;
     for (const s of $$('.screen')) s.classList.toggle('on', s.id === `${name}-screen`);
     document.body.classList.toggle('fighting', name === 'fight' || name === 'pause');
     document.body.classList.toggle('practicing', !!this.fight?.practice && (name === 'fight' || name === 'pause'));
     document.body.dataset.screen = name;
     if (['title', 'mode'].includes(name)) $('#bubbles').textContent = '';
+    // the logo slams in: the room takes the hit too
+    if (name === 'title' && from !== 'title') this.slam();
     if (name !== 'fight' && name !== 'win' && name !== 'pause') this._drainOff(true);
     if (name !== 'fight') $('#namecard').className = '';
     if (name === 'select') this._enterSelect();
@@ -708,7 +714,7 @@ class App {
     $('#win-record').textContent = '';
     if (w === 2) { $('#win-eyebrow').textContent = 'No winner'; $('#win-name').textContent = 'Draw'; return; }
     this.net.winScreen();
-    $('#win-eyebrow').textContent = `Pillow Fight 2 · ${f.session ? `Player ${w + 1} wins${w === this.net.local ? ' — that’s you' : ''}` : f.cpu[w] ? (f.cpu[0] && f.cpu[1] ? `CPU ${w + 1} wins` : 'The computer wins') : `Player ${w + 1} wins`}`;
+    $('#win-eyebrow').textContent = `${f.session ? `Player ${w + 1} wins${w === this.net.local ? ' — that’s you' : ''}` : f.cpu[w] ? (f.cpu[0] && f.cpu[1] ? `CPU ${w + 1} wins` : 'The computer wins') : `Player ${w + 1} wins`}`;
     $('#win-name').innerHTML = `${esc(f.name(w))} wins`;
     const id = st.f[w].id, line = st.egg ? FIGHTERS[id].catchphrase.egg : FIGHTERS[id].catchphrase.main;
     // the camera comes round to the winner, close, from the front
@@ -769,22 +775,31 @@ async function start() {
   app.cpuFor = (k, level, seed) => new CPU(k, level, seed);
   app.ROSTER = ROSTER;
   app.renderAudio = (o) => renderOffline({ clips: CLIPS, ...o });
-  if (!params.has('noportraits')) {
-    const put = (key, url) => { app.portraits[key] = url; for (const c of $$('#cards .card')) app._cardPortrait(c); };
-    try { await portraits(renderer, app.arena, ROSTER, { onEach: put }); await portraits(renderer, app.arena, ROSTER, { alt: true, onEach: put }); } catch (err) { console.warn('portraits', err); }
-  }
-  for (const c of $$('#cards .card')) app._cardPortrait(c);
+  // once the room has drawn (shaders compiled), the title logo slams in —
+  // not while the page loads — and the card portraits wait until it has landed
+  const deep = ['p1', 'practice', 'room', 'screen'].some((k) => params.has(k));
   let last = performance.now();
   app.hold = params.has('hold');
+  let drawn = 0, ready;
+  const roomUp = new Promise((r) => { ready = r; });
   renderer.setAnimationLoop(() => {
     if (!canvas.clientWidth) return;
     const now = performance.now();
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     if (!app.hold) app.frame(dt);
+    if (++drawn === 3 || app.hold) ready();
     app.fps = app.fps ? app.fps * 0.95 + (1 / Math.max(1e-3, (now - (app._lf || now)) / 1000 || 60)) * 0.05 : 60;
     app._lf = now;
   });
+  await roomUp;
+  document.body.classList.add('is-ready');
+  if (!deep) { app.slam(); await new Promise((r) => setTimeout(r, app.hold ? 0 : 1400)); }
+  if (!params.has('noportraits')) {
+    const put = (key, url) => { app.portraits[key] = url; for (const c of $$('#cards .card')) app._cardPortrait(c); };
+    try { await portraits(renderer, app.arena, ROSTER, { onEach: put }); await portraits(renderer, app.arena, ROSTER, { alt: true, onEach: put }); } catch (err) { console.warn('portraits', err); }
+  }
+  for (const c of $$('#cards .card')) app._cardPortrait(c);
   const p1 = fighterId(params.get('p1')), p2 = fighterId(params.get('p2'));
   if (p1 && p2) {
     if (params.get('versus') === '1') app.mode = 'versus';
