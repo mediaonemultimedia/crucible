@@ -26,7 +26,7 @@ h1{font:400 18px Bungee;margin:0;color:#fff;letter-spacing:.04em}
 @keyframes sweep{0%{background-position:120% 0}60%,100%{background-position:-60% 0}}
 
 .print{position:absolute;font:800 2.4cqh Inter;letter-spacing:.16em;z-index:4;transform:translate(-50%,0);white-space:nowrap}
-.og .print,.og .lbl{color:#0d3f73}
+.og .print,.og .lbl{color:#0d3f73;text-shadow:0 0 .6cqh #fff,0 0 .6cqh #fff,0 0 1cqh #fff}
 .goon .print,.goon .lbl{color:#fff;text-shadow:0 .3cqh 0 #0b1d3a,0 0 .8cqh #0b1d3a}
 
 .ping{position:absolute;top:5cqh;right:5cqw;width:1.8cqh;height:1.8cqh;border-radius:50%;background:#3ee07a;box-shadow:0 0 1.4cqh #3ee07a;z-index:6}
@@ -36,7 +36,7 @@ h1{font:400 18px Bungee;margin:0;color:#fff;letter-spacing:.04em}
   background:linear-gradient(#0006,#0002);box-shadow:inset 0 .6cqh 1cqh #000a,0 .3cqh 0 #fff5;padding:1cqh}
 .pill{border-radius:99px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .05s;position:relative}
 .pill.start{width:14cqh;height:5cqh;background:linear-gradient(#5d6066,#2f3135);box-shadow:0 .7cqh 0 #141518,inset 0 .4cqh .4cqh #fff3}
-.pill.super{width:27cqh;height:9cqh;font:400 3.6cqh Bungee;letter-spacing:.08em;color:#3a2500;
+.pill.super{width:36cqh;height:12cqh;font:400 4.8cqh Bungee;letter-spacing:.08em;color:#3a2500;
   background:radial-gradient(120% 140% at 40% 20%,#fff6b8,#ffcc1f 45%,#e09a00);box-shadow:0 1cqh 0 #8a5a00,0 1.4cqh 2cqh #0007,inset 0 .5cqh .5cqh #fff8}
 .goon .pill.super{background:radial-gradient(120% 140% at 40% 20%,#ffd3b0,#ff7a26 45%,#d64f00);box-shadow:0 1cqh 0 #7a2c00,0 1.4cqh 2cqh #0007,inset 0 .5cqh .5cqh #fff8;color:#2a0e00}
 .pill.down{transform:translateY(.8cqh)}
@@ -55,18 +55,20 @@ h1{font:400 18px Bungee;margin:0;color:#fff;letter-spacing:.04em}
 
 /* arcade buttons */
 .btn{position:absolute;transform:translate(-50%,-50%);z-index:5;cursor:pointer;width:17cqh;height:17cqh}
-.bezel{position:absolute;inset:0;border-radius:50%;background:radial-gradient(#0000 0 58%,#0b0b0d 59% 100%);box-shadow:0 .5cqh 0 #0006}
-.cap{position:absolute;inset:11%;border-radius:50%;transition:transform .05s;
-  background:radial-gradient(circle at 38% 30%,#fffa 0 7%,transparent 26%),radial-gradient(circle at 50% 56%,var(--hi),var(--mid) 70%,var(--deep));
-  box-shadow:0 1cqh 0 var(--deep),inset 0 -.8cqh 1cqh #0004,inset 0 .4cqh .5cqh #fff7}
-.btn.down .cap{transform:translateY(.9cqh);box-shadow:0 .1cqh 0 var(--deep),inset 0 -.4cqh .6cqh #0004;filter:brightness(1.3)}
+.bezel{position:absolute;inset:0;border-radius:50%;
+  background:radial-gradient(circle closest-side,var(--ringIn) 0 72%,var(--ring) 80%,var(--hi) 88%,var(--ringOut) 100%);
+  box-shadow:0 .9cqh 0 var(--deep),0 1.4cqh 1.6cqh #0007,inset 0 .5cqh .4cqh #fff6,inset 0 -.4cqh .5cqh #0003}
+.cap{position:absolute;inset:15%;border-radius:50%;transition:transform .05s;
+  background:radial-gradient(circle at 40% 32%,#ffffff70 0 10%,transparent 32%),radial-gradient(circle at 50% 50%,var(--hi) 0,var(--mid) 62%,var(--deep) 100%);
+  box-shadow:0 0 0 .45cqh #0004,0 .7cqh .7cqh #0005,inset 0 .35cqh .3cqh #fff8,inset 0 -.5cqh .6cqh #0003}
+.btn.down .cap{transform:scale(.94) translateY(.4cqh);box-shadow:0 0 0 .45cqh #0006,inset 0 .2cqh .2cqh #fff5,inset 0 -.3cqh .5cqh #0004;filter:brightness(1.18)}
 .lbl{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:.3cqh;font:800 2.4cqh Inter;letter-spacing:.14em;white-space:nowrap}
-.og .c1{--hi:#e9f6ff;--mid:#9fd3f8;--deep:#3d86c6}
-.og .c2{--hi:#ff7a80;--mid:#d42a33;--deep:#7d0d12}
-.og .c3{--hi:#ffffff;--mid:#e6e9ee;--deep:#9aa3ad}
-.goon .c1{--hi:#5f86cc;--mid:#24467f;--deep:#0b1d3a}
-.goon .c2{--hi:#ffa463;--mid:#f05e0a;--deep:#8f3200}
-.goon .c3{--hi:#ffffff;--mid:#e9e9e9;--deep:#8d8d8d}
+.og .c1{--hi:#e9f6ff;--mid:#9fd3f8;--deep:#3d86c6;--ring:#8cc8f3;--ringIn:#5a9fd8;--ringOut:#4f93cf}
+.og .c2{--hi:#ff7a80;--mid:#d42a33;--deep:#7d0d12;--ring:#d42a33;--ringIn:#9e151c;--ringOut:#a3161d}
+.og .c3{--hi:#ffffff;--mid:#eceef1;--deep:#9aa3ad;--ring:#eef0f3;--ringIn:#b9c0c8;--ringOut:#c9ced5}
+.goon .c1{--hi:#5f86cc;--mid:#24467f;--deep:#06122a;--ring:#2b4f8c;--ringIn:#14305f;--ringOut:#1a3a70}
+.goon .c2{--hi:#ffa463;--mid:#f05e0a;--deep:#8f3200;--ring:#f46a18;--ringIn:#b84300;--ringOut:#c44a04}
+.goon .c3{--hi:#ffffff;--mid:#eceef1;--deep:#8d8d8d;--ring:#eef0f3;--ringIn:#b9c0c8;--ringOut:#c9ced5}
 
 /* cheat sheet */
 .tab{position:absolute;right:6cqw;bottom:0;z-index:12;background:#c9a46a;color:#2b1d0e;font:400 2.8cqh 'Permanent Marker';padding:1.1cqh 3.4cqh 1.5cqh;border-radius:2cqh 2cqh 0 0;cursor:pointer;box-shadow:0 -1cqh 2cqh #0003}
@@ -89,7 +91,7 @@ h1{font:400 18px Bungee;margin:0;color:#fff;letter-spacing:.04em}
 </style>
 </head>
 <body>
-<h1>Kevalanche · phone controller v2</h1>
+<h1>Kevalanche · phone controller v3</h1>
 <div class="toggle">
   <button id="bog" class="on">OG · Polar bear</button>
   <button id="bgoon">ALT · Hockey Goon</button>
@@ -107,13 +109,19 @@ h1{font:400 18px Bungee;margin:0;color:#fff;letter-spacing:.04em}
       </filter>
       <filter id="chips" x="0" y="0" width="100%" height="100%">
         <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="4" seed="11" result="n"/>
-        <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -22 6.4" result="a"/>
-        <feComposite in="SourceGraphic" in2="a" operator="in"/>
+        <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -16 6.2" result="a"/>
+        <feTurbulence type="fractalNoise" baseFrequency="0.006" numOctaves="2" seed="5" result="m"/>
+        <feColorMatrix in="m" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 18 -9.6" result="mask"/>
+        <feComposite in="a" in2="mask" operator="in" result="am"/>
+        <feComposite in="SourceGraphic" in2="am" operator="in"/>
       </filter>
       <filter id="chipsBig" x="0" y="0" width="100%" height="100%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.022" numOctaves="4" seed="27" result="n"/>
-        <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -26 7.4" result="a"/>
-        <feComposite in="SourceGraphic" in2="a" operator="in"/>
+        <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="4" seed="27" result="n"/>
+        <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -22 7" result="a"/>
+        <feTurbulence type="fractalNoise" baseFrequency="0.005" numOctaves="2" seed="9" result="m"/>
+        <feColorMatrix in="m" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 20 -11.2" result="mask"/>
+        <feComposite in="a" in2="mask" operator="in" result="am"/>
+        <feComposite in="SourceGraphic" in2="am" operator="in"/>
       </filter>
       <pattern id="dots" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(30)"><circle cx="4.5" cy="4.5" r="2.2" fill="#fff"/></pattern>
       <pattern id="dotsO" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(30)"><circle cx="4.5" cy="4.5" r="2" fill="#ff6a13"/></pattern>
@@ -202,7 +210,7 @@ h1{font:400 18px Bungee;margin:0;color:#fff;letter-spacing:.04em}
   <div class="print" style="left:50%;top:5cqh">START</div>
   <div class="pillwell" style="left:50%;top:16cqh"><div class="pill start" data-snd="700"></div></div>
 
-  <div class="pillwell" style="left:43cqw;top:62cqh"><div class="pill super" data-snd="440">SUPER</div></div>
+  <div class="pillwell" style="left:42cqw;top:56cqh"><div class="pill super" data-snd="440">SUPER</div></div>
 
   <div class="stickzone" id="sz"><div class="gate"></div><div class="shaft"></div><div class="ball" id="ball"></div></div>
 
