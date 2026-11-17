@@ -41,7 +41,7 @@ Use the arcade cabinet panel from Kevin's reference photo.
   - **BLOCK**
   - **TAUNT**: plays that fighter's trash-talk line
 - **START:** an NES-style rubber PILL in a recessed well, top centre, with "START" printed on the overlay above it.
-- **SUPER:** a bigger glossy PILL button in the middle, between the stick and the buttons, with "SUPER" printed on the pill. It fires the meter super.
+- **SUPER:** a LARGE glossy PILL button, vertically level with the joystick centre, between the stick and the buttons, with "SUPER" printed on the pill. It fires the meter super.
 - NO fighter name, NO portrait and NO country text on the controller. The fighter shows only through the art.
 - Buttons press in with a glossy highlight, flash, and make a click sound.
 - Landscape layout. In portrait, show a "rotate your phone" prompt.
@@ -55,7 +55,8 @@ Use the arcade cabinet panel from Kevin's reference photo.
 ### 5. Controller art: unique per fighter (and per OG/ALT)
 The panel art is a printed arcade control-panel overlay, like a racing livery: dynamic but fairly simple.
 - **Visual language:** jagged livery shards, racing-stripe bundles, halftone dot patches, rough brush strokes, thin speed lines, tiny technical decals (barcode bars, chevrons; no words), and an outlined zone around the button cluster.
-- **Wear on most of them:** paint chips revealing primer, scuffs, and rubbed areas around the stick and buttons. It's done in code with SVG feTurbulence thresholds. Keep it subtle, like the PILLOW FIGHT II logo; never mush.
+- **Arcade buttons:** real Sanwa/Seimitsu-style: a solid coloured housing ring with a glossy lip, around a slightly smaller domed plunger with a dark seam; the plunger sinks on press, the ring stays.
+- **Wear on most of them:** in CLUSTERS (some patches dense, most of the board clean), never an even sprinkle like snow. paint chips revealing primer, scuffs, and rubbed areas around the stick and buttons. It's done in code with SVG feTurbulence thresholds. Keep it subtle, like the PILLOW FIGHT II logo; never mush.
 - **Each fighter is distinct** (palette, shapes, motifs), driven mainly by the CHARACTER. Country is only an extra ingredient where fun (Brazil, Mexico, UK). ALT twins get their own evil variant, not just a recolour. Button cap colours and the stick ball match each theme.
 - **Kevalanche OG:** icy-blue avalanche shards, a snow brush, a red flannel-plaid racing stripe. **Goon:** Oilers navy, an orange/white hockey-sweater stripe bundle cut by a jagged break, skate scratches. (These are built in the mockup; port them.)
 - **Zach Sparrow:** black crow-feather shards, iridescent purple/teal sheen, beak-sharp diagonals.
