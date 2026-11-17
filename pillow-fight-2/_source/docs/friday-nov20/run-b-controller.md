@@ -50,15 +50,16 @@ Use the arcade cabinet panel from Kevin's reference photo.
 - The KO screen shows a rude one-liner on the loser's phone, in the fighter's voice and in the existing trash-talk tone.
 - When Rubberta's Ink Jet hits you, your phone screen gets an ink splat that drips off over ~2 seconds. It never blocks the controls' hit areas.
 
-### 5. Controller themed by fighter and country
-After picking, the phone panel restyles partly from the character and partly from their country. ALT twins get a darker, evil variant of the same theme. Look in the PF1/PF2 source for each fighter's country.
-- **Kevalanche** (Canada): snowy, plaid.
+### 5. Controller themed by fighter (country only where it adds something)
+After picking, the phone panel restyles mainly from the CHARACTER. Country is just one extra ingredient, used only where it adds something fun (Brazil, Mexico, UK). ALT twins get a darker, evil variant of the same theme.
+- **Kevalanche** (Canadian): snowy polar bear, flannel plaid.
   - ALT Goon: Oilers navy/orange hockey boards and ice scratches, no logos.
-- **Zach Sparrow** (Canada): crow feathers, maple accents.
+- **Zach Sparrow** (Canadian): crow feathers, a little maple at most. Character first.
+- **K8-E** (Canadian): giraffe pattern, savanna, a long-neck motif. Character first, no Canada theming needed.
+- **Johnny Deuce** (Canadian, Dutch heritage): TENNIS first: court lines, felt-ball texture, a scoreboard font, racquet strings behind the buttons. At most a tiny nod to Dutch heritage, and only if it's genuinely fun (e.g. an orange accent). Don't let it compete with the tennis.
 - **Rubberta** (Brazil): green/yellow Carnaval, ocean, ink.
-- **Sumaura** (Britain): red phone box/double-decker red, tea, a sumo mawashi stripe.
+- **Sumaura** (UK): red phone box/double-decker red, tea, a sumo mawashi stripe.
 - **Sebas Perra** (Mexico): lucha poster type, papel picado, pink/turquoise.
-- **Johnny Deuce** and **K8-E**: use their country if the source has one; otherwise theme on the character (tennis court / giraffe savanna).
 
 Keep everything tasteful and fun, not stereotyped. All art is generated in code (CSS/SVG/canvas). Keep it readable, and keep the buttons recognisably the same layout.
 
