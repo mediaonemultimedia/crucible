@@ -20,6 +20,8 @@ h1{font:400 18px Bungee;margin:0;color:#fff;letter-spacing:.04em}
 .art{position:absolute;inset:0;width:100%;height:100%;z-index:0}
 .art .t{transition:opacity .35s}
 .og .goon-only,.goon .og-only{opacity:0}
+.og .chip{fill:#f4f7f9;opacity:.9}
+.goon .chip{fill:#cfc8b8;opacity:.7}
 
 .sweep{position:absolute;inset:0;z-index:1;pointer-events:none;
   background:linear-gradient(115deg,transparent 40%,#ffffff2e 48%,transparent 56%);background-size:250% 100%;animation:sweep 7s ease-in-out infinite}
@@ -164,8 +166,6 @@ h1{font:400 18px Bungee;margin:0;color:#fff;letter-spacing:.04em}
       <g fill="none" stroke="#0d3f73" stroke-width="3" opacity=".8">
         <rect x="490" y="95" width="290" height="230" rx="56" transform="rotate(-5 635 210)"/>
       </g>
-      <rect width="844" height="390" fill="#eef3f6" filter="url(#chips)" opacity=".95"/>
-      <rect width="844" height="390" fill="#e3eaee" filter="url(#chipsBig)" opacity=".85"/>
     </g>
 
     <!-- ===== ALT GOON: hockey-sweater racing stripes, Oilers navy/orange, skate scratches ===== -->
@@ -196,10 +196,9 @@ h1{font:400 18px Bungee;margin:0;color:#fff;letter-spacing:.04em}
       <g fill="none" stroke="#ff6a13" stroke-width="3" opacity=".85">
         <rect x="490" y="95" width="290" height="230" rx="56" transform="rotate(-5 635 210)"/>
       </g>
-      <rect width="844" height="390" fill="#cfc8b8" filter="url(#chips)" opacity=".5"/>
-      <rect width="844" height="390" fill="#b9b2a2" filter="url(#chipsBig)" opacity=".35"/>
     </g>
 
+    <g id="wear"></g>
     <circle cx="169" cy="218" r="125" fill="url(#fade)" opacity=".35"/>
     <ellipse cx="635" cy="210" rx="160" ry="125" fill="url(#fade)" opacity=".22"/>
     <rect width="844" height="390" fill="url(#vign)"/>
@@ -243,6 +242,22 @@ h1{font:400 18px Bungee;margin:0;color:#fff;letter-spacing:.04em}
 
 <script>
 const scr=document.getElementById('scr');
+// sparse paint-chip wear: a few clusters of 3-6 mostly-small chips
+(function(){
+ let seed=7;const r=()=>(seed=(seed*16807)%2147483647)/2147483647;
+ const g=document.getElementById('wear');let out='';
+ for(let c=0;c<9;c++){
+  const cx=40+r()*764,cy=30+r()*330,k=3+Math.floor(r()*4);
+  for(let i=0;i<k;i++){
+   const big=r()<.18,rad=big?5+r()*5:1.5+r()*3;
+   const x=cx+(r()-.5)*46,y=cy+(r()-.5)*30,pts=[];const sides=5+Math.floor(r()*3);
+   for(let j=0;j<sides;j++){const a=j/sides*6.283+r()*.6,rr=rad*(.55+r()*.7);pts.push((x+Math.cos(a)*rr*1.4).toFixed(1)+','+(y+Math.sin(a)*rr).toFixed(1))}
+   out+=`<polygon class="chip" points="${pts.join(' ')}"/>`;
+  }
+ }
+ g.innerHTML=out;
+})();
+
 function setTheme(g){scr.className='screen '+(g?'goon':'og');
  document.getElementById('bog').classList.toggle('on',!g);document.getElementById('bgoon').classList.toggle('on',g);
  document.getElementById('dtg').textContent=g?'hurls a hockey glove, it poofs back on':'throws a snowball, bursts into snow'}
