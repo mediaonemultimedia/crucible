@@ -2,7 +2,7 @@
 - Source branch: `pf2-source` (`pillow-fight-2/_source/`).
 - Live game: https://mediaonemultimedia.github.io/crucible/pillow-fight-2/.
 
-Read the README first. Full specs for tonight are on `pf2-source` at `pillow-fight-2/_source/docs/friday-nov20/` (run-a-specials.md has the 7 specials).
+Read the README first, then `docs/friday-nov20/controller-design-notes.md` (the design rationale; follow it). Full specs for tonight are on `pf2-source` at `pillow-fight-2/_source/docs/friday-nov20/` (run-a-specials.md has the 7 specials).
 
 Run A (special moves) started at 5pm PT and may still be running. If `pf2-source` is getting fresh commits, build on top of them and rebase as it moves. Never discard its work. If Run A's move-list data isn't there yet, read run-a-specials.md and use that.
 
