@@ -30,7 +30,7 @@ Usage limits have killed runs before they pushed. Commit and push `pf2-source` a
 - Show a ping indicator (green/amber/red) on the title screen per paired phone.
 - Auto-reconnect if the phone sleeps.
 
-### 3. Cabinet look
+### 3. Cabinet look (Kevin-approved mockup: `docs/friday-nov20/kevalanche-controller-mockup.html`. Match its layout and feel)
 Use the arcade cabinet panel from Kevin's reference photo.
 - **Left:** a virtual ball-top stick with a glossy ball on a yellow ring base, 8-way, with a dead zone. It must make ↓↘→, half-circles and charge motions easy. No d-pad.
 - **Right:** six convex arcade buttons in a 2×3 block on a dark plate, each clearly labelled:
@@ -40,7 +40,9 @@ Use the arcade cabinet panel from Kevin's reference photo.
   - **JUMP**
   - **BLOCK**
   - **TAUNT**: plays that fighter's trash-talk line
-- **Top:** a yellow **START** button (pause/menu).
+- **START:** an NES-style rubber PILL in a recessed well, top centre, with "START" printed on the overlay above it.
+- **SUPER:** a bigger glossy PILL button in the middle, between the stick and the buttons, with "SUPER" printed on the pill. It fires the meter super.
+- NO fighter name, NO portrait and NO country text on the controller. The fighter shows only through the art.
 - Buttons press in with a glossy highlight, flash, and make a click sound.
 - Landscape layout. In portrait, show a "rotate your phone" prompt.
 - Haptics via `navigator.vibrate`: a short buzz on hit taken, a longer one on KO. Feature-detect, since iPhone won't buzz, and fail silently.
@@ -50,18 +52,18 @@ Use the arcade cabinet panel from Kevin's reference photo.
 - The KO screen shows a rude one-liner on the loser's phone, in the fighter's voice and in the existing trash-talk tone.
 - When Rubberta's Ink Jet hits you, your phone screen gets an ink splat that drips off over ~2 seconds. It never blocks the controls' hit areas.
 
-### 5. Controller themed by fighter (country only where it adds something)
-After picking, the phone panel restyles mainly from the CHARACTER. Country is just one extra ingredient, used only where it adds something fun (Brazil, Mexico, UK). ALT twins get a darker, evil variant of the same theme.
-- **Kevalanche** (Canadian): snowy polar bear, flannel plaid.
-  - ALT Goon: Oilers navy/orange hockey boards and ice scratches, no logos.
-- **Zach Sparrow** (Canadian): crow feathers, a little maple at most. Character first.
-- **K8-E** (Canadian): giraffe pattern, savanna, a long-neck motif. Character first, no Canada theming needed.
-- **Johnny Deuce** (Canadian, Dutch heritage): TENNIS first: court lines, felt-ball texture, a scoreboard font, racquet strings behind the buttons. At most a tiny nod to Dutch heritage, and only if it's genuinely fun (e.g. an orange accent). Don't let it compete with the tennis.
-- **Rubberta** (Brazil): green/yellow Carnaval, ocean, ink.
-- **Sumaura** (UK): red phone box/double-decker red, tea, a sumo mawashi stripe.
-- **Sebas Perra** (Mexico): lucha poster type, papel picado, pink/turquoise.
-
-Keep everything tasteful and fun, not stereotyped. All art is generated in code (CSS/SVG/canvas). Keep it readable, and keep the buttons recognisably the same layout.
+### 5. Controller art: unique per fighter (and per OG/ALT)
+The panel art is a printed arcade control-panel overlay, like a racing livery: dynamic but fairly simple.
+- **Visual language:** jagged livery shards, racing-stripe bundles, halftone dot patches, rough brush strokes, thin speed lines, tiny technical decals (barcode bars, chevrons; no words), and an outlined zone around the button cluster.
+- **Wear on most of them:** paint chips revealing primer, scuffs, and rubbed areas around the stick and buttons. It's done in code with SVG feTurbulence thresholds. Keep it subtle, like the PILLOW FIGHT II logo; never mush.
+- **Each fighter is distinct** (palette, shapes, motifs), driven mainly by the CHARACTER. Country is only an extra ingredient where fun (Brazil, Mexico, UK). ALT twins get their own evil variant, not just a recolour. Button cap colours and the stick ball match each theme.
+- **Kevalanche OG:** icy-blue avalanche shards, a snow brush, a red flannel-plaid racing stripe. **Goon:** Oilers navy, an orange/white hockey-sweater stripe bundle cut by a jagged break, skate scratches. (These are built in the mockup; port them.)
+- **Zach Sparrow:** black crow-feather shards, iridescent purple/teal sheen, beak-sharp diagonals.
+- **K8-E:** giraffe-patch shapes as livery panels, tall vertical-ish stripes (long neck), sunny savanna palette.
+- **Johnny Deuce:** tennis: court-line geometry, felt-ball yellow-green, racquet-string mesh, a scoreboard-tick decal; maybe one small Dutch orange accent.
+- **Rubberta:** Brazil green/yellow Carnaval energy plus ocean blue, ink splatter, tentacle-curve stripes.
+- **Sumaura:** UK red with navy, a sumo mawashi band as the stripe bundle, maybe a bamboo hint (panda).
+- **Sebas Perra:** lucha poster: pink/turquoise/gold, papel-picado cut shapes, a wolf-claw slash.
 
 ### 6. Cheat sheet
 - A slide-up panel on the phone (swipe up or tap a tab) showing your fighter's specials, throws and supers.
