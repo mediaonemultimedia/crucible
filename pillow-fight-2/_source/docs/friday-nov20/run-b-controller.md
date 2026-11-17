@@ -30,7 +30,7 @@ Usage limits have killed runs before they pushed. Commit and push `pf2-source` a
 - Show a ping indicator (green/amber/red) on the title screen per paired phone.
 - Auto-reconnect if the phone sleeps.
 
-### 3. Cabinet look (Kevin-approved mockup: `docs/friday-nov20/kevalanche-controller-mockup.html`. Match its layout and feel)
+### 3. Cabinet look (Kevin-approved mockups: `docs/friday-nov20/kevalanche-controller-mockup.html` and `sebas-controller-mockup.html`. Match their layout and feel, and give the other 5 fighters the same level of distinctness)
 Use the arcade cabinet panel from Kevin's reference photo.
 - **Left:** a virtual ball-top stick with a glossy ball on a yellow ring base, 8-way, with a dead zone. It must make ↓↘→, half-circles and charge motions easy. No d-pad.
 - **Right:** six convex arcade buttons in a 2×3 block on a dark plate, each clearly labelled:
@@ -64,7 +64,7 @@ The panel art is a printed arcade control-panel overlay, like a racing livery: d
 - **Johnny Deuce:** tennis: court-line geometry, felt-ball yellow-green, racquet-string mesh, a scoreboard-tick decal; maybe one small Dutch orange accent.
 - **Rubberta:** Brazil green/yellow Carnaval energy plus ocean blue, ink splatter, tentacle-curve stripes.
 - **Sumaura:** UK red with navy, a sumo mawashi band as the stripe bundle, maybe a bamboo hint (panda).
-- **Sebas Perra:** lucha poster: pink/turquoise/gold, papel-picado cut shapes, a wolf-claw slash.
+- **Sebas Perra:** BUILT in `sebas-controller-mockup.html` (Kevin-approved), so port it. OG técnico: marigold sunburst on warm cream, strong magenta (not soft pink, which reads 90s), turquoise and gold, with a hero cluster of 3 calavera skulls top-left and claw marks. El Rudo: black and crimson, jagged flames, bone/crimson skulls (big one cracked), claw rips. NO papel picado banner and NO big luchador mask (both rejected).
 
 ### 6. Cheat sheet
 - A slide-up panel on the phone (swipe up or tap a tab) showing your fighter's specials, throws and supers.
