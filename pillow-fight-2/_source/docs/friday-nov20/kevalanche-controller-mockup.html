@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kevalanche Controller</title>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Permanent+Marker&family=Inter:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+body{margin:0;min-height:100vh;background:#1a1d24;color:#ddd;font-family:Inter,system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;gap:18px;padding:24px 16px}
+h1{font:400 18px Bungee;margin:0;color:#fff;letter-spacing:.04em}
+.toggle{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.toggle button{font:700 13px Inter;padding:8px 14px;border-radius:999px;border:1px solid #444;background:#262a33;color:#ccc;cursor:pointer}
+.toggle button.on{background:#ffd23a;color:#111;border-color:#ffd23a}
+.note{font-size:12px;color:#888;max-width:844px;text-align:center}
+
+.phone{width:min(844px,100%);aspect-ratio:844/390;border-radius:46px;background:#000;padding:12px;box-shadow:0 30px 80px #0008,inset 0 0 0 2px #333}
+.screen{position:relative;width:100%;height:100%;border-radius:36px;overflow:hidden;container-type:size;background:#bfe1f7}
+.notch{position:absolute;left:4px;top:50%;width:26px;height:110px;transform:translateY(-50%);background:#000;border-radius:0 18px 18px 0;z-index:30}
+.art{position:absolute;inset:0;width:100%;height:100%;z-index:0}
+.art .t{transition:opacity .35s}
+.og .goon-only,.goon .og-only{opacity:0}
+
+.sweep{position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:linear-gradient(115deg,transparent 40%,#ffffff2e 48%,transparent 56%);background-size:250% 100%;animation:sweep 7s ease-in-out infinite}
+@keyframes sweep{0%{background-position:120% 0}60%,100%{background-position:-60% 0}}
+
+.print{position:absolute;font:800 2.4cqh Inter;letter-spacing:.16em;z-index:4;transform:translate(-50%,0);white-space:nowrap}
+.og .print,.og .lbl{color:#0d3f73}
+.goon .print,.goon .lbl{color:#fff;text-shadow:0 .3cqh 0 #0b1d3a,0 0 .8cqh #0b1d3a}
+
+.ping{position:absolute;top:5cqh;right:5cqw;width:1.8cqh;height:1.8cqh;border-radius:50%;background:#3ee07a;box-shadow:0 0 1.4cqh #3ee07a;z-index:6}
+
+/* NES-style rubber pills in recessed wells */
+.pillwell{position:absolute;transform:translate(-50%,-50%);border-radius:99px;z-index:5;
+  background:linear-gradient(#0006,#0002);box-shadow:inset 0 .6cqh 1cqh #000a,0 .3cqh 0 #fff5;padding:1cqh}
+.pill{border-radius:99px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .05s;position:relative}
+.pill.start{width:14cqh;height:5cqh;background:linear-gradient(#5d6066,#2f3135);box-shadow:0 .7cqh 0 #141518,inset 0 .4cqh .4cqh #fff3}
+.pill.super{width:27cqh;height:9cqh;font:400 3.6cqh Bungee;letter-spacing:.08em;color:#3a2500;
+  background:radial-gradient(120% 140% at 40% 20%,#fff6b8,#ffcc1f 45%,#e09a00);box-shadow:0 1cqh 0 #8a5a00,0 1.4cqh 2cqh #0007,inset 0 .5cqh .5cqh #fff8}
+.goon .pill.super{background:radial-gradient(120% 140% at 40% 20%,#ffd3b0,#ff7a26 45%,#d64f00);box-shadow:0 1cqh 0 #7a2c00,0 1.4cqh 2cqh #0007,inset 0 .5cqh .5cqh #fff8;color:#2a0e00}
+.pill.down{transform:translateY(.8cqh)}
+.pill.start.down{box-shadow:0 .1cqh 0 #141518}
+.pill.super.down{box-shadow:0 .2cqh 0 #8a5a00;filter:brightness(1.15)}
+
+/* stick */
+.stickzone{position:absolute;left:20cqw;top:56cqh;width:50cqh;height:50cqh;transform:translate(-50%,-50%);z-index:5;touch-action:none}
+.gate{position:absolute;inset:16%;border-radius:50%;background:radial-gradient(#111 0 30%,#1d1f23 31% 58%,#000 59% 62%,transparent 63%)}
+.ball{position:absolute;left:50%;top:50%;width:22cqh;height:22cqh;margin:-11cqh 0 0 -11cqh;border-radius:50%;cursor:grab;
+  box-shadow:0 1.8cqh 2.4cqh #0008,inset 0 -1.4cqh 2cqh #0004;transition:transform .14s cubic-bezier(.3,1.6,.5,1);z-index:2}
+.og .ball{background:radial-gradient(circle at 34% 28%,#fff 0 7%,#eaf6ff 14%,#a9d8fb 40%,#4a9ee6 72%,#2770b8)}
+.goon .ball{background:radial-gradient(circle at 34% 28%,#fff 0 6%,#ffd2b0 13%,#ff8a3d 40%,#e2560a 72%,#a63a00)}
+.ball.drag{transition:none}
+.shaft{position:absolute;left:50%;top:50%;width:3cqh;height:3cqh;margin:-1.5cqh;border-radius:50%;background:#c9ced6;z-index:1}
+
+/* arcade buttons */
+.btn{position:absolute;transform:translate(-50%,-50%);z-index:5;cursor:pointer;width:17cqh;height:17cqh}
+.bezel{position:absolute;inset:0;border-radius:50%;background:radial-gradient(#0000 0 58%,#0b0b0d 59% 100%);box-shadow:0 .5cqh 0 #0006}
+.cap{position:absolute;inset:11%;border-radius:50%;transition:transform .05s;
+  background:radial-gradient(circle at 38% 30%,#fffa 0 7%,transparent 26%),radial-gradient(circle at 50% 56%,var(--hi),var(--mid) 70%,var(--deep));
+  box-shadow:0 1cqh 0 var(--deep),inset 0 -.8cqh 1cqh #0004,inset 0 .4cqh .5cqh #fff7}
+.btn.down .cap{transform:translateY(.9cqh);box-shadow:0 .1cqh 0 var(--deep),inset 0 -.4cqh .6cqh #0004;filter:brightness(1.3)}
+.lbl{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:.3cqh;font:800 2.4cqh Inter;letter-spacing:.14em;white-space:nowrap}
+.og .c1{--hi:#e9f6ff;--mid:#9fd3f8;--deep:#3d86c6}
+.og .c2{--hi:#ff7a80;--mid:#d42a33;--deep:#7d0d12}
+.og .c3{--hi:#ffffff;--mid:#e6e9ee;--deep:#9aa3ad}
+.goon .c1{--hi:#5f86cc;--mid:#24467f;--deep:#0b1d3a}
+.goon .c2{--hi:#ffa463;--mid:#f05e0a;--deep:#8f3200}
+.goon .c3{--hi:#ffffff;--mid:#e9e9e9;--deep:#8d8d8d}
+
+/* cheat sheet */
+.tab{position:absolute;right:6cqw;bottom:0;z-index:12;background:#c9a46a;color:#2b1d0e;font:400 2.8cqh 'Permanent Marker';padding:1.1cqh 3.4cqh 1.5cqh;border-radius:2cqh 2cqh 0 0;cursor:pointer;box-shadow:0 -1cqh 2cqh #0003}
+.sheet{position:absolute;left:50%;bottom:0;width:72cqw;height:86cqh;transform:translate(-50%,118%) rotate(-1.2deg);z-index:15;transition:transform .45s cubic-bezier(.2,1.25,.4,1);
+  background:radial-gradient(circle at 82% 78%,transparent 0 6.5cqh,#7a4f1c33 6.6cqh 7.4cqh,transparent 7.5cqh),radial-gradient(#0000 60%,#6b4a1e22),repeating-linear-gradient(0deg,#0000 0 3px,#00000008 3px 4px),linear-gradient(#d8b67e,#cba366);
+  border-radius:1cqh;box-shadow:0 2cqh 5cqh #000a;padding:4cqh 5cqw;color:#24170a;font-family:'Permanent Marker'}
+.sheet.open{transform:translate(-50%,4cqh) rotate(-1.2deg)}
+.tape{position:absolute;width:14cqh;height:5cqh;background:#f4f1e3b0;top:-2cqh}
+.tape.l{left:3cqw;transform:rotate(-8deg)}.tape.r{right:3cqw;transform:rotate(7deg)}
+.sheet h2{margin:0 0 2cqh;font:400 5.4cqh 'Permanent Marker';color:#8b1a1a;transform:rotate(-1deg)}
+.row{display:grid;grid-template-columns:33% 1fr;align-items:center;gap:2cqw;padding:1.2cqh 0;border-bottom:.35cqh dashed #24170a44}
+.row .mv{font-size:3.5cqh;line-height:1.05}
+.row .in{font:400 3.5cqh 'Permanent Marker';display:flex;align-items:center;gap:1cqw;flex-wrap:wrap}
+.row small{display:block;font:500 2.3cqh Inter;opacity:.75;margin-top:.4cqh}
+.chip{display:inline-block;padding:.2cqh 1.4cqh;border-radius:99px;color:#fff;font:400 2.3cqh Bungee}
+.chip.b{background:#3d86c6}.chip.w{background:#cf1f26}.chip.g{background:#fff;color:#222;border:.3cqh solid #222}.chip.s{background:#ffcc1f;color:#3a2500}
+.close{position:absolute;right:3cqw;top:2cqh;font:400 3cqh 'Permanent Marker';cursor:pointer;color:#8b1a1a}
+.hitflash{position:absolute;inset:0;z-index:18;pointer-events:none;transition:box-shadow .25s}
+.hitflash.on{box-shadow:inset 0 0 6cqh 2cqh #ff2a2acc}
+</style>
+</head>
+<body>
+<h1>Kevalanche · phone controller v2</h1>
+<div class="toggle">
+  <button id="bog" class="on">OG · Polar bear</button>
+  <button id="bgoon">ALT · Hockey Goon</button>
+  <button id="hit">Demo: take a hit</button>
+</div>
+
+<div class="phone"><div class="screen og" id="scr">
+  <div class="notch"></div>
+
+  <svg class="art" viewBox="0 0 844 390" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <filter id="rough" x="-10%" y="-10%" width="120%" height="120%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="4"/>
+        <feDisplacementMap in="SourceGraphic" scale="22"/>
+      </filter>
+      <filter id="chips" x="0" y="0" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="4" seed="11" result="n"/>
+        <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -22 6.4" result="a"/>
+        <feComposite in="SourceGraphic" in2="a" operator="in"/>
+      </filter>
+      <filter id="chipsBig" x="0" y="0" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.022" numOctaves="4" seed="27" result="n"/>
+        <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -26 7.4" result="a"/>
+        <feComposite in="SourceGraphic" in2="a" operator="in"/>
+      </filter>
+      <pattern id="dots" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(30)"><circle cx="4.5" cy="4.5" r="2.2" fill="#fff"/></pattern>
+      <pattern id="dotsO" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(30)"><circle cx="4.5" cy="4.5" r="2" fill="#ff6a13"/></pattern>
+      <pattern id="plaid" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(-28)">
+        <rect width="40" height="40" fill="#c22b33"/><rect width="20" height="40" fill="#7c1218" opacity=".9"/>
+        <rect width="40" height="20" fill="#000" opacity=".45"/><rect x="9" width="2" height="40" fill="#000" opacity=".35"/>
+      </pattern>
+      <pattern id="bars" width="6" height="20" patternUnits="userSpaceOnUse"><rect width="3" height="20" fill="currentColor"/></pattern>
+      <radialGradient id="fade" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+      <linearGradient id="vign" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".18"/></linearGradient>
+    </defs>
+
+    <!-- ===== OG: avalanche — jagged ice shards, snow brush, flannel racing stripe ===== -->
+    <g class="t og-only">
+      <rect width="844" height="390" fill="#c8e6f8"/>
+      <!-- big jagged avalanche shards (livery style) -->
+      <path d="M-20 300 L120 230 L95 262 L250 170 L222 205 L400 95 L372 135 L560 20 L520 80 L700 -20 L900 -20 L900 40 L640 150 L668 118 L470 220 L498 186 L300 290 L330 255 L130 360 L160 330 L-20 410Z" fill="#6fbcef"/>
+      <path d="M180 410 L380 300 L352 334 L560 210 L530 250 L760 120 L730 160 L900 70 L900 150 L700 250 L728 218 L520 330 L548 296 L360 410Z" fill="#4aa6e3"/>
+      <path d="M-20 130 L80 85 L60 108 L200 40 L180 70 L330 -20 L-20 -20Z" fill="#9fd6f7"/>
+      <!-- flannel racing stripe bundle -->
+      <g transform="rotate(-28 422 195)">
+        <rect x="-200" y="250" width="1300" height="26" fill="url(#plaid)"/>
+        <rect x="-200" y="282" width="1300" height="7" fill="#c22b33"/>
+        <rect x="-200" y="294" width="1300" height="4" fill="#fff"/>
+      </g>
+      <!-- snow brush -->
+      <g filter="url(#rough)" fill="#fff">
+        <path d="M-20 70 C 120 40, 220 60, 330 10 L 360 40 C 240 100, 120 110, -20 130Z" opacity=".9"/>
+        <path d="M560 300 C 660 260, 760 250, 880 210 L 880 260 C 760 300, 660 330, 560 340Z" opacity=".85"/>
+        <path d="M40 390 C 140 350, 200 360, 280 330 L 300 400 L 20 400Z" opacity=".8"/>
+      </g>
+      <rect x="10" y="170" width="170" height="110" fill="url(#dots)" opacity=".5" transform="rotate(-28 95 225)"/>
+      <rect x="650" y="30" width="190" height="80" fill="url(#dots)" opacity=".45" transform="rotate(-28 745 70)"/>
+      <!-- technical decals (no words) -->
+      <g color="#0d3f73" opacity=".55">
+        <rect x="40" y="26" width="90" height="10" fill="url(#bars)"/>
+        <rect x="40" y="40" width="54" height="4" fill="#0d3f73"/>
+        <path d="M720 350 l12 -12 l12 12 M744 350 l12 -12 l12 12 M768 350 l12 -12 l12 12" stroke="#0d3f73" stroke-width="5" fill="none"/>
+      </g>
+      <g fill="none" stroke="#0d3f73" stroke-width="3" opacity=".8">
+        <rect x="490" y="95" width="290" height="230" rx="56" transform="rotate(-5 635 210)"/>
+      </g>
+      <rect width="844" height="390" fill="#eef3f6" filter="url(#chips)" opacity=".95"/>
+      <rect width="844" height="390" fill="#e3eaee" filter="url(#chipsBig)" opacity=".85"/>
+    </g>
+
+    <!-- ===== ALT GOON: hockey-sweater racing stripes, Oilers navy/orange, skate scratches ===== -->
+    <g class="t goon-only">
+      <rect width="844" height="390" fill="#0b1d3a"/>
+      <path d="M-20 320 L200 200 L178 228 L420 90 L396 122 L620 -20 L-20 -20Z" fill="#102852"/>
+      <!-- sweater-stripe bundle (orange / white / orange) -->
+      <g transform="rotate(-24 422 195)">
+        <rect x="-200" y="200" width="1300" height="44" fill="#ff6a13"/>
+        <rect x="-200" y="250" width="1300" height="12" fill="#fff"/>
+        <rect x="-200" y="268" width="1300" height="22" fill="#ff6a13"/>
+        <rect x="-200" y="296" width="1300" height="5" fill="#fff" opacity=".8"/>
+        <!-- cut-off chevron end like a livery -->
+        <polygon points="-200,150 160,150 130,186 -200,186" fill="#13305e"/>
+      </g>
+      <!-- jagged break through the stripes -->
+      <path d="M520 410 L560 330 L540 340 L600 250 L578 262 L640 160 L700 160 L640 260 L664 250 L600 345 L622 335 L580 410Z" fill="#0b1d3a"/>
+      <rect x="560" y="260" width="260" height="110" fill="url(#dotsO)" opacity=".45" transform="rotate(-28 690 315)"/>
+      <g stroke="#cfe0f5" stroke-width="1.2" opacity=".35" fill="none">
+        <path d="M30 300 Q 200 230 380 260"/><path d="M60 330 Q 260 250 470 300"/><path d="M500 60 Q 640 20 820 70"/>
+        <path d="M120 60 Q 260 110 420 80"/><path d="M540 370 Q 650 330 800 350"/><path d="M10 230 Q 120 200 260 215"/>
+      </g>
+      <g color="#ff9a5a" opacity=".6">
+        <rect x="40" y="26" width="90" height="10" fill="url(#bars)"/>
+        <rect x="40" y="40" width="54" height="4" fill="#ff9a5a"/>
+        <path d="M720 350 l12 -12 l12 12 M744 350 l12 -12 l12 12 M768 350 l12 -12 l12 12" stroke="#ff9a5a" stroke-width="5" fill="none"/>
+      </g>
+      <g fill="none" stroke="#ff6a13" stroke-width="3" opacity=".85">
+        <rect x="490" y="95" width="290" height="230" rx="56" transform="rotate(-5 635 210)"/>
+      </g>
+      <rect width="844" height="390" fill="#cfc8b8" filter="url(#chips)" opacity=".5"/>
+      <rect width="844" height="390" fill="#b9b2a2" filter="url(#chipsBig)" opacity=".35"/>
+    </g>
+
+    <circle cx="169" cy="218" r="125" fill="url(#fade)" opacity=".35"/>
+    <ellipse cx="635" cy="210" rx="160" ry="125" fill="url(#fade)" opacity=".22"/>
+    <rect width="844" height="390" fill="url(#vign)"/>
+  </svg>
+  <div class="sweep"></div>
+  <div class="ping"></div>
+
+  <div class="print" style="left:50%;top:5cqh">START</div>
+  <div class="pillwell" style="left:50%;top:16cqh"><div class="pill start" data-snd="700"></div></div>
+
+  <div class="pillwell" style="left:43cqw;top:62cqh"><div class="pill super" data-snd="440">SUPER</div></div>
+
+  <div class="stickzone" id="sz"><div class="gate"></div><div class="shaft"></div><div class="ball" id="ball"></div></div>
+
+  <div class="btn c1" style="left:65cqw;top:40cqh" data-snd="900"><div class="bezel"></div><div class="cap"></div><div class="lbl">BOP</div></div>
+  <div class="btn c2" style="left:76cqw;top:35cqh" data-snd="600"><div class="bezel"></div><div class="cap"></div><div class="lbl">WALLOP</div></div>
+  <div class="btn c3" style="left:87cqw;top:37cqh" data-snd="780"><div class="bezel"></div><div class="cap"></div><div class="lbl">GRAB</div></div>
+  <div class="btn c1" style="left:64cqw;top:72cqh" data-snd="850"><div class="bezel"></div><div class="cap"></div><div class="lbl">BLOCK</div></div>
+  <div class="btn c3" style="left:75cqw;top:67cqh" data-snd="1000"><div class="bezel"></div><div class="cap"></div><div class="lbl">JUMP</div></div>
+  <div class="btn c2" style="left:86cqw;top:69cqh" data-snd="520"><div class="bezel"></div><div class="cap"></div><div class="lbl">TAUNT</div></div>
+
+  <div class="tab" id="tab">▲ MOVES</div>
+  <div class="sheet" id="sheet">
+    <div class="tape l"></div><div class="tape r"></div>
+    <div class="close" id="close">✕</div>
+    <h2>KEVALANCHE</h2>
+    <div class="row"><div class="mv">Drop the Gloves<small id="dtg">throws a snowball, bursts into snow</small></div>
+      <div class="in">↓ ↘ → + <span class="chip b">BOP</span> slow / <span class="chip w">WALLOP</span> fast</div></div>
+    <div class="row"><div class="mv">Jersey Flip<small>auto-throws toward the open side</small></div>
+      <div class="in"><span class="chip g">GRAB</span> near them</div></div>
+    <div class="row"><div class="mv">Bear-Hug Suplex<small>when the room's behind you</small></div>
+      <div class="in"><span class="chip g">GRAB</span> (auto)</div></div>
+    <div class="row"><div class="mv">Sidestep<small>dodges Drop the Gloves &amp; rolls</small></div>
+      <div class="in">↑↑ or ↓↓ (double-tap)</div></div>
+    <div class="row" style="border:0"><div class="mv">Super<small>needs a full meter</small></div>
+      <div class="in"><span class="chip s">SUPER</span></div></div>
+  </div>
+  <div class="hitflash" id="hf"></div>
+</div></div>
+<p class="note">Interactive mockup. Drag the stick, press the buttons (SUPER and START too), and tap ▲ MOVES for the cheat sheet.</p>
+
+<script>
+const scr=document.getElementById('scr');
+function setTheme(g){scr.className='screen '+(g?'goon':'og');
+ document.getElementById('bog').classList.toggle('on',!g);document.getElementById('bgoon').classList.toggle('on',g);
+ document.getElementById('dtg').textContent=g?'hurls a hockey glove, it poofs back on':'throws a snowball, bursts into snow'}
+document.getElementById('bog').onclick=()=>setTheme(false);
+document.getElementById('bgoon').onclick=()=>setTheme(true);
+let ac;function snd(f){try{ac=ac||new AudioContext();const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;o.type='square';g.gain.setValueAtTime(.05,ac.currentTime);g.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+.05);o.connect(g).connect(ac.destination);o.start();o.stop(ac.currentTime+.06)}catch(e){}}
+document.querySelectorAll('.btn,.pill').forEach(b=>{
+ b.addEventListener('pointerdown',()=>{b.classList.add('down');snd(+b.dataset.snd||800)});
+ ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>b.classList.remove('down')))});
+const sz=document.getElementById('sz'),ball=document.getElementById('ball');
+sz.addEventListener('pointerdown',e=>{sz.setPointerCapture(e.pointerId);ball.classList.add('drag');mv(e)});
+sz.addEventListener('pointermove',e=>{if(sz.hasPointerCapture(e.pointerId))mv(e)});
+sz.addEventListener('pointerup',()=>{ball.classList.remove('drag');ball.style.transform=''});
+function mv(e){const r=sz.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy;const m=r.width*.24,d=Math.hypot(dx,dy);if(d>m){dx*=m/d;dy*=m/d}ball.style.transform=`translate(${dx}px,${dy}px)`}
+const sh=document.getElementById('sheet');
+document.getElementById('tab').onclick=()=>sh.classList.add('open');
+document.getElementById('close').onclick=()=>sh.classList.remove('open');
+document.getElementById('hit').onclick=()=>{const h=document.getElementById('hf');h.classList.add('on');scr.animate([{transform:'translate(0)'},{transform:'translate(-6px,3px)'},{transform:'translate(5px,-2px)'},{transform:'translate(0)'}],{duration:220});setTimeout(()=>h.classList.remove('on'),260)};
+</script>
+</body>
+</html>
