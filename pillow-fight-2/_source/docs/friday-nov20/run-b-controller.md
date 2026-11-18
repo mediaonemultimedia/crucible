@@ -52,16 +52,15 @@ Use the arcade cabinet panel from Kevin's reference photo.
 - The KO screen shows a rude one-liner on the loser's phone, in the fighter's voice and in the existing trash-talk tone.
 - When Rubberta's Ink Jet hits you, your phone screen gets an ink splat that drips off over ~2 seconds. It never blocks the controls' hit areas.
 
-### 5. Controller art: Kevin's 14 finished mockups ARE the skins (match them exactly)
-Kevin painted a finished controller for every fighter and every ALT. **Do not redraw the art in SVG/CSS.** Use his images as the controller background, and layer the live controls exactly over the painted ones. The older SVG/CSS mockups (`kevalanche-controller-mockup.html`, `sebas-controller-mockup.html`) are now superseded for art. Keep them only as a reference for button-press feel and the cheat sheet.
-- **Files:** `docs/friday-nov20/skins/<id>.webp`, all 1920×1072. The 14 ids are `kevalanche`, `kevalanche-alt`, `zach`, `zach-alt` (ghost pirate), `k8-e`, `k8-e-alt` (punk), `johnny`, `johnny-alt` (red-laser padel), `rubberta`, `rubberta-alt` (deep-sea tentacle), `sumaura`, `sumaura-alt` (art-deco casino), `sebas` and `sebas-alt`. Map each to the game's OG/ALT roster entry. Ship them to the live site as `pillow-fight-2/controller/skins/<id>.webp`. Lazy-load only the chosen fighter's skin, and show a dark plain panel until it arrives.
-- **Hit-zone map:** `docs/friday-nov20/skins/skins.json` gives each skin's stick, 6 buttons, SUPER, START and MOVES positions as fractions of the image. These are eyeballed estimates. Before shipping, build a `?pad=debug` overlay that outlines every zone on every skin, screenshot all 14, and nudge the numbers until each outline sits exactly on its painted part. Make hit zones about 15% larger than the painted part, for fat thumbs.
-- **Layout on the phone:** fit the whole image (contain) in landscape, centred, with near-black letterbox bars. Never crop the art. Every zone scales with the image rect.
-- **Buttons, SUPER, START and MOVES press feel:** use a sprite of that exact region, cut from the same image with `background-position`. On press, scale it to about 0.93 with a darker inner shadow, then release it with a quick spring. Add the click sound and haptic. The painted art IS the button, so no separate CSS button is drawn on top.
-- **Stick:** cut the ball as a circular sprite from the image. Under it, draw a dark socket disc the size of the ball, so the painted ball is hidden whenever the live one moves. Limit travel to about 35% of the ball radius, and tilt the ball slightly with a highlight shift. The touch area for the stick is the whole left 40% of the screen (floating origin where the thumb lands); only the visual is anchored to the painted stick.
-- **Keep what's painted, as painted.** Some skins carry a fighter name or logo (K8-E, Johnny, Rubberta, Sumaura) and some have no button labels (Kevalanche OG). Kevin made these, so leave them. Don't add or remove text.
-- **Ping dot:** reuse the painted LED position (top right) and tint it green/amber/red with a small glowing overlay.
-- **Wear:** it's already in the art. Don't add procedural wear.
+### 5. Controller art: one shared layout, Kevin paints a background per skin (Nov 18 decision)
+**Layout is fixed for every fighter.** The canvas is 2400×1100, full bleed, positioned with `object-fit: cover`. The x 222–2178 safe zone always shows; the pink side bleed may crop on 16:9 phones. The reference is `docs/friday-nov20/skin-template.html`; port its layout constant `L` and its control drawing code exactly. Also see `pf2-skin-guide.png` and `pf2-skin-overlay.png`.
+- **Kevin's backgrounds:** `docs/friday-nov20/backgrounds/<id>.webp` (2400×1100), one per fighter and ALT (14 ids, as listed in skins/). Each has the art and the button plate only, with NO stick, buttons, labels, SUPER, START, MOVES or LED.
+  - **If a background isn't there yet,** fall back to the full painting in `skins/<id>.webp`. Fit it with contain, and don't draw code controls over it; use invisible hit zones from `skins/skins.json` and the sprite-press method instead. Log which skins used the fallback in the PR body.
+- **Controls are drawn in code, on top, the same for everyone.** Only colours change per skin.
+  - **Buttons are DISHED arcade buttons.** That means a convex glossy housing ring, a dark seam, and a CONCAVE cap: dark at the top, light at the bottom, with an inner shadow under the top lip and a thin light rim along the bottom inside edge. They must NOT look like roller balls, so no domed specular blob on the cap. On press, the cap sinks (translateY plus scale .92, darker) and springs back.
+  - **Stick:** ring plus ball (moves). **SUPER:** glossy pill. **START:** NES rubber pill with "START" printed above it. **MOVES:** tab. **Ping LED.** Labels go under the buttons.
+- **Per-skin colour config:** 6 cap colours, stick ring and ball, SUPER colour and text colour, label colour, and MOVES colour. Take them from Kevin's paintings in `skins/` (e.g. Sebas: orange, teal and cream on top; green, red and cream on the bottom; brass ring; orange ball). Keep every cap visible against its plate.
+- **No procedural wear or art.** Kevin's background is the whole look.
 
 ### 6. Cheat sheet
 - A slide-up panel on the phone (swipe up or tap a tab) showing your fighter's specials, throws and supers.
@@ -76,7 +75,7 @@ Kevin painted a finished controller for every fighter and every ALT. **Do not re
 - The game makes zero runtime network requests except PeerJS.
 
 ## Shipping
-- Release branch `pf2-release-5` off current `main`. It touches ONLY `pillow-fight-2/index.html` (plus `controller.html` if you went that route) and the 14 files in `pillow-fight-2/controller/skins/`.
+- Release branch `pf2-release-5` off current `main`. It touches ONLY `pillow-fight-2/index.html` (plus `controller.html` if you went that route) and the skin images in `pillow-fight-2/controller/` (backgrounds/ and any fallback skins/).
 - **Auto-merge** YOUR PR (`gh pr merge <n> --merge`) only if all the quality-bar checks pass, then confirm the Pages deploy. Otherwise, leave the PR open with a comment.
 - The PR should open with a skimmable summary: how to pair, the controls, and screenshots of the phone panel for 3+ fighters and the cheat sheet. LOOK at them critically.
 - Never push to `main`, never force-push, merge only your own PR. No self-scheduled follow-ups and no polling.
