@@ -1,6 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>PF2 Skin Template</title>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Permanent+Marker&display=swap" rel="stylesheet">
 <style>html,body{margin:0;background:transparent;font-family:Oswald,'Arial Narrow',sans-serif}svg{display:block}</style></head>
 <body><svg id="s" width="2400" height="1100" viewBox="0 0 2400 1100"></svg>
 <script>
@@ -64,7 +64,11 @@ function controls(){const cols=C.caps;let o='';
  L.btn.forEach((p,k)=>o+=btn(p[0],p[1],cols[k],L.lbl[k],C.lab));
  o+=pill(L.super[0],L.super[1],L.super[2],L.super[3],C.sup,'SUPER',C.st);
  o+=nesStart(L.start[0],L.start[1],L.start[2],L.start[3],C.slab||C.lab);
- const m=L.moves;o+=`<g class="pl" id="movesBtn" data-snd="520"><g class="cap"><rect x="${m[0]-m[2]/2}" y="${m[1]-m[3]/2}" width="${m[2]}" height="${m[3]}" rx="12" fill="${C.mv}" stroke="rgba(0,0,0,.5)" stroke-width="2.5"/><text x="${m[0]}" y="${m[1]+12}" text-anchor="middle" font-size="34" font-weight="700" fill="${C.mt}">▲ MOVES</text></g></g>`;
+ const m=L.moves,tw=230,th=78,tx=m[0]-tw/2,ty=1100-th;D+=`<linearGradient id="kraft" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d8b67e"/><stop offset="1" stop-color="#c49a5c"/></linearGradient>`;
+ o+=`<g class="pl" id="movesBtn" data-snd="520"><g class="cap"><path d="M${tx} 1110 V${ty+18} q0 -18 18 -18 H${tx+tw-18} q18 0 18 18 V1110Z" fill="#000" opacity=".45" filter="url(#b8)" transform="translate(0 -6)"/>
+ <path d="M${tx} 1110 V${ty+18} q0 -18 18 -18 H${tx+tw-18} q18 0 18 18 V1110Z" fill="url(#kraft)" stroke="#6b4a1e" stroke-opacity=".5" stroke-width="2"/>
+ <path d="M${tx+12} ${ty+8} H${tx+tw-12}" stroke="#fff" stroke-opacity=".25" stroke-width="2"/>
+ <text x="${m[0]}" y="${ty+52}" text-anchor="middle" font-family="'Permanent Marker',Oswald" font-size="36" fill="#2b1d0e">▲ MOVES</text></g></g>`;
  o+=`<circle cx="${L.led[0]}" cy="${L.led[1]}" r="24" fill="${C.led}" opacity=".5" filter="url(#b8)"/><circle cx="${L.led[0]}" cy="${L.led[1]}" r="10" fill="${sh(C.led,.55)}"/>`;
  return o}
 function guide(){let o=`<rect width="2400" height="1100" fill="#3b3e44"/>`;
@@ -92,21 +96,26 @@ if(mode==='live'){
  .b.dn .cap{transform:translateY(2px) scale(.9);filter:brightness(.78)}.pl.dn .cap{transform:translateY(2px) scale(.95);filter:brightness(.8)}
  #hf{position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 80px 20px rgba(255,30,30,0);transition:box-shadow .3s}#hf.on{box-shadow:inset 0 0 80px 20px rgba(255,30,30,.75);transition:none}
  #hb{position:fixed;left:10px;top:10px;font:600 12px Oswald;background:#0008;color:#fff;border:1px solid #fff3;border-radius:99px;padding:4px 10px;z-index:5}
- .sheet{position:fixed;left:50%;bottom:0;width:min(72vw,900px);height:84vh;transform:translate(-50%,118%) rotate(-1.2deg);transition:transform .45s cubic-bezier(.2,1.25,.4,1);z-index:9;
-  background:#c9a46a;background-image:radial-gradient(circle at 80% 22%,transparent 38px,#6b4a2333 40px,transparent 44px),repeating-linear-gradient(90deg,#0000 0 3px,#00000008 3px 4px);
-  box-shadow:0 10px 40px #000a;border-radius:4px;padding:3.5vh 4vw;color:#24170a;font-family:'Permanent Marker',Oswald}
- .sheet.open{transform:translate(-50%,6vh) rotate(-1.2deg)}.tape{position:absolute;width:14vh;height:5vh;background:#f4f1e3b0;top:-2vh}.tape.l{left:3vw;transform:rotate(-8deg)}.tape.r{right:3vw;transform:rotate(7deg)}
- .sheet h2{margin:0 0 2vh;font-size:5.4vh;color:#8b1a1a;transform:rotate(-1deg)}.row{display:grid;grid-template-columns:36% 1fr;align-items:center;gap:2vw;padding:1.3vh 0;border-bottom:.35vh dashed #24170a44}
- .mv{font:600 3.6vh Oswald}.mv small{display:block;font:500 2.4vh Oswald;opacity:.7}.in{font-size:3.6vh}.chip{display:inline-block;font:700 2.4vh Oswald;color:#fff;background:#1f2c78;border-radius:99px;padding:.3vh 1.2vh;margin:0 .4vh}
- .chip.w{background:#d4560f}.chip.g{background:#555}.chip.s{background:#c4520f}.x{position:absolute;right:2vw;top:1.5vh;font:700 4vh Oswald;cursor:pointer}`;
+ :root{--u:min(1vh,.5vw)}
+ .sheet{position:fixed;left:50%;top:50%;width:min(78vw,130vh);max-height:92vh;overflow:hidden;transform:translate(-50%,70vh) rotate(-1.2deg);transition:transform .45s cubic-bezier(.2,1.25,.4,1);z-index:9;
+  background:radial-gradient(circle at 84% 80%,transparent 0 calc(6.5*var(--u)),#7a4f1c33 calc(6.6*var(--u)) calc(7.4*var(--u)),transparent calc(7.5*var(--u))),radial-gradient(#0000 60%,#6b4a1e22),repeating-linear-gradient(0deg,#0000 0 3px,#00000008 3px 4px),linear-gradient(#d8b67e,#cba366);
+  border-radius:calc(1*var(--u));box-shadow:0 2vh 5vh #000a;padding:calc(4*var(--u)) calc(5*var(--u)) calc(3*var(--u));color:#24170a;font-family:'Permanent Marker',Oswald}
+ .sheet.open{transform:translate(-50%,-50%) rotate(-1.2deg)}
+ .tape{position:absolute;width:calc(14*var(--u));height:calc(5*var(--u));background:#f4f1e3b0;top:calc(-2*var(--u))}.tape.l{left:5%;transform:rotate(-8deg)}.tape.r{right:5%;transform:rotate(7deg)}
+ .sheet h2{margin:0 0 calc(1.5*var(--u));font-size:calc(6*var(--u));font-weight:400;color:#8b1a1a;transform:rotate(-1deg);white-space:nowrap}
+ .row{display:grid;grid-template-columns:44% 1fr;align-items:center;gap:calc(2*var(--u));padding:calc(1.3*var(--u)) 0;border-bottom:calc(.35*var(--u)) dashed #24170a44}
+ .mv{font:600 calc(4.3*var(--u)) Oswald;line-height:1.1}.mv small{display:block;font:500 calc(2.9*var(--u)) Oswald;opacity:.72;white-space:nowrap}
+ .in{font-size:calc(4.1*var(--u));display:flex;align-items:center;flex-wrap:wrap;gap:calc(.6*var(--u))}
+ .chip{display:inline-block;font:700 calc(2.9*var(--u)) Oswald;color:#fff;background:#1f2c78;border-radius:99px;padding:calc(.3*var(--u)) calc(1.3*var(--u))}
+ .chip.w{background:#d4560f}.chip.g{background:#555}.chip.s{background:#c4520f}.x{position:absolute;right:calc(3*var(--u));top:calc(2*var(--u));font:700 calc(4*var(--u)) Oswald;cursor:pointer}`;
  document.head.appendChild(st);const fl=document.createElement('link');fl.rel='stylesheet';fl.href='https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap';document.head.appendChild(fl);
  const svg=document.getElementById('s');svg.removeAttribute('width');svg.removeAttribute('height');
  const fit=()=>svg.setAttribute('preserveAspectRatio',innerWidth/innerHeight>=1956/1100?'xMidYMid slice':'xMidYMid meet');fit();addEventListener('resize',fit);
  document.body.insertAdjacentHTML('beforeend',`<div id="hf"></div><button id="hb">hit demo</button><div class="sheet" id="sh"><div class="tape l"></div><div class="tape r"></div><div class="x" id="sx">✕</div>
- <h2>KEVALANCHE · HOCKEY GOON</h2>
- <div class="row"><div class="mv">Drop the Gloves<small>hurls a glove that poofs back on</small></div><div class="in">↓ ↘ → + <span class="chip">BOP</span> slow / <span class="chip w">WALLOP</span> fast</div></div>
- <div class="row"><div class="mv">Jersey Flip<small>auto-throws toward the open side</small></div><div class="in"><span class="chip g">GRAB</span> near them</div></div>
- <div class="row"><div class="mv">Bear-Hug Suplex<small>when the room's behind you</small></div><div class="in"><span class="chip g">GRAB</span> (auto)</div></div>
+ <h2>Hockey Goon moves</h2>
+ <div class="row"><div class="mv">Drop the Gloves<small>glove flies, poofs back on</small></div><div class="in">↓ ↘ → + <span class="chip">BOP</span> slow / <span class="chip w">WALLOP</span> fast</div></div>
+ <div class="row"><div class="mv">Jersey Flip<small>throws toward the open side</small></div><div class="in"><span class="chip g">GRAB</span> near them</div></div>
+ <div class="row"><div class="mv">Bear-Hug Suplex<small>when there's room behind</small></div><div class="in"><span class="chip g">GRAB</span> (auto)</div></div>
  <div class="row"><div class="mv">Sidestep<small>dodges specials &amp; rolls</small></div><div class="in">↑↑ or ↓↓</div></div>
  <div class="row" style="border:0"><div class="mv">Super<small>needs a full meter</small></div><div class="in"><span class="chip s">SUPER</span></div></div></div>`);
  let ac;const snd=f=>{try{ac=ac||new AudioContext();const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;o.type='square';g.gain.setValueAtTime(.05,ac.currentTime);g.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+.05);o.connect(g).connect(ac.destination);o.start();o.stop(ac.currentTime+.06)}catch(e){}};
