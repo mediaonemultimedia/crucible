@@ -6,48 +6,65 @@
 <script>
 /* Shared PF2 controller layout: canvas 2400x1100, full bleed. */
 const L={stick:[604,517,185],btn:[[1550,425],[1762,361],[1979,348],[1550,692],[1764,637],[1979,626]],
- lbl:['BOP','WALLOP','GRAB','BLOCK','JUMP','TAUNT'],super:[1097,550,262,112],start:[1132,215,150,60],moves:[2062,1012,190,62],led:[2139,92],
+ lbl:['BOP','WALLOP','GRAB','BLOCK','JUMP','TAUNT'],super:[1097,550,262,112],start:[1132,215,176,62],moves:[2062,1012,190,62],led:[2139,92],
  safe:[222,0,1956,1100],plate:[1395,235,745,620]};
 const Q=new URLSearchParams(location.search),mode=Q.get('mode')||'guide',SKIN=Q.get('skin')||'sebas';
 /* per-skin control colours: caps[BOP,WALLOP,GRAB,BLOCK,JUMP,TAUNT], ring, ball, super, superText, label, moves, movesText, led */
 const SK={
  'sebas':{caps:['#f08a1a','#17a6a8','#efe5cf','#2ca23a','#d6242a','#efe5cf'],ring:'#c9a04a',ball:'#e0742c',sup:'#ffe27a',st:'#4a3205',lab:'#f3e3b0',mv:'#f2a12a',mt:'#2a1505',led:'#5cff5c'},
- 'kevalanche-alt':{caps:['#1f2c78','#f26a1b','#ececee','#f26a1b','#1f2c78','#ececee'],ring:'#f26a1b',ball:'#f26a1b',sup:'#e8641a',st:'#2a0e02',lab:'#f2c9a0',mv:'#f2d40c',mt:'#111',led:'#ff6a1b'}
+ 'kevalanche-alt':{caps:['#1f2c78','#f26a1b','#ececee','#f26a1b','#1f2c78','#ececee'],ring:'#b5440f',ball:'#f26a1b',sup:'#e8641a',st:'#2a0e02',lab:'#f2c9a0',slab:'#f0a088',mv:'#f2d40c',mt:'#111',led:'#ff6a1b'}
 };const C=SK[SKIN]||SK.sebas;
 function sh(hex,a){let n=parseInt(hex.slice(1),16),r=n>>16,g=n>>8&255,b=n&255;const f=a<0?0:255,t=Math.abs(a);r=Math.round(r+(f-r)*t);g=Math.round(g+(f-g)*t);b=Math.round(b+(f-b)*t);return `rgb(${r},${g},${b})`}
-let D='',i=0;const id=p=>p+(++i);
+let D='',i=0,bi=0;const SND=[900,600,780,850,1000,520];const id=p=>p+(++i);
 /* dished arcade button: convex glossy housing ring, dark seam, CONCAVE cap (dark top / light bottom, inner shadow under the top lip) */
 function btn(cx,cy,col,label,lc){const ring=id('r'),cap=id('c'),s=89/46;
  D+=`<radialGradient id="${ring}" cx="40%" cy="28%" r="80%"><stop offset="0" stop-color="${sh(col,.5)}"/><stop offset=".45" stop-color="${col}"/><stop offset=".92" stop-color="${sh(col,-.5)}"/><stop offset="1" stop-color="${sh(col,-.75)}"/></radialGradient>
  <linearGradient id="${cap}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sh(col,-.45)}"/><stop offset=".45" stop-color="${sh(col,-.08)}"/><stop offset="1" stop-color="${sh(col,.3)}"/></linearGradient>`;
- return `<g transform="translate(${cx} ${cy}) scale(${s})">
+ return `<g class="b" data-snd="${SND[bi++%6]}"><g transform="translate(${cx} ${cy}) scale(${s})">
  <ellipse cx="2" cy="8" rx="48" ry="45" fill="#000" opacity=".55" filter="url(#b4)"/>
  <circle r="46" fill="url(#${ring})" stroke="${sh(col,-.8)}" stroke-width="1.4"/>
  <path d="M-37 -24 A44 44 0 0 1 24 -38" stroke="#fff" stroke-opacity=".6" stroke-width="2.6" fill="none" stroke-linecap="round"/>
  <circle r="36.5" fill="#0b0b0d"/>
- <circle r="33" fill="url(#${cap})"/>
+ <g class="cap"><circle r="33" fill="url(#${cap})"/>
  <circle r="33" fill="none" stroke="#000" stroke-opacity=".55" stroke-width="7" filter="url(#b2)" clip-path="url(#capclip)" transform="translate(0 -3)"/>
  <path d="M-24 22 A33 33 0 0 0 24 22" stroke="#fff" stroke-opacity=".45" stroke-width="2" fill="none" stroke-linecap="round"/>
- <ellipse cx="0" cy="14" rx="17" ry="6" fill="#fff" opacity=".14" filter="url(#b2)"/>
- </g>`+(label?`<text x="${cx}" y="${cy+89+38}" text-anchor="middle" font-size="31" font-weight="600" letter-spacing="1" fill="${lc}">${label}</text>`:'')}
+ <ellipse cx="0" cy="14" rx="17" ry="6" fill="#fff" opacity=".14" filter="url(#b2)"/></g>
+ </g>`+(label?`<text x="${cx}" y="${cy+89+38}" text-anchor="middle" font-size="31" font-weight="600" letter-spacing="1" fill="${lc}">${label}</text>`:'')+'</g>'}
 function stick(cx,cy,R,ring,ball){const a=id('sa'),b=id('sb');
  D+=`<radialGradient id="${a}" cx="35%" cy="28%" r="80%"><stop offset="0" stop-color="${sh(ring,.5)}"/><stop offset=".5" stop-color="${ring}"/><stop offset="1" stop-color="${sh(ring,-.6)}"/></radialGradient>
  <radialGradient id="${b}" cx="38%" cy="30%" r="72%"><stop offset="0" stop-color="${sh(ball,.5)}"/><stop offset=".45" stop-color="${ball}"/><stop offset="1" stop-color="${sh(ball,-.6)}"/></radialGradient>`;
  const r2=R*.76,rb=R*.72;
  return `<g transform="translate(${cx} ${cy})"><ellipse cx="6" cy="18" rx="${R+10}" ry="${R+4}" fill="#000" opacity=".5" filter="url(#b8)"/>
  <circle r="${R}" fill="url(#${a})" stroke="${sh(ring,-.75)}" stroke-width="3"/><circle r="${(R+r2)/2}" fill="none" stroke="${sh(ring,-.45)}" stroke-width="3" opacity=".7"/>
- <circle r="${r2}" fill="#0c0c0e"/><ellipse cx="10" cy="24" rx="${rb}" ry="${rb*.9}" fill="#000" opacity=".6" filter="url(#b8)"/>
- <circle r="${rb}" fill="url(#${b})" stroke="${sh(ball,-.7)}" stroke-width="2"/><ellipse cx="${-rb*.3}" cy="${-rb*.42}" rx="${rb*.38}" ry="${rb*.2}" fill="#fff" opacity=".55" filter="url(#b4)"/></g>`}
-function pill(cx,cy,w,h,col,txt,tc){const g=id('p');D+=`<linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sh(col,.45)}"/><stop offset=".5" stop-color="${col}"/><stop offset="1" stop-color="${sh(col,-.4)}"/></linearGradient>`;
- return `<g transform="translate(${cx} ${cy})"><rect x="${-w/2-12}" y="${-h/2-12}" width="${w+24}" height="${h+24}" rx="${h/2+12}" fill="#141416" stroke="#000" stroke-width="3"/>
- <rect x="${-w/2}" y="${-h/2}" width="${w}" height="${h}" rx="${h/2}" fill="url(#${g})" stroke="${sh(col,-.6)}" stroke-width="2"/><rect x="${-w/2+18}" y="${-h/2+7}" width="${w-36}" height="${h*.3}" rx="${h*.15}" fill="#fff" opacity=".33"/>
- ${txt?`<text y="${h*.17+2}" text-anchor="middle" font-size="${h*.46}" font-weight="600" letter-spacing="1" fill="${tc}">${txt}</text>`:''}</g>`}
+ <circle r="${r2}" fill="#0c0c0e"/><g id="ball"><ellipse cx="10" cy="24" rx="${rb}" ry="${rb*.9}" fill="#000" opacity=".6" filter="url(#b8)"/>
+ <circle r="${rb}" fill="url(#${b})" stroke="${sh(ball,-.7)}" stroke-width="2"/><ellipse cx="${-rb*.3}" cy="${-rb*.42}" rx="${rb*.38}" ry="${rb*.2}" fill="#fff" opacity=".55" filter="url(#b4)"/></g></g>`}
+function pill(cx,cy,w,h,col,txt,tc){const g=id('p'),bv=id('bv');D+=`<linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sh(col,.06)}"/><stop offset="1" stop-color="${sh(col,-.1)}"/></linearGradient>
+ <linearGradient id="${bv}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sh(col,.55)}"/><stop offset=".45" stop-color="${sh(col,.1)}"/><stop offset=".55" stop-color="${sh(col,-.25)}"/><stop offset="1" stop-color="${sh(col,-.6)}"/></linearGradient>`;
+ return `<g class="pl" data-snd="440" transform="translate(${cx} ${cy})"><rect x="${-w/2-12}" y="${-h/2-12}" width="${w+24}" height="${h+24}" rx="${h/2+12}" fill="#141416" stroke="#000" stroke-width="3"/>
+ <ellipse cx="0" cy="${h*.2}" rx="${w/2}" ry="${h/2}" fill="#000" opacity=".7" filter="url(#b4)"/>
+ <g class="cap"><rect x="${-w/2}" y="${-h/2}" width="${w}" height="${h}" rx="${h/2}" fill="url(#${bv})" stroke="${sh(col,-.75)}" stroke-width="2.5"/>
+ <rect x="${-w/2+9}" y="${-h/2+8}" width="${w-18}" height="${h-16}" rx="${(h-16)/2}" fill="url(#${g})"/>
+ <path d="M${-w/2+h/2} ${-h/2+8.5} H${w/2-h/2}" stroke="#fff" stroke-opacity=".35" stroke-width="1.5" stroke-linecap="round"/>
+ ${txt?`<text y="${h*.17+2}" text-anchor="middle" font-size="${h*.46}" font-weight="600" letter-spacing="1" fill="${tc}">${txt}</text>`:''}</g></g>`}
+function nesStart(cx,cy,w,h,lab){D+=`<linearGradient id="rub" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3d3e42"/><stop offset=".3" stop-color="#2a2b2e"/><stop offset="1" stop-color="#151618"/></linearGradient>
+ <linearGradient id="lip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity=".0"/><stop offset=".6" stop-color="#fff" stop-opacity=".0"/><stop offset="1" stop-color="#fff" stop-opacity=".22"/></linearGradient>
+ <linearGradient id="shn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".2"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>`;
+ const W=w+30,H=h+26;
+ return `<text x="${cx}" y="${cy-H/2-16}" text-anchor="middle" font-size="30" font-weight="600" fill="${lab}" letter-spacing="1.5">START</text>
+ <g class="pl" data-snd="700" transform="translate(${cx} ${cy})">
+ <rect x="${-W/2}" y="${-H/2}" width="${W}" height="${H}" rx="${H/2}" fill="#08080a"/>
+ <rect x="${-W/2}" y="${-H/2}" width="${W}" height="${H}" rx="${H/2}" fill="none" stroke="url(#lip)" stroke-width="3"/>
+ <rect x="${-W/2+3}" y="${-H/2+2}" width="${W-6}" height="${H-4}" rx="${H/2-2}" fill="none" stroke="#000" stroke-width="8" opacity=".8" filter="url(#b4)"/>
+ <ellipse cx="0" cy="${h*.18}" rx="${w/2}" ry="${h/2}" fill="#000" opacity=".7" filter="url(#b4)"/>
+ <g class="cap"><rect x="${-w/2}" y="${-h/2}" width="${w}" height="${h}" rx="${h/2}" fill="url(#rub)" stroke="#050506" stroke-width="2.5"/>
+ <rect x="${-w/2+8}" y="${-h/2+3}" width="${w-16}" height="${h*.42}" rx="${h*.21}" fill="url(#shn)"/>
+ <path d="M${-w/2+h/2} ${-h/2+2.5} H${w/2-h/2}" stroke="#6a6c71" stroke-width="2" stroke-linecap="round" opacity=".7"/></g></g>`}
 function controls(){const cols=C.caps;let o='';
  o+=stick(...L.stick,C.ring,C.ball);
  L.btn.forEach((p,k)=>o+=btn(p[0],p[1],cols[k],L.lbl[k],C.lab));
  o+=pill(L.super[0],L.super[1],L.super[2],L.super[3],C.sup,'SUPER',C.st);
- o+=`<text x="${L.start[0]}" y="${L.start[1]-58}" text-anchor="middle" font-size="28" font-weight="600" fill="#fff" letter-spacing="1">START</text>`+pill(L.start[0],L.start[1],L.start[2],L.start[3],'#3a3b40','','');
- const m=L.moves;o+=`<rect x="${m[0]-m[2]/2}" y="${m[1]-m[3]/2}" width="${m[2]}" height="${m[3]}" rx="12" fill="${C.mv}" stroke="rgba(0,0,0,.5)" stroke-width="2.5"/><text x="${m[0]}" y="${m[1]+12}" text-anchor="middle" font-size="34" font-weight="700" fill="${C.mt}">▲ MOVES</text>`;
+ o+=nesStart(L.start[0],L.start[1],L.start[2],L.start[3],C.slab||C.lab);
+ const m=L.moves;o+=`<g class="pl" id="movesBtn" data-snd="520"><g class="cap"><rect x="${m[0]-m[2]/2}" y="${m[1]-m[3]/2}" width="${m[2]}" height="${m[3]}" rx="12" fill="${C.mv}" stroke="rgba(0,0,0,.5)" stroke-width="2.5"/><text x="${m[0]}" y="${m[1]+12}" text-anchor="middle" font-size="34" font-weight="700" fill="${C.mt}">▲ MOVES</text></g></g>`;
  o+=`<circle cx="${L.led[0]}" cy="${L.led[1]}" r="24" fill="${C.led}" opacity=".5" filter="url(#b8)"/><circle cx="${L.led[0]}" cy="${L.led[1]}" r="10" fill="${sh(C.led,.55)}"/>`;
  return o}
 function guide(){let o=`<rect width="2400" height="1100" fill="#3b3e44"/>`;
@@ -65,6 +82,43 @@ function notes(){return `<g font-size="30" font-weight="600" fill="#fff"><rect x
  <text x="280" y="975">Paint: background art + the button plate only.</text>
  <text x="280" y="1017">Don't paint: stick, 6 buttons, labels, SUPER, START, MOVES, LED.</text>
  <text x="280" y="1059" fill="#ff8aa6">No rounded corners or frame. Pink edges may crop.</text></g>`}
-const g=mode==='preview'?`<image href="Skins/${SKIN}.jpg" width="2400" height="1100" preserveAspectRatio="none"/>`+controls():mode==='overlay'?controls():guide()+controls().replace(/<g /,'<g opacity=".9" ')+notes();
+const g=(mode==='preview'||mode==='live')?`<image href="Skins/${SKIN}.jpg" width="2400" height="1100" preserveAspectRatio="none"/>`+controls():mode==='overlay'?controls():guide()+controls().replace(/<g /,'<g opacity=".9" ')+notes();
 document.getElementById('s').innerHTML=`<defs><filter id="b2"><feGaussianBlur stdDeviation="2"/></filter><filter id="b4"><feGaussianBlur stdDeviation="4"/></filter><filter id="b8"><feGaussianBlur stdDeviation="8"/></filter><clipPath id="capclip"><circle r="33"/></clipPath>${D}</defs>`+g;
+
+if(mode==='live'){
+ document.title='PF2 Controller';
+ const st=document.createElement('style');st.textContent=`html,body{background:#000;height:100%;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}
+ #s{width:100vw;height:100vh}.b .cap,.pl .cap{transition:transform .09s cubic-bezier(.3,1.6,.5,1);transform-box:fill-box;transform-origin:center}
+ .b.dn .cap{transform:translateY(2px) scale(.9);filter:brightness(.78)}.pl.dn .cap{transform:translateY(2px) scale(.95);filter:brightness(.8)}
+ #hf{position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 80px 20px rgba(255,30,30,0);transition:box-shadow .3s}#hf.on{box-shadow:inset 0 0 80px 20px rgba(255,30,30,.75);transition:none}
+ #hb{position:fixed;left:10px;top:10px;font:600 12px Oswald;background:#0008;color:#fff;border:1px solid #fff3;border-radius:99px;padding:4px 10px;z-index:5}
+ .sheet{position:fixed;left:50%;bottom:0;width:min(72vw,900px);height:84vh;transform:translate(-50%,118%) rotate(-1.2deg);transition:transform .45s cubic-bezier(.2,1.25,.4,1);z-index:9;
+  background:#c9a46a;background-image:radial-gradient(circle at 80% 22%,transparent 38px,#6b4a2333 40px,transparent 44px),repeating-linear-gradient(90deg,#0000 0 3px,#00000008 3px 4px);
+  box-shadow:0 10px 40px #000a;border-radius:4px;padding:3.5vh 4vw;color:#24170a;font-family:'Permanent Marker',Oswald}
+ .sheet.open{transform:translate(-50%,6vh) rotate(-1.2deg)}.tape{position:absolute;width:14vh;height:5vh;background:#f4f1e3b0;top:-2vh}.tape.l{left:3vw;transform:rotate(-8deg)}.tape.r{right:3vw;transform:rotate(7deg)}
+ .sheet h2{margin:0 0 2vh;font-size:5.4vh;color:#8b1a1a;transform:rotate(-1deg)}.row{display:grid;grid-template-columns:36% 1fr;align-items:center;gap:2vw;padding:1.3vh 0;border-bottom:.35vh dashed #24170a44}
+ .mv{font:600 3.6vh Oswald}.mv small{display:block;font:500 2.4vh Oswald;opacity:.7}.in{font-size:3.6vh}.chip{display:inline-block;font:700 2.4vh Oswald;color:#fff;background:#1f2c78;border-radius:99px;padding:.3vh 1.2vh;margin:0 .4vh}
+ .chip.w{background:#d4560f}.chip.g{background:#555}.chip.s{background:#c4520f}.x{position:absolute;right:2vw;top:1.5vh;font:700 4vh Oswald;cursor:pointer}`;
+ document.head.appendChild(st);const fl=document.createElement('link');fl.rel='stylesheet';fl.href='https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap';document.head.appendChild(fl);
+ const svg=document.getElementById('s');svg.removeAttribute('width');svg.removeAttribute('height');
+ const fit=()=>svg.setAttribute('preserveAspectRatio',innerWidth/innerHeight>=1956/1100?'xMidYMid slice':'xMidYMid meet');fit();addEventListener('resize',fit);
+ document.body.insertAdjacentHTML('beforeend',`<div id="hf"></div><button id="hb">hit demo</button><div class="sheet" id="sh"><div class="tape l"></div><div class="tape r"></div><div class="x" id="sx">✕</div>
+ <h2>KEVALANCHE · HOCKEY GOON</h2>
+ <div class="row"><div class="mv">Drop the Gloves<small>hurls a glove that poofs back on</small></div><div class="in">↓ ↘ → + <span class="chip">BOP</span> slow / <span class="chip w">WALLOP</span> fast</div></div>
+ <div class="row"><div class="mv">Jersey Flip<small>auto-throws toward the open side</small></div><div class="in"><span class="chip g">GRAB</span> near them</div></div>
+ <div class="row"><div class="mv">Bear-Hug Suplex<small>when the room's behind you</small></div><div class="in"><span class="chip g">GRAB</span> (auto)</div></div>
+ <div class="row"><div class="mv">Sidestep<small>dodges specials &amp; rolls</small></div><div class="in">↑↑ or ↓↓</div></div>
+ <div class="row" style="border:0"><div class="mv">Super<small>needs a full meter</small></div><div class="in"><span class="chip s">SUPER</span></div></div></div>`);
+ let ac;const snd=f=>{try{ac=ac||new AudioContext();const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;o.type='square';g.gain.setValueAtTime(.05,ac.currentTime);g.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+.05);o.connect(g).connect(ac.destination);o.start();o.stop(ac.currentTime+.06)}catch(e){}};
+ const sh_=document.getElementById('sh');
+ svg.querySelectorAll('.b,.pl').forEach(el=>{el.style.cursor='pointer';el.addEventListener('pointerdown',e=>{e.stopPropagation();el.classList.add('dn');snd(+el.dataset.snd);navigator.vibrate&&navigator.vibrate(10);if(el.id==='movesBtn')sh_.classList.add('open')});
+  const up=()=>el.classList.remove('dn');['pointerup','pointerleave','pointercancel'].forEach(t=>el.addEventListener(t,up))});
+ document.getElementById('sx').onpointerdown=()=>sh_.classList.remove('open');
+ const ball=document.getElementById('ball');let drag=null;
+ const pt=e=>{const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(svg.getScreenCTM().inverse())};
+ svg.addEventListener('pointerdown',e=>{const p=pt(e);if(p.x<1000){drag={x:p.x,y:p.y,id:e.pointerId};svg.setPointerCapture(e.pointerId)}});
+ svg.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;const p=pt(e);let dx=p.x-drag.x,dy=p.y-drag.y;const m=60,d=Math.hypot(dx,dy);if(d>m){dx*=m/d;dy*=m/d}ball.setAttribute('transform',`translate(${dx} ${dy})`)});
+ const end=()=>{if(drag){drag=null;ball.setAttribute('transform','')}};svg.addEventListener('pointerup',end);svg.addEventListener('pointercancel',end);
+ document.getElementById('hb').onclick=()=>{const h=document.getElementById('hf');h.classList.add('on');navigator.vibrate&&navigator.vibrate([40,30,60]);svg.animate([{transform:'translate(0,0)'},{transform:'translate(-8px,4px)'},{transform:'translate(6px,-3px)'},{transform:'translate(0,0)'}],{duration:220});setTimeout(()=>h.classList.remove('on'),70)};
+}
 </script></body></html>
