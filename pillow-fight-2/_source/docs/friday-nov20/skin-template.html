@@ -8,7 +8,12 @@
 const L={stick:[604,517,185],btn:[[1550,425],[1762,361],[1979,348],[1550,692],[1764,637],[1979,626]],
  lbl:['BOP','WALLOP','GRAB','BLOCK','JUMP','TAUNT'],super:[1097,550,262,112],start:[1132,215,150,60],moves:[2062,1012,190,62],led:[2139,92],
  safe:[222,0,1956,1100],plate:[1395,235,745,620]};
-const mode=new URLSearchParams(location.search).get('mode')||'guide';
+const Q=new URLSearchParams(location.search),mode=Q.get('mode')||'guide',SKIN=Q.get('skin')||'sebas';
+/* per-skin control colours: caps[BOP,WALLOP,GRAB,BLOCK,JUMP,TAUNT], ring, ball, super, superText, label, moves, movesText, led */
+const SK={
+ 'sebas':{caps:['#f08a1a','#17a6a8','#efe5cf','#2ca23a','#d6242a','#efe5cf'],ring:'#c9a04a',ball:'#e0742c',sup:'#ffe27a',st:'#4a3205',lab:'#f3e3b0',mv:'#f2a12a',mt:'#2a1505',led:'#5cff5c'},
+ 'kevalanche-alt':{caps:['#1f2c78','#f26a1b','#ececee','#f26a1b','#1f2c78','#ececee'],ring:'#f26a1b',ball:'#f26a1b',sup:'#e8641a',st:'#2a0e02',lab:'#f2c9a0',mv:'#f2d40c',mt:'#111',led:'#ff6a1b'}
+};const C=SK[SKIN]||SK.sebas;
 function sh(hex,a){let n=parseInt(hex.slice(1),16),r=n>>16,g=n>>8&255,b=n&255;const f=a<0?0:255,t=Math.abs(a);r=Math.round(r+(f-r)*t);g=Math.round(g+(f-g)*t);b=Math.round(b+(f-b)*t);return `rgb(${r},${g},${b})`}
 let D='',i=0;const id=p=>p+(++i);
 /* dished arcade button: convex glossy housing ring, dark seam, CONCAVE cap (dark top / light bottom, inner shadow under the top lip) */
@@ -37,13 +42,13 @@ function pill(cx,cy,w,h,col,txt,tc){const g=id('p');D+=`<linearGradient id="${g}
  return `<g transform="translate(${cx} ${cy})"><rect x="${-w/2-12}" y="${-h/2-12}" width="${w+24}" height="${h+24}" rx="${h/2+12}" fill="#141416" stroke="#000" stroke-width="3"/>
  <rect x="${-w/2}" y="${-h/2}" width="${w}" height="${h}" rx="${h/2}" fill="url(#${g})" stroke="${sh(col,-.6)}" stroke-width="2"/><rect x="${-w/2+18}" y="${-h/2+7}" width="${w-36}" height="${h*.3}" rx="${h*.15}" fill="#fff" opacity=".33"/>
  ${txt?`<text y="${h*.17+2}" text-anchor="middle" font-size="${h*.46}" font-weight="600" letter-spacing="1" fill="${tc}">${txt}</text>`:''}</g>`}
-function controls(){const cols=['#f08a1a','#17a6a8','#efe5cf','#2ca23a','#d6242a','#efe5cf'];let o='';
- o+=stick(...L.stick,'#c9a04a','#e0742c');
- L.btn.forEach((p,k)=>o+=btn(p[0],p[1],cols[k],L.lbl[k],'#f3e3b0'));
- o+=pill(L.super[0],L.super[1],L.super[2],L.super[3],'#ffe27a','SUPER','#4a3205');
+function controls(){const cols=C.caps;let o='';
+ o+=stick(...L.stick,C.ring,C.ball);
+ L.btn.forEach((p,k)=>o+=btn(p[0],p[1],cols[k],L.lbl[k],C.lab));
+ o+=pill(L.super[0],L.super[1],L.super[2],L.super[3],C.sup,'SUPER',C.st);
  o+=`<text x="${L.start[0]}" y="${L.start[1]-58}" text-anchor="middle" font-size="28" font-weight="600" fill="#fff" letter-spacing="1">START</text>`+pill(L.start[0],L.start[1],L.start[2],L.start[3],'#3a3b40','','');
- const m=L.moves;o+=`<rect x="${m[0]-m[2]/2}" y="${m[1]-m[3]/2}" width="${m[2]}" height="${m[3]}" rx="12" fill="#f2a12a" stroke="#6a3a05" stroke-width="2.5"/><text x="${m[0]}" y="${m[1]+12}" text-anchor="middle" font-size="34" font-weight="700" fill="#2a1505">▲ MOVES</text>`;
- o+=`<circle cx="${L.led[0]}" cy="${L.led[1]}" r="24" fill="#5cff5c" opacity=".45" filter="url(#b8)"/><circle cx="${L.led[0]}" cy="${L.led[1]}" r="10" fill="#b6ffb6"/>`;
+ const m=L.moves;o+=`<rect x="${m[0]-m[2]/2}" y="${m[1]-m[3]/2}" width="${m[2]}" height="${m[3]}" rx="12" fill="${C.mv}" stroke="rgba(0,0,0,.5)" stroke-width="2.5"/><text x="${m[0]}" y="${m[1]+12}" text-anchor="middle" font-size="34" font-weight="700" fill="${C.mt}">▲ MOVES</text>`;
+ o+=`<circle cx="${L.led[0]}" cy="${L.led[1]}" r="24" fill="${C.led}" opacity=".5" filter="url(#b8)"/><circle cx="${L.led[0]}" cy="${L.led[1]}" r="10" fill="${sh(C.led,.55)}"/>`;
  return o}
 function guide(){let o=`<rect width="2400" height="1100" fill="#3b3e44"/>`;
  for(let x=0;x<2400;x+=100)o+=`<line x1="${x}" y1="0" x2="${x}" y2="1100" stroke="#fff" stroke-opacity=".05"/>`;for(let y=0;y<1100;y+=100)o+=`<line x1="0" y1="${y}" x2="2400" y2="${y}" stroke="#fff" stroke-opacity=".05"/>`;
@@ -60,6 +65,6 @@ function notes(){return `<g font-size="30" font-weight="600" fill="#fff"><rect x
  <text x="280" y="975">Paint: background art + the button plate only.</text>
  <text x="280" y="1017">Don't paint: stick, 6 buttons, labels, SUPER, START, MOVES, LED.</text>
  <text x="280" y="1059" fill="#ff8aa6">No rounded corners or frame. Pink edges may crop.</text></g>`}
-const g=mode==='overlay'?controls():guide()+controls().replace(/<g /,'<g opacity=".9" ')+notes();
+const g=mode==='preview'?`<image href="Skins/${SKIN}.jpg" width="2400" height="1100" preserveAspectRatio="none"/>`+controls():mode==='overlay'?controls():guide()+controls().replace(/<g /,'<g opacity=".9" ')+notes();
 document.getElementById('s').innerHTML=`<defs><filter id="b2"><feGaussianBlur stdDeviation="2"/></filter><filter id="b4"><feGaussianBlur stdDeviation="4"/></filter><filter id="b8"><feGaussianBlur stdDeviation="8"/></filter><clipPath id="capclip"><circle r="33"/></clipPath>${D}</defs>`+g;
 </script></body></html>
