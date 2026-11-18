@@ -30,7 +30,7 @@ Usage limits have killed runs before they pushed. Commit and push `pf2-source` a
 - Show a ping indicator (green/amber/red) on the title screen per paired phone.
 - Auto-reconnect if the phone sleeps.
 
-### 3. Cabinet look (Kevin-approved mockups: `docs/friday-nov20/kevalanche-controller-mockup.html` and `sebas-controller-mockup.html`. Match their layout and feel, and give the other 5 fighters the same level of distinctness)
+### 3. Cabinet look (the art now comes from Kevin's painted skins, see section 5; the rules below describe what they show)
 Use the arcade cabinet panel from Kevin's reference photo.
 - **Left:** a virtual ball-top stick with a glossy ball on a yellow ring base, 8-way, with a dead zone. It must make ↓↘→, half-circles and charge motions easy. No d-pad.
 - **Right:** six convex arcade buttons in a 2×3 block on a dark plate, each clearly labelled:
@@ -42,7 +42,7 @@ Use the arcade cabinet panel from Kevin's reference photo.
   - **TAUNT**: plays that fighter's trash-talk line
 - **START:** an NES-style rubber PILL in a recessed well, top centre, with "START" printed on the overlay above it.
 - **SUPER:** a LARGE glossy PILL button, vertically level with the joystick centre, between the stick and the buttons, with "SUPER" printed on the pill. It fires the meter super.
-- NO fighter name, NO portrait and NO country text on the controller. The fighter shows only through the art.
+- No portrait. Any text or logo that is painted into Kevin's skins stays (see section 5); add nothing else.
 - Buttons press in with a glossy highlight, flash, and make a click sound.
 - Landscape layout. In portrait, show a "rotate your phone" prompt.
 - Haptics via `navigator.vibrate`: a short buzz on hit taken, a longer one on KO. Feature-detect, since iPhone won't buzz, and fail silently.
@@ -52,20 +52,16 @@ Use the arcade cabinet panel from Kevin's reference photo.
 - The KO screen shows a rude one-liner on the loser's phone, in the fighter's voice and in the existing trash-talk tone.
 - When Rubberta's Ink Jet hits you, your phone screen gets an ink splat that drips off over ~2 seconds. It never blocks the controls' hit areas.
 
-### 5. Controller art: unique per fighter (and per OG/ALT)
-The panel art is a printed arcade control-panel overlay, like a racing livery: dynamic but fairly simple.
-- **Visual language:** jagged livery shards, racing-stripe bundles, halftone dot patches, rough brush strokes, thin speed lines, tiny technical decals (barcode bars, chevrons; no words), and an outlined zone around the button cluster.
-- **Solid button plate (DEFAULT, every fighter):** the six buttons sit on a solid near-black/dark-grey plate (not an outline), with the theme colour in its edge trim, a corner flash, an accent notch, and the same sparse wear. Labels are white on the plate. **The plate SHAPE suits the character:** angular, straight-edged livery cuts for sharp designs (Kevalanche, Sebas, as in the mockups); soft, bubbly, rounded blobs for bubbly designs (e.g. Rubberta's tentacle curves, Sumaura's round panda softness); pick per fighter and per OG/ALT. Make sure no button colour vanishes against the plate (e.g. El Rudo uses gunmetal caps with crimson rings, not black on black).
-- **Arcade buttons:** real Sanwa/Seimitsu-style: a solid coloured housing ring with a glossy lip, around a slightly smaller domed plunger with a dark seam; the plunger sinks on press, the ring stays.
-- **Wear on most of them:** SPARSE and random: about 8-10 small clusters of only 3-6 chips each, mostly tiny with the odd bigger one. Chips are seeded random polygons in the primer colour (see the mockup code). Most of the board is clean. NO noise-filter speckle.
-- **Each fighter is distinct** (palette, shapes, motifs), driven mainly by the CHARACTER. Country is only an extra ingredient where fun (Brazil, Mexico, UK). ALT twins get their own evil variant, not just a recolour. Button cap colours and the stick ball match each theme.
-- **Kevalanche OG:** icy-blue avalanche shards, a snow brush, a red flannel-plaid racing stripe. **Goon:** Oilers navy, an orange/white hockey-sweater stripe bundle cut by a jagged break, skate scratches. (These are built in the mockup; port them.)
-- **Zach Sparrow:** black crow-feather shards, iridescent purple/teal sheen, beak-sharp diagonals.
-- **K8-E:** giraffe-patch shapes as livery panels, tall vertical-ish stripes (long neck), sunny savanna palette.
-- **Johnny Deuce:** tennis: court-line geometry, felt-ball yellow-green, racquet-string mesh, a scoreboard-tick decal; maybe one small Dutch orange accent.
-- **Rubberta:** Brazil green/yellow Carnaval energy plus ocean blue, ink splatter, tentacle-curve stripes.
-- **Sumaura:** UK red with navy, a sumo mawashi band as the stripe bundle, maybe a bamboo hint (panda).
-- **Sebas Perra:** BUILT in `sebas-controller-mockup.html` (Kevin-approved), so port it. OG técnico: marigold sunburst on warm cream, strong magenta (not soft pink, which reads 90s), turquoise and gold, with a hero cluster of 3 calavera skulls top-left and claw marks. El Rudo: black and crimson, jagged flames, bone/crimson skulls (big one cracked), claw rips. NO papel picado banner and NO big luchador mask (both rejected).
+### 5. Controller art: Kevin's 14 finished mockups ARE the skins (match them exactly)
+Kevin painted a finished controller for every fighter and every ALT. **Do not redraw the art in SVG/CSS.** Use his images as the controller background, and layer the live controls exactly over the painted ones. The older SVG/CSS mockups (`kevalanche-controller-mockup.html`, `sebas-controller-mockup.html`) are now superseded for art. Keep them only as a reference for button-press feel and the cheat sheet.
+- **Files:** `docs/friday-nov20/skins/<id>.webp`, all 1920×1072. The 14 ids are `kevalanche`, `kevalanche-alt`, `zach`, `zach-alt` (ghost pirate), `k8-e`, `k8-e-alt` (punk), `johnny`, `johnny-alt` (red-laser padel), `rubberta`, `rubberta-alt` (deep-sea tentacle), `sumaura`, `sumaura-alt` (art-deco casino), `sebas` and `sebas-alt`. Map each to the game's OG/ALT roster entry. Ship them to the live site as `pillow-fight-2/controller/skins/<id>.webp`. Lazy-load only the chosen fighter's skin, and show a dark plain panel until it arrives.
+- **Hit-zone map:** `docs/friday-nov20/skins/skins.json` gives each skin's stick, 6 buttons, SUPER, START and MOVES positions as fractions of the image. These are eyeballed estimates. Before shipping, build a `?pad=debug` overlay that outlines every zone on every skin, screenshot all 14, and nudge the numbers until each outline sits exactly on its painted part. Make hit zones about 15% larger than the painted part, for fat thumbs.
+- **Layout on the phone:** fit the whole image (contain) in landscape, centred, with near-black letterbox bars. Never crop the art. Every zone scales with the image rect.
+- **Buttons, SUPER, START and MOVES press feel:** use a sprite of that exact region, cut from the same image with `background-position`. On press, scale it to about 0.93 with a darker inner shadow, then release it with a quick spring. Add the click sound and haptic. The painted art IS the button, so no separate CSS button is drawn on top.
+- **Stick:** cut the ball as a circular sprite from the image. Under it, draw a dark socket disc the size of the ball, so the painted ball is hidden whenever the live one moves. Limit travel to about 35% of the ball radius, and tilt the ball slightly with a highlight shift. The touch area for the stick is the whole left 40% of the screen (floating origin where the thumb lands); only the visual is anchored to the painted stick.
+- **Keep what's painted, as painted.** Some skins carry a fighter name or logo (K8-E, Johnny, Rubberta, Sumaura) and some have no button labels (Kevalanche OG). Kevin made these, so leave them. Don't add or remove text.
+- **Ping dot:** reuse the painted LED position (top right) and tint it green/amber/red with a small glowing overlay.
+- **Wear:** it's already in the art. Don't add procedural wear.
 
 ### 6. Cheat sheet
 - A slide-up panel on the phone (swipe up or tap a tab) showing your fighter's specials, throws and supers.
@@ -80,7 +76,7 @@ The panel art is a printed arcade control-panel overlay, like a racing livery: d
 - The game makes zero runtime network requests except PeerJS.
 
 ## Shipping
-- Release branch `pf2-release-5` off current `main`. It touches ONLY `pillow-fight-2/index.html` (plus `controller.html` if you went that route).
+- Release branch `pf2-release-5` off current `main`. It touches ONLY `pillow-fight-2/index.html` (plus `controller.html` if you went that route) and the 14 files in `pillow-fight-2/controller/skins/`.
 - **Auto-merge** YOUR PR (`gh pr merge <n> --merge`) only if all the quality-bar checks pass, then confirm the Pages deploy. Otherwise, leave the PR open with a comment.
 - The PR should open with a skimmable summary: how to pair, the controls, and screenshots of the phone panel for 3+ fighters and the cheat sheet. LOOK at them critically.
 - Never push to `main`, never force-push, merge only your own PR. No self-scheduled follow-ups and no polling.
