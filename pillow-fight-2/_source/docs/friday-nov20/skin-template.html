@@ -1,0 +1,65 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>PF2 Skin Template</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
+<style>html,body{margin:0;background:transparent;font-family:Oswald,'Arial Narrow',sans-serif}svg{display:block}</style></head>
+<body><svg id="s" width="2400" height="1100" viewBox="0 0 2400 1100"></svg>
+<script>
+/* Shared PF2 controller layout: canvas 2400x1100, full bleed. */
+const L={stick:[604,517,185],btn:[[1550,425],[1762,361],[1979,348],[1550,692],[1764,637],[1979,626]],
+ lbl:['BOP','WALLOP','GRAB','BLOCK','JUMP','TAUNT'],super:[1097,550,262,112],start:[1132,215,150,60],moves:[2062,1012,190,62],led:[2139,92],
+ safe:[222,0,1956,1100],plate:[1395,235,745,620]};
+const mode=new URLSearchParams(location.search).get('mode')||'guide';
+function sh(hex,a){let n=parseInt(hex.slice(1),16),r=n>>16,g=n>>8&255,b=n&255;const f=a<0?0:255,t=Math.abs(a);r=Math.round(r+(f-r)*t);g=Math.round(g+(f-g)*t);b=Math.round(b+(f-b)*t);return `rgb(${r},${g},${b})`}
+let D='',i=0;const id=p=>p+(++i);
+/* dished arcade button: convex glossy housing ring, dark seam, CONCAVE cap (dark top / light bottom, inner shadow under the top lip) */
+function btn(cx,cy,col,label,lc){const ring=id('r'),cap=id('c'),s=89/46;
+ D+=`<radialGradient id="${ring}" cx="40%" cy="28%" r="80%"><stop offset="0" stop-color="${sh(col,.5)}"/><stop offset=".45" stop-color="${col}"/><stop offset=".92" stop-color="${sh(col,-.5)}"/><stop offset="1" stop-color="${sh(col,-.75)}"/></radialGradient>
+ <linearGradient id="${cap}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sh(col,-.45)}"/><stop offset=".45" stop-color="${sh(col,-.08)}"/><stop offset="1" stop-color="${sh(col,.3)}"/></linearGradient>`;
+ return `<g transform="translate(${cx} ${cy}) scale(${s})">
+ <ellipse cx="2" cy="8" rx="48" ry="45" fill="#000" opacity=".55" filter="url(#b4)"/>
+ <circle r="46" fill="url(#${ring})" stroke="${sh(col,-.8)}" stroke-width="1.4"/>
+ <path d="M-37 -24 A44 44 0 0 1 24 -38" stroke="#fff" stroke-opacity=".6" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+ <circle r="36.5" fill="#0b0b0d"/>
+ <circle r="33" fill="url(#${cap})"/>
+ <circle r="33" fill="none" stroke="#000" stroke-opacity=".55" stroke-width="7" filter="url(#b2)" clip-path="url(#capclip)" transform="translate(0 -3)"/>
+ <path d="M-24 22 A33 33 0 0 0 24 22" stroke="#fff" stroke-opacity=".45" stroke-width="2" fill="none" stroke-linecap="round"/>
+ <ellipse cx="0" cy="14" rx="17" ry="6" fill="#fff" opacity=".14" filter="url(#b2)"/>
+ </g>`+(label?`<text x="${cx}" y="${cy+89+38}" text-anchor="middle" font-size="31" font-weight="600" letter-spacing="1" fill="${lc}">${label}</text>`:'')}
+function stick(cx,cy,R,ring,ball){const a=id('sa'),b=id('sb');
+ D+=`<radialGradient id="${a}" cx="35%" cy="28%" r="80%"><stop offset="0" stop-color="${sh(ring,.5)}"/><stop offset=".5" stop-color="${ring}"/><stop offset="1" stop-color="${sh(ring,-.6)}"/></radialGradient>
+ <radialGradient id="${b}" cx="38%" cy="30%" r="72%"><stop offset="0" stop-color="${sh(ball,.5)}"/><stop offset=".45" stop-color="${ball}"/><stop offset="1" stop-color="${sh(ball,-.6)}"/></radialGradient>`;
+ const r2=R*.76,rb=R*.72;
+ return `<g transform="translate(${cx} ${cy})"><ellipse cx="6" cy="18" rx="${R+10}" ry="${R+4}" fill="#000" opacity=".5" filter="url(#b8)"/>
+ <circle r="${R}" fill="url(#${a})" stroke="${sh(ring,-.75)}" stroke-width="3"/><circle r="${(R+r2)/2}" fill="none" stroke="${sh(ring,-.45)}" stroke-width="3" opacity=".7"/>
+ <circle r="${r2}" fill="#0c0c0e"/><ellipse cx="10" cy="24" rx="${rb}" ry="${rb*.9}" fill="#000" opacity=".6" filter="url(#b8)"/>
+ <circle r="${rb}" fill="url(#${b})" stroke="${sh(ball,-.7)}" stroke-width="2"/><ellipse cx="${-rb*.3}" cy="${-rb*.42}" rx="${rb*.38}" ry="${rb*.2}" fill="#fff" opacity=".55" filter="url(#b4)"/></g>`}
+function pill(cx,cy,w,h,col,txt,tc){const g=id('p');D+=`<linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sh(col,.45)}"/><stop offset=".5" stop-color="${col}"/><stop offset="1" stop-color="${sh(col,-.4)}"/></linearGradient>`;
+ return `<g transform="translate(${cx} ${cy})"><rect x="${-w/2-12}" y="${-h/2-12}" width="${w+24}" height="${h+24}" rx="${h/2+12}" fill="#141416" stroke="#000" stroke-width="3"/>
+ <rect x="${-w/2}" y="${-h/2}" width="${w}" height="${h}" rx="${h/2}" fill="url(#${g})" stroke="${sh(col,-.6)}" stroke-width="2"/><rect x="${-w/2+18}" y="${-h/2+7}" width="${w-36}" height="${h*.3}" rx="${h*.15}" fill="#fff" opacity=".33"/>
+ ${txt?`<text y="${h*.17+2}" text-anchor="middle" font-size="${h*.46}" font-weight="600" letter-spacing="1" fill="${tc}">${txt}</text>`:''}</g>`}
+function controls(){const cols=['#f08a1a','#17a6a8','#efe5cf','#2ca23a','#d6242a','#efe5cf'];let o='';
+ o+=stick(...L.stick,'#c9a04a','#e0742c');
+ L.btn.forEach((p,k)=>o+=btn(p[0],p[1],cols[k],L.lbl[k],'#f3e3b0'));
+ o+=pill(L.super[0],L.super[1],L.super[2],L.super[3],'#ffe27a','SUPER','#4a3205');
+ o+=`<text x="${L.start[0]}" y="${L.start[1]-58}" text-anchor="middle" font-size="28" font-weight="600" fill="#fff" letter-spacing="1">START</text>`+pill(L.start[0],L.start[1],L.start[2],L.start[3],'#3a3b40','','');
+ const m=L.moves;o+=`<rect x="${m[0]-m[2]/2}" y="${m[1]-m[3]/2}" width="${m[2]}" height="${m[3]}" rx="12" fill="#f2a12a" stroke="#6a3a05" stroke-width="2.5"/><text x="${m[0]}" y="${m[1]+12}" text-anchor="middle" font-size="34" font-weight="700" fill="#2a1505">▲ MOVES</text>`;
+ o+=`<circle cx="${L.led[0]}" cy="${L.led[1]}" r="24" fill="#5cff5c" opacity=".45" filter="url(#b8)"/><circle cx="${L.led[0]}" cy="${L.led[1]}" r="10" fill="#b6ffb6"/>`;
+ return o}
+function guide(){let o=`<rect width="2400" height="1100" fill="#3b3e44"/>`;
+ for(let x=0;x<2400;x+=100)o+=`<line x1="${x}" y1="0" x2="${x}" y2="1100" stroke="#fff" stroke-opacity=".05"/>`;for(let y=0;y<1100;y+=100)o+=`<line x1="0" y1="${y}" x2="2400" y2="${y}" stroke="#fff" stroke-opacity=".05"/>`;
+ o+=`<rect x="0" y="0" width="222" height="1100" fill="#ff3b6b" opacity=".18"/><rect x="2178" y="0" width="222" height="1100" fill="#ff3b6b" opacity=".18"/>`;
+ o+=`<rect x="222" y="0" width="1956" height="1100" fill="none" stroke="#ff3b6b" stroke-width="5" stroke-dasharray="26 14"/>`;
+ o+=`<text x="111" y="560" text-anchor="middle" font-size="26" font-weight="600" fill="#ff8aa6" transform="rotate(-90 111 560)">BLEED · may crop on 16:9 phones · keep art going, nothing important</text>`;
+ o+=`<text x="2289" y="560" text-anchor="middle" font-size="26" font-weight="600" fill="#ff8aa6" transform="rotate(90 2289 560)">BLEED · may crop on 16:9 phones · keep art going, nothing important</text>`;
+ const p=L.plate;o+=`<rect x="${p[0]}" y="${p[1]}" width="${p[2]}" height="${p[3]}" rx="30" fill="#ffd400" opacity=".14" stroke="#ffd400" stroke-width="4" stroke-dasharray="18 10"/>
+ <text x="${p[0]+p[2]/2}" y="${p[1]-22}" text-anchor="middle" font-size="30" font-weight="700" fill="#ffd400">BUTTON PLATE: paint it here, any shape (must cover this zone)</text>`;
+ o+=`<circle cx="${L.stick[0]}" cy="${L.stick[1]}" r="${L.stick[2]}" fill="#00e5ff" opacity=".12" stroke="#00e5ff" stroke-width="4" stroke-dasharray="16 10"/><text x="${L.stick[0]}" y="${L.stick[1]+L.stick[2]+50}" text-anchor="middle" font-size="30" font-weight="700" fill="#00e5ff">JOYSTICK (code draws ring + ball)</text>`;
+ return o}
+function notes(){return `<g font-size="30" font-weight="600" fill="#fff"><rect x="250" y="880" width="900" height="200" rx="16" fill="#000" opacity=".55"/>
+ <text x="280" y="928" font-size="36" font-weight="700" fill="#ffd400">PF2 CONTROLLER SKIN · 2400 × 1100 px · full bleed</text>
+ <text x="280" y="975">Paint: background art + the button plate only.</text>
+ <text x="280" y="1017">Don't paint: stick, 6 buttons, labels, SUPER, START, MOVES, LED.</text>
+ <text x="280" y="1059" fill="#ff8aa6">No rounded corners or frame. Pink edges may crop.</text></g>`}
+const g=mode==='overlay'?controls():guide()+controls().replace(/<g /,'<g opacity=".9" ')+notes();
+document.getElementById('s').innerHTML=`<defs><filter id="b2"><feGaussianBlur stdDeviation="2"/></filter><filter id="b4"><feGaussianBlur stdDeviation="4"/></filter><filter id="b8"><feGaussianBlur stdDeviation="8"/></filter><clipPath id="capclip"><circle r="33"/></clipPath>${D}</defs>`+g;
+</script></body></html>
