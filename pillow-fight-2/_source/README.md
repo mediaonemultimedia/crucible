@@ -29,6 +29,9 @@ Deep links: `final.html?p1=kevalanche&p2=rubberta&cpu=hard` (a fight),
 twins), `seed=N`, `hold` (no free-running loop; tools step `__pf2`),
 `webgl` (force WebGL 2), `noportraits` (skip the card portraits).
 
+## Specials (Run A, Thu Nov 19) — status
+**PF2:** sim + move data + tests done for all 7 (Kevalanche, Johnny, K8-E, Rubberta, Sumaura, Zach, Sebas); visuals / SFX / CPU / practice list: in progress. **PF1:** not started.
+
 ## Status — stage 2 of 2 (shipped: PR #47, merged and deployed)
 
 | # | Stage 2 item | State |

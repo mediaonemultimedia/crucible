@@ -32,6 +32,7 @@
 import { FIGHTERS, MAX_METER, dashOf, isShot } from '../fighters/index.js';
 import { LEFT, RIGHT, UP, DOWN, LIGHT, HEAVY, SPECIAL, BLOCK, JUMP, CROUCH } from './input.js';
 import { rngInt } from './rng.js';
+import { MOTION_FIELDS, MSP_COOL, track, motionSpecial } from './motion.js';
 
 export const TICKS = 60;
 export const ROUND_TICKS = 60 * TICKS;
@@ -78,6 +79,7 @@ export const KO_FINAL = { freeze: 6, slow: 120, ramp: 24, len: 190, g: 22, vy: 4
 export const RO_SEQ = { freeze: 4, slow: 110, ramp: 20, len: 170, g: 24, vy: 260, vx: 120, spin: 30, banner: 140 };
 export const SLOW = 25;
 export const KO_AFTER = 90;
+export const INK_T = 120;           // an inked face: two seconds (cosmetic)
 
 const sgn = (v) => (v > 0 ? 1 : v < 0 ? -1 : 0);
 const tdiv = (a, b) => Math.trunc(a / b) + 0;   // (+ 0: never a −0 in the state)
@@ -108,6 +110,8 @@ function newFighter(id, side) {
     jmp: 0, jd: 0, dl: 0, ro: 0, out: 0, td: 1, bn: 0, tt: 0,
     lt: -99, ht: -99, ok: 0, ch: 0, lc: 0, lk: 0, it: 99, rep: 0, lmv: '', rt: -999,
     kx: 0, kz: 0, ky: 0, kvx: 0, kvz: 0, kvy: 0, kb: 0, kr: 0, kfx: 0, kfz: 0, kfl: 0,
+    ink: 0,                                   // inked face (Rubberta's Ink Jet): cosmetic, ticks left
+    ...MOTION_FIELDS,                         // the motion specials' input history (sim/motion.js)
   };
 }
 
@@ -204,6 +208,8 @@ function readInput(st, k, m) {
     f.bl = Math.max(0, f.bl - 1); f.bh = Math.max(0, f.bh - 1); f.bs = Math.max(0, f.bs - 1);
     f.tf = Math.max(0, f.tf - 1); f.tb = Math.max(0, f.tb - 1); f.db = Math.max(0, f.db - 1); f.sb = Math.max(0, f.sb - 1);
   }
+  track(f, m, was, st.tick);
+  if (f.ink > 0) f.ink--;
   const released = was & ~m;
   if (m & fwd) f.hf++; else if (!(released & fwd)) f.hf = 0;
   if (m & bk) f.hb++; else if (!(released & bk)) f.hb = 0;
@@ -254,6 +260,7 @@ function startMove(st, k, name, chain = 0) {
   }
   if (m.kind === 'special') { f.meter = 0; f.bs = 0; f.nag = 0; st.ev.push({ k: 'special', p: k }); }
   if (m.kind === 'signature') st.ev.push({ k: 'signature', p: k });
+  if (m.kind === 'msp') { f.mc = m.total + MSP_COOL; f.bl = f.bh = 0; st.ev.push({ k: 'msp', p: k, mv: name }); }
   if (!m.air && !f.air) { f.vx = 0; f.vz = 0; }
 }
 
@@ -267,6 +274,12 @@ function think(st, k, L) {
   if (f.tt > 0 && !f.air && (GROUND_FREE[f.act] || f.act === 'side' || f.act === 'attack' || f.act === 'dash')) {
     f.tt--;
     if (RING - Math.max(Math.abs(f.x), Math.abs(f.z)) > TEETER_SAFE) f.tt = 0;
+  }
+  // the motion specials: from anything free on the ground — and out of the
+  // sidestep or the hop's crouch the motion's own ↓ / ↑ started
+  if (!f.air && (f.bl || f.bh) && (GROUND_FREE[f.act] || f.act === 'side' || f.act === 'jumpsquat')) {
+    const v = motionSpecial(f, D.moves, f.bl, f.bh);
+    if (v && !(D.moves[v].spawn.length && st.proj.some((p) => p.o === k))) return startMove(st, k, v);
   }
   // a sidestep's tail can be attacked (or blocked) out of
   const sideFree = f.act === 'side' && f.t >= SIDE_FREE;
@@ -463,6 +476,7 @@ function spawn(st, k, P) {
     vx: tdiv(P.vx * f.fx, ONE), vz: tdiv(P.vx * f.fz, ONE), vy: P.vy, fx: f.fx, fz: f.fz,
     w: P.box.w, h: P.box.h, lat: P.lat || (P.box.w >> 1), dmg: P.dmg, level: P.level, life: P.life,
     hitstun: P.hitstun, blockstun: P.blockstun, push: P.push, chip: P.chip, kd: P.kd || 0, sp: P.special || 0, pause: P.pause || 8, bpush: 0, t: 0,
+    ms: P.ms || 0, ink: P.ink || 0,
   });
   st.ev.push({ k: 'throw', p: k, kind: P.kind });
 }
@@ -594,7 +608,7 @@ export function hurtOf(f) {
 export function limbOf(f) {
   if (f.act !== 'attack' || f.inv > 0) return null;
   const m = FIGHTERS[f.id].moves[f.mv], e = m.ext;
-  if (!e || f.t < e.from || f.t > e.to) return null;
+  if (!e || e.neck || f.t < e.from || f.t > e.to) return null;
   const hb = m.hits[0].box, reach = e.x1 - 350;
   return { x: f.x + tdiv(f.fx * reach, ONE), z: f.z + tdiv(f.fz * reach, ONE), r: 420, y0: f.y + hb.y - 150, y1: f.y + hb.y + hb.h + 150 };
 }
@@ -618,11 +632,28 @@ export function boxTouches(B, c) {
   return ea * ea + el * el < c.r * c.r;
 }
 
+/* K8-E's Long Neck: the whole stretched neck is hittable — a row of
+   cylinders from her shoulders to the head (the punish on a whiff or a block) */
+export function neckOf(f) {
+  if (f.act !== 'attack' || f.inv > 0) return null;
+  const m = FIGHTERS[f.id].moves[f.mv], e = m.ext;
+  if (!e || !e.neck || f.t < e.from || f.t > e.to) return null;
+  const hb = m.hits[0].box, out = [];
+  // out at full length only while it's out: growing in over the first ticks, back over the last
+  const grow = Math.min(e.x1, tdiv(e.x1 * (f.t - e.from + 1), 4)), shrink = tdiv(e.x1 * Math.max(0, e.to - f.t + 1), 6);
+  const len = Math.min(grow, shrink);
+  for (let a = 1200; a <= len - 300; a += 900) out.push({ x: f.x + tdiv(f.fx * a, ONE), z: f.z + tdiv(f.fz * a, ONE), r: 380, y0: f.y + hb.y - 100, y1: f.y + hb.y + hb.h + 100 });
+  return out;
+}
+
 function touches(f, box) {
   const hb = hurtOf(f);
   if (hb && boxTouches(box, hb)) return hb;
   const lb = limbOf(f);
-  return lb && boxTouches(box, lb) ? lb : null;
+  if (lb && boxTouches(box, lb)) return lb;
+  const nk = neckOf(f);
+  if (nk) for (const c of nk) if (boxTouches(box, c)) return c;
+  return null;
 }
 
 function invulnTo(o, attackerAir) {
@@ -677,6 +708,8 @@ function strike(st) {
     const res = landHit(st, c.k, c.h, dx, dz, { special: m.kind === 'special', at, kind: m.kind, fin, mv: f.mv, lite: m.lite, power });
     if (res === 'hit') f.ok = 1;
     if (res === 'hit' && m.stopOnHit) { f.stop = 1; setVel(f, -20); }
+    // the roll / the torpedo bounce back off a block, a little hop up and away
+    if (res === 'block' && m.bounce) { f.stop = 1; setVel(f, -62); f.vy = 115; f.air = 1; st.ev.push({ k: 'rebound', p: c.k, x: f.x, z: f.z }); }
   }
 }
 
@@ -793,9 +826,13 @@ function projectiles(st) {
     if (p.dead) continue;
     const d = st.f[1 - p.o];
     if (!invulnTo(d, false) && touches(d, projBox(p))) {
-      landHit(st, p.o, p, p.fx, p.fz, { special: !!p.sp, at: [p.x, p.y, p.z], kind: p.sp ? 'special' : 'signature', power: !!p.sp });
+      const res = landHit(st, p.o, p, p.fx, p.fz, { special: !!p.sp, at: [p.x, p.y, p.z], kind: p.sp ? 'special' : p.ms ? 'msp' : 'signature', power: !!p.sp || !!p.ms, shot: p.kind });
+      if (p.ink && res === 'hit') { d.ink = INK_T; st.ev.push({ k: 'inked', p: 1 - p.o, x: d.x, z: d.z }); }
+      st.ev.push({ k: 'splat', p: p.o, kind: p.kind, x: p.x, y: p.y, z: p.z, hit: res === 'hit' ? 1 : 0 });
       continue;
     }
+    // a dipping serve that comes down short: into the quilt
+    if (p.vy < 0 && p.y < 250) { st.ev.push({ k: 'splat', p: p.o, kind: p.kind, x: p.x, y: 250, z: p.z, hit: 0 }); continue; }
     const far = isqrt((p.x - d.x) ** 2 + (p.z - d.z) ** 2);
     if (p.life <= 0 || Math.abs(p.x) > RING + 3000 || Math.abs(p.z) > RING + 3000 || (far > OFFSCREEN)) continue;
     keep.push(p);

@@ -73,6 +73,62 @@ function normals({ tDmg = 100, lReach, hReach, cReach, lDmg = 40, hDmg = 85, cDm
   };
 }
 
+/* ── the motion specials (Street Fighter-style; no meter) ──────────────────
+   Each fighter has one, read off a motion in the sim (sim/motion.js):
+   `mspL` on BOP (light), `mspH` on WALLOP (heavy). BOP: the shorter,
+   quicker, weaker one; WALLOP: further, stronger, slower. Every one is
+   ranged, and linear in 3D (a sidestep beats it). `ms: 1` on a projectile
+   marks it as a motion special's (ring-out power; `ink` inks the face). */
+const msp = (o) => move({ kind: 'msp', whiffLag: 6, ...o });
+const shotP = (o) => ({ dx: 1000, vy: 0, level: 'mid', hitstun: 20, blockstun: 14, push: 36, chip: 5, pause: 9, ms: 1, ...o });
+export const MSP = {
+  // Drop the Gloves: a snowball (OG) / the hockey glove (ALT), BOP slow, WALLOP fast
+  kevalanche: {
+    mspL: msp({ total: 47, spawn: [{ at: 13, proj: shotP({ kind: 'snow', y: 2000, vx: 68, box: { w: 560, h: 560 }, dmg: 58, life: 190 }) }] }),
+    mspH: msp({ total: 47, spawn: [{ at: 13, proj: shotP({ kind: 'snow', y: 2000, vx: 128, box: { w: 560, h: 560 }, dmg: 62, life: 110 }) }] }),
+  },
+  // Flaming Ace: the giant ball tossed up and served on fire; WALLOP a faster, dipping topspin serve
+  johnny: {
+    mspL: msp({ total: 50, spawn: [{ at: 15, proj: shotP({ kind: 'flame', dx: 1100, y: 2200, vx: 112, box: { w: 600, h: 600 }, dmg: 62, life: 130 }) }] }),
+    mspH: msp({ total: 54, spawn: [{ at: 17, proj: shotP({ kind: 'flame', dx: 1100, y: 3000, vx: 160, vy: -26, box: { w: 600, h: 600 }, dmg: 70, life: 80, top: 1 }) }] }),
+  },
+  // Long Neck: the neck straight out across the ring, the head bonks; the neck is a hurt box
+  k8e: {
+    mspL: msp({ total: 46, whiffLag: 6, ext: { from: 11, to: 32, x1: 5600, neck: 1 },
+      hits: [hit(16, 19, { x: 1200, y: 1500, w: 4400, h: 900 }, 70, { hitstun: 20, blockstun: 14, push: 40, pause: 10, chip: 6 })] }),
+    mspH: msp({ total: 62, whiffLag: 8, ext: { from: 15, to: 46, x1: 7300, neck: 1 },
+      hits: [hit(22, 25, { x: 1200, y: 2300, w: 6100, h: 900 }, 92, { kd: 1, hitstun: 24, blockstun: 16, push: 50, pause: 13, chip: 8 })] }),
+  },
+  // Ink Jet: a blob of ink; inks the face (cosmetic) — BOP short range, WALLOP across the ring
+  rubberta: {
+    mspL: msp({ total: 44, spawn: [{ at: 12, proj: shotP({ kind: 'ink', dx: 1300, y: 1500, vx: 125, box: { w: 560, h: 560 }, dmg: 52, life: 40, ink: 1 }) }] }),
+    mspH: msp({ total: 52, spawn: [{ at: 16, proj: shotP({ kind: 'ink', dx: 1300, y: 1600, vx: 150, box: { w: 680, h: 680 }, dmg: 66, life: 85, ink: 1 }) }] }),
+  },
+  // Panda Roll (← → + WALLOP): curled into a ball, rolling across; bounces off a block
+  sumaura: {
+    mspH: msp({ total: 60, whiffLag: 10, low: 1, stopOnHit: 1, bounce: 1,
+      motion: [{ from: 10, to: 38, vx: 150 }],
+      hits: [hit(10, 38, { x: 0, y: 0, w: 1450, h: 1800 }, 92, { kd: 1, hitstun: 24, blockstun: 12, push: 50, bpush: 20, pause: 12, chip: 9 })] }),
+  },
+  // Torpedo (charge ↓, ↑ + WALLOP): beak first, wings tucked, low across the ring (a hop clears it)
+  zach: {
+    mspH: msp({ total: 58, whiffLag: 10, low: 1, stopOnHit: 1, bounce: 1,
+      motion: [{ from: 8, to: 34, vx: 175 }],
+      hits: [hit(8, 34, { x: 0, y: 150, w: 1500, h: 1000 }, 88, { kd: 1, hitstun: 24, blockstun: 12, push: 46, bpush: 18, pause: 12, chip: 8 })] }),
+  },
+  // Tornado de Lobo (charge ←, → + BOP/WALLOP): a corkscrewing tail-whip, several hits; WALLOP further
+  sebas: {
+    mspL: msp({ total: 58, whiffLag: 6,
+      motion: [{ from: 8, to: 34, vx: 128 }],
+      hits: [10, 14, 18, 22, 26, 30].map((f) => hit(f, f + 2, { x: -200, y: 300, w: 1800, h: 2300 }, 17, { hitstun: 24, blockstun: 9, push: 6, pause: 5, chip: 3 }))
+        .concat([hit(34, 37, { x: -200, y: 300, w: 1800, h: 2300 }, 40, { kd: 1, hitstun: 24, blockstun: 12, push: 48, pause: 11, chip: 5 })]) }),
+    mspH: msp({ total: 68, whiffLag: 8,
+      motion: [{ from: 8, to: 44, vx: 142 }],
+      hits: [10, 14, 18, 22, 26, 30, 34, 38, 42].map((f) => hit(f, f + 2, { x: -200, y: 300, w: 1800, h: 2300 }, 16, { hitstun: 24, blockstun: 9, push: 6, pause: 5, chip: 3 }))
+        .concat([hit(45, 48, { x: -200, y: 300, w: 1800, h: 2300 }, 44, { kd: 1, hitstun: 24, blockstun: 12, push: 52, pause: 12, chip: 6 })]) }),
+  },
+};
+
 /* a quick dash in (double-tap forward) and a short backdash (double-tap
    back): [ticks, speed per tick] */
 const DASH = { f: [16, 150], b: [14, 100] };
@@ -256,6 +312,8 @@ export const FIGHTERS = {
     impatient: 'Not yet, bud.',
   },
 };
+
+for (const id in MSP) Object.assign(FIGHTERS[id].moves, MSP[id]);
 
 export const dashOf = () => DASH;
 
