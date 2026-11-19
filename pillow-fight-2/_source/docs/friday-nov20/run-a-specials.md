@@ -5,7 +5,7 @@
 Read both READMEs first. Full specs for tonight live on `pf2-source` at `pillow-fight-2/_source/docs/friday-nov20/` (run-a-specials.md, run-b-controller.md). PF1 is normally frozen; this run is Kevin's approved exception. Touch PF1 only for this feature.
 
 ## PUSH EARLY (important)
-Usage limits have killed runs before they pushed. Commit and push the source branch after each fighter. Keep a README status line current: which fighters are done, in which game. A continuation run at 10pm PT tonight will resume from your pushes. **Order:** do PF2 first (all 7 fighters), ship it, then PF1.
+Usage limits have killed runs before they pushed. Commit and push the source branch after each fighter. Keep a README status line current: which fighters are done, in which game. A continuation run at 10pm PT (Thu Nov 19) will resume from your pushes. **Order:** do PF2 first (all 7 fighters), ship it, then PF1.
 
 ## What to build
 Every fighter gets ONE Street Fighter-style motion special. These are new, separate from the existing Space/meter supers, which stay as they are. No meter cost.
