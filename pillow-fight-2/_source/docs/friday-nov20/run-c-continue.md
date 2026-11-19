@@ -1,8 +1,8 @@
 **CONTINUATION CHECK for tonight's Pillow Fight runs.** Repo: https://github.com/mediaonemultimedia/crucible.
 
-Two runs fired this evening. You run after the weekly usage reset, in case either was cut off by a limit.
-- **Run A (5pm PT):** motion special moves for all 7 fighters in PF1 (`bolster-source`) and PF2 (`pf2-source`). Spec: `pillow-fight-2/_source/docs/friday-nov20/run-a-specials.md` on `pf2-source`.
-- **Run B (7:30pm PT):** the PF2 phone controller: QR pairing, cabinet stick and buttons, fighter themes, cheat sheet. Spec: `run-b-controller.md` in the same folder.
+Two runs fired this evening. You run at 10pm PT Thu Nov 19, in case either was cut off by a usage limit.
+- **Run A (Thu Nov 19, 3:45pm PT):** motion special moves for all 7 fighters in PF1 (`bolster-source`) and PF2 (`pf2-source`). Spec: `pillow-fight-2/_source/docs/friday-nov20/run-a-specials.md` on `pf2-source`.
+- **Run B (Thu Nov 19, 6:30pm PT):** the PF2 phone controller: QR pairing, cabinet stick and buttons, fighter themes, cheat sheet. Spec: `run-b-controller.md` in the same folder.
 
 ## Step 1: Check, cheaply
 - Use `gh pr list --state all` and check for merged PRs from branches `pf2-release-4`, `bolster-release-specials` and `pf2-release-5`.
