@@ -4,12 +4,12 @@
 
 Read the README first, then `docs/friday-nov20/controller-design-notes.md` (the design rationale; follow it). Full specs for tonight are on `pf2-source` at `pillow-fight-2/_source/docs/friday-nov20/` (run-a-specials.md has the 7 specials).
 
-Run A (special moves) started at 5pm PT and may still be running. If `pf2-source` is getting fresh commits, build on top of them and rebase as it moves. Never discard its work. If Run A's move-list data isn't there yet, read run-a-specials.md and use that.
+Run A (special moves) started at 3:45pm PT and should be done; it may still be running. If `pf2-source` is getting fresh commits, build on top of them and rebase as it moves. Never discard its work. If Run A's move-list data isn't there yet, read run-a-specials.md and use that.
 
 Do not touch `bolster/` (PF1). This is PF2 only.
 
 ## PUSH EARLY (important)
-Usage limits have killed runs before they pushed. Commit and push `pf2-source` after every item below, and keep a README status line current. A continuation run at 10pm PT will resume from your pushes.
+Usage limits have killed runs before they pushed. Commit and push `pf2-source` after every item below, and keep a README status line current. A continuation run at 10pm PT (Thu Nov 19) will resume from your pushes.
 
 ## Build, in priority order
 
