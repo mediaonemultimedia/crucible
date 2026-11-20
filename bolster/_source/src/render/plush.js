@@ -344,6 +344,16 @@ export class Plush {
 
   /* render-frame update: F is the sim fighter (positions interpolated by the
      caller into wx, wy), O the other one */
+  /* the middle of the head in the world (Rubberta's ink on a face; specials.js) */
+  headWorld(pos) {
+    const x = this.soft.x, ix = this.puppet.cfg?.core || this.rig.head;
+    let cx = 0, cy = 0, cz = 0;
+    for (const i of ix) { cx += x[i * 3]; cy += x[i * 3 + 1]; cz += x[i * 3 + 2]; }
+    pos.set(cx / ix.length, cy / ix.length, cz / ix.length).applyMatrix4(this.group.matrixWorld);
+    const head = this.rig.parts?.find((p) => p.name === 'head');
+    return head ? Math.max(head.r[0], head.r[2]) : 0.6;
+  }
+
   update(dt, F, O, wx, wy, ox, oy, threat) {
     const L = this.look;
     this.time += dt;
@@ -370,7 +380,7 @@ export class Plush {
     }
     this.pos.set(nx, ny, 0);
     g.position.set(nx, ny, 0);
-    g.rotation.y = this.yaw.x;
+    g.rotation.y = this.yaw.x + (this.yawExtra || 0);   // (+ Tornado de Lobo's spin, fight.js)
     // the K.O. launch: he tumbles end over end (the sim's own spin, kr in
     // thousandths of a turn), about his middle; flat out once he's down
     // the wolf's and the crow's acrobatics (a flip, the moonsault, the
@@ -392,7 +402,10 @@ export class Plush {
     this.squash.v += (ks * (0 - this.squash.x) - 2 * Math.sqrt(ks) * 0.5 * this.squash.v) * dt;
     this.squash.x += this.squash.v * dt;
     const sq = Math.max(-0.25, Math.min(0.2, this.squash.x * 0.06));
-    const crouch = this.puppet.crouchT ? 0.84 : 1;
+    // (Sumaura's Panda Roll: squashed round into a ball)
+    const ballT = this.puppet.ballT || 0;
+    const crouch = ballT ? 0.66 : this.puppet.crouchT ? 0.84 : 1;
+    this._ball = (this._ball || 0) + (ballT - (this._ball || 0)) * Math.min(1, dt * 14);
     // the jump: squashed in the crouch before it, stretched going up fast
     // (and coming down in a dive), squashed again on landing
     let sy = 1;
@@ -419,7 +432,8 @@ export class Plush {
       const q = Math.max(-0.16, Math.min(0.12, C.x));
       cx = 1 - q; cy = 1 + q * 0.6;
     }
-    g.scale.set((1 - sq * 0.5 + df * 0.35) * sx * cx, (1 + sq) * this._crouch * (1 - df * 0.62) * this._ss * cy, (1 - sq * 0.5 + df * 0.35) * sx * cx);
+    const bw = 1 + 0.2 * this._ball;
+    g.scale.set((1 - sq * 0.5 + df * 0.35) * sx * cx * bw, (1 + sq) * this._crouch * (1 - df * 0.62) * this._ss * cy, (1 - sq * 0.5 + df * 0.35) * sx * cx * bw);
     g.updateMatrixWorld(true);
 
     // the fight frame in the plush's own frame

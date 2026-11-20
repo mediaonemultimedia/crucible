@@ -14,6 +14,7 @@ import { FIGHTERS, ROSTER, MAX_METER, fighterId } from './fighters/index.js';
 import { U } from './render/stage.js';
 import { ROUND_TICKS, hurtBox, limbBox, activeHits } from './sim/sim.js';
 import { moveOf } from './fighters/index.js';
+import { SPECIALS, MOVE_LIST, motionText } from './fighters/movelist.js';
 import { FLAGS } from './ui/flags.js';
 import { say, dismiss } from './ui/bubble.js';
 import { SAYINGS } from './ui/sayings.js';
@@ -519,7 +520,7 @@ class App {
       if (!tw) { tw = document.createElement('div'); tw.className = 'tw'; P.querySelector('.nm').after(tw); }
       tw.textContent = evil ? TWIN_TITLE[id] : '';
       P.querySelector('.an').innerHTML = `${f.animal} · ${f.style}`;
-      P.querySelector('.moves').innerHTML = `<b>S+P</b> ${f.signatureName}<br><b>Space</b> ${f.specialName}`;
+      P.querySelector('.moves').innerHTML = `<b>${esc(motionText(id).replace('BOP', 'O').replace('WALLOP', 'P'))}</b> ${esc(SPECIALS[id].name)}<br><b>S+P</b> ${f.signatureName}<br><b>Space</b> ${f.specialName}`;
     };
     if (this.mode === 'versus' && !this.net.on) { this._paintVersusSelect(ids, plate); return; }
     if (this.net.on) { this.net.paintSelect(ids, plate); return; }
@@ -983,8 +984,11 @@ class App {
 
   _paintMoves(id) {
     const f = FIGHTERS[id], k = (...ks) => ks.map((x) => `<kbd>${x}</kbd>`).join('+');
+    // the motion special first: its arrows, the BOP (O) and WALLOP (P) versions
+    const S = SPECIALS[id], arrows = (S.charge ? `[${S.motion[0]}] ${S.motion.slice(1).join(' ')}` : S.motion.join(' '));
+    const sp = ['mspL', 'mspH'].filter((mv) => f.moves[mv]).map((mv) => `<span class="msp"><b class="arw">${arrows}</b> + ${k(mv === 'mspL' ? 'O' : 'P')} ${esc(S.name)} <i>${mv === 'mspL' ? 'BOP' : 'WALLOP'}: ${esc(mv === 'mspL' ? S.bop : S.wallop)}</i></span>`).join('');
     $('#pr-moves').innerHTML = `<h5>${f.name} — moves <small>Esc pause · X reset</small></h5>
-      <span>${k('O')} light</span><span>${k('P')} heavy</span><span>${k('S', 'O')} low</span><span>${k('S', 'P')} ${f.signatureName}</span><span>${k('Space')} ${f.specialName}</span>
+      ${sp}<span>${k('O')} light</span><span>${k('P')} heavy</span><span>${k('S', 'O')} low</span><span>${k('S', 'P')} ${f.signatureName}</span><span>${k('Space')} ${f.specialName}</span>
       <span><kbd>W</kbd> then ${k('S', 'P')} ${f.diveName}</span><span>${k('O', 'P')} ${f.throwName}</span><span>${k('E')} / ${k('S', 'E')} block</span><span><kbd>D</kbd><kbd>D</kbd> · <kbd>A</kbd><kbd>A</kbd> dash</span>
       <span class="bnb"><kbd>O</kbd> → <kbd>O</kbd> → <kbd>P</kbd> bread &amp; butter</span>`;
   }
@@ -1146,6 +1150,7 @@ class App {
       if (e.ctr) this.pop('COUNTER', e.x, e.y, e.p ? 'p2' : 'p1');
     }
     if (e.k === 'tech') this.pop('TECH', e.x, e.y, 'tech');
+    if (e.k === 'msp') { const g = st.f[e.p]; this.pop(`${SPECIALS[g.id].name}!`, g.x, g.id === 'k8e' ? 4600 : 3500, `${e.p ? 'p2' : 'p1'} msp`); }
     // the K.O.: the white flash on contact; the launch, the slow motion and
     // the bounce are the sim's (fight.js shows them); then the banner
     if (e.k === 'koapex' && st.fluff && st.f[e.p].act === 'ko' && !this._fluffed) {
@@ -1339,6 +1344,8 @@ async function start() {
   const app = new App(renderer, canvas);
   window.__bolster = app;
   app.moveOf = moveOf;
+  // the move lists as data (a phone cheat sheet can read these: fighters/movelist.js)
+  app.moves = { SPECIALS, MOVE_LIST };
   app.cpuFor = (k, level, seed) => new CPU(k, level, seed);   // tests: scripted online play
   app.boxes = params.has('boxes');
   app.say = (text, x, y, o) => say($('#bubbles'), text, x, y, o);

@@ -52,7 +52,7 @@ the WebGL 2 path; `hold` stops the free-running loop for scripted stepping;
 `boxes` draws the sim's hurt, limb, hit and shot boxes over the picture).
 
 ## Specials (Run A, Thu Nov 19) — status
-**PF1 (this game):** sim + move data + CPU + SFX + tests done for all 7; visuals / practice list / legend: in progress. **PF2:** see `pf2-source`.
+**PF1 (this game):** sim, move data, CPU, SFX, visuals (render/specials.js, shared with PF2), practice list, legend, tests: done for all 7; screenshots / shipping: in progress. **PF2:** see `pf2-source`.
 
 ## Fixes: card portraits, the goon's head and gloves (bolster-fixes)
 

@@ -18,6 +18,7 @@ import { KEY } from '../../shared/grommet/fur.js';
 import { makeCap } from '../../shared/grommet/crowprops.js';
 import { ITEMS } from '../../shared/grommet/athletes/crow.game.js';
 
+const FX_SHOTS = { snow: 1, glove: 1, flame: 1, ink: 1 };   // render/specials.js flies these
 export const U = 1000;   // sim units per world unit
 const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -117,7 +118,7 @@ export class Stage {
     this.ringPool = [];
     this.ringGeo = new THREE.TorusGeometry(0.42, 0.12, 14, 32);
     this.extras = new Map();      // the roster 2 shots: caps, howls, crows
-    this.pools = { cap: [], howl: [], crow: [] };
+    this.pools = { cap: [], howl: [], crow: [], snow: [], glove: [], flame: [], ink: [] };
     this._initMoon();
     // the arena itself (floor, wall, the effect pools): what a card portrait
     // keeps in shot; anything added later (a fight's plush, the select
@@ -127,6 +128,8 @@ export class Stage {
 
   /* ── roster 2's shots ─────────────────────────────────────────────────── */
   _makeShot(kind) {
+    const made = this.fx?.makeShot(kind);
+    if (made) return made;
     if (kind === 'cap') {
       // Zach's bottle cap: Grommet's crimped red-and-silver cap, a touch big
       const g = new THREE.Group();
@@ -200,7 +203,11 @@ export class Stage {
     }
     m.visible = true;
     const dir = Math.sign(p.vx) || 1;
-    if (p.kind === 'cap') {
+    if (FX_SHOTS[p.kind]) {
+      // the motion specials' shots (render/specials.js), built along +x
+      m.position.set(x, y, 0.3); m.rotation.set(0, dir > 0 ? 0 : Math.PI, 0);
+      this.fx?.animShot(m, p, x, y, 0.3, 1 / 60);
+    } else if (p.kind === 'cap') {
       // flicked: spinning edge-over-edge
       m.position.set(x, y, 0.25);
       m.rotation.set(Math.PI / 2 - 0.35, 0, -p.t * 0.55 * dir);

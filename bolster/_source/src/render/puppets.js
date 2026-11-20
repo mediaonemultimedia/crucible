@@ -180,6 +180,16 @@ export class BipedPuppet extends FightMixin(Athlete) {
     return clamp((x - along - lift - arm.tipR - prop) / arm.len, 1, 2.6);
   }
 
+  /* Sumaura's Panda Roll: forward rolls round her middle while she travels
+     (eased in and out, ending upright) */
+  acro(F) {
+    if (this.style !== 'sumo' || F.act !== 'attack' || F.mv !== 'mspH') return null;
+    const m = FIGHTERS[F.id].moves.mspH, t = F.t + (this.frac || 0);
+    const a = m.motion[0].from - 2, b = m.motion[0].to + 4;
+    const u = clamp((t - a) / (b - a), 0, 1), e = u * u * (3 - 2 * u);
+    return { a: -(F.face || 1) * TAU * 3 * e, h: 1.05, y: 0.12 * Math.sin(Math.PI * u) };
+  }
+
   /* the sim says what he's doing; pick the pose targets */
   perform(F, ph) {
     this.F = F;
@@ -338,6 +348,38 @@ export class BipedPuppet extends FightMixin(Athlete) {
       } else {
         // Bamboo Headbutt: head down, arms back, flying
         R = [-0.6, -0.2, -0.8]; L = [0.6, -0.2, -0.8]; lean = [0.9 * Math.max(w, o), 0, 0]; k = 700;
+      }
+    } else if (mv === 'mspL' || mv === 'mspH') {
+      const first = ph.first, rec = smooth(first + 6, ph.total - 4, t);
+      if (st === 'boxer') {
+        // Drop the Gloves: the right arm cocked back high behind his head
+        // (the ALT shakes the glove loose: a wobble at the top), then an
+        // overhand hurl, the body turning through it
+        const load = smooth(0, first * 0.6, t), fire = smooth(first - 4, first, t) * (1 - rec);
+        const back = load * (1 - smooth(first - 4, first, t)), sh = Math.sin(t * 2.2) * 0.12 * pulse(t, 3, 7, first - 3);
+        R = mix3(mix3(R, [-0.5, 1, -0.65 + sh], back), [0.05, 0.3, 1], fire);
+        L = mix3(L, [0.5, 0.45, 0.85], Math.max(back, fire));
+        lean = [mix(-0.25 * back, 0.45, fire), mix(-0.55 * back, 0.4, fire), 0];
+        this.tS = [mix(1, 1.25, fire), 1];
+        k = back > 0.05 && fire < 0.05 ? 600 : 1500;
+      } else if (st === 'tennis') {
+        // Flaming Ace: the giant ball tossed high off the left hand, the
+        // racquet taken back over the shoulder, then served down through it
+        // (WALLOP: more wrist, over the top — the topspin)
+        const toss = smooth(0, first * 0.45, t) * (1 - smooth(first - 2, first + 6, t));
+        const sw = smooth(first - 4, first + 1, t) * (1 - rec);
+        const top = mv === 'mspH' ? 1 : 0;
+        L = mix3([0.3, 0.2, 0.7], [0.1, 1, 0.25], toss);
+        R = mix3(mix3(R, [-0.5, 1, -0.65], smooth(0, first - 4, t)), [0.2, top ? -0.45 : -0.2, 1], sw);
+        wrist = mix(mix(0.9, 1.9, smooth(0, first - 4, t)), top ? -0.1 : 0.2, sw);
+        lean = [mix(-0.3 * smooth(0, first - 4, t), top ? 0.55 : 0.4, sw), mix(0, 0.35, sw), 0];
+        k = 1300;
+      } else {
+        // Panda Roll: tucked into a ball, paws hugging her knees (the roll
+        // itself is the whole-body turn in acro)
+        const c = smooth(2, 9, t) * (1 - smooth(ph.last + 2, ph.total - 6, t));
+        R = mix3(R, [-0.3, -0.25, 0.6], c); L = mix3(L, [0.3, -0.25, 0.6], c);
+        lean = [mix(lean[0], 1.0, c), 0, 0]; k = 900;
       }
     } else if (mv === 'special') {
       if (st === 'boxer') {
@@ -548,6 +590,22 @@ export class GiraffePuppet extends FightMixin(Athlete) {
         // Ring Toss: the nose flicks up, then the throw
         const fl = smooth(2, 12, t) * (1 - smooth(14, 22, t));
         T.nx = mix(0.1, -0.35, fl) + 0.5 * smooth(13, 17, t) * (1 - smooth(22, 34, t)); T.head = -1.1 * fl + 0.3 * smooth(13, 17, t);
+      } else if (F.mv === 'mspL' || F.mv === 'mspH') {
+        // Long Neck: coiled back and down, then shot straight out across the
+        // ring, level (WALLOP a little higher and further), held there, the
+        // head butting forward — and reeled back in
+        const H = F.mv === 'mspH', first = ph.first;
+        const back = smooth(0, first * 0.6, t) * (1 - smooth(first - 4, first, t));
+        const out = smooth(first - 4, first, t) * (1 - smooth(ph.last + 3, ph.total - 6, t));
+        const R = this.rig.rest, r = this.neckCh.idx[0], c0 = this.c0, a = this.aim;
+        const along = (R[r * 3] - c0[0]) * a[0] + (R[r * 3 + 2] - c0[2]) * a[2];
+        const want = (ph.m.hits[0].box.x + ph.m.hits[0].box.w) / 1000 - along - 0.6;
+        const full = clamp(want / (this.neckLen * 0.95), 1, 5);
+        T.nx = mix(mix(0.15, -0.5, back), H ? 1.38 : 1.55, out);
+        T.head = mix(0.4 * back, H ? -0.15 : -0.05, out) - 0.25 * pulse(t, first - 1, first + 1, first + 5);
+        T.stretch = mix(mix(1, 0.9, back), full, out);
+        T.lean = [mix(-0.12 * back, 0.1, out), 0];
+        T.k = back > 0.05 && out < 0.05 ? 450 : 1600;
       } else if (F.mv === 'special') {
         // Sky Neck: straight up, out of the frame, then over and down
         const up = smooth(2, 14, t), over = smooth(18, 30, t), back = smooth(44, 60, t);
@@ -571,7 +629,7 @@ export class GiraffePuppet extends FightMixin(Athlete) {
     this.lean = [sd[0] * this.lean3[0].x, this.lean3[1].x, sd[2] * this.lean3[0].x];
     this.face = Math.atan2(this.aim[0], this.aim[2]) * 0.4;
     this.daze = Math.max(0, this.daze - dt * 0.6);
-    this._setStretch(clamp(this.stretch.x, 0.9, 4.2));
+    this._setStretch(clamp(this.stretch.x, 0.9, 5));
   }
 
   /* the neck grows: its links, bending windows and tethers scale with it,
@@ -733,6 +791,18 @@ export class OctopusPuppet extends FightMixin(class {}) {
           plan.push({ a: front[0], t: at(-0.3, -0.5, mix(1, 2.2, o)), k: 0.45 * o });
           if (F.mv === 'airHeavy') plan.push({ a: front[1], t: at(0.3, -0.5, mix(1, 2.2, o)), k: 0.45 * o });
         }
+      } else if (F.mv === 'mspL' || F.mv === 'mspH') {
+        // Ink Jet: the mantle drawn up and back, two arms flung back, then
+        // squeezed — the blob spat out forward — and a slow settle
+        const first = ph.first, draw = smooth(0, first - 2, t), jet = smooth(first - 2, first + 1, t), rec = smooth(first + 4, ph.total - 4, t);
+        squash = mix(mix(0, -0.3, draw), 0.4, jet) * (1 - rec); sway = 0;
+        if (draw > 0.05 && jet < 0.5) {
+          plan.push({ a: front[0], t: at(-1.1, 2.2, -0.8), k: 0.3 * draw });
+          plan.push({ a: front[1], t: at(1.1, 2.2, -0.8), k: 0.3 * draw });
+        } else if (jet > 0.05 && rec < 0.9) {
+          plan.push({ a: front[2], t: at(-1.3, 0.6, 0.9), k: 0.3 * (1 - rec) });
+          plan.push({ a: front[3], t: at(1.3, 0.6, 0.9), k: 0.3 * (1 - rec) });
+        }
       } else if (F.mv === 'special') {
         // Abraço: all eight arms reach out together
         const r = smooth(2, 10, t) * (1 - smooth(16, 30, t));
@@ -869,6 +939,12 @@ export class WolfPuppet extends BipedPuppet {
       R = mix3(mix3(R, [-0.75, 0.85, 0.15], up), [-0.2, 0.35, 1], push);
       L = mix3(mix3(L, [0.75, 0.85, 0.15], up), [0.2, 0.35, 1], push);
       lean = [mix(-0.3 * up, 0.25, push), 0, 0]; k = 800;
+    } else if (mv === 'mspL' || mv === 'mspH') {
+      // Tornado de Lobo: paws flung out wide for the spin (the turn itself
+      // is the plush's yaw, fight.js), low and leaning into it, the tail whipping round
+      const sp = smooth(3, 9, t) * (1 - smooth(ph.last, ph.total - 4, t));
+      R = mix3(R, [-1, 0.25, 0.15], sp); L = mix3(L, [1, 0.25, 0.15], sp);
+      lean = [mix(lean[0], 0.35, sp), 0, 0.15 * sp]; k = 1000;
     } else if (mv === 'dive' || mv === 'diveLand') {
       // the moonsault: arms spread through the backflip, then the splash —
       // flat out, paws wide
@@ -922,6 +998,8 @@ export class WolfPuppet extends BipedPuppet {
     if (F.mv === 'dive') return { a: f * TAU * smooth(0, 11, t), h: 1.4, y: 0 };
     if (F.mv === 'throwHold') { const p = smooth(12, 26, t); return { a: f * TAU * p, h: 1.4, y: 1.3 * Math.sin(Math.PI * p) }; }
     if (F.mv === 'signature') return { a: f * 1.05 * smooth(3, 8, t) * (1 - smooth(22, 34, t)), h: 0.3, y: 0 };
+    // the corkscrew: tipped forward into the spin, a little off the mat
+    if (F.mv === 'mspL' || F.mv === 'mspH') { const s = smooth(4, 10, t) * (1 - smooth(FIGHTERS.sebas.moves[F.mv].motion[0].to, FIGHTERS.sebas.moves[F.mv].motion[0].to + 10, t)); return { a: -f * 0.35 * s, h: 1.2, y: 0.35 * s }; }
     return null;
   }
 }
@@ -982,6 +1060,7 @@ export class CrowPuppet extends BipedPuppet {
     }
     if (mv === 'signature') this.tBeak = 0.25 * smooth(12, 16, t) * (1 - smooth(22, 30, t));
     if (mv === 'special') this.tBeak = smooth(2, 8, t) * (1 - smooth(40, 60, t));
+    if (mv === 'mspH') { this.tPeck = 0.4 * smooth(3, 8, t) * (1 - smooth(ph.last, ph.last + 8, t)); this.tBeak = 0.35 * smooth(6, 10, t) * (1 - smooth(ph.last, ph.last + 6, t)); }
     if (mv === 'dive') this.tPeck = 0.35;
   }
 
@@ -1006,6 +1085,11 @@ export class CrowPuppet extends BipedPuppet {
       const up = smooth(2, 9, t) * (1 - smooth(46, 62, t)), b = Math.sin(t * 0.9) * 0.2;
       R = mix3(R, [-1, 0.8 + b, -0.1], up); L = mix3(L, [1, 0.8 - b, -0.1], up);
       lean = [-0.25 * up, 0, 0]; k = 900;
+    } else if (mv === 'mspH') {
+      // Torpedo: wings tucked tight along his back, beak first
+      const d = smooth(2, 8, t) * (1 - smooth(ph.last + 2, ph.total - 6, t));
+      R = mix3(READY.thief.R, [-0.25, 0.1, -1], d); L = mix3(READY.thief.L, [0.25, 0.1, -1], d);
+      lean = [0.2 * d, 0, 0]; k = 1200;
     } else if (mv === 'dive' || mv === 'diveLand') {
       // the dive bomb: wings folded tight back, beak first
       const d = mv === 'diveLand' ? 1 - smooth(8, 26, t) : smooth(3, 8, t);
@@ -1077,6 +1161,8 @@ export class CrowPuppet extends BipedPuppet {
     const f = F.face || 1, t = F.t;
     if (F.mv === 'dive') return { a: -f * 0.95 * smooth(4, 8, t), h: 1.1, y: 0 };
     if (F.mv === 'diveLand') return { a: -f * 0.95 * (1 - smooth(0, 10, t)), h: 1.1, y: 0 };
+    // the Torpedo: flat out, beak first, skimming low over the quilt
+    if (F.mv === 'mspH') { const m = FIGHTERS.zach.moves.mspH, s = smooth(3, 8, t) * (1 - smooth(m.motion[0].to + 1, m.motion[0].to + 12, t)); return { a: -f * 1.45 * s, h: 1.0, y: 0.25 * s }; }
     return null;
   }
 }

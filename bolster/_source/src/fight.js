@@ -9,6 +9,7 @@ import { FIGHTERS, MAX_METER } from './fighters/index.js';
 import { CPU } from './ai/cpu.js';
 import { Plush } from './render/plush.js';
 import { U } from './render/stage.js';
+import { SpecialFX } from './render/specials.js';
 import { Rollback } from './net/rollback.js';
 import { Taunter } from './ui/taunt.js';
 import { ordinal, sessionTickOf } from './audio/sfxmap.js';
@@ -58,6 +59,15 @@ export class Fight {
     this.lastInputs = [0, 0];
     this.override = null;
     this.focus = null;         // the winner screen: the camera on one spot
+    // the motion specials' look (render/specials.js — PF2's, in this flat
+    // stage: one per stage, cleared per fight); arena-shaped calls mapped onto the stage
+    const st0 = stage;
+    if (!stage.fx) stage.fx = new SpecialFX({ world: stage.scene, camera: stage.camera,
+      tufts: (x, y, z, n, p, d, f) => st0.tufts(x, y, Math.max(n, f ? Math.ceil(f / 2) : 0), p, d && d[0] ? Math.sign(d[0]) : 1),
+      spark: (x, y, z, k, sz) => st0.spark(x, y, k, sz) });
+    this.fx = stage.fx;
+    this.fx.clear();
+    this.gloveOff = [0, 0];
     this._place(1);
   }
 
@@ -130,7 +140,7 @@ export class Fight {
   _evAt(e) { [this.evTick, this.evN] = sessionTickOf(this.session, e, this.flow0); }
 
   _fx(e) {
-    this.onSfx(e, this.evTick, this.evN);
+    this.onSfx(e.k === 'splat' ? { ...e, kind: this._shotKind(e.p, e.kind) } : e, this.evTick, this.evN);
     const S = this.stage, st = this.st;
     if (e.k === 'hit' || e.k === 'block') {
       const x = e.x / U, y = e.y / U;
@@ -188,6 +198,18 @@ export class Fight {
     if (e.k === 'special' && st.f[e.p].id === 'sebas') this.stage.moonAt(st.f[e.p].x / U);
     // a murder of crows: a shake as they come in
     if (e.k === 'special' && st.f[e.p].id === 'zach') S.shake(0.3);
+    if (e.k === 'splat') {
+      const f = st.f[e.p];
+      this.fx.splat(this._shotKind(e.p, e.kind), e.x / U, e.y / U, 0.3, [f.face, 0], e.hit);
+    }
+    if (e.k === 'msp') {
+      const f = st.f[e.p];
+      if (f.id === 'sebas') for (let i = 0; i < 4; i++) this.fx.puff('whirl', f.x / U, 0.5 + i * 0.45, 0.3, 1.6 + i * 0.2, [0, 0.3, 0], 0.35);
+      if (f.id === 'sumaura' || f.id === 'zach') S.tufts(f.x / U, 0.1, 4, 0.6, -f.face);
+    }
+    if (e.k === 'rebound') { S.tufts(e.x / U, 0.6, 6, 0.8, 1); S.shake(0.25); }
+    // the hook for the phone: a face inked by Rubberta's Ink Jet
+    if (e.k === 'inked' && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('bolster:inked', { detail: { p: e.p, ticks: st.f[e.p].ink } }));
     if (e.k === 'clash') { S.spark(e.x / U, e.y / U, 'hit', 1.2); S.tufts(e.x / U, e.y / U, 4, 0.6, 1); }
     this.onEvent(e, this);
   }
@@ -215,6 +237,13 @@ export class Fight {
       const threat = O.act === 'attack' || st.proj.some((p) => p.o !== k);
       this.plush[k].frac = koSeq || st.pause > 0 ? 1 : a;
       this.plush[k].simPause = st.pause;
+      // Tornado de Lobo: spun round and round across the stage
+      this.plush[k].yawExtra = 0;
+      if (F.act === 'attack' && F.id === 'sebas' && (F.mv === 'mspL' || F.mv === 'mspH')) {
+        const m = FIGHTERS.sebas.moves[F.mv], s0 = 5, e = m.motion[0].to + 4, turns = Math.round((e - s0) / 7);
+        const u = Math.max(0, Math.min(1, (F.t + a - s0) / (e - s0)));
+        this.plush[k].yawExtra = -Math.PI * 2 * turns * u * u * (3 - 2 * u);
+      }
       this.plush[k].update(Math.min(dt, 0.05) * slow, F, O, P[k].x, P[k].y, P[1 - k].x, P[1 - k].y, threat);
     }
     if (koSeq) {
@@ -225,11 +254,60 @@ export class Fight {
       this.koCam = { x, d: st.kf ? 9 : 10, y: 0, ty: Math.max(1.8, y + 1.2) };
       this.focus = this.koCam;
     } else if (this.koCam) { if (this.focus === this.koCam) this.focus = null; this.koCam = null; }
-    const extra = this.stage.projectiles(st.proj, a, this.prevProj);
+    this._specials(st, P, a);
+    const extra = this.stage.projectiles(st.proj.map((p) => (p.kind === 'snow' && this._goon(p.o) ? { ...p, kind: 'glove' } : p)), a, this.prevProj);
+    this.fx.update(dt * slow, this.plush, st);
     this.stage.frame(P[0].x, P[1].x, dt || 0.016, innerWidth / innerHeight, this.focus, Math.max(P[0].y, P[1].y));
     this.stage.paintShadows(this.plush, extra);
     this.stage.update(dt * slow);
   }
 
-  dispose() { for (const p of this.plush) p.dispose(this.stage.scene); this.stage.projectiles([], 0, null); }
+  /* the ALT Kevalanche (the hockey goon) throws his glove, not a snowball */
+  _goon(k) { return this.evil[k] && this.st.f[k].id === 'kevalanche' && !!this.plush[k].gloves?.hk; }
+  _shotKind(k, kind) { return kind === 'snow' && this._goon(k) ? 'glove' : kind; }
+
+  /* per frame: what the motion specials add round the plush (render only) */
+  _specials(st, P, a) {
+    const fx = this.fx;
+    let toss = null;
+    for (let k = 0; k < 2; k++) {
+      const F = st.f[k], pl = this.plush[k], p = P[k], d = F.face;
+      const msp = F.act === 'attack' && (F.mv === 'mspL' || F.mv === 'mspH');
+      const m = msp ? FIGHTERS[F.id].moves[F.mv] : null, t = F.t + a;
+      // the goon: the glove off his right hand while it's thrown — it poofs back on
+      if (this._goon(k)) {
+        const A = pl.gloves.arms.find((q) => q.inward === 1);
+        if (A && !fx.glove) { fx.glove = A.glove.children[0]; const e = A.glove.matrix.elements; fx.gloveScale = Math.hypot(e[0], e[1], e[2]) * 1.15; }
+        const off = (msp && F.t >= m.spawn[0].at - 1) || st.proj.some((q) => q.o === k && q.kind === 'snow');
+        if (A) {
+          if (this.gloveOff[k] && !off) {
+            const g = A.glove.matrix.elements, w = pl.group.localToWorld(A.glove.position.set(g[12], g[13], g[14]).clone());
+            this.stage.tufts(w.x, w.y, 4, 0.4, d);
+            for (let i = 0; i < 5; i++) fx.puff('snow', w.x, w.y, w.z, 0.3, [(Math.random() - 0.5) * 1.5, 0.6, (Math.random() - 0.5) * 0.5], 0.45);
+          }
+          A.glove.visible = !off;
+        }
+        this.gloveOff[k] = off ? 1 : 0;
+      }
+      if (!msp) continue;
+      if (F.id === 'johnny' && F.t < m.spawn[0].at) {
+        const u = Math.min(1, t / m.spawn[0].at), hY = m.spawn[0].proj.y / 1000;
+        const y = 1.5 + (hY + 0.6 - 1.5) * Math.sin(Math.PI * 0.5 * Math.min(1, u * 1.25)) - (u > 0.8 ? (u - 0.8) * 2.4 : 0);
+        toss = [p.x + d * (0.3 + 0.5 * u), p.y + y, 0.35, t];
+      }
+      if (pl._lastFx === F.t) continue;
+      pl._lastFx = F.t;
+      const mo = m.motion[0];
+      if (F.id === 'sumaura' && F.t >= mo.from && F.t <= mo.to && F.t % 4 === 0) this.stage.tufts(p.x - d * 0.6, 0.08, 2, 0.5, -d);
+      if (F.id === 'zach' && F.t >= mo.from && F.t <= mo.to) fx.puff('whirl', p.x - d * 0.5, 0.95, 0.3, 1.1, [-d * 2, 0, 0], 0.22);
+      if (F.id === 'sebas' && F.t >= 6 && F.t <= mo.to + 4) {
+        if (F.t % 2 === 0) fx.puff('whirl', p.x, 0.4 + Math.random() * 1.9, 0.3, 1.5 + Math.random() * 0.6, [-d * 1.5, 0.2, 0], 0.3);
+        if (F.t % 6 === 0) this.stage.tufts(p.x, 0.1, 2, 0.5, -d);
+      }
+    }
+    if (toss) fx.tossAt(toss[0], toss[1], toss[2], toss[3] * 0.3); else fx.tossAt(null);
+  }
+
+  dispose() {
+    this.fx.clear(); for (const p of this.plush) p.dispose(this.stage.scene); this.stage.projectiles([], 0, null); }
 }
