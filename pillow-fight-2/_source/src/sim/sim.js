@@ -828,7 +828,7 @@ function projectiles(st) {
     if (!invulnTo(d, false) && touches(d, projBox(p))) {
       const res = landHit(st, p.o, p, p.fx, p.fz, { special: !!p.sp, at: [p.x, p.y, p.z], kind: p.sp ? 'special' : p.ms ? 'msp' : 'signature', power: !!p.sp || !!p.ms, shot: p.kind });
       if (p.ink && res === 'hit') { d.ink = INK_T; st.ev.push({ k: 'inked', p: 1 - p.o, x: d.x, z: d.z }); }
-      st.ev.push({ k: 'splat', p: p.o, kind: p.kind, x: p.x, y: p.y, z: p.z, hit: res === 'hit' ? 1 : 0 });
+      if (p.ms) st.ev.push({ k: 'splat', p: p.o, kind: p.kind, x: p.x, y: p.y, z: p.z, hit: res === 'hit' ? 1 : 0 });
       continue;
     }
     // a dipping serve that comes down short: into the quilt
