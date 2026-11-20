@@ -153,21 +153,24 @@ body.pad *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 function inkSVG(seed) {
   let s = seed;
   const R = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
-  const spots = [[1100, 820], [1000, 120], [380, 950], [1250, 960], [300, 160]];
+  // between and around the controls (stick 419–789, SUPER 966–1228, START, the plate 1460–2070)
+  const spots = [[1100, 820, 1], [880, 300, 0.6], [270, 930, 0.75], [1330, 990, 0.55], [1240, 90, 0.5]];
+  const INK = '#160a26';
   let o = '';
-  spots.forEach(([cx, cy], n) => {
-    const big = n === 0 ? 1 : 0.55 + R() * 0.35, r = 120 * big;
-    let d = '';
-    const k = 14;
-    for (let i = 0; i <= k; i++) {
-      const a = (i / k) * Math.PI * 2, rr = r * (0.75 + R() * 0.5) * (i % 2 ? 1 : 1.25);
-      d += `${i ? 'L' : 'M'}${(cx + Math.cos(a) * rr).toFixed(0)} ${(cy + Math.sin(a) * rr).toFixed(0)}`;
-    }
-    o += `<path d="${d}Z" fill="#0d0a1c"/>`;
-    for (let j = 0; j < 5; j++) o += `<circle cx="${(cx + (R() - 0.5) * r * 3.2).toFixed(0)}" cy="${(cy + (R() - 0.5) * r * 2.4).toFixed(0)}" r="${(8 + R() * 22).toFixed(0)}" fill="#0d0a1c"/>`;
-    for (let j = 0; j < 3; j++) { const x = cx + (R() - 0.5) * r * 1.2, w = 10 + R() * 14; o += `<rect class="drip" x="${x.toFixed(0)}" y="${cy.toFixed(0)}" width="${w.toFixed(0)}" height="${(r * 0.9 + R() * 120).toFixed(0)}" rx="${(w / 2).toFixed(0)}" fill="#0d0a1c"/>`; }
+  spots.forEach(([cx, cy, big]) => {
+    const r = 110 * big, k = 22, pts = [];
+    for (let i = 0; i < k; i++) { const a = (i / k) * Math.PI * 2, rr = r * (0.8 + R() * 0.35) * (i % 4 === 0 ? 1.3 + R() * 0.3 : 1); pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr * 0.9]); }
+    // a smooth closed curve through the points (midpoint quadratics)
+    const mid = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+    let d = `M${mid(pts[k - 1], pts[0]).map((v) => v.toFixed(0)).join(' ')}`;
+    for (let i = 0; i < k; i++) { const p = pts[i], m = mid(p, pts[(i + 1) % k]); d += `Q${p[0].toFixed(0)} ${p[1].toFixed(0)} ${m[0].toFixed(0)} ${m[1].toFixed(0)}`; }
+    o += `<path d="${d}Z" fill="${INK}" stroke="${INK}" stroke-width="18" stroke-linejoin="round"/>`;
+    for (let j = 0; j < 6; j++) { const a = R() * Math.PI * 2, dd = r * (1.35 + R() * 0.7); o += `<circle cx="${(cx + Math.cos(a) * dd).toFixed(0)}" cy="${(cy + Math.sin(a) * dd * 0.8).toFixed(0)}" r="${(5 + R() * 16 * big).toFixed(0)}" fill="${INK}"/>`; }
+    for (let j = 0; j < 3; j++) { const x = cx + (R() - 0.5) * r * 1.1, w = 12 + R() * 14 * big; o += `<g class="drip" style="transform-origin:${x.toFixed(0)}px ${cy.toFixed(0)}px"><rect x="${(x - w / 2).toFixed(0)}" y="${cy.toFixed(0)}" width="${w.toFixed(0)}" height="${(r * 0.8 + R() * 90).toFixed(0)}" rx="${(w / 2).toFixed(0)}" fill="${INK}"/></g>`; }
+    // the wet sheen
+    o += `<ellipse cx="${(cx - r * 0.3).toFixed(0)}" cy="${(cy - r * 0.35).toFixed(0)}" rx="${(r * 0.32).toFixed(0)}" ry="${(r * 0.14).toFixed(0)}" fill="#fff" opacity=".22" transform="rotate(-20 ${cx} ${cy})"/>`;
   });
-  return `<svg viewBox="0 0 2400 1100" preserveAspectRatio="xMidYMid slice"><g opacity=".93">${o}</g></svg>`;
+  return `<svg viewBox="0 0 2400 1100" preserveAspectRatio="xMidYMid slice"><g opacity=".94">${o}</g></svg>`;
 }
 
 /* ── the app ────────────────────────────────────────────────────────── */
@@ -405,7 +408,7 @@ export function runPad(params) {
     const g = inkEl.querySelector('g');
     g.animate([{ transform: 'scale(.6)', opacity: 0 }, { transform: 'scale(1)', opacity: 0.93, offset: 0.06 }, { transform: 'translateY(0)', opacity: 0.93, offset: 0.35 }, { transform: 'translateY(60px)', opacity: 0 }], { duration: 2100, easing: 'ease-in', fill: 'forwards' });
     g.style.transformOrigin = '50% 50%';
-    for (const d of inkEl.querySelectorAll('.drip')) d.animate([{ transform: 'scaleY(.2)' }, { transform: 'scaleY(1.6)' }], { duration: 2000, easing: 'ease-in', fill: 'forwards' });
+    for (const d of inkEl.querySelectorAll('.drip')) d.animate([{ transform: 'scaleY(.3)' }, { transform: 'scaleY(1.8)' }], { duration: 2000, easing: 'ease-in', fill: 'forwards' });
     setTimeout(() => { inkEl.textContent = ''; }, 2150);
     buzz(60);
   }
@@ -426,7 +429,7 @@ export function runPad(params) {
       S.view = m;
       if (m.skin && SK[m.skin]) draw(m.skin);
       if (!prev || prev.fid !== m.fid || prev.alt !== m.alt) sheet();
-      if (m.scr !== 'win') koEl.classList.remove('on');
+      if (prev?.scr === 'win' && m.scr !== 'win') koEl.classList.remove('on');
       paintSel();
     } else if (m.t === 'bz') hitFx(m.kind);
     else if (m.t === 'ink') ink();

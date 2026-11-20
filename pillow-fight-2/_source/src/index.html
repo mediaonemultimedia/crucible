@@ -669,6 +669,8 @@ body.is-ready #title-screen.on .big{animation:titleShake .42s linear .53s both}
 @media (prefers-reduced-motion:reduce){.logo2,.logo2 *,#title-screen.on .big{animation:none!important}.logo2 .burst,.logo2 .sp{display:none}}
 .b.ringout{color:#fff;text-shadow:0 0 14px #3ff0c8,0 0 40px #3ff0c8,0 6px 0 #120d1f}
 </style>
+<script>/* the phone pad (?pad=CODE): no game DOM, not even for a frame */if(/[?&]pad=/.test(location.search))document.documentElement.className+=" padmode"</script>
+<style>html.padmode #ui,html.padmode #stage{display:none}html.padmode,html.padmode body{background:#000}</style>
 </head>
 <body>
 <canvas id="stage" aria-label="Pillow Fight 2: two plush fighters on a giant mattress ring"></canvas>

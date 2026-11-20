@@ -208,7 +208,7 @@ ok(heldOK >= 29, `held ← through loss: ${heldOK}/30 frames`);
 
 // 6. haptics, ink, KO roast, taunt
 await G.evaluate(() => { __pf2._padEvent({ k: 'inked', p: 0 }); __pf2._padEvent({ k: 'hit', p: 1 }); });
-await sleep(150);
+await sleep(500);
 results.ink = await P1.evaluate(() => !!document.querySelector('#ink svg'));
 ok(results.ink, 'ink splat on P1’s phone');
 await P1.screenshot({ path: path.join(out, 'phone-ink.png') });
@@ -222,7 +222,7 @@ ok(results.taunt.length > 3, 'TAUNT: a bubble over the fighter');
 await step(0, true);
 await G.screenshot({ path: path.join(out, '3-taunt.png') });
 await G.evaluate(() => __pf2._padEvent({ k: 'end', w: 1 }));
-await sleep(200);
+await sleep(600);
 results.koLine = await P1.evaluate(() => document.querySelector('#ko').classList.contains('on') && document.querySelector('#ko .card').textContent);
 ok(!!results.koLine, 'KO roast on the loser’s phone');
 ok(!(await P2b.evaluate(() => document.querySelector('#ko').classList.contains('on'))), 'no roast on the winner’s phone');

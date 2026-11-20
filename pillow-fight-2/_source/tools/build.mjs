@@ -56,10 +56,14 @@ fs.writeFileSync(dest, final);
 
 /* ── self-containment gate ────────────────────────────────────────────────
    The rule for this series is zero runtime network requests, with one
-   exception that stage 2 brings: online play. After the player picks
-   Online or opens a ?room= link — never before, never in the offline modes
-   — the page may reach exactly the PeerJS cloud broker (0.peerjs.com, the
-   handshake), public STUN (stun.l.google.com:19302) and the peer itself.
+   exception that stage 2 brings: PeerJS. Online play (after the player
+   picks Online or opens a ?room= link) and, since the phone controller
+   (Run B), the phone-pad room the title and select screens open for the
+   QR — the page may reach exactly the PeerJS cloud broker (0.peerjs.com,
+   the handshake), public STUN (stun.l.google.com:19302) and the peers
+   themselves. (?pads=off keeps the pad room shut; the test harness's
+   ?hold does too unless ?pads=1.) The phone pad loads its painted
+   background from controller/backgrounds/ beside the page.
    PeerJS is bundled (no script fetch). Everything else: no `src`
    anywhere, no <link href>, no dynamic import, no absolute URL reachable
    from the script. Anchors are allowed — an anchor is a place the reader
