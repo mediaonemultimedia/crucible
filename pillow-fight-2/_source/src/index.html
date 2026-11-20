@@ -47,6 +47,26 @@ button{font:inherit}
 #mark .sub{margin-top:9px}
 body.fighting #mark{display:none}
 
+/* the phone-pad pairing card (title + select): the QR, the room code, a ping LED per phone */
+#pads{position:fixed;right:22px;bottom:22px;z-index:9;display:none;align-items:center;gap:12px;padding:10px 14px 10px 10px;background:rgba(18,13,31,.9);border:1px solid var(--line);border-radius:10px;box-shadow:0 0 18px rgba(155,92,255,.25);pointer-events:auto}
+body[data-screen=title] #pads,body[data-screen=select] #pads{display:flex}
+body.vs-on #pads,#pads:empty{display:none!important}
+#pads .qr{width:112px;height:112px;border-radius:4px;overflow:hidden;background:#fff}
+#pads .qr svg{display:block;width:100%;height:100%}
+#pads .pi{display:flex;flex-direction:column;gap:3px;font-family:var(--cond);font-weight:700;text-transform:uppercase;letter-spacing:.14em;color:var(--ink)}
+#pads .h{font-size:11px;color:var(--dim)}
+#pads .code{font-size:30px;letter-spacing:.22em;line-height:1;text-shadow:var(--glow-v)}
+#pads .how{font-size:10px;color:var(--dim);letter-spacing:.1em}
+#pads .seats{display:flex;flex-direction:column;gap:2px;margin-top:4px;font-size:11px;letter-spacing:.1em}
+#pads .seat{display:flex;align-items:center;gap:6px;color:var(--dim)}
+#pads .seat i{width:9px;height:9px;border-radius:50%;background:#4a4458;box-shadow:inset 0 0 0 1px #0006}
+#pads .seat.green i{background:#3fdc7a;box-shadow:0 0 8px #3fdc7a}#pads .seat.amber i{background:#ffb020;box-shadow:0 0 8px #ffb020}#pads .seat.red i{background:#ff3030;box-shadow:0 0 8px #ff3030}
+#pads .seat.green,#pads .seat.amber,#pads .seat.red{color:var(--ink)}
+body[data-screen=select] #pads{top:70px;bottom:auto;right:20px;padding:6px 10px 6px 6px;gap:8px}
+body[data-screen=select] #pads .qr{width:78px;height:78px}
+body[data-screen=select] #pads .code{font-size:20px}
+body[data-screen=select] #pads .how{display:none}
+
 /* title --------------------------------------------------------------------- */
 #title-screen .big{position:absolute;left:50%;top:25%;transform:translate(-50%,-50%);text-align:center;width:min(92vw,820px)}
 #title-screen .press-wrap{position:absolute;left:0;right:0;bottom:6%;text-align:center}
@@ -654,6 +674,7 @@ body.is-ready #title-screen.on .big{animation:titleShake .42s linear .53s both}
 <canvas id="stage" aria-label="Pillow Fight 2: two plush fighters on a giant mattress ring"></canvas>
 <div id="ui">
   <button id="sound" type="button" aria-label="Sound on / off (M)" aria-pressed="false" title="Sound on (M)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke-width="1.6"/><path class="w" d="M15.5 9.2a4 4 0 0 1 0 5.6M18.2 6.8a7.4 7.4 0 0 1 0 10.4"/><path class="x" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
+  <div id="pads" aria-label="Phone pad: scan the code to use your phone as a controller"></div>
   <div id="mark">
     <div class="col">
       <span class="w">Pillow Fight II</span>
@@ -678,7 +699,7 @@ body.is-ready #title-screen.on .big{animation:titleShake .42s linear .53s both}
     <div class="menu">
       <h2>Mode</h2>
       <button class="opt sel" data-mode="cpu">Vs Computer <small>1 player</small></button>
-      <button class="opt" data-mode="versus">Versus <small>2 players · 1 keyboard</small></button>
+      <button class="opt" data-mode="versus">Versus <small>2 players · 1 keyboard or 2 phones</small></button>
       <button class="opt" data-mode="practice">Practice <small>a dummy and the move list</small></button>
       <button class="opt" data-mode="online">Online <small>play a friend · share a link</small></button>
       <div class="hintline">W / S choose · O or Enter to go</div>

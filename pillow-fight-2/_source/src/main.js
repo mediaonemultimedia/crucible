@@ -27,6 +27,11 @@ import { SfxRouter } from './audio/sfxmap.js';
 import { CPU } from './ai/cpu.js';
 import { LEFT, RIGHT, UP, DOWN, LIGHT, HEAVY, SPECIAL, BLOCK, JUMP, CROUCH } from './sim/input.js';
 import { Online } from './online.js';
+import { PadHost } from './pad/host.js';
+import { runPad } from './pad/pad.js';
+import { tauntLine, koLine } from './pad/lines.js';
+import { skinId } from './pad/skins.js';
+import { START, TAUNT } from './pad/wire.js';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -84,6 +89,11 @@ class App {
     this.audio.onChange(() => this._paintSound());
     this.dummyMode = 'stand';
     this.net = new Online(this);
+    // the phone pads: off in the test harness (?hold) unless asked for (?pads=1); ?pads=off turns them off
+    this.pads = new PadHost(this, params);
+    this.padsOn = params.get('pads') === 'off' ? false : params.has('hold') ? params.has('pads') : true;
+    this.padN = 0; this.padTauntAt = [0, 0]; this.padLast = [null, null];
+    this.pads.onSeat = () => this.padSheet();
     this._bindUI();
     this.resize();
     addEventListener('resize', () => this.resize());
@@ -115,6 +125,8 @@ class App {
     if (name !== 'fight' && name !== 'win' && name !== 'pause') this._drainOff(true);
     if (name !== 'fight') $('#namecard').className = '';
     if (name === 'select') this._enterSelect();
+    if ((name === 'title' || name === 'select') && this.padsOn) this.pads.start();
+    this.pads.paint(true);
     if (name !== 'select' && name !== 'diff' && name !== 'pause' && this.table) { this.table.dispose(); this.table = null; }
     if ((name === 'title' || name === 'mode') && this.fight) { this.fight.dispose(); this.fight = null; }
     const A = this.audio;
@@ -376,10 +388,11 @@ class App {
     this.kb2.enabled = versus;
     this.kb2.setMap(toMap(this.bind[1]));
     const s = seed || (this.seed = (this.seed * 1103515245 + 12345) & 0x7fffffff) || 1;
-    const f = (this.fight = new Fight(this.arena, { p1, p2, seed: s, cpu: net ? [null, null] : [p1cpu, versus ? null : level], keyboard: this.kb, keyboard2: versus ? this.kb2 : null, alt: this.alt, net }));
+    const f = (this.fight = new Fight(this.arena, { p1, p2, seed: s, cpu: net ? [null, null] : [p1cpu, versus ? null : level], keyboard: this.pads.mix(0, this.kb), keyboard2: versus ? this.pads.mix(1, this.kb2) : null, alt: this.alt, net }));
+    this.pads.state.forEach((P) => P.clear());
     this.last = net ? null : { p1, p2, level, p1cpu };
     this._legend();
-    f.onEvent = (e) => this._event(e);
+    f.onEvent = (e) => { this._event(e); this._padEvent(e); };
     f.onTick = (st) => this._hud(st);
     f.onSfx = (e, t, n) => this._sfx(e, t, n);
     f.onSwing = (st) => this._swing(st);
@@ -489,8 +502,8 @@ class App {
         st.timer = ROUND_TICKS;
       },
     };
-    const f = (this.fight = new Fight(this.arena, { p1, p2, seed: 3, cpu: [null, null], keyboard: this.kb, practice, dummy, alt: this.alt }));
-    f.onEvent = (e) => this._event(e);
+    const f = (this.fight = new Fight(this.arena, { p1, p2, seed: 3, cpu: [null, null], keyboard: this.pads.mix(0, this.kb), practice, dummy, alt: this.alt }));
+    f.onEvent = (e) => { this._event(e); this._padEvent(e); };
     f.onTick = (st) => this._hud(st);
     f.onSfx = (e, t, n) => this._sfx(e, t, n);
     f.onSwing = (st) => this._swing(st);
@@ -740,10 +753,119 @@ class App {
     });
   }
 
+  /* ── the phone pads (src/pad/) ───────────────────────────────────────
+     A phone's seat → the game seat whose fighter it plays: versus both;
+     online the local seat (the first phone); otherwise player 1.        */
+  padGameSeat(k) {
+    if (this.net.on) return k === 0 ? this.net.local : -1;
+    if (this.mode === 'versus') return k;
+    return k === 0 ? 0 : -1;
+  }
+  padPhoneOf(s) { for (let k = 0; k < 2; k++) if (this.padGameSeat(k) === s) return k; return -1; }
+
+  /* presses from a phone outside the fight drive the menus, as that
+     player's keys would (in the fight its bits go straight to the sim) */
+  padPress(k, pressed) {
+    const scr = this.screen;
+    if (pressed & TAUNT) this._padTaunt(k);
+    const fake = (code) => this._key({ code, repeat: false, preventDefault() {}, target: null });
+    if (scr === 'fight') { if ((pressed & START) && !this.net.on && !this.fight?.session) fake('Escape'); return; }
+    if (scr === 'pause' && (pressed & START)) { this.pause(false); return; }
+    const vs = this.mode === 'versus' && scr === 'select' && !this.net.on;
+    if (scr === 'select' && this._padPickSeat(k) < 0) return;
+    const B = this.bind[k] || this.bind[0];
+    const dir = { left: vs ? B.left[0] : 'KeyA', right: vs ? B.right[0] : 'KeyD', up: vs ? B.up[0] : 'KeyW', down: vs ? B.down[0] : 'KeyS' };
+    const grab = (pressed & LIGHT) && (pressed & HEAVY);
+    if (pressed & LEFT) fake(dir.left);
+    if (pressed & RIGHT) fake(dir.right);
+    if (pressed & (UP | JUMP)) fake(dir.up);
+    if (pressed & (DOWN | CROUCH)) fake(dir.down);
+    if ((pressed & LIGHT) || (pressed & START)) fake(vs ? B.light[0] : 'KeyO');
+    if ((pressed & HEAVY) && !grab) fake(vs ? B.heavy[0] : scr === 'select' || scr === 'diff' ? 'KeyP' : 'Escape');
+  }
+
+  /* the phone's own select strip: ◀ ▶, OG / ALT, lock */
+  padSelect(k, m) {
+    if (this.screen !== 'select') return;
+    const s = this._padPickSeat(k);
+    if (s < 0) return;
+    if (m.dx) this.padPress(k, m.dx < 0 ? LEFT : RIGHT);
+    if (typeof m.alt === 'boolean' && this.alt[s] !== m.alt && !this.locked[s]) this.padPress(k, UP);
+    if (m.lock && !this.locked[s]) this.padPress(k, LIGHT);
+  }
+  /* the seat a phone's select strip moves right now */
+  _padPickSeat(k) {
+    if (this.net.on) return k === 0 ? this.net.local : -1;
+    if (this.mode === 'versus') return k;
+    return k === 0 ? this.picking : -1;
+  }
+
+  /* what a phone shows: its fighter's skin, the select strip, the screen */
+  padView(k) {
+    const s = this.padGameSeat(k), scr = this.screen;
+    const f = this.fight, live = f && ['fight', 'pause', 'win'].includes(scr);
+    let fid, alt;
+    if (s >= 0 && live) { fid = f.st.f[s].id; alt = !!f.evil[s]; }
+    else if (s >= 0 && scr === 'select') { fid = ROSTER[this.pick[s]]; alt = !!this.alt[s]; }
+    else if (this.padLast[k]) [fid, alt] = this.padLast[k];
+    else { fid = k ? 'sebas' : 'kevalanche'; alt = false; }
+    this.padLast[k] = [fid, alt];
+    const v = { scr, skin: skinId(fid, alt), fid, alt, prac: !!f?.practice };
+    const ps = scr === 'select' ? this._padPickSeat(k) : -1;
+    if (ps >= 0) {
+      const pid = ROSTER[this.pick[ps]], palt = !!this.alt[ps];
+      Object.assign(v, { pick: 1, name: (palt ? 'Evil ' : '') + FIGHTERS[pid].name, palt, locked: !!this.locked[ps],
+        who: this.mode === 'versus' || this.net.on ? `Player ${ps + 1}` : ps === 0 ? 'Player 1' : this.mode === 'practice' ? 'The dummy' : 'The computer' });
+      v.alt = alt; v.salt = palt;
+    }
+    return v;
+  }
+
+  /* the phone feels the fight: a buzz on a hit taken, a long one on a K.O.,
+     Rubberta's ink, and the winner's roast on the loser's phone */
+  _padEvent(e) {
+    const f = this.fight;
+    if (!f) return;
+    const to = (s, msg) => { const k = this.padPhoneOf(s); if (k >= 0) this.pads.send(k, msg); };
+    if (e.k === 'hit') to(1 - e.p, { t: 'bz', kind: 'hit' });
+    if (e.k === 'ko') { if (e.w === 0 || e.w === 1) to(1 - e.w, { t: 'bz', kind: 'ko' }); else { to(0, { t: 'bz', kind: 'ko' }); to(1, { t: 'bz', kind: 'ko' }); } }
+    if (e.k === 'inked') to(e.p, { t: 'ink' });
+    if (e.k === 'end' && (e.w === 0 || e.w === 1)) {
+      const w = e.w, id = f.st.f[w].id;
+      to(1 - w, { t: 'ko', line: koLine(id, !!f.evil[w], this.padN++), who: f.name(w) });
+    }
+  }
+
+  /* TAUNT: the fighter's trash talk over their head (cosmetic: never the sim) */
+  _padTaunt(k) {
+    const s = this.padGameSeat(k), f = this.fight;
+    if (s < 0 || !f || !['fight', 'win'].includes(this.screen) || f.paused) return;
+    const t = performance.now();
+    if (t - this.padTauntAt[k] < 1500) return;
+    this.padTauntAt[k] = t;
+    const id = f.st.f[s].id, line = tauntLine(id, !!f.evil[s], this.padN++);
+    const [x, y] = this.headScreen(s);
+    const b = say($('#bubbles'), line, x, y, { size: Math.max(20, Math.min(28, innerWidth / 48)), tail: s === 0 ? 'down-left' : 'down-right', maxWidth: 260 });
+    this.later(1.8, () => dismiss(b));
+    this.audio.ui?.('tick');
+  }
+
+  /* the cheat sheets: in practice the game holds while every paired phone has
+     its sheet open; in a match the sheet is only an overlay on the phone */
+  padSheet() {
+    const f = this.fight;
+    if (!f?.practice) return;
+    const on = [0, 1].filter((k) => this.pads.connected(k));
+    const all = on.length > 0 && on.every((k) => this.pads.sheetOpen(k));
+    if (all && !f.paused && this.screen === 'fight') { f.paused = true; this._sheetHold = true; }
+    else if (!all && this._sheetHold) { this._sheetHold = false; if (this.screen === 'fight') f.paused = false; }
+  }
+
   /* ── the loop ─────────────────────────────────────────────────────── */
   frame(dt, draw = true) {
     this.audio.pump();
     this.net.frame(dt);
+    this.pads.frame(dt);
     if (this.vs && (this.vs.t += dt) >= this.vs.dur) this._vsEnd();
     this._timers(this.fight?.paused ? 0 : dt);
     if (this.fight && this.screen !== 'select' && this.screen !== 'diff') {
@@ -773,6 +895,8 @@ class App {
 }
 
 async function start() {
+  // the phone pad: the same page, ?pad=CODE (no renderer, no game)
+  if (params.has('pad')) { runPad(params); return; }
   const touch = matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches;
   document.body.classList.toggle('touch', touch);
   const { renderer, canvas } = await makeRenderer($('#stage'));

@@ -287,7 +287,7 @@ export function runPad(params) {
 
   svg.addEventListener('pointerdown', (e) => {
     e.preventDefault();
-    wake();
+    wake(false, true);
     if (S.sheetOpen) return;
     const p = toSvg(e), h = hit(p);
     if (!h) return;
@@ -371,8 +371,9 @@ export function runPad(params) {
     if (!on) return;
     selEl.querySelector('.nm span').textContent = v.name;
     selEl.querySelector('.nm small').textContent = v.who || 'Pick';
-    selEl.querySelector('.og').classList.toggle('on', !v.alt);
-    selEl.querySelector('.alt').classList.toggle('on', !!v.alt);
+    const a = v.salt ?? v.alt;
+    selEl.querySelector('.og').classList.toggle('on', !a);
+    selEl.querySelector('.alt').classList.toggle('on', !!a);
     selEl.classList.toggle('locked', !!v.locked);
     selEl.querySelector('.lk').textContent = v.locked ? 'Locked' : 'Lock';
   }
@@ -466,14 +467,15 @@ export function runPad(params) {
 
   /* ── keep the screen on ──────────────────────────────────────────── */
   let lock = null, full = false;
-  async function wake(force) {
-    if (!full && document.documentElement.requestFullscreen && !params.has('nofs')) { full = true; try { await document.documentElement.requestFullscreen({ navigationUI: 'hide' }); await screen.orientation?.lock?.('landscape'); } catch { /* */ } }
+  async function wake(force, gesture) {
+    if (gesture && !full && !document.fullscreenElement && document.documentElement.requestFullscreen && !params.has('nofs')) { full = true; try { await document.documentElement.requestFullscreen({ navigationUI: 'hide' }); await screen.orientation?.lock?.('landscape'); } catch { /* not allowed here: fine */ } }
     if (lock && !force) return;
     try { if (navigator.wakeLock) { lock = await navigator.wakeLock.request('screen'); lock.addEventListener?.('release', () => { lock = null; }); } } catch { lock = null; }
   }
 
   draw(params.get('skin') && SK[params.get('skin')] ? params.get('skin') : 'kevalanche');
   wake();
-  connect();
+  // ?pad=DEMO: the panel alone, no game (for looking at the skins)
+  if (code === 'DEMO') { S.view = { fid: (params.get('skin') || 'kevalanche').replace(/-alt$/, '').replace('k8-e', 'k8e'), alt: /-alt$/.test(params.get('skin') || '') }; sheet(); } else connect();
   window.__pad = { S, mask, openSheet, get sheetOpen() { return S.sheetOpen; }, hit, toSvg, ink, koLine, hitFx, skinId };
 }
