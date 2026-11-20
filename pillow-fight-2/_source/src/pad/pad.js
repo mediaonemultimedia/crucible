@@ -460,6 +460,7 @@ export function runPad(params) {
   const schedule = (ms) => { clearTimeout(retryT); retryT = setTimeout(connect, ms); };
   // a link that has gone quiet (the phone slept, the network changed): drop it and rejoin
   setInterval(() => { if (S.link && document.visibilityState === 'visible' && performance.now() - S.lastPing > 4000) { const l = S.link; S.link = null; try { l.close(); } catch { /* */ } connect(); } }, 1000);
+  addEventListener('pagehide', () => { const l = S.link; S.link = null; try { l?.close(); } catch { /* */ } });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') { wake(true); S.lastPing = performance.now(); if (!S.link) connect(); }
     else { for (const id of [...ptrs.keys()]) up({ pointerId: id }); }

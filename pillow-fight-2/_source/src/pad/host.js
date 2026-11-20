@@ -73,7 +73,12 @@ export class PadHost {
     let seat = -1;
     c.on = (ch, msg) => {
       if (ch === 'pc') {
-        if (msg?.t === 'hi' && seat < 0) { seat = this._seat(c, String(msg.uid || c.id)); return; }
+        if (msg?.t === 'hi') {
+          // a phone saying hello again on a link we still hold (it reloaded, or woke up): its seat again
+          if (seat >= 0 && this.seats[seat]?.c === c) { this.state[seat].reset(); this.seats[seat].sent = ''; c.send('pc', { t: 'seat', k: seat }); return; }
+          seat = this._seat(c, String(msg.uid || c.id));
+          return;
+        }
         if (seat >= 0 && this.seats[seat]?.c === c) this._ctl(seat, msg);
         return;
       }
@@ -137,9 +142,14 @@ export class PadHost {
     if (!this.handle) return;
     const t = now();
     this.t += dt;
+    // the page itself stalled (a long frame): the phones' packets are still queued, so
+    // nothing has gone quiet — don't drop held bits for a gap that was ours
+    const stalled = this._ft && t - this._ft > 120;
+    this._ft = t;
     for (let k = 0; k < 2; k++) {
       const S = this.seats[k];
-      this.state[k].stale(t);
+      if (stalled) this.state[k].heard = Math.max(this.state[k].heard, t);
+      else this.state[k].stale(t);
       if (!S) continue;
       // a ping every half second (on the input channel: it measures the input path)
       if (t >= (S.next || 0)) {

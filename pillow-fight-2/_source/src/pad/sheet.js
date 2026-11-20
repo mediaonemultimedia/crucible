@@ -13,6 +13,8 @@ const CHIP = { BOP: '', WALLOP: ' w', GRAB: ' g', SUPER: ' s' };
 const chip = (b) => `<span class="chip${CHIP[b] ?? ''}">${b}</span>`;
 const arrows = (a) => `<span class="ar">${a.map(esc).join(' ')}</span>`;
 
+const SMALL = { projectile: 'a shot · one on screen', stretch: 'the neck can be hit', rush: 'charges across the ring' };
+
 /* the rows: [name, small print, the input as HTML] */
 export function sheetRows(id, alt = false) {
   const F = FIGHTERS[id], S = SPECIALS[id];
@@ -21,9 +23,10 @@ export function sheetRows(id, alt = false) {
   const rows = [];
   // the motion special: its arrows; BOP / WALLOP versions
   const motion = S.charge ? `${arrows([`[${S.motion[0]}]`])} hold, ${arrows(S.motion.slice(1))}` : arrows(S.motion);
-  const vers = S.buttons.map((b) => `${chip(b)} ${esc(b === 'BOP' ? S.bop : S.wallop)}`).join(' / ');
-  const desc = (alt && S.alt?.desc) || S.desc;
-  rows.push([S.name, desc.split(/[.:]/)[0], `${motion} + ${vers}`]);
+  const goon = alt && id === 'kevalanche';
+  const word = (t) => (goon ? t.replace('snowball', 'glove') : t);
+  const vers = S.buttons.map((b) => `${chip(b)} ${esc(word(b === 'BOP' ? S.bop : S.wallop))}`).join(' / ');
+  rows.push([S.name, SMALL[S.kind] || 'special move', `${motion} + ${vers}`]);
   rows.push([F.throwName, 'throws toward the open side', `${chip('GRAB')} near them`]);
   rows.push([F.throwBackName, 'when there’s room behind', `${chip('GRAB')} (auto)`]);
   rows.push([sig.name, sig.travel === 'tracking' ? 'tracks a sidestep' : 'signature move', `${arrows(['↓'])} + ${chip('WALLOP')}`]);

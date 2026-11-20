@@ -31,7 +31,7 @@ const out = path.join(root, 'shots', 'pad');
 fs.mkdirSync(out, { recursive: true });
 const ART = 'docs/friday-nov20/backgrounds/';
 
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'] });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
 const phoneCtx = ctx;   // same context: BroadcastChannel reaches the game tab
 const problems = [], results = {};
@@ -71,7 +71,7 @@ results.qr = { url: qr.url, decoded: dec?.data === qr.url };
 /* ── the phones ───────────────────────────────────────────────────── */
 const PHONE = { viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 };
 async function phone(name, extra = '') {
-  const p = await phoneCtx.newPage({ ...PHONE });
+  const p = await phoneCtx.newPage();
   await p.setViewportSize(PHONE.viewport);
   watch(p, name);
   const u = `file://${html}?pad=${qr.code}&net=local&art=${ART}&nofs&uid=${name}${extra}`;
@@ -245,16 +245,9 @@ await P2b.evaluate(() => __pad.openSheet(false)); await tick(4);
 results.sheet = { opened: sh1, pausedWithOne: paused1, pausedWithBoth: paused2, afterClose: paused3 };
 ok(sh1 && !paused1 && paused2 && !paused3, `cheat sheet / practice pause ${JSON.stringify(results.sheet)}`);
 
-// 9. the phone page's frame rate while playing (rAF intervals during 2 s of input)
-const fpsP = P1.evaluate(() => new Promise((r) => { const ts = []; const f = (t) => { ts.push(t); if (t - ts[0] < 2000) requestAnimationFrame(f); else r(ts); }; requestAnimationFrame(f); }));
-for (let i = 0; i < 8; i++) { await down(P1, 2, ...L.stick); await move(P1, 2, L.stick[0] + 60, L.stick[1] + 30); await tap(P1, ...btn(i % 6), 60, 4); await up(P1, 2); await sleep(60); }
-const ts = await fpsP;
-const iv = ts.slice(1).map((t, i) => t - ts[i]);
-results.phoneFps = { fps: +(1000 / (iv.reduce((a, b) => a + b, 0) / iv.length)).toFixed(1), worstMs: +Math.max(...iv).toFixed(1) };
-ok(results.phoneFps.fps >= 55, `phone page ${results.phoneFps.fps} fps`);
-
 /* skins: the panel for every fighter (DEMO: no game) */
-const demo = await phoneCtx.newPage({ ...PHONE });
+const demoCtx = await browser.newContext({ ...PHONE });   // the panels alone: their own context, at 2×
+const demo = await demoCtx.newPage();
 watch(demo, 'demo');
 for (const s of ['kevalanche', 'kevalanche-alt', 'sebas', 'sebas-alt', 'rubberta', 'k8-e-alt', 'zach', 'johnny', 'sumaura-alt']) {
   await demo.goto(`file://${html}?pad=DEMO&art=${ART}&nofs&skin=${s}`);
@@ -262,7 +255,24 @@ for (const s of ['kevalanche', 'kevalanche-alt', 'sebas', 'sebas-alt', 'rubberta
   await sleep(300);
   await demo.screenshot({ path: path.join(out, `skin-${s}.png`) });
 }
-const portrait = await phoneCtx.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+// 9. the phone page's frame rate while playing: the stick circling + a second finger
+// on a button, 2 s (its own context and tab, so the game's software WebGL isn't in its way)
+{
+  await demo.goto(`file://${html}?pad=DEMO&art=${ART}&nofs&skin=sebas`);
+  await sleep(600);
+  const cdp = await demoCtx.newCDPSession(demo);
+  const fpsP = demo.evaluate(() => new Promise((r) => { const ts = []; const f = (t) => { ts.push(t); if (t - ts[0] < 2000) requestAnimationFrame(f); else r(ts); }; requestAnimationFrame(f); }));
+  const T = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts });
+  const t0 = Date.now(); let i = 0;
+  await T('touchStart', [{ x: 210, y: 180, id: 1 }]);
+  while (Date.now() - t0 < 1900) { const a = i++ * 0.3; await T('touchMove', [{ x: 210 + Math.cos(a) * 25, y: 180 + Math.sin(a) * 25, id: 1 }, ...(i % 10 < 5 ? [{ x: 640, y: 150, id: 2 }] : [])]); await sleep(8); }
+  await T('touchEnd', []);
+  const ts = await fpsP, iv = ts.slice(1).map((t, k) => t - ts[k]);
+  results.phoneFps = { fps: +(1000 / (iv.reduce((a, b) => a + b, 0) / iv.length)).toFixed(1), worstMs: +Math.max(...iv).toFixed(1) };
+  ok(results.phoneFps.fps >= 58, `phone page ${results.phoneFps.fps} fps`);
+}
+const portrait = await demoCtx.newPage();
+await portrait.setViewportSize({ width: 390, height: 844 });
 watch(portrait, 'portrait');
 await portrait.goto(`file://${html}?pad=DEMO&art=${ART}&nofs`);
 await sleep(300);
