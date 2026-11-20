@@ -88,7 +88,8 @@ const t0 = Date.now();
 let ticks = 0, inputsSeen = [0, 0], last = null;
 while (ticks < SECONDS * 60) {
   await Promise.all([play(PA), play(PB)]);
-  for (let i = 0; i < 4; i++) { await step(A, 1 / 60); await step(B, 1 / 60); await sleep(8); ticks++; }
+  await Promise.all([step(A, 4 / 60), step(B, 4 / 60)]); await sleep(12); ticks += 4;
+  if (ticks % 600 === 0) console.log(`${ticks / 60}s of play, ${Math.round((Date.now() - t0) / 1000)}s wall`);
   const s = await Promise.all([A, B].map((P) => P.evaluate(() => { const f = __pf2.fight, S = f?.session; return S ? { f: S.frame, c: S.stats.checked || 0, d: !!S.desync || !!__pf2.net.desynced, ph: S.st.phase, li: f.lastInputs, scr: __pf2.screen } : { scr: __pf2.screen }; })));
   last = s;
   if (s.some((x) => x.d)) { errs.push(`desync ${JSON.stringify(s)}`); break; }

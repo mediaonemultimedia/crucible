@@ -187,7 +187,10 @@ export function runPad(params) {
   let vp = document.querySelector('meta[name=viewport]');
   if (!vp) { vp = document.createElement('meta'); vp.name = 'viewport'; document.head.appendChild(vp); }
   vp.content = 'width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover';
-  const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
+  // the game's stylesheets go (their class names would leak onto the pad); their @font-face rules stay
+  const faces = [];
+  for (const el of [...document.querySelectorAll('style')]) { faces.push(...(el.textContent.match(/@font-face\s*\{[^}]*\}/g) || [])); el.remove(); }
+  const st = document.createElement('style'); st.textContent = faces.join('\n') + CSS; document.head.appendChild(st);
   document.body.className = 'pad';
   document.body.innerHTML = `<svg id="s" viewBox="0 0 2400 1100"></svg><div id="ink"></div><div id="hf"></div><div id="st"></div>
 <div id="sel"><button class="arw" data-dx="-1">◀</button><div class="nm"><small>Pick</small><span></span></div><button class="arw" data-dx="1">▶</button><div class="tg"><b class="og" data-alt="0">OG</b><b class="alt" data-alt="1">ALT</b></div><b class="lk">Lock</b></div>
