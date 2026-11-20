@@ -118,7 +118,7 @@ export function keyboardSVG(bindings, { wait = null, click = false, title = 'Key
 
 /* the combos under it; off-board keys and unbound actions listed */
 export function comboLine() {
-  return '<b>Sidestep</b> tap Side (hold: circle) · <b>Spin</b> Back+Heavy (tracks a sidestep) · <b>Throw</b> Light+Heavy · <b>Dash</b> double-tap Move · <b>Signature</b> Crouch+Heavy · <b>Dive slam</b> Crouch+Heavy in the air · <b>Low block</b> Crouch+Block · <b>Mute</b> M';
+  return '<b>Specials</b> a motion + Light (BOP) or Heavy (WALLOP), no meter: e.g. Crouch, Crouch+Move fwd, Move fwd + Light — each fighter’s is in Practice · <b>Sidestep</b> tap Side (hold: circle) · <b>Spin</b> Back+Heavy (tracks a sidestep) · <b>Throw</b> Light+Heavy · <b>Dash</b> double-tap Move · <b>Signature</b> Crouch+Heavy · <b>Dive slam</b> Crouch+Heavy in the air · <b>Low block</b> Crouch+Block · <b>Mute</b> M';
 }
 export function strays(bindings, keyCap) {
   const out = [];

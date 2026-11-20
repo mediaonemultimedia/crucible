@@ -18,9 +18,9 @@ import { roomAlong, isqrt, unit } from '../sim/sim.js';
 import { makeRng } from '../sim/rng.js';
 
 const LV = {
-  easy: { react: 24, block: 22, side: 10, aggr: 30, think: 18, throwP: 8, edge: 30, sweep: 20, special: 30 },
-  normal: { react: 14, block: 48, side: 30, aggr: 55, think: 11, throwP: 25, edge: 70, sweep: 50, special: 70 },
-  hard: { react: 8, block: 70, side: 55, aggr: 72, think: 6, throwP: 45, edge: 95, sweep: 85, special: 95 },
+  easy: { react: 24, block: 22, side: 10, aggr: 30, think: 18, throwP: 8, edge: 30, sweep: 20, special: 30, msp: 10 },
+  normal: { react: 14, block: 48, side: 30, aggr: 55, think: 11, throwP: 25, edge: 70, sweep: 50, special: 70, msp: 24 },
+  hard: { react: 8, block: 70, side: 55, aggr: 72, think: 6, throwP: 45, edge: 95, sweep: 85, special: 95, msp: 34 },
 };
 
 export class CPU {
@@ -98,6 +98,10 @@ export class CPU {
     if (f.meter >= MAX_METER && this.chance(L.special) && (d < hReach + 800 || M.special.spawn.length || M.special.grab)) {
       return this._do([[SPECIAL, 1], [0, 6]]);
     }
+    // ── the motion special, at the range it's for (not at someone in the air
+    // or already on his way out of it; not twice in a row) ──────────────
+    const sp = this._special(f, o, d, fwdBit, backBit, st);
+    if (sp && this.chance(L.msp)) return this._do(sp);
     // ── far: in, or shoot ─────────────────────────────────────────────────
     if (d > hReach + 300) {
       if (isShot(M.signature) && d > 4200 && this.chance(35)) return this._do([[HEAVY | CROUCH, 1], [0, 20]]);
@@ -137,6 +141,25 @@ export class CPU {
     if (r < 80) return this._do([[HEAVY, 1], [0, 30]]);
     if (r < 90) return this._do([[LIGHT | HEAVY, 1], [0, 30]]);
     return this._do([[JUMP | fwdBit, 4], [0, 4], [HEAVY, 1], [0, 30]]);
+  }
+
+  /* the motion special's inputs for this fighter at this range, or null:
+     projectiles from afar (one on screen), the neck at mid range, the
+     rushes and charges across the ring (a charge is held while guarding) */
+  _special(f, o, d, F, B, st) {
+    if (f.mc > 0 || o.air || o.act === 'down' || o.act === 'getup') return null;
+    const M = FIGHTERS[f.id].moves, P = HEAVY, O = LIGHT, C = CROUCH, wait = [0, 34];
+    const shotOut = st.proj.some((p) => p.o === this.k);
+    switch (f.id) {
+      case 'kevalanche': return d > 4200 && !shotOut ? [[C, 2], [C | F, 2], [F, 1], [F | (this.chance(50) ? O : P), 1], wait] : null;
+      case 'johnny': return d > 4200 && !shotOut ? [[C, 2], [C | B, 2], [B, 1], [B | (this.chance(50) ? O : P), 1], wait] : null;
+      case 'rubberta': return d > 3600 && !shotOut ? [[F, 2], [F | C, 2], [C, 1], [C | B, 2], [B, 1], [B | (d < 5200 ? O : P), 1], wait] : null;
+      case 'k8e': return d > 3800 && d < 7600 ? [[B, 2], [B | C, 2], [C, 1], [C | F, 2], [F, 1], [F | (d < 5400 ? O : P), 1], [0, 44]] : null;
+      case 'sumaura': return d > 3200 && d < 6400 ? [[B, 3], [0, 1], [F | P, 1], [0, 50]] : null;
+      case 'zach': return d > 3400 && d < 6800 ? [[C | BLOCK, 44], [UP | P, 1], [0, 50]] : null;
+      case 'sebas': return d > 3000 && d < 6400 && M.mspH ? [[B | BLOCK, 44], [F | (d < 4600 ? O : P), 1], [0, 50]] : null;
+      default: return null;
+    }
   }
 
   /* start a plan: [[mask, ticks], …]; returns its first input */

@@ -29,6 +29,7 @@ import { RING, BED } from '../sim/sim.js';
 export const U = 1000;
 export const RING_W = RING / U;          // 7.6: the mattress top's half-width the sim plays on
 export const BED_H = BED / U;            // the carpet is this far below the top
+const FX_SHOTS = { snow: 1, glove: 1, flame: 1, ink: 1 };   // render/specials.js flies these
 const MAT = RING_W + 0.45;               // the mattress itself, piping included
 const ROOM = 36;                         // walls at ±ROOM
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -126,7 +127,7 @@ export class Arena {
     this.balls = new Map(); this.rings = new Map(); this.ballPool = []; this.ringPool = [];
     this.ringGeo = new THREE.TorusGeometry(0.42, 0.12, 14, 32);
     this.extras = new Map();
-    this.pools = { cap: [], howl: [], crow: [] };
+    this.pools = { cap: [], howl: [], crow: [], snow: [], glove: [], flame: [], ink: [] };
     this._initMoon();
     this.base = new Set(this.world.children);
   }
@@ -451,6 +452,8 @@ export class Arena {
 
   /* ── projectiles (3D: along their own line) ─────────────────────────────── */
   _makeShot(kind) {
+    const made = this.fx?.makeShot(kind);
+    if (made) return made;
     if (kind === 'cap') { const g = new THREE.Group(); g.add(makeCap(ITEMS.cap.r * 2.4)); return g; }
     if (kind === 'howl') {
       const g = new THREE.Group();
@@ -509,6 +512,7 @@ export class Arena {
         m.visible = true;
         m.position.set(x, y, z); m.rotation.set(0, yaw, 0);
         if (p.kind === 'cap') m.children[0].rotation.set(Math.PI / 2 - 0.35, 0, -p.t * 0.55);
+        else if (FX_SHOTS[p.kind]) this.fx?.animShot(m, p, x, y, z, 1 / 60);
         else if (p.kind === 'howl') {
           m.position.y = y + 0.15;
           m.scale.set(1 + 0.08 * Math.sin(p.t * 0.6), 0.85 + 0.25 * Math.min(1, p.t / 10), 1.6);

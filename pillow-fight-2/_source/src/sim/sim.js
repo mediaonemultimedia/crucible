@@ -260,7 +260,7 @@ function startMove(st, k, name, chain = 0) {
   }
   if (m.kind === 'special') { f.meter = 0; f.bs = 0; f.nag = 0; st.ev.push({ k: 'special', p: k }); }
   if (m.kind === 'signature') st.ev.push({ k: 'signature', p: k });
-  if (m.kind === 'msp') { f.mc = m.total + MSP_COOL; f.bl = f.bh = 0; st.ev.push({ k: 'msp', p: k, mv: name }); }
+  if (m.kind === 'msp') { f.mc = m.total + MSP_COOL; f.bl = f.bh = 0; st.ev.push({ k: 'msp', p: k, mv: name, who: f.id }); }
   if (!m.air && !f.air) { f.vx = 0; f.vz = 0; }
 }
 

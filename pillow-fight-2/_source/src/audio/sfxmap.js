@@ -29,6 +29,10 @@ function spread(tick, salt) {
   return ((h >>> 0) % 1000) / 1000 * 2 - 1;      // -1 … 1
 }
 
+/* the motion specials' sounds (synth.js 'sp-…'): as each comes out, and as a shot bursts */
+const MSP_SFX = { kevalanche: 'whoosh-heavy', johnny: 'sp-flame', k8e: 'sp-stretch', rubberta: 'sp-ink', sumaura: 'sp-roll', zach: 'sp-torpedo', sebas: 'sp-tornado' };
+const SPLAT_SFX = { snow: 'sp-snow', glove: 'sp-glove', flame: 'sp-fire', ink: 'sp-splat' };
+
 /* the variation on a hit: pitch ±6 %, gain ±1.5 dB */
 const vary = (tick, salt, pitch = 0.06, gain = 0.16) => ({
   rate: 1 + pitch * spread(tick, salt),
@@ -98,6 +102,10 @@ export function soundsFor(e, tick = 0) {
     case 'bounce': return [{ id: 'land', gain: 0.8, rate: 1.1, delay: 0 }];
     case 'side': return [{ id: 'whoosh-light', gain: 0.45, rate: 1.3, delay: 0 }];
     case 'ko': return [{ id: 'crowd-ooh', gain: e.final ? 1.1 : 0.95, rate: 1, delay: 0.12 }];
+    // the motion specials: a sound each as it comes out, and the shots' bursts
+    case 'msp': return MSP_SFX[e.who] ? [{ id: MSP_SFX[e.who], gain: 1, rate: e.mv === 'mspH' ? 0.94 : 1.06, delay: 0 }] : [];
+    case 'splat': return SPLAT_SFX[e.kind] ? [{ id: SPLAT_SFX[e.kind], ...vary(tick, p + 31, 0.05, 0.1), delay: 0 }] : [];
+    case 'rebound': return [{ id: 'block', gain: 1.1, rate: 0.8, delay: 0 }];
     default: return [];
   }
 }

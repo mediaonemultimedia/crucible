@@ -422,7 +422,10 @@ export class Plush {
     this.squash.v += (ks * (0 - this.squash.x) - 2 * Math.sqrt(ks) * 0.5 * this.squash.v) * dt;
     this.squash.x += this.squash.v * dt;
     const sq = Math.max(-0.25, Math.min(0.2, this.squash.x * 0.06));
-    const crouch = this.puppet.crouchT ? 0.84 : 1;
+    // (Sumaura's Panda Roll: squashed round into a ball)
+    const ballT = this.puppet.ballT || 0;
+    const crouch = ballT ? 0.66 : this.puppet.crouchT ? 0.84 : 1;
+    this._ball = (this._ball || 0) + (ballT - (this._ball || 0)) * Math.min(1, dt * 14);
     // the jump: squashed in the crouch before it, stretched going up fast
     // (and coming down in a dive), squashed again on landing
     let sy = 1;
@@ -449,7 +452,8 @@ export class Plush {
       const q = Math.max(-0.16, Math.min(0.12, C.x));
       cx = 1 - q; cy = 1 + q * 0.6;
     }
-    g.scale.set((1 - sq * 0.5 + df * 0.35) * sx * cx, (1 + sq) * this._crouch * (1 - df * 0.62) * this._ss * cy, (1 - sq * 0.5 + df * 0.35) * sx * cx);
+    const bw = 1 + 0.2 * this._ball;
+    g.scale.set((1 - sq * 0.5 + df * 0.35) * sx * cx * bw, (1 + sq) * this._crouch * (1 - df * 0.62) * this._ss * cy, (1 - sq * 0.5 + df * 0.35) * sx * cx * bw);
     g.updateMatrixWorld(true);
 
     // the fight frame in the plush's own frame

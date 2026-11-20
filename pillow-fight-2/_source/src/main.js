@@ -14,6 +14,7 @@ import { portraits, portraitKey, Turntable } from './render/portraits.js';
 import { Fight } from './fight.js';
 import { Keyboard } from './input/keyboard.js';
 import { FIGHTERS, ROSTER, MAX_METER, fighterId } from './fighters/index.js';
+import { SPECIALS, MOVE_LIST, motionText } from './fighters/movelist.js';
 import { hash, createMatch, ROUND_TICKS } from './sim/sim.js';
 import { FLAGS } from './ui/flags.js';
 import { say, dismiss } from './ui/bubble.js';
@@ -41,7 +42,7 @@ const N = ROSTER.length;
 export function frameData(id, name) {
   const m = FIGHTERS[id].moves[name];
   if (!m) return null;
-  const tag = m.kind === 'throw' ? 'throw' : m.circ || m.hits.some((h) => h.W >= 2000) ? 'tracking' : m.spawn.length && !m.hits.length ? 'shot' : 'linear';
+  const tag = m.kind === 'msp' ? 'linear' : m.kind === 'throw' ? 'throw' : m.circ || m.hits.some((h) => h.W >= 2000) ? 'tracking' : m.spawn.length && !m.hits.length ? 'shot' : 'linear';
   if (m.grab) return { tag, start: m.grab.from, active: m.grab.to - m.grab.from + 1, rec: m.total - m.grab.to, blk: null };
   const h0 = m.hits[0], hN = m.hits[m.hits.length - 1];
   if (!h0) { const at = m.spawn[0]?.at ?? 0; return { tag, start: at, active: 1, rec: m.total - at, blk: null }; }
@@ -53,8 +54,9 @@ const MOVE_ROWS = [['O', 'light', 'Light (chains)'], ['P', 'heavy', 'Heavy (lung
 
 /* the move list (practice, the select plates) */
 export function moveList(id) {
-  const f = FIGHTERS[id];
+  const f = FIGHTERS[id], S = SPECIALS[id];
   return [
+    [motionText(id).replace('BOP', 'O').replace('WALLOP', 'P'), `${S.name} — special (no meter)`],
     ['O', 'Light (chains)'], ['P', 'Heavy (lunge)'], ['← + P', 'Spin — tracks a sidestep'], ['Shift + O', 'Low light'],
     ['Shift + P', f.signatureName], ['Space', `${f.specialName} (full meter)`], ['O + P', `${f.throwName} (throw)`],
     ['Q, then P', 'Hop + air heavy'], ['Q, then Shift + P', f.diveName], ['W / S tap', 'Sidestep (beats linear moves)'], ['W / S hold', 'Circle'], ['→→ / ←←', 'Dash'],
@@ -520,7 +522,13 @@ class App {
     const F = FIGHTERS[id];
     const name = (mv, l) => l || (mv === 'signature' ? F.signatureName : mv === 'special' ? F.specialName : `${F.throwName} / ${F.throwBackName}`);
     const sg = (v) => (v === null ? '—' : v > 0 ? `+${v}` : `${v}`);
-    const rows = MOVE_ROWS.map(([k, mv, l]) => { const d = frameData(id, mv); return `<tr><td><b>${esc(k)}</b></td><td>${esc(name(mv, l))}</td><td><i class="tg ${d.tag}">${d.tag}</i></td><td>${d.start}</td><td>${sg(d.blk)}</td></tr>`; }).join('');
+    // the motion special first: its arrows, the BOP (O) and WALLOP (P) versions
+    const S = SPECIALS[id], arrows = S.charge ? `[${S.motion[0]}] ${S.motion.slice(1).join(' ')}` : S.motion.join(' ');
+    const spRows = ['mspL', 'mspH'].filter((mv) => F.moves[mv]).map((mv) => {
+      const d = frameData(id, mv), v = mv === 'mspL' ? 'BOP' : 'WALLOP';
+      return `<tr class="msp"><td><b class="arw">${esc(arrows)}</b> + <b>${mv === 'mspL' ? 'O' : 'P'}</b></td><td>${esc(S.name)} <i class="vv">${v}: ${esc(mv === 'mspL' ? S.bop : S.wallop)}</i></td><td><i class="tg ${d.tag}">${d.tag}</i></td><td>${d.start}</td><td>${sg(d.blk)}</td></tr>`;
+    }).join('');
+    const rows = spRows + MOVE_ROWS.map(([k, mv, l]) => { const d = frameData(id, mv); return `<tr><td><b>${esc(k)}</b></td><td>${esc(name(mv, l))}</td><td><i class="tg ${d.tag}">${d.tag}</i></td><td>${d.start}</td><td>${sg(d.blk)}</td></tr>`; }).join('');
     const drill = this.dummyMode === 'drill' ? `<div class="drill">Ring-out drill: put the dummy on the lip (a heavy pushes him onto it — LEDGE!), then a second heavy sends him off. Ring-outs: <b id="pr-ro">${this.drillN || 0}</b></div>` : '';
     $('#practice-panel').innerHTML = `<h5>Dummy</h5><div class="dm">${dm.map(([k, m, l]) => `<b class="${this.dummyMode === m ? 'on' : ''}">${k} ${l}</b>`).join('')}</div>${drill}
       <h5 style="margin-top:10px">${esc(F.name)} — moves</h5>
@@ -661,6 +669,7 @@ class App {
       if (e.ctr) this.pop('COUNTER', e.x, e.y, e.z, e.p ? 'p2' : 'p1');
       if (e.edge) this.pop('EDGE!', e.x, e.y, e.z, e.p ? 'p2' : 'p1');
     }
+    if (e.k === 'msp') { const g = st.f[e.p]; this.pop(`${SPECIALS[g.id].name}!`, g.x, g.id === 'k8e' ? 4600 : 3500, g.z, `${e.p ? 'p2' : 'p1'} msp`); }
     if (e.k === 'tech') this.pop('TECH', e.x, e.y, e.z, 'tech');
     if (e.k === 'teeter') { const f = st.f[e.p]; this.pop('LEDGE!', f.x, 2600, f.z, e.p ? 'p2' : 'p1'); }
     if (e.k === 'ringout') this.banner('Ring Out!', 'ringout', 2400);
@@ -774,6 +783,8 @@ async function start() {
   app.createMatch = createMatch;
   app.cpuFor = (k, level, seed) => new CPU(k, level, seed);
   app.ROSTER = ROSTER;
+  // the move lists as data (Run B's phone cheat sheet reads these too: fighters/movelist.js)
+  app.moves = { SPECIALS, MOVE_LIST };
   app.renderAudio = (o) => renderOffline({ clips: CLIPS, ...o });
   // once the room has drawn (shaders compiled), the title logo slams in —
   // not while the page loads — and the card portraits wait until it has landed

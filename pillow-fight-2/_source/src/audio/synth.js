@@ -238,6 +238,43 @@ export function playSynthSfx(ctx, dest, id, t, rate = 1, gain = 1) {
     }
     g.gain.value = 1;
     end = t + 0.24;
+  } else if (id.startsWith('sp-')) {
+    // the motion specials (PF2): soft, plush, cartoon — noise and sines only
+    const N = (lenS, type, f0, f1, q, peak, a = 0.01, nrate = 1) => {
+      const n = noiseSrc(ctx, t, nrate), f = ctx.createBiquadFilter(), ng = ctx.createGain();
+      f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0 * rate, t); f.frequency.exponentialRampToValueAtTime(f1 * rate, t + lenS);
+      ng.gain.setValueAtTime(0.0001, t); ng.gain.exponentialRampToValueAtTime(peak * gain, t + a); ng.gain.exponentialRampToValueAtTime(0.0001, t + lenS);
+      n.connect(f); f.connect(ng); ng.connect(g); n.stop(t + lenS + 0.02); srcs.push(n);
+      return ng;
+    };
+    const O = (lenS, type, f0, f1, peak, a = 0.005, at = 0) => {
+      const o = ctx.createOscillator(), og = ctx.createGain();
+      o.type = type; o.frequency.setValueAtTime(f0 * rate, t + at); o.frequency.exponentialRampToValueAtTime(f1 * rate, t + at + lenS);
+      og.gain.setValueAtTime(0.0001, t + at); og.gain.exponentialRampToValueAtTime(peak * gain, t + at + a); og.gain.exponentialRampToValueAtTime(0.0001, t + at + lenS);
+      o.connect(og); og.connect(g); o.start(t + at); o.stop(t + at + lenS + 0.02); srcs.push(o);
+    };
+    g.gain.value = 1;
+    const k = id.slice(3);
+    let len = 0.3;
+    if (k === 'snow') { len = 0.22; N(0.2, 'bandpass', 2600, 900, 0.9, 0.34, 0.004, 1.4); N(0.12, 'lowpass', 900, 300, 0.7, 0.3, 0.003); }       // a snowball bursting: a crunchy puff
+    else if (k === 'glove') { len = 0.3; N(0.28, 'bandpass', 1500, 600, 0.8, 0.26, 0.01, 0.6); O(0.12, 'sine', 210, 90, 0.35); }              // a felt glove's whump and a feather rustle
+    else if (k === 'flame') { len = 0.55; N(0.55, 'lowpass', 500, 2400, 0.6, 0.3, 0.06, 0.5); N(0.5, 'bandpass', 3200, 1800, 3, 0.08, 0.03, 2.2); } // a soft whoomph of flame, a crackle
+    else if (k === 'fire') { len = 0.35; N(0.35, 'lowpass', 1800, 300, 0.7, 0.34, 0.004, 0.7); O(0.14, 'sine', 160, 60, 0.3); }               // a flame puffs out
+    else if (k === 'stretch') { len = 0.42; O(0.4, 'triangle', 260, 1100, 0.16, 0.02); O(0.4, 'sine', 520, 2200, 0.05, 0.02); }            // a slide-whistle neck
+    else if (k === 'bonk') { len = 0.2; O(0.18, 'sine', 620, 300, 0.32); N(0.06, 'bandpass', 1800, 1200, 1.2, 0.18, 0.002); }                 // the head bonks
+    else if (k === 'ink') { len = 0.3; O(0.16, 'sine', 420, 140, 0.32, 0.004); N(0.22, 'bandpass', 900, 2600, 2, 0.16, 0.01, 0.8); }          // a wet squirt
+    else if (k === 'splat') { len = 0.3; N(0.28, 'lowpass', 1200, 200, 1.2, 0.4, 0.003, 0.8); O(0.1, 'sine', 180, 70, 0.25); }                // the ink splats
+    else if (k === 'roll') { len = 0.75; N(0.75, 'lowpass', 220, 520, 1.5, 0.42, 0.08, 0.4); O(0.7, 'sine', 55, 75, 0.2, 0.08); }              // a big plush rumbling roll
+    else if (k === 'torpedo') { len = 0.6; O(0.55, 'sine', 1500, 520, 0.11, 0.03); N(0.55, 'bandpass', 600, 2400, 1.3, 0.3, 0.05); }         // a whistling dive across
+    else if (k === 'tornado') {
+      // a whirling gust: band-passed noise with a fast tremolo
+      len = 0.8;
+      const ng = N(0.8, 'bandpass', 500, 1600, 1.1, 0.38, 0.06, 0.9);
+      const l = ctx.createOscillator(), lg = ctx.createGain();
+      l.frequency.value = 11 * rate; lg.gain.value = 0.5;
+      l.connect(lg); lg.connect(ng.gain); l.start(t); l.stop(t + 0.82); srcs.push(l);
+    } else return null;
+    end = t + len + 0.03;
   } else return null;
   return { end, out: g, srcs };
 }
