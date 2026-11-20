@@ -46,6 +46,9 @@ const reach = (m) => reachOf(m);
 const unsafe = (m) => m && !m.air && m.hits.length && !m.hits[0].auto && m.hits[m.hits.length - 1].blockstun - frameData(m).recovery <= -6;
 const lastActive = (m) => (m.hits.length ? m.hits[m.hits.length - 1].to : m.spawn.length ? m.spawn[m.spawn.length - 1].at : 0);
 
+/* the motion specials: how often (per decision) it goes for one at the right range */
+const MSP_P = { easy: 0.05, normal: 0.12, hard: 0.18 };
+
 /* how far this fighter's special reaches (projectiles and Sky Neck: anywhere) */
 function specialRange(id) {
   const m = FIGHTERS[id].moves.special;
@@ -109,6 +112,11 @@ export class CPU {
     const me = st.f[this.side];
     if (st.phase !== 'fight') { this.last = 0; return 0; }
     const D = FIGHTERS[me.id];
+    // a motion special's inputs under way: the next one (dropped if it got hit)
+    if (this.plan?.length) {
+      if (me.act === 'hitstun' || me.act === 'down' || me.act === 'grabbed' || me.act === 'ko') this.plan = [];
+      else { const p = this.plan[0]; if (--p.n <= 0) this.plan.shift(); this.last = p.m; return p.m; }
+    }
     const fwd = me.face > 0 ? RIGHT : LEFT, back = me.face > 0 ? LEFT : RIGHT;
     const dist = Math.abs(o.x - me.x);
     const free = (me.act === 'idle' || me.act === 'walkF' || me.act === 'walkB' || me.act === 'crouch' || me.act === 'guard' || me.act === 'blockstun') && !me.air;
@@ -265,6 +273,10 @@ export class CPU {
         else if (!shooter) { hold = DOWN; press = HEAVY; } else press = LIGHT;
       } else if (dist <= lunge && this.chance(this.L.aggro)) {
         press = this.chance(0.7) ? HEAVY : LIGHT;
+      } else if (this._special(me, o, dist, fwd, back, st) && this.chance(MSP_P[this.level] ?? 0.12)) {
+        // the motion special, at the range it's for: its inputs over the next ticks
+        this.plan = this._special(me, o, dist, fwd, back, st).map(([m, n]) => ({ m, n }));
+        const p = this.plan[0]; if (--p.n <= 0) this.plan.shift(); this.last = p.m; return p.m;
       } else if (canShoot && dist > 3500 && this.chance(this.L.shotP)) {
         hold = DOWN; press = HEAVY;
         this.lastShot = st.tick;
@@ -320,6 +332,25 @@ export class CPU {
     const t1 = (v - Math.sqrt(disc)) / g, t2 = (v + Math.sqrt(disc)) / g;
     const rel = Math.abs(p.vx) + D.jumpX, half = D.hurt.air.w / 2 + 320;
     return d > t1 * rel + half + 150 && d < t2 * rel - half - 400;
+  }
+
+  /* the motion special's inputs for this fighter at this range, or null:
+     projectiles from afar (one on screen), the neck at mid range, the
+     rushes and charges across the stage (a charge is held crouching / guarding) */
+  _special(me, o, d, F, B, st) {
+    if (me.mc > 0 || o.air || o.act === 'down' || o.act === 'getup') return null;
+    const P = HEAVY, O = LIGHT, C = DOWN, wait = [0, 30];
+    const shotOut = st.proj.some((p) => p.o === this.side);
+    switch (me.id) {
+      case 'kevalanche': return d > 4200 && !shotOut ? [[C, 2], [C | F, 2], [F, 1], [F | (this.chance(0.5) ? O : P), 1], wait] : null;
+      case 'johnny': return d > 4200 && !shotOut ? [[C, 2], [C | B, 2], [B, 1], [B | (this.chance(0.5) ? O : P), 1], wait] : null;
+      case 'rubberta': return d > 3600 && !shotOut ? [[F, 2], [F | C, 2], [C, 1], [C | B, 2], [B, 1], [B | (d < 5200 ? O : P), 1], wait] : null;
+      case 'k8e': return d > 3800 && d < 7600 ? [[B, 2], [B | C, 2], [C, 1], [C | F, 2], [F, 1], [F | (d < 5400 ? O : P), 1], [0, 40]] : null;
+      case 'sumaura': return d > 3200 && d < 6400 ? [[B, 3], [0, 1], [F | P, 1], [0, 46]] : null;
+      case 'zach': return d > 3400 && d < 6800 ? [[C | BLOCK, 44], [UP | P, 1], [0, 46]] : null;
+      case 'sebas': return d > 3000 && d < 6400 ? [[B | BLOCK, 44], [F | (d < 4600 ? O : P), 1], [0, 46]] : null;
+      default: return null;
+    }
   }
 
   /* buttons are presses: release, then press on the next tick. Its walks

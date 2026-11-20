@@ -145,7 +145,7 @@ test('the sim state hash is identical with and without the sound listening, for 
   }
 });
 
-const SOUNDED = new Set(['hit', 'block', 'grab', 'jump', 'land', 'slam', 'kobounce', 'koflash', 'clash', 'tech', 'throw']);
+const SOUNDED = new Set(['hit', 'block', 'grab', 'jump', 'land', 'slam', 'kobounce', 'koflash', 'clash', 'tech', 'throw', 'msp', 'splat', 'rebound']);
 
 test('online over a laggy, lossy link: every real event sounds once on each peer (rollbacks never double-play)', () => {
   const st0 = createMatch({ p1: 'kevalanche', p2: 'zach', seed: 13 });

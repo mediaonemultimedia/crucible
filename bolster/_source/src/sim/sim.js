@@ -22,6 +22,7 @@
 import { FIGHTERS, MAX_METER, dashOf, isShot } from '../fighters/index.js';
 import { LEFT, RIGHT, UP, DOWN, LIGHT, HEAVY, SPECIAL, BLOCK } from './input.js';
 import { rngInt } from './rng.js';
+import { MOTION_FIELDS, MSP_COOL, track, motionSpecial } from './motion.js';
 
 export const TICKS = 60;
 export const ROUND_TICKS = 99 * TICKS;
@@ -48,7 +49,8 @@ export const REPEAT = 120;           // the same light landing again within this
 export const KO_SEQ = { freeze: 6, slow: 90, ramp: 18, len: 150, g: 26, vy: 439, vx: 95, spin: 28, banner: 128 };
 export const KO_FINAL = { freeze: 6, slow: 120, ramp: 24, len: 190, g: 22, vy: 495, vx: 110, spin: 36, banner: 166 };
 export const SLOW = 25;
-export const KO_AFTER = 90;          // after the cinematic, before the next round
+export const KO_AFTER = 90;
+export const INK_T = 120;           // an inked face: two seconds (cosmetic)          // after the cinematic, before the next round
 
 const sgn = (v) => (v > 0 ? 1 : v < 0 ? -1 : 0);
 const tdiv = (a, b) => Math.trunc(a / b);
@@ -68,6 +70,8 @@ function newFighter(id, side) {
     jmp: 0, jd: 0, dl: 0,
     blk: 0, lt: -99, ht: -99, ok: 0, ch: 0, lc: 0, lk: 0, it: 99, rep: 0, lmv: '', rt: -999,
     kx: 0, ky: 0, kvx: 0, kvy: 0, kb: 0, kr: 0, kdir: 0,
+    ink: 0,                                   // inked face (Rubberta's Ink Jet): cosmetic, ticks left
+    ...MOTION_FIELDS,                         // the motion specials' input history (sim/motion.js)
   };
 }
 
@@ -151,6 +155,8 @@ function readInput(st, k, m) {
   // a double-tap asks for a dash: a tap (pressed and let go within TAP
   // ticks), then pressed again within TAP ticks of letting go. A walk that
   // stops and starts again, or a block held and let go, isn't one.
+  track(f, m, was, st.tick);
+  if (f.ink > 0) f.ink--;
   const released = was & ~m;
   if (m & fwd) f.hf++; else if (!(released & fwd)) f.hf = 0;
   if (m & bk) f.hb++; else if (!(released & bk)) f.hb = 0;
@@ -189,6 +195,7 @@ function startMove(st, k, name, chain = 0) {
   }
   if (m.kind === 'special') { f.meter = 0; f.bs = 0; f.nag = 0; st.ev.push({ k: 'special', p: k }); }
   if (m.kind === 'signature') st.ev.push({ k: 'signature', p: k });
+  if (m.kind === 'msp') { f.mc = m.total + MSP_COOL; f.bl = f.bh = 0; st.ev.push({ k: 'msp', p: k, mv: name, who: f.id }); }
   if (!m.air && !f.air) f.vx = 0;
 }
 
@@ -198,6 +205,12 @@ function think(st, k) {
   if (f.inv > 0) f.inv--;
   if (f.lk > 0) f.lk--;
   if (f.act === 'attack') f.it = 0; else if (f.it < 99) f.it++;
+  // the motion specials: from anything free on the ground, or out of the
+  // jump's crouch the motion's own ↑ started
+  if (!f.air && (f.bl || f.bh) && (GROUND_FREE[f.act] || f.act === 'jumpsquat')) {
+    const v = motionSpecial(f, D.moves, f.bl, f.bh);
+    if (v && !(D.moves[v].spawn.length && st.proj.some((p) => p.o === k))) return startMove(st, k, v);
+  }
   if (GROUND_FREE[f.act] && !f.air) {
     if (f.bs && f.meter >= MAX_METER) return startMove(st, k, 'special');
     // O and P together (pressed within THROW_GAP ticks of each other): the throw
@@ -363,6 +376,7 @@ function spawn(st, k, P) {
     // (every shot has its own hit-pause: without one, a shot that landed
     // left st.pause NaN — no more hit-pause, and buffered presses never expired)
     hitstun: P.hitstun, blockstun: P.blockstun, push: P.push, chip: P.chip, kd: P.kd || 0, sp: P.special || 0, pause: P.pause || 8, bpush: 0, t: 0,
+    ms: P.ms || 0, ink: P.ink || 0,
   });
   st.ev.push({ k: 'throw', p: k, kind: P.kind });
 }
@@ -528,6 +542,8 @@ function strike(st) {
     const r = land_hit(st, c.k, c.h, f.face, { special: m.kind === 'special', at, kind: m.kind, fin, mv: f.mv, lite: m.lite });
     if (r === 'hit') f.ok = 1;
     if (r === 'hit' && m.stopOnHit) { f.stop = 1; f.vx = -20 * f.face; }
+    // the roll / the torpedo bounce back off a block, a little hop up and away
+    if (r === 'block' && m.bounce) { f.stop = 1; f.vx = -62 * f.face; f.vy = 115; f.air = 1; st.ev.push({ k: 'rebound', p: c.k, x: f.x }); }
   }
 }
 
@@ -632,9 +648,13 @@ function projectiles(st) {
     if (p.dead) continue;
     const d = st.f[1 - p.o];
     if (!invulnTo(d, false) && touches(d, projBox(p))) {
-      land_hit(st, p.o, p, sgn(p.vx), { special: !!p.sp, at: [p.x, p.y], kind: p.sp ? 'special' : 'signature' });
+      const res = land_hit(st, p.o, p, sgn(p.vx), { special: !!p.sp, at: [p.x, p.y], kind: p.sp ? 'special' : p.ms ? 'msp' : 'signature' });
+      if (p.ink && res === 'hit') { d.ink = INK_T; st.ev.push({ k: 'inked', p: 1 - p.o, x: d.x }); }
+      if (p.ms) st.ev.push({ k: 'splat', p: p.o, kind: p.kind, x: p.x, y: p.y, hit: res === 'hit' ? 1 : 0 });
       continue;
     }
+    // a dipping serve that comes down short: into the floor
+    if (p.vy < 0 && p.y < 250) { st.ev.push({ k: 'splat', p: p.o, kind: p.kind, x: p.x, y: 250, hit: 0 }); continue; }
     // gone once it's off the screen: well past the one it was thrown at, or the walls
     if (p.life <= 0 || p.x < -STAGE - 1500 || p.x > STAGE + 1500 || (p.x - d.x) * sgn(p.vx) > OFFSCREEN) continue;
     keep.push(p);

@@ -28,24 +28,27 @@ function play(p1, p2, seed, ticks, { random = false, onTick = null } = {}) {
   return hash(st);
 }
 
-/* recorded with the sim as it was before the feel pass (bolster-source @ 2b8c479) */
+/* recorded with the sim as it was before the feel pass (bolster-source @ 2b8c479);
+   re-recorded at the motion specials (Run A, Nov 19), which change the sim on
+   purpose (new state fields, new moves the CPU and random inputs reach). The
+   feel pass's render-only rule is the next test: posing never changes the hash. */
 const GOLDEN = {
-  'kevalanche:kevalanche:11:cpu': 686157200,
-  'kevalanche:kevalanche:12:rnd': 1525362313,
-  'kevalanche:rubberta:11:cpu': 2044242159,
-  'kevalanche:rubberta:12:rnd': 2046609616,
-  'kevalanche:johnny:11:cpu': 1675428574,
-  'kevalanche:johnny:12:rnd': 3232020266,
-  'kevalanche:sumaura:11:cpu': 3202807706,
-  'kevalanche:sumaura:12:rnd': 1508415709,
-  'kevalanche:k8e:11:cpu': 1175875927,
-  'kevalanche:k8e:12:rnd': 1694887189,
-  'kevalanche:sebas:11:cpu': 442970070,
-  'kevalanche:sebas:12:rnd': 1064779989,
-  'kevalanche:zach:11:cpu': 3760462518,
-  'kevalanche:zach:12:rnd': 1272041948,
-  'johnny:kevalanche:13:cpu': 3768130729,
-  'sumaura:zach:14:rnd': 3195573986,
+  'kevalanche:kevalanche:11:cpu': 2784400334,
+  'kevalanche:kevalanche:12:rnd': 1395793573,
+  'kevalanche:rubberta:11:cpu': 2776683063,
+  'kevalanche:rubberta:12:rnd': 2253408792,
+  'kevalanche:johnny:11:cpu': 3407356919,
+  'kevalanche:johnny:12:rnd': 594943148,
+  'kevalanche:sumaura:11:cpu': 974672997,
+  'kevalanche:sumaura:12:rnd': 2083488912,
+  'kevalanche:k8e:11:cpu': 2910625534,
+  'kevalanche:k8e:12:rnd': 1938182600,
+  'kevalanche:sebas:11:cpu': 86704813,
+  'kevalanche:sebas:12:rnd': 1844782757,
+  'kevalanche:zach:11:cpu': 2756783861,
+  'kevalanche:zach:12:rnd': 1728496668,
+  'johnny:kevalanche:13:cpu': 150436664,
+  'sumaura:zach:14:rnd': 2154797616,
 };
 
 test('the sim hash for every input sequence is the same as before the feel pass', () => {
