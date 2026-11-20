@@ -20,6 +20,8 @@ node tools/shots.mjs [scene …]   # evidence → shots/pf2/ (ring-overview, sid
 node tools/peek.mjs out.png '?hold&webgl' '__pf2.step(1)'   # one screenshot (HTML=path to use another build)
 node tools/online-match.mjs [--minutes 3.5] [--lag 30]       # two pages online over the loopback, OG + ALT picks, CPUs, hashes compared
 node tools/throws-shots.mjs                                  # every throw, both directions → shots/throws/
+node tools/pad-test.mjs                                      # phone pads: two phones, latency, jitter, sheet, skins → shots/pad/
+node tools/pad-online.mjs [--seconds 60]                     # online with a phone on each side, hashes compared
 node tools/build.mjs --out other.html                        # build elsewhere
 ```
 
@@ -33,7 +35,11 @@ twins), `seed=N`, `hold` (no free-running loop; tools step `__pf2`),
 **PF2:** done for all 7 (Kevalanche, Johnny, K8-E, Rubberta, Sumaura, Zach, Sebas): sim + motion inputs (`sim/motion.js`), move data (`fighters/movelist.js`), visuals (`render/specials.js`), SFX, CPU, practice list, legend, tests (`test/specials.test.mjs`), shots (`tools/specials-shots.mjs` → `shots/specials/`). Shipped: PR #49 (`pf2-release-4`, merged). **PF1:** see `bolster-source` (in progress).
 
 ## Phone controller (Run B, Thu Nov 19) — status
-**In progress.** Done: pairing (QR + code, PeerJS), wire, phone pad (template port, all 14 backgrounds), pick on phone, haptics/ink/KO/taunt, cheat sheet, `test/pad.test.mjs`, `tools/pad-test.mjs` (two phones, latency ≤ 2 frames, lag+jitter+loss). Next: online-with-phones sync run, full release checks, `pf2-release-5`.
+**Done**, shipped as `pf2-release-5` (`pillow-fight-2/index.html` + `pillow-fight-2/controller/backgrounds/`, Kevin's 14 backgrounds; no fallback skins needed).
+- **Pairing:** the title and select screens show a QR (encoded in `src/pad/qr.js`, no service) + a 4-letter code; the phone opens `index.html?pad=CODE`. PeerJS room `pillowfight2-pad-CODE`; first phone P1, second P2; same device gets its seat back. `?pads=off` disables; `?hold` (tests) keeps it off unless `?pads=1`.
+- **Wire** (`src/pad/wire.js`): 9-byte state packets on an unreliable, unordered channel, on change + 60 Hz, with per-button press counters (taps survive loss). The game is the only sim: pad bits are OR-ed with the keyboard per tick, and online that mask goes through the rollback session.
+- **Phone** (`src/pad/pad.js`, `skins.js`, `sheet.js`, `lines.js`): the skin template's layout/colours/drawing/live feel; pointerdown multi-touch, floating 8-way stick (dead zone, ↓↓ = sidestep out), wake lock, rotate prompt, reconnect, haptics (flash + shake where no vibrate), OG/ALT strip on select, KO roast, Ink Jet splat, TAUNT bubble on the big screen, cheat sheet (holds practice only while every paired phone has it open).
+- **Tests:** `test/pad.test.mjs`; `tools/pad-test.mjs` (two phones, latency, lag+jitter+loss, multi-touch, screenshots → `shots/pad/`); `tools/pad-online.mjs` (online with a phone each side, in sync).
 
 ## Status — stage 2 of 2 (shipped: PR #47, merged and deployed)
 
