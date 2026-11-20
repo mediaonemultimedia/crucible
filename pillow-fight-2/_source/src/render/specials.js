@@ -155,9 +155,11 @@ export class SpecialFX {
   /* each frame a shot flies: its spin, wobble, flicker — and a trail */
   animShot(m, p, x, y, z, dt) {
     const t = p.t;
+    // its line (PF2: the shot's facing; PF1: along x)
+    const ux = p.fx !== undefined ? p.fx / 1024 : Math.sign(p.vx) || 1, uz = p.fz !== undefined ? p.fz / 1024 : 0;
     if (p.kind === 'snow') {
       m.rotation.z = -t * 0.21; m.rotation.x = t * 0.07;
-      if (Math.random() < dt * 30) this.puff('snow', x - p.fx / 1024 * 0.3, y + (Math.random() - 0.5) * 0.25, z - p.fz / 1024 * 0.3, 0.22 + Math.random() * 0.18, [-p.fx / 2048, 0.4, -p.fz / 2048], 0.6);
+      if (Math.random() < dt * 30) this.puff('snow', x - ux * 0.3, y + (Math.random() - 0.5) * 0.25, z - uz * 0.3, 0.22 + Math.random() * 0.18, [-ux / 2, 0.4, -uz / 2], 0.6);
     } else if (p.kind === 'glove') {
       // spinning end over end, as thrown
       const inner = m.userData.inner;
@@ -170,16 +172,16 @@ export class SpecialFX {
       m.userData.licks.forEach((q, k) => {
         const fl = 0.85 + 0.25 * Math.sin(t * 1.7 + k * 2.1) + 0.1 * Math.sin(t * 3.9 + k);
         q.position.set(back * (0.95 + k * 0.55), (k - 1) * 0.05 + Math.sin(t * 0.9 + k) * 0.05, 0);
-        q.scale.set((1.05 - k * 0.2) * fl * 1.25, (0.9 - k * 0.2) * fl, 1);
+        q.scale.set((1.05 - k * 0.2) * fl * 1.9, (0.9 - k * 0.2) * fl * 1.45, 1);
         q.quaternion.copy(this._toCam(m));
       });
-      for (let i = 0; i < 2; i++) if (Math.random() < dt * 40) this.puff('flame', x - p.fx / 1024 * (0.9 + Math.random() * 0.4), y + (Math.random() - 0.5) * 0.3, z - p.fz / 1024 * (0.9 + Math.random() * 0.4), 0.3 + Math.random() * 0.3, [-p.fx / 1024 * 0.8, 1.2, -p.fz / 1024 * 0.8], 0.45);
+      for (let i = 0; i < 2; i++) if (Math.random() < dt * 40) this.puff('flame', x - ux * (0.9 + Math.random() * 0.4), y + (Math.random() - 0.5) * 0.3, z - uz * (0.9 + Math.random() * 0.4), 0.3 + Math.random() * 0.3, [-ux * 0.8, 1.2, -uz * 0.8], 0.45);
     } else if (p.kind === 'ink') {
       // a wobbling blob (stretched along its flight), the droplets trailing
       const w = Math.sin(t * 0.9);
       m.userData.blob.scale.set(1.18 + 0.08 * w, 0.9 - 0.06 * w, 0.95 - 0.04 * w);
       m.userData.drops.forEach((d, k) => { d.position.y = 0.04 * Math.sin(t * 0.8 + k * 2); });
-      if (Math.random() < dt * 14) this.puff('ink', x - p.fx / 1024 * 0.55, y - 0.1, z - p.fz / 1024 * 0.55, 0.12 + Math.random() * 0.08, [0, -1.5, 0], 0.5, { grav: 1 });
+      if (Math.random() < dt * 14) this.puff('ink', x - ux * 0.55, y - 0.1, z - uz * 0.55, 0.12 + Math.random() * 0.08, [0, -1.5, 0], 0.5, { grav: 1 });
     }
   }
 
@@ -251,18 +253,25 @@ export class SpecialFX {
       const F = st.f[k], I = this.faceInk[k], pl = plush[k];
       const on = F.ink > 0 && F.act !== 'ko' && F.act !== 'ringout';
       if (!on) { for (const b of I.blots) b.visible = false; continue; }
+      this._hq.set(0, 0, 0, 0);
       const r = pl.headWorld(this._hp, this._hq);
       // into the world group's frame
       this.world.updateWorldMatrix(true, false);
       const inv = this._inv || (this._inv = new THREE.Matrix4());
       inv.copy(this.world.matrixWorld).invert();
       const hp = this._hp.applyMatrix4(inv);
-      const fx = F.fx / 1024, fz = F.fz / 1024;
+      // the way the face looks: the head's own turn where the plush gives it
+      // (PF2), else three-quarters to the camera (PF1's flat stage, camera at +z)
+      let fx = F.face * 0.65, fz = 0.76;
+      if (this._hq.lengthSq() > 0.5 && F.fx !== undefined) {
+        const d = (this._hd || (this._hd = new THREE.Vector3())).set(0, 0, 1).applyQuaternion(this._hq).transformDirection(inv);
+        const l = Math.hypot(d.x, d.z) || 1; fx = d.x / l; fz = d.z / l;
+      }
       const fade = Math.min(1, F.ink / 20), drip = 1 - F.ink / 120;
       I.blots.forEach((b, j) => {
         const side = (j - 1) * 0.42, up = [0.08, 0.22, -0.05][j] - drip * 0.08 * (j + 1);
         b.visible = true;
-        b.position.set(hp.x + fx * r * 0.92 + -fz * side * r, hp.y + up * r, hp.z + fz * r * 0.92 + fx * side * r);
+        b.position.set(hp.x + fx * r * 1.02 + -fz * side * r * 0.8, hp.y + up * r, hp.z + fz * r * 1.02 + fx * side * r * 0.8);
         const s = r * [0.75, 0.95, 0.6][j] * (0.6 + 0.4 * fade);
         b.scale.set(s, s * (1 + drip * 0.35), s);
         b.quaternion.copy(cq);

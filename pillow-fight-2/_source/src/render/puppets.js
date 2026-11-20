@@ -203,7 +203,7 @@ export class BipedPuppet extends FightMixin(Athlete) {
     const m = FIGHTERS[F.id].moves.mspH, t = F.t + (this.frac || 0);
     const a = m.motion[0].from - 2, b = m.motion[0].to + 4;
     const u = clamp((t - a) / (b - a), 0, 1), e = u * u * (3 - 2 * u);
-    return { a: -TAU * 3 * e, h: 1.05, y: 0.12 * Math.sin(Math.PI * u) };
+    return { a: -(F.face || 1) * TAU * 3 * e, h: 1.05, y: 0.12 * Math.sin(Math.PI * u) };
   }
 
   /* the sim says what he's doing; pick the pose targets */
