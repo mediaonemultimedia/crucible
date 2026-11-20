@@ -1162,7 +1162,7 @@ export class CrowPuppet extends BipedPuppet {
     if (F.mv === 'dive') return { a: -f * 0.95 * smooth(4, 8, t), h: 1.1, y: 0 };
     if (F.mv === 'diveLand') return { a: -f * 0.95 * (1 - smooth(0, 10, t)), h: 1.1, y: 0 };
     // the Torpedo: flat out, beak first, skimming low over the quilt
-    if (F.mv === 'mspH') { const m = FIGHTERS.zach.moves.mspH, s = smooth(3, 8, t) * (1 - smooth(m.motion[0].to + 1, m.motion[0].to + 12, t)); return { a: -f * 1.45 * s, h: 1.0, y: 0.25 * s }; }
+    if (F.mv === 'mspH') { const m = FIGHTERS.zach.moves.mspH, s = smooth(3, 8, t) * (1 - smooth(m.motion[0].to + 1, m.motion[0].to + 12, t)); return { a: -f * 1.02 * s, h: 1.0, y: 0.5 * s }; }
     return null;
   }
 }

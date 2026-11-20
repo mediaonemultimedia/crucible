@@ -342,7 +342,7 @@ export class CPU {
     const P = HEAVY, O = LIGHT, C = DOWN, wait = [0, 30];
     const shotOut = st.proj.some((p) => p.o === this.side);
     switch (me.id) {
-      case 'kevalanche': return d > 4200 && !shotOut ? [[C, 2], [C | F, 2], [F, 1], [F | (this.chance(0.5) ? O : P), 1], wait] : null;
+      case 'kevalanche': return d > 3400 && !shotOut ? [[C, 2], [C | F, 2], [F, 1], [F | (this.chance(0.5) ? O : P), 1], wait] : null;
       case 'johnny': return d > 4200 && !shotOut ? [[C, 2], [C | B, 2], [B, 1], [B | (this.chance(0.5) ? O : P), 1], wait] : null;
       case 'rubberta': return d > 3600 && !shotOut ? [[F, 2], [F | C, 2], [C, 1], [C | B, 2], [B, 1], [B | (d < 5200 ? O : P), 1], wait] : null;
       case 'k8e': return d > 3800 && d < 7600 ? [[B, 2], [B | C, 2], [C, 1], [C | F, 2], [F, 1], [F | (d < 5400 ? O : P), 1], [0, 40]] : null;

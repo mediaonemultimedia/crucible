@@ -208,3 +208,19 @@ test('roster 2 online: Sebas Perra and Zach Sparrow, both ways, CPU and random i
     console.log(`  ${c.p1} v ${c.p2} ${c.kind} @${c.latency}ms: ${r.ticks} ticks, rollbacks ${r.stats[0].rollbacks}/${r.stats[1].rollbacks}, max ${r.stats[0].maxRollback}`);
   }
 });
+
+test('the motion specials online: every fighter, CPU inputs over 60 ms ± 20 and 5% loss, 3+ minutes in sync', () => {
+  let ticks = 0;
+  const used = new Set();
+  ROSTER.forEach((p1, i) => {
+    const p2 = ROSTER[(i + 3) % ROSTER.length], seed = 300 + i;
+    const net = makeNet({ latency: 60, jitter: 20, loss: 0.05, seed: 40 + i });
+    const res = playOnline({ p1, p2, seed, net, inputs: cpuInputs(p1, p2, seed, 'normal') });
+    const r = checkMatch(res, createMatch({ p1, p2, seed }), `specials ${p1} v ${p2}`);
+    ticks += r.ticks;
+    for (const e of reference(createMatch({ p1, p2, seed }), res.peers, res.peers[0].frame).ev) if (e.k === 'msp') used.add(e.who);
+  });
+  console.log(`  specials online: ${(ticks / 3600).toFixed(2)} min in sync, specials used by ${[...used].join(', ')}`);
+  assert.ok(ticks >= 3 * 3600, `${ticks} ticks`);
+  assert.equal(used.size, ROSTER.length, `every fighter's special came out online (${[...used]})`);
+});
