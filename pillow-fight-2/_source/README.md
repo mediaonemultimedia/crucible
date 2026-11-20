@@ -30,7 +30,7 @@ twins), `seed=N`, `hold` (no free-running loop; tools step `__pf2`),
 `webgl` (force WebGL 2), `noportraits` (skip the card portraits).
 
 ## Specials (Run A, Thu Nov 19) — status
-**PF2:** done for all 7 (Kevalanche, Johnny, K8-E, Rubberta, Sumaura, Zach, Sebas): sim + motion inputs (`sim/motion.js`), move data (`fighters/movelist.js`), visuals (`render/specials.js`), SFX, CPU, practice list, legend, tests (`test/specials.test.mjs`), shots (`tools/specials-shots.mjs` → `shots/specials/`). Shipping: `pf2-release-4`. **PF1:** see `bolster-source` (in progress).
+**PF2:** done for all 7 (Kevalanche, Johnny, K8-E, Rubberta, Sumaura, Zach, Sebas): sim + motion inputs (`sim/motion.js`), move data (`fighters/movelist.js`), visuals (`render/specials.js`), SFX, CPU, practice list, legend, tests (`test/specials.test.mjs`), shots (`tools/specials-shots.mjs` → `shots/specials/`). Shipped: PR #49 (`pf2-release-4`, merged). **PF1:** see `bolster-source` (in progress).
 
 ## Status — stage 2 of 2 (shipped: PR #47, merged and deployed)
 
