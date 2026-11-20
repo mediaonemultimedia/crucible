@@ -32,6 +32,9 @@ twins), `seed=N`, `hold` (no free-running loop; tools step `__pf2`),
 ## Specials (Run A, Thu Nov 19) — status
 **PF2:** done for all 7 (Kevalanche, Johnny, K8-E, Rubberta, Sumaura, Zach, Sebas): sim + motion inputs (`sim/motion.js`), move data (`fighters/movelist.js`), visuals (`render/specials.js`), SFX, CPU, practice list, legend, tests (`test/specials.test.mjs`), shots (`tools/specials-shots.mjs` → `shots/specials/`). Shipped: PR #49 (`pf2-release-4`, merged). **PF1:** see `bolster-source` (in progress).
 
+## Phone controller (Run B, Thu Nov 19) — status
+**In progress.** Done: QR encoder (`src/pad/qr.js`, decoded by jsQR v1–10). Next: pairing + wire, phone UI, cheat sheet, tests, release `pf2-release-5`.
+
 ## Status — stage 2 of 2 (shipped: PR #47, merged and deployed)
 
 | # | Stage 2 item | State |
