@@ -168,7 +168,34 @@ const lose = {
   },
 };
 
-export const TRACKS = { menu, fight, vs, round: roundStart, win, lose };
+/* Down Hill's race loop: G major, bright and bouncy, 164 bpm. A (8 bars)
+   the hook, B (8 bars) climbing over E minor, a 16-bar loop; the hype
+   layer (16th hats, a doubled arp) comes in on the final lap. Original. */
+const RA = ['G', 'G', 'C', 'D', 'G', 'Em', 'C', 'D'];
+const RB = ['Em', 'C', 'G', 'D', 'Em', 'C', 'Am', 'D7'];
+const RACE_CHORDS = [...RA, ...RB];
+const race = {
+  name: 'race', bpm: 164, swing: 0.52, loop: true,
+  channels: {
+    lead: { grid: 8, gain: 0.85, bars: bars(`
+      g4 b4 d5 . g5 . d5 b4 | c5 . d5 . e5 d5 b4 . | c5 e5 g5 . e5 . c5 . | d5 - a4 . f#4 . a4 d5 |
+      b4 d5 g5 . b5 . a5 g5 | e5 . g5 . b5 - g5 e5 | c5 e5 g5 c6 b5 . g5 e5 | f#5 - - . d5 e5 f#5 a5 |
+      g5 . e5 . b4 . e5 g5 | e5 . c5 . g4 . c5 e5 | d5 . b4 . g4 . b4 d5 | a5 - f#5 . d5 . f#5 a5 |
+      b5 . g5 . e5 . g5 b5 | c6 . g5 . e5 . c5 e5 | c5 . e5 a5 - . g5 e5 | f#5 - - . a5 - - .`) },
+    lead2: { grid: 8, gain: 0.7, bars: bars(`
+      . | . . . . . . . g5 | . | . . . . . . f#5 . |
+      . | . . . . . . . b5 | . | . . . . . . c6 . |
+      b4 . . . g4 . . . | g4 . . . e4 . . . | b4 . . . d5 . . . | f#5 - d5 . a4 . d5 f#5 |
+      g5 . . . b4 . . . | g5 . . . c5 . . . | a4 . c5 e5 - . c5 a4 | d5 - - . f#5 - - .`) },
+    arp: { grid: 16, gain: 0.45, bars: RACE_CHORDS.map((c, i) => (i >= 8 ? arpBar(c, [0, 1, 2, 8, 2, 1, 0, 1, 0, 1, 2, 8, 9, 8, 2, 1], 4) : ['.'])) },
+    bass: { grid: 8, gain: 1, bars: RACE_CHORDS.map((c, i) => bassBar(c, i % 4 === 3 ? 'R O R O 5 5 A A' : 'R O 5 O R O 5 A', RACE_CHORDS[(i + 1) % 16])) },
+    drums: { grid: 16, gain: 0.85, bars: RACE_CHORDS.map((_, i) => (i === 0 ? 'kc . h . s . h k . k h . s . h h' : i % 8 === 7 ? 'k . h . s . s s . s s . s s s s' : i >= 8 ? 'k . h h s . h k k . h h s . o .' : 'k . h . s . h k . k h . s . h h').split(' ')) },
+    hats: { grid: 16, gain: 0.5, hype: true, drum: true, bars: RACE_CHORDS.map(() => 'h h h h h h h h h h h h h h h h'.split(' ')) },
+    arp2: { grid: 16, gain: 0.4, hype: true, inst: 'arp', bars: RACE_CHORDS.map((c, i) => (i < 8 ? arpBar(c, [0, 1, 2, 8, 2, 1, 0, 1, 0, 1, 2, 8, 9, 8, 2, 1], 5) : ['.'])) },
+  },
+};
+
+export const TRACKS = { menu, fight, vs, round: roundStart, win, lose, race };
 
 /* ── compile: a track → { beats, events: [{ beat, dur, ch, inst, note, drum, gain, hype }] } ── */
 export function compile(track) {

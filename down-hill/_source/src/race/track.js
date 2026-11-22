@@ -64,11 +64,11 @@ export const LANDING = {
     W(108, 2.5, -40, { tag: 'drawer', w: 9, m: 1.5 }),
     W(92, 0, -44, { tag: 'landing', w: 9, m: 4 }),
     W(68, 0, -46, { tag: 'door', w: 8, m: 1 }),
-    W(52, 0, -46, { tag: 'pillows', w: 9, m: 3, pad: 1 }),
-    W(40, 6.5, -46, { tag: 'pillows', w: 9, m: 2, launch: 15 }),
-    W(22, 16, -46, { tag: 'duvet', w: 10, m: 5 }),
-    W(6, 16, -50, { tag: 'duvet', w: 10, m: 6 }),
-    W(-8, 16, -48, { tag: 'duvet', w: 10, m: 6 }),
+    W(52, 0, -46, { tag: 'pillows', w: 9, m: 2, pad: 1 }),
+    W(38, 8, -46, { tag: 'pillows', w: 9, m: 1.5 }),
+    W(25, 16, -46, { tag: 'pillows', w: 9, m: 1.5, launch: 19 }),
+    W(8, 16, -50, { tag: 'duvet', w: 10, m: 6 }),
+    W(-8, 16, -46, { tag: 'duvet', w: 10, m: 6 }),
   ],
   /* the slow patches on the driving line (circles: x, z, r, kind) */
   patches: [

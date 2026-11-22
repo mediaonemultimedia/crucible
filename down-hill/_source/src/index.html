@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#120d1f">
+<title>Down Hill</title>
+<meta name="description" content="Down Hill: a Pillow Fight kart race. The Pillow Fight 2 plush cast race karts round a giant kid's bedroom and the upstairs landing at night — drift for feather sparks, trick off ramps, and throw pillow missiles, feather slicks, fuzzy handcuffs and alarm clocks.">
+<style>
+/*FONTFACE*/
+:root{
+  --stage:#120d1f;--panel:#1d1630;--panel2:#2a2140;--line:#4a3b78;--ink:#ffffff;--dim:#bdb3dc;
+  --p1:#ff3b6b;--p2:#3ff0c8;--violet:#9b5cff;--gold:#ffc93a;--on-neon:#120d1f;
+  --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",Arial,sans-serif;
+  --heavy:"Bolster Display","Arial Black","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --cond:"Bolster Condensed","Oswald","Arial Narrow","Roboto Condensed","Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --hand:"Bolster Hand","Comic Sans MS","Chalkboard SE",cursive;
+  --glow-v:0 0 10px rgba(155,92,255,.75),0 0 26px rgba(155,92,255,.4);
+  --glow-p:0 0 10px rgba(255,59,107,.8),0 0 26px rgba(255,59,107,.4);
+  --glow-m:0 0 10px rgba(63,240,200,.75),0 0 26px rgba(63,240,200,.35);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--stage);color:var(--ink);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
+canvas#stage{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#ui{position:fixed;inset:0;z-index:5;pointer-events:none}
+#dark{position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0;background:radial-gradient(70% 70% at 50% 55%,rgba(5,3,12,.55),rgba(2,1,6,.97))}
+.screen{position:absolute;inset:0;display:none;pointer-events:auto}
+.screen.on{display:block}
+.eyebrow{font-family:var(--cond);font-weight:700;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim)}
+kbd{display:inline-block;min-width:22px;text-align:center;font-family:var(--mono);font-size:11px;padding:2px 5px;border:1.5px solid #8a78c4;border-bottom-width:3px;border-radius:4px;background:var(--panel2);color:var(--ink);margin-right:2px;line-height:1.2}
+#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:20;background:var(--stage);font-family:var(--cond);font-weight:700;letter-spacing:.3em;text-transform:uppercase;color:var(--dim);transition:opacity .5s}
+body.is-live #loading{opacity:0;pointer-events:none}
+
+/* the series mark */
+#mark{position:absolute;top:22px;left:26px;font-size:14px;font-weight:300;letter-spacing:.52em;text-transform:uppercase;color:var(--ink);pointer-events:none}
+body.racing #mark{display:none}
+
+/* title: the logo is type, neon, with a feather */
+.logo{position:absolute;left:50%;top:27%;transform:translate(-50%,-50%) rotate(-4deg);text-align:center;white-space:nowrap}
+.logo .l1{font-family:var(--heavy);font-size:clamp(64px,11vw,150px);line-height:.86;letter-spacing:.02em;color:#fff;
+  text-shadow:0 3px 0 #ff3b6b,0 6px 0 #b51f4c,0 9px 0 #5c1031,0 0 30px rgba(255,59,107,.55),0 0 70px rgba(155,92,255,.45);display:block}
+.logo .l1 em{font-style:normal;color:var(--p2);text-shadow:0 3px 0 #1fae8e,0 6px 0 #11735d,0 9px 0 #0a3d33,0 0 30px rgba(63,240,200,.55)}
+.logo .sub{display:inline-block;margin-top:22px;font-family:var(--hand);font-size:clamp(20px,2.6vw,34px);color:#fff;transform:rotate(3deg);background:var(--violet);padding:2px 16px 4px;border-radius:8px;box-shadow:var(--glow-v)}
+.logo .feather{position:absolute;right:-6%;top:-26%;font-size:clamp(40px,6vw,80px);transform:rotate(25deg);animation:float 3.2s ease-in-out infinite;filter:drop-shadow(0 0 12px rgba(255,255,255,.6))}
+@keyframes float{50%{transform:rotate(15deg) translateY(10px)}}
+.press{position:absolute;left:0;right:0;bottom:30%;text-align:center;font-family:var(--cond);font-weight:700;font-size:16px;letter-spacing:.34em;text-transform:uppercase;color:var(--ink);text-shadow:var(--glow-v);animation:blink 1.3s steps(2) infinite}
+@keyframes blink{50%{opacity:.25}}
+.keys{position:absolute;left:50%;bottom:4%;transform:translateX(-50%);display:grid;grid-template-columns:repeat(4,auto);gap:6px 22px;background:rgba(29,22,48,.9);border:1px solid var(--line);border-radius:10px;padding:12px 18px;font-size:13px;box-shadow:0 0 20px rgba(155,92,255,.2)}
+.keys h4{grid-column:1/-1;margin:0 0 2px;font-family:var(--cond);font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--dim);font-weight:700}
+.keys div{white-space:nowrap}
+.keys b{font-family:var(--cond);letter-spacing:.12em;text-transform:uppercase;font-size:12px;color:#cdb6ff;margin-left:4px}
+
+/* select */
+#select .head{position:absolute;top:20px;left:0;right:0;text-align:center}
+.panel-title{margin:0;font-family:var(--cond);font-weight:700;font-size:clamp(28px,3.6vw,44px);text-transform:uppercase;letter-spacing:.08em;color:var(--ink);text-shadow:var(--glow-v);font-style:italic}
+.plate{position:absolute;left:3.5vw;top:max(16%,120px);width:min(32vw,360px)}
+.plate .who{font-family:var(--cond);font-weight:700;font-size:13px;letter-spacing:.24em;text-transform:uppercase;color:var(--on-neon);background:var(--p1);display:inline-block;padding:3px 9px;box-shadow:0 0 14px rgba(255,59,107,.6)}
+.plate .nm{font-family:var(--cond);font-weight:700;font-size:clamp(30px,4vw,54px);line-height:1;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.03em;font-style:italic;text-shadow:var(--glow-p)}
+.plate .an{font-size:14px;color:var(--dim)}
+.plate .kart{margin-top:14px;font-family:var(--cond);font-weight:700;font-size:20px;letter-spacing:.06em;text-transform:uppercase;color:var(--p2);text-shadow:var(--glow-m)}
+.plate .blurb{font-size:13px;color:var(--ink);margin-top:4px;line-height:1.4}
+.stats{margin-top:12px;display:grid;grid-template-columns:auto 1fr;gap:5px 10px;align-items:center;font-family:var(--cond);font-weight:700;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+.bar{height:8px;border-radius:4px;background:#2a2140;overflow:hidden;box-shadow:inset 0 0 0 1px var(--line)}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--p1),var(--violet));border-radius:4px}
+.diff{position:absolute;right:3.5vw;top:max(16%,120px);display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.diff .eyebrow{margin-bottom:2px}
+.pill{font-family:var(--cond);font-weight:700;font-size:16px;letter-spacing:.14em;text-transform:uppercase;padding:8px 18px;border:2px solid var(--line);border-radius:22px;background:#1d1630;color:var(--dim);cursor:pointer}
+.pill.sel{border-color:var(--p2);color:var(--ink);box-shadow:var(--glow-m)}
+.cards{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);display:grid;grid-template-columns:repeat(7,auto);gap:8px}
+.card{position:relative;width:clamp(74px,8.6vw,120px);aspect-ratio:4/5;border:2px solid var(--line);border-radius:6px;cursor:pointer;overflow:hidden;background:var(--panel);transition:transform .12s,box-shadow .12s}
+.card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.card .sw{position:absolute;inset:0;background:radial-gradient(80% 70% at 50% 35%,var(--c1),var(--c2))}
+.card .emo{position:absolute;left:0;right:0;top:22%;text-align:center;font-size:clamp(26px,3vw,40px)}
+.card .lab{position:absolute;left:0;right:0;bottom:0;background:rgba(18,13,31,.88);font-family:var(--cond);font-weight:700;font-size:clamp(9px,.95vw,12px);text-transform:uppercase;letter-spacing:.03em;padding:4px 4px 4px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .alt{position:absolute;top:5px;right:5px;font-family:var(--cond);font-weight:700;font-size:10px;letter-spacing:.12em;background:var(--violet);padding:1px 5px;border-radius:3px}
+.card:hover{transform:translateY(-3px)}
+.card.c1{border-color:var(--p1);box-shadow:0 0 0 2px var(--p1),0 0 22px rgba(255,59,107,.65);transform:translateY(-4px)}
+.hintline{position:absolute;left:0;right:0;bottom:calc(18px + 2 * clamp(74px,8.6vw,120px) * 1.25 + 26px);text-align:center;font-family:var(--cond);font-weight:700;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+
+/* HUD */
+#hud{display:none}
+body.racing #hud{display:block}
+.place{position:absolute;right:28px;bottom:22px;font-family:var(--heavy);font-size:clamp(70px,9vw,120px);line-height:.8;color:#fff;text-shadow:0 4px 0 var(--p1),0 0 26px rgba(255,59,107,.6)}
+.place sup{font-size:.36em;vertical-align:top;margin-left:2px;position:relative;top:.2em}
+.place.p1{text-shadow:0 4px 0 #c99a00,0 0 26px rgba(255,201,58,.7)}
+.lap{position:absolute;right:30px;top:20px;text-align:right;font-family:var(--cond);font-weight:700;text-transform:uppercase}
+.lap .l{font-size:13px;letter-spacing:.26em;color:var(--dim)}
+.lap .n{font-size:40px;letter-spacing:.04em;line-height:1;text-shadow:var(--glow-v)}
+.lap .tm{font-family:var(--mono);font-size:15px;color:var(--ink);margin-top:2px}
+.final{position:absolute;left:50%;top:22%;transform:translate(-50%,-50%);font-family:var(--heavy);font-size:clamp(40px,6vw,76px);color:#fff;text-shadow:0 4px 0 var(--violet),0 0 30px rgba(155,92,255,.8);opacity:0;pointer-events:none;white-space:nowrap}
+.final.on{animation:pop 2s ease-out forwards}
+@keyframes pop{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}12%{opacity:1;transform:translate(-50%,-50%) scale(1.15)}22%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-60%) scale(1)}}
+.item{position:absolute;left:28px;top:22px;width:96px;height:96px;border-radius:22px;border:3px solid var(--violet);background:radial-gradient(70% 70% at 50% 40%,#3a2c62,#1a1330);box-shadow:var(--glow-v),inset 0 0 18px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.item::before{content:'';position:absolute;inset:6px;border:1.5px dashed rgba(205,190,255,.45);border-radius:16px}
+.item svg{width:68px;height:68px;filter:drop-shadow(0 2px 0 rgba(0,0,0,.4))}
+.item.spin svg{animation:jig .09s steps(2) infinite}
+@keyframes jig{50%{transform:translateY(-3px) scale(.92)}}
+.item-name{position:absolute;left:28px;top:124px;width:96px;text-align:center;font-family:var(--cond);font-weight:700;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.item-name kbd{margin-top:4px}
+.drift{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);display:flex;gap:8px;align-items:center;font-family:var(--cond);font-weight:700;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim)}
+.drift i{width:34px;height:10px;border-radius:5px;background:#2a2140;box-shadow:inset 0 0 0 1px var(--line);transition:background .1s,box-shadow .1s}
+.drift i.t1{background:#fff;box-shadow:0 0 12px #fff}
+.drift i.t2{background:var(--gold);box-shadow:0 0 12px var(--gold)}
+.drift i.t3{background:#4dffc3;box-shadow:0 0 14px #4dffc3}
+.drift .fill{width:120px;height:6px;border-radius:3px;background:#2a2140;overflow:hidden}
+.drift .fill b{display:block;height:100%;width:0;background:linear-gradient(90deg,#fff,var(--gold),#4dffc3)}
+#minimap{position:absolute;left:24px;bottom:20px;width:230px;height:170px;border-radius:12px;background:rgba(18,13,31,.55);border:1px solid rgba(155,92,255,.45);box-shadow:0 0 16px rgba(155,92,255,.25)}
+.count{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-family:var(--heavy);font-size:clamp(90px,16vw,200px);color:#fff;text-shadow:0 6px 0 var(--p1),0 0 40px rgba(255,59,107,.7);pointer-events:none}
+.count.go{color:var(--p2);text-shadow:0 6px 0 #11735d,0 0 40px rgba(63,240,200,.8)}
+.toast{position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);font-family:var(--heavy);font-size:clamp(28px,4vw,52px);color:#fff;white-space:nowrap;pointer-events:none;opacity:0}
+.toast.on{animation:pop 1.3s ease-out forwards}
+.fabric{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .25s;background:
+  radial-gradient(60% 55% at 50% 50%,rgba(0,0,0,0) 40%,rgba(244,239,230,.92) 78%),
+  repeating-linear-gradient(45deg,rgba(255,255,255,.08) 0 3px,rgba(0,0,0,.05) 3px 6px)}
+.fabric.on{opacity:1}
+.scare{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(0);font-size:40vmin;pointer-events:none;filter:drop-shadow(0 0 40px #ff3030)}
+.scare.on{animation:scare 1.1s ease-out forwards}
+@keyframes scare{0%{transform:translate(-50%,-50%) scale(.2) rotate(-10deg)}10%{transform:translate(-50%,-50%) scale(1.25) rotate(8deg)}20%{transform:translate(-50%,-50%) scale(1) rotate(-6deg)}30%{transform:translate(-50%,-50%) scale(1.05) rotate(5deg)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(1.1)}}
+.scare b{position:absolute;left:50%;top:92%;transform:translateX(-50%);font-family:var(--heavy);font-size:8vmin;color:#fff;text-shadow:0 4px 0 #c00,0 0 20px #f00;white-space:nowrap}
+.lookback{position:absolute;left:50%;top:20px;transform:translateX(-50%);font-family:var(--cond);font-weight:700;letter-spacing:.3em;font-size:13px;text-transform:uppercase;background:var(--violet);padding:3px 10px;border-radius:4px;display:none}
+body.looking .lookback{display:block}
+
+/* the speech bubbles (ui/bubble.js) */
+#bubbles{position:fixed;inset:0;pointer-events:none;z-index:6;overflow:visible}
+/* speech bubbles (cardboard) ------------------------------------------------- */
+.bubble{position:absolute;pointer-events:none;transform-origin:var(--ox,50%) var(--oy,100%)}
+.bubble svg{display:block;overflow:visible}
+.bubble.slap{animation:slap .42s cubic-bezier(.25,1.5,.45,1) both}
+@keyframes slap{0%{transform:rotate(var(--rot)) scale(.2,.1);opacity:0}45%{transform:rotate(var(--rot)) scale(1.12,.86);opacity:1}70%{transform:rotate(var(--rot)) scale(.95,1.05)}100%{transform:rotate(var(--rot)) scale(1)}}
+.bubble.out{animation:bubout .3s ease-in forwards}
+@keyframes bubout{to{transform:rotate(var(--rot)) scale(.6);opacity:0}}
+
+/* toast (the toque code) ------------------------------------------------------ */
+
+
+/* results */
+#results .head{position:absolute;top:22px;left:0;right:0;text-align:center}
+.board{position:absolute;right:3.5vw;top:50%;transform:translateY(-50%);width:min(34vw,380px);background:rgba(18,13,31,.86);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:0 0 22px rgba(155,92,255,.25)}
+.board .row{display:grid;grid-template-columns:34px 1fr auto;gap:8px;align-items:center;padding:5px 4px;font-family:var(--cond);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:16px;border-bottom:1px solid rgba(74,59,120,.5)}
+.board .row:last-child{border-bottom:0}
+.board .row .p{font-family:var(--heavy);font-size:20px;color:var(--dim)}
+.board .row.you{color:var(--p2);text-shadow:var(--glow-m)}
+.board .row .t{font-family:var(--mono);font-size:13px;color:var(--dim);letter-spacing:0}
+.board .row:nth-child(1) .p{color:var(--gold)}
+.again{position:absolute;left:0;right:0;bottom:6%;text-align:center;font-family:var(--cond);font-weight:700;font-size:15px;letter-spacing:.3em;text-transform:uppercase;text-shadow:var(--glow-v);animation:blink 1.3s steps(2) infinite}
+
+/* pause */
+#pause{background:rgba(10,7,20,.72)}
+#pause .box{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px 30px;box-shadow:0 0 26px rgba(155,92,255,.35)}
+#pause .box p{font-family:var(--cond);font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);font-size:13px}
+@media (max-width:700px){.keys{grid-template-columns:repeat(2,auto)}.plate{width:60vw}.diff{top:auto;bottom:52%}#minimap{width:150px;height:110px}}
+</style>
+</head>
+<body data-screen="title">
+<canvas id="stage"></canvas>
+<div id="dark"></div>
+<div id="loading">Fluffing the pillows…</div>
+<div id="ui">
+  <div id="mark">Crucible</div>
+
+  <section class="screen on" id="title">
+    <div class="logo"><span class="l1">DOWN <em>HILL</em></span><span class="sub">a Pillow Fight kart race</span><span class="feather">🪶</span></div>
+    <div class="press">Press Enter</div>
+    <div class="keys">
+      <h4>Keyboard (or a gamepad)</h4>
+      <div><kbd>←</kbd><kbd>→</kbd> / <kbd>A</kbd><kbd>D</kbd><b>Steer</b></div>
+      <div><kbd>↑</kbd> / <kbd>W</kbd><b>Gas</b></div>
+      <div><kbd>↓</kbd> / <kbd>S</kbd><b>Brake / reverse</b></div>
+      <div><kbd>Shift</kbd> / <kbd>K</kbd><b>Drift</b></div>
+      <div><kbd>Space</kbd> / <kbd>J</kbd><b>Item</b></div>
+      <div><kbd>T</kbd> / <kbd>L</kbd><b>Taunt · trick</b></div>
+      <div><kbd>Q</kbd> / <kbd>C</kbd><b>Look back</b></div>
+      <div><kbd>Esc</kbd> <kbd>M</kbd><b>Pause · mute</b></div>
+    </div>
+  </section>
+
+  <section class="screen" id="select">
+    <div class="head"><h2 class="panel-title">Pick your racer</h2><span class="eyebrow">← → fighter · ↑ ↓ OG or ALT · Enter to race</span></div>
+    <div class="plate">
+      <span class="who">P1</span>
+      <div class="nm" id="s-name"></div>
+      <div class="an" id="s-animal"></div>
+      <div class="kart" id="s-kart"></div>
+      <div class="blurb" id="s-blurb"></div>
+      <div class="stats" id="s-stats"></div>
+    </div>
+    <div class="diff" id="diff"><span class="eyebrow">CPU · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></span></div>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section class="screen" id="hud">
+    <div class="item" id="h-item"></div>
+    <div class="item-name" id="h-itemname"></div>
+    <div class="lap"><div class="l">Lap</div><div class="n" id="h-lap">1/3</div><div class="tm" id="h-time">0:00.00</div></div>
+    <canvas id="minimap" width="460" height="340"></canvas>
+    <div class="place" id="h-place">8<sup>th</sup></div>
+    <div class="drift" id="h-drift"><span>Drift</span><i></i><i></i><i></i></div>
+    <div class="final" id="h-final">FINAL LAP!</div>
+    <div class="count" id="h-count"></div>
+    <div class="toast" id="h-toast"></div>
+    <div class="lookback">Look back</div>
+  </section>
+  <div class="fabric" id="fabric"></div>
+  <div class="scare" id="scare">⏰<b>BRRRRING!</b></div>
+
+  <section class="screen" id="results">
+    <div class="head"><h2 class="panel-title" id="r-title">Results</h2></div>
+    <div class="board" id="board"></div>
+    <div class="again">Enter: race again · Esc: pick a racer</div>
+  </section>
+
+  <section class="screen" id="pause">
+    <div class="box"><h2 class="panel-title">Paused</h2><p>Esc to go on · R to restart · Q to quit · M mute</p></div>
+  </section>
+</div>
+<div id="bubbles"></div>
+<!--BUNDLE-->
+</body>
+</html>

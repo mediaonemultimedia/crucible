@@ -238,7 +238,7 @@ export function playSynthSfx(ctx, dest, id, t, rate = 1, gain = 1) {
     }
     g.gain.value = 1;
     end = t + 0.24;
-  } else if (id.startsWith('sp-')) {
+  } else if (id.startsWith('sp-') || id.startsWith('dh-')) {
     // the motion specials (PF2): soft, plush, cartoon — noise and sines only
     const N = (lenS, type, f0, f1, q, peak, a = 0.01, nrate = 1) => {
       const n = noiseSrc(ctx, t, nrate), f = ctx.createBiquadFilter(), ng = ctx.createGain();
@@ -273,7 +273,34 @@ export function playSynthSfx(ctx, dest, id, t, rate = 1, gain = 1) {
       const l = ctx.createOscillator(), lg = ctx.createGain();
       l.frequency.value = 11 * rate; lg.gain.value = 0.5;
       l.connect(lg); lg.connect(ng.gain); l.start(t); l.stop(t + 0.82); srcs.push(l);
-    } else return null;
+    }
+    // ── Down Hill (dh-): the kart race's own ──
+    else if (k === 'boost') { len = 0.6; N(0.6, 'bandpass', 500, 3200, 1.1, 0.36, 0.01, 1); O(0.45, 'sawtooth', 160, 520, 0.07, 0.01); }
+    else if (k === 'pad') { len = 0.32; O(0.12, 'square', 660, 990, 0.08); O(0.16, 'square', 990, 1480, 0.08, 0.004, 0.08); N(0.3, 'bandpass', 2000, 4200, 1.4, 0.12, 0.01, 1.4); }
+    else if (k === 'tier') { len = 0.3; O(0.25, 'triangle', 1200, 1250, 0.16, 0.003); O(0.2, 'sine', 2400, 2500, 0.06, 0.003, 0.03); }
+    else if (k === 'tick') { len = 0.05; O(0.04, 'square', 1500, 1400, 0.05, 0.002); }
+    else if (k === 'get') { len = 0.36; for (const [a, f] of [[0, 784], [0.07, 988], [0.14, 1175], [0.21, 1568]]) O(0.12, 'square', f, f, 0.07, 0.003, a); }
+    else if (k === 'throw') { len = 0.3; N(0.28, 'bandpass', 700, 2600, 1.6, 0.3, 0.01, 1); }
+    else if (k === 'spin') { len = 0.75; O(0.7, 'triangle', 900, 140, 0.2, 0.01); N(0.6, 'bandpass', 1400, 400, 1.5, 0.14, 0.02, 1); }
+    else if (k === 'bonk') { len = 0.25; O(0.2, 'sine', 560, 220, 0.34); N(0.08, 'bandpass', 1700, 900, 1.2, 0.22, 0.002); }
+    else if (k === 'ring') {
+      // the alarm clock: a hammer between two bells, very fast, very loud
+      len = 1.3;
+      for (let i = 0; i < 26; i++) { const a = i * 0.048; O(0.05, 'square', i % 2 ? 2300 : 2650, i % 2 ? 2280 : 2600, 0.09, 0.002, a); }
+      O(1.2, 'sine', 1180, 1170, 0.05, 0.01);
+    }
+    else if (k === 'reel') { len = 0.9; for (let i = 0; i < 14; i++) N(0.03, 'bandpass', 3000, 2800, 4, 0.18, 0.002, 1 + i * 0.02); O(0.85, 'sine', 300, 600, 0.05, 0.05); }
+    else if (k === 'beep') { len = 0.25; O(0.22, 'square', 880, 880, 0.12, 0.003); }
+    else if (k === 'go') { len = 0.6; O(0.55, 'square', 1760, 1760, 0.13, 0.003); O(0.55, 'square', 1318, 1318, 0.07, 0.003); }
+    else if (k === 'grunt') { len = 0.32; O(0.28, 'sawtooth', 240, 120, 0.12, 0.01); N(0.22, 'bandpass', 900, 500, 3, 0.16, 0.01, 1); O(0.2, 'square', 120, 80, 0.06, 0.01); }
+    else if (k === 'clink') { len = 0.5; for (const [a, f] of [[0, 2900], [0.09, 3400], [0.2, 3100]]) O(0.2, 'sine', f, f * 0.98, 0.12, 0.002, a); N(0.4, 'bandpass', 1200, 1600, 2, 0.08, 0.02, 0.7); }
+    else if (k === 'bump') { len = 0.22; O(0.18, 'sine', 150, 60, 0.36, 0.003); N(0.1, 'lowpass', 900, 300, 0.8, 0.2, 0.002); }
+    else if (k === 'honk') { len = 0.5; O(0.22, 'square', 392, 392, 0.09, 0.005); O(0.22, 'square', 494, 494, 0.07, 0.005); O(0.24, 'square', 392, 392, 0.09, 0.005, 0.26); O(0.24, 'square', 523, 523, 0.07, 0.005, 0.26); }
+    else if (k === 'flap') { len = 0.45; for (let i = 0; i < 5; i++) N(0.07, 'bandpass', 800, 1400, 1.2, 0.2, 0.004, 1 + i * 0.05); }
+    else if (k === 'splat') { len = 0.3; N(0.28, 'lowpass', 1200, 200, 1.2, 0.4, 0.003, 0.8); O(0.1, 'sine', 180, 70, 0.25); }
+    else if (k === 'trick') { len = 0.5; O(0.45, 'triangle', 400, 1600, 0.12, 0.01); N(0.4, 'bandpass', 800, 3000, 1.5, 0.16, 0.02, 1); }
+    else if (k === 'scare') { len = 0.7; O(0.6, 'sawtooth', 110, 55, 0.18, 0.003); N(0.5, 'lowpass', 2000, 300, 0.8, 0.3, 0.003, 0.6); }
+    else return null;
     end = t + len + 0.03;
   } else return null;
   return { end, out: g, srcs };

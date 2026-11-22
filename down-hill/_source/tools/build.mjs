@@ -42,33 +42,17 @@ const face = `/* Bubble lettering: a subset of Gochi Hand, Copyright (c) 2011 HT
 @font-face{font-family:"Bolster Condensed";src:url(data:font/woff2;base64,${cond}) format("woff2");font-weight:700;font-display:block}`;
 html = html.replace('/*FONTFACE*/', () => face);
 
-/* the Pillow Fight II logo (the owner's artwork, transparent WebP), inlined
-   once as the CSS custom property --logo: assets/pillow-fight-2-logo-1200.webp
-   is assets/pillow-fight-2-logo.webp at 1200 px, WebP q 0.82 (~176 KB) */
-if (html.split('__LOGO__').length !== 2) throw new Error('index.html must have exactly one __LOGO__ marker');
-const logo = fs.readFileSync(path.join(root, 'assets/pillow-fight-2-logo-1200.webp')).toString('base64');
-html = html.replace('__LOGO__', () => `data:image/webp;base64,${logo}`);
-
 const final = html.replace('<!--BUNDLE-->', () => `<script>\n${js}\n</script>`);
 const oi = process.argv.indexOf('--out');
 const dest = oi > 0 ? path.resolve(process.argv[oi + 1]) : path.join(root, 'final.html');
 fs.writeFileSync(dest, final);
 
 /* ── self-containment gate ────────────────────────────────────────────────
-   The rule for this series is zero runtime network requests, with one
-   exception that stage 2 brings: PeerJS. Online play (after the player
-   picks Online or opens a ?room= link) and, since the phone controller
-   (Run B), the phone-pad room the title and select screens open for the
-   QR — the page may reach exactly the PeerJS cloud broker (0.peerjs.com,
-   the handshake), public STUN (stun.l.google.com:19302) and the peers
-   themselves. (?pads=off keeps the pad room shut; the test harness's
-   ?hold does too unless ?pads=1.) The phone pad loads its painted
-   background from controller/backgrounds/ beside the page.
-   PeerJS is bundled (no script fetch). Everything else: no `src`
-   anywhere, no <link href>, no dynamic import, no absolute URL reachable
-   from the script. Anchors are allowed — an anchor is a place the reader
-   may choose to go, not a resource the page loads — but there are none in
-   this piece.
+   Down Hill makes zero runtime network requests (stage 2's phone pads will
+   bring PF2's PeerJS exception with them; until then there is none). No
+   `src` anywhere, no <link href>, no dynamic import, no absolute URL or
+   network host reachable from the script. Anchors would be allowed (a place
+   the reader may choose to go), but there are none.
    ──────────────────────────────────────────────────────────────────────── */
 const fetched = [];
 for (const m of final.matchAll(/<([a-z0-9]+)\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']/gi)) {
@@ -91,29 +75,17 @@ const NS_ALLOW = [
   'http://www.w3.org/1999/xlink',
 ];
 
-/* PeerJS's own strings: links in its log/error text and package metadata,
-   never requested */
-const PEERJS_TEXT = [
-  'https://peerjs.com',
-  'https://github.com/peers/peerjs',
-  'https://github.com/peers/peerjs/issues',
-  'https://opencollective.com/peer',
-];
+const PEERJS_TEXT = [];
 
 const urlLiterals = [...new Set([...js.matchAll(/["'`](https?:\/\/[^"'`\s]+)["'`]/gi)].map((m) => m[1]))]
   .filter((u) => !NS_ALLOW.includes(u) && !PEERJS_TEXT.includes(u));
 
-/* the network the online mode may use: the broker host, and ICE servers.
-   Our STUN is the only one passed to PeerJS; its built-in defaults (a
-   Google STUN and two peerjs TURN hosts) are in the bundle but overridden
-   by src/net/link.js, so never contacted. Any other ws(s):// or stun:/turn:
-   literal fails the build. */
-const NET_ALLOW = ['0.peerjs.com', 'stun:stun.l.google.com:19302', 'turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'];
+const NET_ALLOW = [];
 const netLiterals = [...new Set([
   ...[...js.matchAll(/["'`]((?:wss?:\/\/|stuns?:|turns?:)[^"'`\s]+)["'`]/gi)].map((m) => m[1]),
   ...[...js.matchAll(/["'`]([a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|net|org|io))["'`]/gi)].map((m) => m[1]),
 ])].filter((u) => !NET_ALLOW.includes(u));
-const stunOk = /stun:stun\.l\.google\.com:19302/.test(js) && js.includes('0.peerjs.com');
+
 
 const netCalls = [...js.matchAll(/\b(?:fetch|XMLHttpRequest|EventSource|WebSocket)\s*\(/g)].map((m) => m[0]);
 
@@ -122,15 +94,14 @@ console.log(`final    ${(fs.statSync(dest).size / 1024).toFixed(1)} KB  -> ${des
 console.log(`fetched refs   ${fetched.length ? fetched.join(', ') : 'none'}`);
 console.log(`dynamic import ${dynImports.length ? dynImports.join(', ') : 'none'}`);
 console.log(`url literals   ${urlLiterals.length ? urlLiterals.join(', ') : 'none'} (in script)`);
-console.log(`fetch sites    ${netCalls.length} (three's loaders, never reached; PeerJS's broker calls, online only)`);
-console.log(`online net     ${NET_ALLOW.join(', ')}${netLiterals.length ? ` — and NOT ALLOWED: ${netLiterals.join(', ')}` : ''}`);
+console.log(`fetch sites    ${netCalls.length} (three's loaders, never reached)`);
+console.log(`net hosts      ${netLiterals.length ? `NOT ALLOWED: ${netLiterals.join(', ')}` : 'none'}`);
 
 const fail = [];
 if (fetched.length) fail.push('page fetches external resources');
 if (dynImports.length) fail.push('page has dynamic imports');
 if (urlLiterals.length) fail.push(`script contains absolute URLs: ${urlLiterals.join(', ')}`);
-if (netLiterals.length) fail.push(`script names network hosts outside the online allowlist: ${netLiterals.join(', ')}`);
-if (!stunOk) fail.push('online: the broker / STUN configuration is missing');
+if (netLiterals.length) fail.push(`script names network hosts: ${netLiterals.join(', ')}`);
 if (fail.length) {
   console.error(`\nNOT SELF-CONTAINED\n  ${fail.join('\n  ')}`);
   process.exit(1);
