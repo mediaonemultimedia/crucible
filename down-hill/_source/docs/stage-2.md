@@ -16,6 +16,13 @@ If any stage 1 item is unfinished or its PR wasn't merged, finish and ship that 
   - MOVES tab = a cardboard "how to race" sheet listing the items
 - **Hold to accelerate:** GAS is held (a toggle-able "auto-gas" in the sheet helps phone players).
 - **Haptics:** buzz when you're hit by an item.
+- **Tilt-to-steer (Kevin's request).** Steering on each phone has two options, chosen on the phone's select screen and in the sheet:
+  - **STICK** (the default)
+  - **TILT**: hold the phone landscape like a steering wheel and steer with the gyro (`DeviceOrientationEvent`). Use roll relative to a calibrated centre, with a small dead zone, a sensitivity slider (3 steps), smoothing, and a "re-centre" tap.
+  - **iPhone:** `DeviceOrientationEvent.requestPermission()` must be called from a tap. Show a "Tap to enable tilt" button, and fall back to STICK if it's denied or unsupported.
+  - **In TILT mode:** hide the stick and show a small tilting wheel icon in its place. The six buttons work the same.
+  - **Send the steering value** in the existing wire packet (the stick-X byte), so the game side doesn't change.
+  - **Test it** in the headless pad test with simulated orientation events.
 - **Seats:** up to 4 phones; each picks a fighter and OG/ALT on their own phone.
 
 ## 2. Split screen for 2 to 4 local players
