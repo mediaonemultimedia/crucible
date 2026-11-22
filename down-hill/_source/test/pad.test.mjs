@@ -89,3 +89,13 @@ test('wire: a button held through a quiet spell is not pressed twice', () => {
   c[TAPS.indexOf(ITEM)]++;
   assert.ok(P.take(decode(encodeInput(5, ITEM, c, 0)), 2020) & ITEM, 'a real second press');
 });
+
+test('wire: a phone that (re)joins holding a button does not press it', () => {
+  const P = new PadState();
+  P.reset(true);
+  const c = new Array(TAPS.length).fill(0);
+  assert.equal(P.take(decode(encodeInput(1, ITEM, c, 0)), 0) & ITEM, 0);
+  assert.equal(P.sample().item, true, 'still held for driving');
+  P.take(decode(encodeInput(2, 0, c, 0)), 10);
+  assert.ok(P.take(decode(encodeInput(3, ITEM, c, 0)), 20) & ITEM, 'pressed after letting go');
+});

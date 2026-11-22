@@ -83,5 +83,6 @@ export class PadState {
     };
   }
   clear() { this.tapped = 0; }
-  reset() { this.held = 0; this.tapped = 0; this.seq = -1; this.counts = null; this.steer = 0; this.wasHeld = 0; }
+  /* joined (true): whatever the phone already holds isn't a press until it's let go */
+  reset(joined = false) { this.held = 0; this.tapped = 0; this.seq = -1; this.counts = null; this.steer = 0; this.wasHeld = joined ? 0xffff : 0; }
 }

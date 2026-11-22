@@ -77,7 +77,7 @@ export class PadHost {
       if (ch === 'pc') {
         if (msg?.t === 'hi') {
           // a phone saying hello again on a link we still hold (it reloaded, or woke up): its seat again
-          if (seat >= 0 && this.seats[seat]?.c === c) { this.state[seat].reset(); this.seats[seat].sent = ''; c.send('pc', { t: 'seat', k: seat }); return; }
+          if (seat >= 0 && this.seats[seat]?.c === c) { this.state[seat].reset(true); this.seats[seat].sent = ''; c.send('pc', { t: 'seat', k: seat }); return; }
           seat = this._seat(c, String(msg.uid || c.id));
           return;
         }
@@ -100,7 +100,7 @@ export class PadHost {
     if (old && old.c !== c) { try { old.c.close(); } catch { /* */ } }
     this.uids[k] = uid;
     this.seats[k] = { c, uid, rtt: 0, pid: 0, pingAt: 0, pongAt: now(), sheet: false, sent: '' };
-    this.state[k].reset();
+    this.state[k].reset(true);
     c.send('pc', { t: 'seat', k });
     this.paint(true);
     this.onSeat(k, true);

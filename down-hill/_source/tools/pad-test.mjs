@@ -124,6 +124,7 @@ results.who = whoOn;
 // 2. menus from the phones: START → select
 await tap(phones[0], ...L.start); await tick(4);
 ok(await G.evaluate(() => __dh.screen) === 'select', 'phone START: title → select');
+results.afterStart = { mask: await phones[0].evaluate(() => __pad.mask()), locked: await G.evaluate(() => __dh.players[0].locked) };
 await tick(10);
 // P1: ▶ twice (K8-E); P2: ALT; P3: ◀ once; P4: ▶ once + ALT; P1's phone picks the track (Tab equivalent)
 await stripTap(phones[0], '#sel [data-dx="1"]'); await tick(3);
@@ -230,23 +231,31 @@ await G.evaluate(() => __dh.step(4.2, false));    // past the countdown
 ok((await Promise.all(phones.map((p) => p.evaluate(() => __pad.sheetOpen)))).every((o) => !o), 'every sheet closed before the race');
 for (const p of phones) await down(p, 3, ...L.btn[B.GAS]);
 const kc0 = await G.evaluate(() => __dh.hv.map((h) => __dh.race.karts[h.i].kc));
+await tick(3);
+results.gasHeld = { phone: await Promise.all(phones.map((p) => p.evaluate(() => [__pad.mask(), __pad.sheetOpen, __pad.SET.mode, !!__pad.S.link, __pad.S.seat]))), game: await G.evaluate(() => [0, 1, 2, 3].map((k) => [__dh.pads.state[k].held, __dh.pads.connected(k), __dh.playerOfPhone(k) && __dh.num(__dh.playerOfPhone(k))])) };
 const tapsSent = [0, 0, 0, 0];
 let sync = [];
+// beta / gamma for wheel angles −30…40°, once (the phone's own maths)
+const TILT = await phones[2].evaluate((a) => { const out = {}; for (let th = -30; th <= 40; th++) { let best = [0, 0], bd = 1e9; for (let b = -180; b <= 180; b += 1) for (let g = -90; g <= 90; g += 1) { const r = __pad.tiltRoll(b, g, a); if (r === null) continue; const tl = Math.abs(Math.cos(b * Math.PI / 180) * Math.cos(g * Math.PI / 180)); const d = Math.abs(r - th) + tl * 0.02; if (d < bd) { bd = d; best = [b, g]; } } out[th] = best; } return out; }, angle);
+let want = [0, 0, 0, 0];
 for (let f = 0; f < 600; f++) {
+  if (f % 2 === 0) await phones[2].evaluate(([b, g]) => dispatchEvent(new DeviceOrientationEvent('deviceorientation', { alpha: 0, beta: b, gamma: g })), TILT[Math.round(Math.max(-30, Math.min(40, 4 + want[2] * 24)))]);
   // each phone steers toward the racing line ahead of its kart
   if (f % 6 === 0) {
-    const want = await G.evaluate(() => __dh.hv.map((h) => { const R = __dh.race, T = R.T, K = R.karts[h.i], k = (K.k + 14) % T.N; const tx = T.x[k] + (-T.tz[k]) * T.line[k], tz = T.z[k] + T.tx[k] * T.line[k]; const a = Math.atan2(tx - K.x, tz - K.z), d = Math.atan2(Math.sin(a - K.yaw), Math.cos(a - K.yaw)); return Math.max(-1, Math.min(1, -d * 2.2)); }));
+    want = await G.evaluate(() => __dh.hv.map((h, j) => { const R = __dh.race, T = R.T, K = R.karts[h.i], k = (K.k + 14) % T.N; const tx = T.x[k] + (-T.tz[k]) * T.line[k], tz = T.z[k] + T.tx[k] * T.line[k]; const a = Math.atan2(tx - K.x, tz - K.z), d = Math.atan2(Math.sin(a - K.yaw), Math.cos(a - K.yaw)); return Math.max(-1, Math.min(1, -d * (j === 2 ? 1.4 : 2.2))); }));
     for (let n = 0; n < 4; n++) {
-      if (n === 2) await fire(phones[2], await orient(4 + want[n] * 26), 1);
+      if (n === 2) continue;
       else { if (!phones[n].T.has(2)) await down(phones[n], 2, ...L.stick); await move(phones[n], 2, L.stick[0] + want[n] * 64, L.stick[1]); }
     }
   }
   // a TAUNT tap now and then from every phone (counted at both ends)
-  if (f % 90 === 45) for (let n = 0; n < 4; n++) { await tap(phones[n], ...L.btn[B.TAUNT], 20, 5); tapsSent[n]++; }
+  // (not on the tilt phone: CDP's touch emulation mixes up two touches when no third one is down)
+  if (f % 90 === 45) for (const n of [0, 1, 3]) { await tap(phones[n], ...L.btn[B.TAUNT], 20, 5); tapsSent[n]++; }
   await tick(1);
+  if (f % 30 === 0) (results.p3 = results.p3 || []).push([f, +want[2].toFixed(2), await phones[2].evaluate(() => [+__pad.T.steer.toFixed(2), +__pad.T.centre.toFixed(1), __pad.T.roll && +__pad.T.roll.toFixed(1), __pad.SET.mode, __pad.mask()]), await G.evaluate(() => { const K = __dh.race.karts[__dh.hv[2].i]; return [+__dh.pads.state[2].steer.toFixed(2), +K.fwd.toFixed(1), +K.steer.toFixed(2), K.kc, K.spinT > 0, K.fish ? 1 : 0, K.surf]; })]);
   if (f % 60 === 0) sync.push(await G.evaluate(() => __dh.hv.map((h) => __dh.pads.state[__dh.humanP[h.j].phone]?.seq ?? -1)));
 }
-for (const p of phones) { await up(p, 3); if (p.T.has(2)) await up(p, 2); }
+for (const p of phones) { if (p.T.has(3)) await up(p, 3); if (p.T.has(2)) await up(p, 2); }
 const kc1 = await G.evaluate(() => __dh.hv.map((h) => __dh.race.karts[h.i].kc));
 const prog = kc1.map((v, n) => v - kc0[n]);
 const tauntsSeen = await G.evaluate(() => __dh._tauntsSeen || null);

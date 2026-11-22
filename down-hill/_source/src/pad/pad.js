@@ -148,7 +148,7 @@ body.pad *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .in .ar{font-family:system-ui,sans-serif;font-weight:700;letter-spacing:.05em}
 .chip{display:inline-block;font:700 calc(2.9*var(--u)) "Bolster Condensed",Oswald,sans-serif;color:#fff;background:#1f2c78;border-radius:99px;padding:calc(.3*var(--u)) calc(1.3*var(--u))}
 .chip.w{background:#d4560f}.chip.g{background:#555}.chip.s{background:#c4520f}
-.x{position:absolute;right:calc(3*var(--u));top:calc(2*var(--u));font:700 calc(4.5*var(--u)) system-ui,sans-serif;padding:0 calc(1*var(--u))}
+.x{position:absolute;z-index:2;right:calc(3*var(--u));top:calc(2*var(--u));font:700 calc(4.5*var(--u)) system-ui,sans-serif;padding:0 calc(1*var(--u))}
 #rot{position:fixed;inset:0;display:none;z-index:20;background:#140b22;color:#fff;align-items:center;justify-content:center;flex-direction:column;gap:18px;text-align:center;font:700 22px "Bolster Condensed",Oswald,sans-serif;letter-spacing:.06em;text-transform:uppercase}
 #rot svg{width:96px;height:96px;animation:rt 1.6s ease-in-out infinite}
 @keyframes rt{0%,20%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
