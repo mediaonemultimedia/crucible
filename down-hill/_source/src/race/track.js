@@ -88,6 +88,130 @@ export const LANDING = {
   boxes: [0.1, 0.33, 0.52, 0.68, 0.86],
 };
 
+/* ── Laundry Day ─────────────────────────────────────────────────────────
+   The basement laundry room, under one bare bulb and a buzzing tube. Start
+   on the concrete by the washers heading east, up a cardboard ramp onto
+   the folding table's conveyor of folded towels (it carries you: ride it
+   and you're quicker), off its end in a jump, round the soap-sudsy corner
+   by the water heater, then west along the far wall — the road bulges
+   round the bank of machines, or take the SHORTCUT: straight through the
+   gap and the open dryer drum, which tumbles you round once and spits you
+   out with a kick. Up the west wall the detergent pods roll back and forth
+   across the floor, then kick through the sock piles to the line.        */
+export const LAUNDRY = {
+  id: 'laundry',
+  name: 'Laundry Day',
+  laps: 3,
+  start: [-100, 0, 71],
+  points: [
+    W(-140, 0, 60, { tag: 'floor', w: 10, m: 5 }),
+    W(-112, 0, 70, { tag: 'floor', w: 10, m: 5 }),
+    W(-80, 0, 72, { tag: 'floor', w: 10, m: 5 }),
+    W(-56, 0, 72, { tag: 'floor', w: 9, m: 4, pad: 1 }),
+    W(-38, 5, 72, { tag: 'ramp', w: 8, m: 1, edge: 'drop' }),
+    W(-20, 10, 72, { tag: 'belt', w: 7, m: 0.8, edge: 'drop', belt: 9 }),
+    W(16, 10, 72, { tag: 'belt', w: 7, m: 0.8, edge: 'drop', belt: 9 }),
+    W(52, 10, 72, { tag: 'belt', w: 7, m: 0.8, edge: 'drop', belt: 9 }),
+    W(74, 10, 72, { tag: 'belt', w: 7, m: 0.8, edge: 'drop', belt: 9, launch: 8 }),
+    W(100, 0, 66, { tag: 'floor', w: 11, m: 5 }),
+    W(124, 0, 44, { tag: 'floor', w: 10, m: 5 }),
+    W(134, 0, 8, { tag: 'suds', w: 10, m: 5 }),
+    W(130, 0, -28, { tag: 'floor', w: 10, m: 5, pad: 1 }),
+    W(112, 0, -62, { tag: 'floor', w: 10, m: 5 }),
+    W(84, 0, -80, { tag: 'floor', w: 9, m: 3 }),
+    W(58, 0, -82, { tag: 'bulge', w: 9, m: 2 }),
+    W(36, 0, -58, { tag: 'bulge', w: 9, m: 2 }),
+    W(8, 0, -46, { tag: 'bulge', w: 9, m: 2 }),
+    W(-20, 0, -56, { tag: 'bulge', w: 9, m: 2 }),
+    W(-42, 0, -80, { tag: 'bulge', w: 9, m: 2 }),
+    W(-72, 0, -86, { tag: 'floor', w: 10, m: 4 }),
+    W(-104, 0, -82, { tag: 'floor', w: 10, m: 4 }),
+    W(-128, 0, -62, { tag: 'pods', w: 11, m: 3 }),
+    W(-140, 0, -30, { tag: 'pods', w: 11, m: 3 }),
+    W(-146, 0, 0, { tag: 'socks', w: 10, m: 4 }),
+    W(-148, 0, 30, { tag: 'socks', w: 10, m: 4 }),
+  ],
+  /* the shortcut: a corridor (from, to, half-width) through the gap in the
+     machines, the dryer drum on it (its span, as fractions of the corridor) */
+  cut: { from: [80, -84.5], to: [-58, -85.5], w: 4.6, drum: [0.42, 0.6] },
+  patches: [
+    { x: 134, z: 8, r: 6, kind: 'suds' },
+    { x: 120, z: -46, r: 4, kind: 'suds' },
+    { x: -90, z: -84, r: 4.5, kind: 'fluff' },
+  ],
+  posts: [
+    { x: 112, z: 38, r: 2.4, kind: 'bottle' }, { x: -96, z: 66, r: 2.2, kind: 'bottle' },
+  ],
+  /* detergent pods rolling back and forth across the road: where, how far
+     across (× the half-width), the period (ticks) and phase */
+  pods: [
+    { at: [-130, -56], amp: 0.85, period: 170, phase: 0, r: 2.0 },
+    { at: [-137, -38], amp: 0.85, period: 136, phase: 2.1, r: 2.0 },
+    { at: [-142, -18], amp: 0.85, period: 190, phase: 4.2, r: 2.0 },
+  ],
+  /* sock piles: kick through them (a little slower, socks everywhere) */
+  piles: [
+    { x: -147, z: 8, r: 3.2 }, { x: -142, z: 18, r: 2.8 }, { x: -151, z: 22, r: 2.8 }, { x: -146, z: 36, r: 3.2 },
+  ],
+  boxes: [0.1, 0.34, 0.5, 0.7, 0.86],
+  mapHigh: [5, 30],
+  music: 'laundry',
+};
+
+/* ── Sprinkler Park ──────────────────────────────────────────────────────
+   The back garden at golden hour, at plush scale: the lawn is a meadow,
+   the hose a log. Start on the lawn heading east past the first
+   sprinkler, over the garden-hose jump, across the patio pavers, through
+   the kiddie pool's splash zone (wet: slow), up the plank ramp onto the
+   treehouse deck round the old oak, off its end in a big jump, and back
+   along the west lawn past the sprinklers — when one's on, its jet knocks
+   you sideways.                                                          */
+export const PARK = {
+  id: 'park',
+  name: 'Sprinkler Park',
+  laps: 3,
+  start: [-74, 0, 63],
+  points: [
+    W(-112, 0, 50, { tag: 'lawn', w: 10, m: 5 }),
+    W(-82, 0, 62, { tag: 'lawn', w: 10, m: 5 }),
+    W(-48, 0, 66, { tag: 'lawn', w: 10, m: 5 }),
+    W(-14, 0, 62, { tag: 'lawn', w: 10, m: 5 }),
+    W(14, 0, 54, { tag: 'hose', w: 10, m: 4, launch: 10 }),
+    W(40, 0, 42, { tag: 'lawn', w: 10, m: 5 }),
+    W(62, 0, 22, { tag: 'patio', w: 9, m: 2, pad: 1 }),
+    W(70, 0, -4, { tag: 'patio', w: 9, m: 2 }),
+    W(64, 0, -28, { tag: 'pool', w: 11, m: 3 }),
+    W(46, 0, -46, { tag: 'lawn', w: 10, m: 4 }),
+    W(22, 0, -56, { tag: 'lawn', w: 9, m: 3 }),
+    W(4, 3.5, -60, { tag: 'ramp', w: 7.5, m: 0.8, edge: 'drop' }),
+    W(-14, 9, -60, { tag: 'ramp', w: 7.5, m: 0.8, edge: 'drop' }),
+    W(-32, 12, -55, { tag: 'deck', w: 8, m: 0.8, edge: 'drop' }),
+    W(-46, 12, -44, { tag: 'deck', w: 8, m: 0.8, edge: 'drop', launch: 11 }),
+    W(-62, 0, -26, { tag: 'lawn', w: 10, m: 5 }),
+    W(-84, 0, -8, { tag: 'lawn', w: 10, m: 5 }),
+    W(-102, 0, 14, { tag: 'lawn', w: 10, m: 5, pad: 1 }),
+    W(-114, 0, 34, { tag: 'lawn', w: 10, m: 5 }),
+  ],
+  patches: [
+    { x: 62, z: -30, r: 6.5, kind: 'pool' },
+    { x: -30, z: 70, r: 3.6, kind: 'mulch' },
+    { x: 54, z: 34, r: 3.6, kind: 'mulch' },
+  ],
+  posts: [
+    { x: 30, z: 52, r: 1.6, kind: 'gnome' }, { x: -96, z: 2, r: 1.6, kind: 'flamingo' },
+  ],
+  /* lawn sprinklers: where, the jet's reach (world units), on for `dur` of every `period` ticks */
+  sprinklers: [
+    { x: -28, z: 70, reach: 22, period: 170, dur: 75, phase: 0 },
+    { x: 34, z: -54, reach: 20, period: 150, dur: 64, phase: 60 },
+    { x: -86, z: -18, reach: 22, period: 180, dur: 80, phase: 110 },
+    { x: -112, z: 22, reach: 20, period: 140, dur: 60, phase: 30 },
+  ],
+  boxes: [0.12, 0.33, 0.52, 0.74, 0.9],
+  mapHigh: [4, 16],
+  music: 'park',
+};
+
 /* the room was laid out in a compact sketch; the race runs it 1.9× wider
    and 1.25× taller (a lap of ~55 s at racing speed) */
 function scaled(def, sxz, sy) {
@@ -99,11 +223,15 @@ function scaled(def, sxz, sy) {
     points: def.points.map((p) => ({ ...P(p), y: p.y * sy, ceil: p.ceil ? p.ceil * sy : 0 })),
     patches: def.patches.map((p) => ({ ...P(p), r: p.r * 1.3 })),
     posts: def.posts.map(P),
+    cut: def.cut ? { ...def.cut, from: [def.cut.from[0] * sxz, def.cut.from[1] * sxz], to: [def.cut.to[0] * sxz, def.cut.to[1] * sxz] } : null,
+    pods: (def.pods || []).map((p) => ({ ...p, at: [p.at[0] * sxz, p.at[1] * sxz] })),
+    piles: (def.piles || []).map((p) => ({ ...P(p), r: p.r * 1.3 })),
+    sprinklers: (def.sprinklers || []).map(P),
   };
 }
-export const TRACKS = { landing: scaled(LANDING, 1.9, 1.25) };
+export const TRACKS = { landing: scaled(LANDING, 1.9, 1.25), laundry: scaled(LAUNDRY, 1.78, 1.0), park: scaled(PARK, 2.9, 1.6) };
 /* the Pillow Cup: three races, points for every place */
-export const CUP = ['landing'];
+export const CUP = ['landing', 'laundry', 'park'];
 
 /* ── sampling ─────────────────────────────────────────────────────────── */
 function cr(p0, p1, p2, p3, t) {
@@ -154,6 +282,7 @@ export function buildTrack(def) {
     line: new Float32Array(N),                           // the racing line's lateral offset
     sec: new Uint8Array(N),                              // index into def.points (the section)
     drop: new Uint8Array(N), ceil: new Float32Array(N), pad: new Uint8Array(N), launch: new Float32Array(N),
+    belt: new Float32Array(N),                           // a conveyor's speed along the track
   };
   let j = 0;
   for (let k = 0; k < N; k++) {
@@ -168,6 +297,7 @@ export function buildTrack(def) {
     const S = P[sec], Sa = P[a.from];
     T.drop[k] = S.edge === 'drop' || Sa.edge === 'drop' ? 1 : 0;
     T.ceil[k] = Sa.ceil && (P[(a.from + 1) % n].ceil || a.t < 0.5) ? Sa.ceil : 0;
+    T.belt[k] = Sa.belt && P[(a.from + 1) % n].belt ? Sa.belt : 0;
   }
   // flags that happen at a point: launches and pads on the sample nearest the waypoint
   for (let i = 0; i < n; i++) {
@@ -200,8 +330,32 @@ export function buildTrack(def) {
     const c = T.line.slice();
     for (let k = 0; k < N; k++) { let s = 0; for (let q = -6; q <= 6; q++) s += c[(k + q + N) % N]; T.line[k] = s / 13; }
   }
+  T.cut = def.cut ? buildCut(T, def.cut) : null;
+  T.pods = (def.pods || []).map((p) => ({ ...p, k: locateGlobal(T, p.at[0], p.at[1]) }));
   return T;
 }
+
+/* the shortcut corridor: a straight from `from` to `to`, its ends overlapping
+   the road; m0…m1 is the part off the road (walled), d0…d1 the dryer drum,
+   kA / kB the road samples at its mouth and its exit */
+function buildCut(T, c) {
+  const [ax, az] = c.from, [bx, bz] = c.to;
+  const len = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / len, uz = (bz - az) / len;
+  let m0 = len, m1 = 0;
+  for (let s = 0; s <= len; s += 1) {
+    const x = ax + ux * s, z = az + uz * s, k = locateGlobal(T, x, z);
+    const off = Math.abs(lateral(T, k, x, z)) > T.w[k] + T.m[k] - 1;
+    if (off) { m0 = Math.min(m0, s); m1 = Math.max(m1, s); }
+  }
+  return { ax, az, bx, bz, len, ux, uz, w: c.w, m0, m1, d0: len * c.drum[0], d1: len * c.drum[1], kA: locateGlobal(T, ax, az), kB: locateGlobal(T, bx, bz) };
+}
+/* a detergent pod's place at a tick (pure: the sim and the renderer agree) */
+export function podPos(T, P, tick) {
+  const k = P.k, d = Math.sin((tick / P.period) * Math.PI * 2 + P.phase) * P.amp * T.w[k];
+  return { x: T.x[k] + rightX(T, k) * d, z: T.z[k] + rightZ(T, k) * d, y: T.y[k], spin: Math.cos((tick / P.period) * Math.PI * 2 + P.phase) };
+}
+/* a sprinkler is spraying at this tick */
+export const sprinklerOn = (S, tick) => ((tick + S.phase) % S.period) < S.dur;
 
 /* the right-hand vector at sample k (horizontal): tangent × up */
 export const rightX = (T, k) => -T.tz[k];

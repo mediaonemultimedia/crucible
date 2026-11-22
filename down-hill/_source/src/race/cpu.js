@@ -69,7 +69,7 @@ export class CPU {
         if (Math.abs(hd - want) < 4) want = hd + (want >= hd ? 4.5 : -4.5);
       }
     }
-    for (const P of T.def.posts) {
+    for (const P of R.pods.length ? [...T.def.posts, ...R.pods.map((p) => ({ x: p.x, z: p.z, r: p.r + 1.2 }))] : T.def.posts) {
       const dx = P.x - K.x, dz = P.z - K.z, dist = Math.hypot(dx, dz);
       if (dist < 16 && dist > 0.1) {
         const pk = t; const pd = (P.x - T.x[pk]) * rightX(T, pk) + (P.z - T.z[pk]) * rightZ(T, pk);
@@ -78,7 +78,20 @@ export class CPU {
     }
     const lim = T.w[t] - (careful ? 3 : 2);
     want = Math.max(-lim, Math.min(lim, want));
-    const tx = T.x[t] + rightX(T, t) * want, tz = T.z[t] + rightZ(T, t) * want;
+    let tx = T.x[t] + rightX(T, t) * want, tz = T.z[t] + rightZ(T, t) * want;
+    // the shortcut: decided once a lap on the way in (the bold ones take it more)
+    const C = T.cut;
+    let onCut = false;
+    if (C) {
+      const toA = (C.kA - K.k + N) % N;
+      if (toA > 80 && toA < 200) this.cutPlan = null;
+      if (this.cutPlan === null || this.cutPlan === undefined) if (toA < 70) this.cutPlan = this.rng.int(1000) < { easy: 250, normal: 500, hard: 750 }[this.level];
+      const rx = K.x - C.ax, rz = K.z - C.az, s0 = rx * C.ux + rz * C.uz, l0 = -rx * C.uz + rz * C.ux;
+      if (this.cutPlan && (K.cut || toA < 80 || (s0 > -10 && s0 < C.m0 && Math.abs(l0) < 30))) {
+        const s1 = Math.max(0, s0) + Math.max(6, la);
+        if (s1 < C.len + 4) { tx = C.ax + C.ux * Math.min(C.len, s1); tz = C.az + C.uz * Math.min(C.len, s1); onCut = true; }
+      }
+    }
     const hT = Math.atan2(tx - K.x, tz - K.z);
     const diff = Math.atan2(Math.sin(hT - K.yaw), Math.cos(hT - K.yaw));
     let steer = -diff * 2.6 + (this.rng.int(1000) / 1000 - 0.5) * L.noise;
@@ -91,8 +104,8 @@ export class CPU {
     let bend = 0;
     for (let q = 4; q < 30; q += 2) bend += T.curv[(K.k + q) % N];
     bend /= 13;
-    const wantDrift = Math.abs(bend) > 0.016 && K.fwd > 16 && !K.air && !careful;
-    if (K.drift) {
+    const wantDrift = Math.abs(bend) > 0.016 && K.fwd > 16 && !K.air && !careful && !onCut;
+    if (onCut) { I.drift = false; } else if (K.drift) {
       // hold it while the bend lasts, to this CPU's tier; let go on the straight
       I.drift = Math.abs(bend) > 0.012 && K.tier < L.tier + (L.tier === 3 ? 0 : 0) || (K.tier < 1 && Math.abs(bend) > 0.008);
       if (K.tier >= L.tier && Math.abs(bend) < 0.02) I.drift = false;

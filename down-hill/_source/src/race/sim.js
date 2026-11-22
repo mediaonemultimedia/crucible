@@ -11,7 +11,7 @@
    through three spark tiers — white feathers, gold, mint — and released
    into a boost.                                                          */
 
-import { buildTrack, locate, lateral, along, groundAt, rightX, rightZ, TRACKS } from './track.js';
+import { buildTrack, locate, lateral, along, groundAt, rightX, rightZ, TRACKS, podPos, sprinklerOn } from './track.js';
 import { RACERS, stats } from './roster.js';
 import { makeRng } from '../sim/rng.js';
 
@@ -65,6 +65,10 @@ export class Race {
     this.hazards = [];      // feather slicks on the ground
     this.finished = 0;
     this.finishOrder = [];
+    // the track's own moving things: detergent pods, sock piles, sprinklers
+    this.pods = T.pods.map((P) => ({ ...P, ...podPos(T, P, 0) }));
+    this.piles = (T.def.piles || []).map((P) => ({ ...P, kicked: 0 }));
+    this.sprinklers = (T.def.sprinklers || []).map((S) => ({ ...S, on: false }));
     this._place();
   }
 
@@ -113,6 +117,7 @@ export class Race {
     }
     if (this.phase === 'done') { for (const K of this.karts) this._kartTick(K, inputs[K.i] || noInput()); this._bumps(); return; }
     for (const B of this.boxes) if (B.dead > 0) B.dead--;
+    this._world();
     for (const K of this.karts) this._kartTick(K, inputs[K.i] || noInput());
     this._bumps();
     this._cuffs();
@@ -174,10 +179,13 @@ export class Race {
       if (Math.abs(K.d) > T.w[K.k] + 0.6) surf = 'fluff';
       for (const P of T.def.patches) if ((K.x - P.x) ** 2 + (K.z - P.z) ** 2 < P.r * P.r) surf = P.kind;
     }
+    if (K.cut) surf = 'track';
+    if (surf === 'pool' && K.surf !== 'pool' && !K.air) this.emit({ k: 'splash', i: K.i, x: K.x, y: K.y, z: K.z, big: Math.abs(K.fwd) > 14 });
     K.surf = surf;
     let top = S.top * (K.topMul || 1);
-    if (surf === 'fluff') top *= 0.58;
+    if (surf === 'fluff' || surf === 'mulch') top *= 0.58;
     else if (surf === 'cereal') top *= 0.64;
+    else if (surf === 'pool') top *= 0.66;
     if (K.cuff >= 0) top *= 0.86;
     if (K.caseT > 0) top *= 0.9;
     let accel = S.accel;
@@ -237,7 +245,7 @@ export class Race {
     if (K.hop > 0) K.hop = Math.max(0, K.hop - DT);
 
     // grip: the sideways slip bleeds away (less in a drift, less in the air, less on fluff)
-    const grip = K.air ? 1.5 : K.drift ? 4.5 : surf === 'fluff' ? 7 : 13;
+    const grip = K.air ? 1.5 : K.drift ? 4.5 : surf === 'suds' ? 3.2 : surf === 'fluff' || surf === 'mulch' || surf === 'pool' ? 7 : 13;
     lat *= Math.exp(-grip * DT);
     const nfx = Math.sin(K.yaw), nfz = Math.cos(K.yaw), nrx = -nfz, nrz = nfx;
     K.vx = nfx * fwd + nrx * lat; K.vz = nfz * fwd + nrz * lat;
@@ -246,14 +254,18 @@ export class Race {
     // ── move ──
     const y0 = K.y;
     K.x += K.vx * DT; K.z += K.vz * DT;
+    // a conveyor carries you along
+    if (!K.air && T.belt[K.k]) { K.x += T.tx[K.k] * T.belt[K.k] * DT; K.z += T.tz[K.k] * T.belt[K.k] * DT; }
     const kPrev = K.k;
-    K.k = locate(T, K.x, K.z, K.k, 20);
+    const inCut = this._cut(K);
+    if (!inCut) K.k = locate(T, K.x, K.z, K.k, 20);
     let d = lateral(T, K.k, K.x, K.z);
     const a = along(T, K.k, K.x, K.z);
 
     // the edge: a wall (pushed back along the track, nose nudged round), or a drop
     const lim = T.w[K.k] + T.m[K.k];
-    if (Math.abs(d) > lim && !T.drop[K.k]) {
+    if (inCut) { d = 0; }
+    else if (Math.abs(d) > lim && !T.drop[K.k]) {
       const over = Math.abs(d) - lim, s = Math.sign(d);
       const Rx = rightX(T, K.k), Rz = rightZ(T, K.k);
       K.x -= Rx * over * s; K.z -= Rz * over * s;
@@ -280,6 +292,7 @@ export class Race {
         if (vn < 0) { K.vx -= nx * vn * 1.5; K.vz -= nz * vn * 1.5; if (vn < -6) this.emit({ k: 'post', i: K.i, kind: P.kind }); }
       }
     }
+    if (!K.air) this._trackThings(K);
     K.d = d;
 
     // ── height: on the ground, off a ramp, in the air, off the edge ──
@@ -300,7 +313,7 @@ export class Race {
       } else {
         K.slopeVy = (g - y0) / DT;
         K.y = g;
-        if (Math.abs(d) < T.w[K.k] + T.m[K.k] * 0.5) K.lastGood = K.k;
+        if (Math.abs(d) < T.w[K.k] + T.m[K.k] * 0.5 && !K.cut) K.lastGood = K.k;
       }
       if (T.pad[K.k] && K.padT <= 0 && Math.abs(d) < T.w[K.k]) { K.boostT = Math.max(K.boostT, 1.05); K.padT = 0.5; this.emit({ k: 'pad', i: K.i }); }
     }
@@ -331,7 +344,7 @@ export class Race {
     // ── progress round the lap ──
     if (live) {
       const dk = ((K.k - kPrev + N + N / 2) % N) - N / 2;
-      if (Math.abs(dk) < 40) K.kc += dk;
+      if (Math.abs(dk) < 40 || (K.cut && Math.abs(dk) < 120)) K.kc += dk;
       const lap = Math.floor(K.kc / N);
       if (lap > K.lap && !K.fin) {
         K.lap = lap;
@@ -357,6 +370,98 @@ export class Race {
         }
       }
       if (pressed('item') && K.item && !K.roulette && K.spinT <= 0) this._use(K, I);
+    }
+  }
+
+  /* the shortcut (Laundry Day's dryer): inside its corridor the road's own
+     walls don't apply, the corridor's do (in its walled middle), and the
+     kart's place on the lap runs from the mouth's sample to the exit's.
+     You can only get in from the road (its ends overlap it). The drum
+     tumbles you round once and spits you out with a kick. */
+  _cut(K) {
+    const C = this.T.cut;
+    if (!C || K.air && !K.cut) { if (K.cut) K.cut = 0; return false; }
+    const T = this.T, N = T.N;
+    const rx = K.x - C.ax, rz = K.z - C.az;
+    const s = rx * C.ux + rz * C.uz, l = -rx * C.uz + rz * C.ux;
+    // the mouth and the exit are funnels (on the road anyway): wide, narrowing to the gap
+    const half = C.w + 0.4 + Math.max(0, Math.min(10, Math.max((C.m0 - s) * 0.3, (s - C.m1) * 0.3)));
+    const inside = s > -3 && s < C.len + 3 && Math.abs(l) < half;
+    if (!K.cut) {
+      // in from the road only: the mouth or the exit, where the corridor overlaps it
+      if (!inside || (s > C.m0 && s < C.m1)) return false;
+      const k = locate(T, K.x, K.z, K.k, 20);
+      if (Math.abs(lateral(T, k, K.x, K.z)) > T.w[k] + T.m[k] + 0.5) return false;
+      // only heading through it
+      const head = Math.sin(K.yaw) * C.ux + Math.cos(K.yaw) * C.uz;
+      if (s > C.len / 2 || head < 0.3) return false;
+      K.cut = 1;
+    }
+    if (s > C.len + 3 || s < -3 || (Math.abs(l) > half && (s < C.m0 || s > C.m1))) {
+      K.cut = 0; K.drum = 0;
+      K.k = locate(T, K.x, K.z, s > C.len / 2 ? C.kB : C.kA, 30);
+      return false;
+    }
+    // the walled middle: the gap between the machines
+    if (s > C.m0 - 2 && s < C.m1 + 2 && Math.abs(l) > C.w) {
+      const sg = Math.sign(l), over = Math.abs(l) - C.w, nx = -C.uz * sg, nz = C.ux * sg;
+      K.x -= nx * over; K.z -= nz * over;
+      const vOut = K.vx * nx + K.vz * nz;
+      if (vOut > 0) { K.vx -= nx * vOut * 1.35; K.vz -= nz * vOut * 1.35; if (vOut > 6) this.emit({ k: 'wall', i: K.i, p: Math.min(1, vOut / 20) }); }
+      const th = Math.atan2(C.ux, C.uz), df = Math.atan2(Math.sin(th - K.yaw), Math.cos(th - K.yaw));
+      if (Math.abs(df) < 1.6) K.yaw += df * 0.08;
+    }
+    const f = Math.max(0, Math.min(1, s / C.len));
+    K.k = (C.kA + Math.round(f * ((C.kB - C.kA + N) % N))) % N;
+    // the drum
+    const inDrum = s > C.d0 && s < C.d1 ? (s - C.d0) / (C.d1 - C.d0) : 0;
+    if (inDrum && !K.drum) this.emit({ k: 'drum', i: K.i });
+    if (!inDrum && K.drum > 0.5 && s >= C.d1) { K.boostT = Math.max(K.boostT, 1.0); this.emit({ k: 'drumOut', i: K.i }); }
+    K.drum = inDrum;
+    return true;
+  }
+
+  /* the track's moving things, once a tick: the pods roll, sprinklers pulse */
+  _world() {
+    const T = this.T;
+    for (const P of this.pods) Object.assign(P, podPos(T, P, this.tick));
+    for (const S of this.sprinklers) { const on = sprinklerOn(S, this.tick); if (on && !S.on) this.emit({ k: 'spray', s: this.sprinklers.indexOf(S) }); S.on = on; }
+    for (const P of this.piles) if (P.kicked > 0) P.kicked--;
+    // a pod runs into you: a little spin
+    for (const P of this.pods) for (const K of this.karts) {
+      if (K.air || K.fish || K.cut) continue;
+      const r = P.r + KART_R;
+      if ((K.x - P.x) ** 2 + (K.z - P.z) ** 2 < r * r && this.hit(K, 'pod')) { K.spinT = 0.85; K.invT = 1.5; }
+    }
+  }
+
+  /* sock piles and sprinkler jets on a grounded kart */
+  _trackThings(K) {
+    for (let j = 0; j < this.piles.length; j++) {
+      const P = this.piles[j], r = P.r + KART_R * 0.6;
+      if ((K.x - P.x) ** 2 + (K.z - P.z) ** 2 < r * r) {
+        if (!K.pile || K.pile.j !== j || this.tick - K.pile.t > 40) {
+          K.vx *= 0.8; K.vz *= 0.8;
+          if (P.kicked <= 0) { P.kicked = 30; this.emit({ k: 'pile', i: K.i, p: j, x: P.x, z: P.z }); }
+        }
+        K.pile = { j, t: this.tick };
+      }
+    }
+    for (let j = 0; j < this.sprinklers.length; j++) {
+      const S = this.sprinklers[j];
+      if (!S.on) continue;
+      const dx = K.x - S.x, dz = K.z - S.z, dd = Math.hypot(dx, dz);
+      if (dd > S.reach || dd < 0.1) continue;
+      const nx = dx / dd, nz = dz / dd, f = 1 - dd / S.reach;
+      const cyc = Math.floor((this.tick + S.phase) / S.period);
+      if (K.soak !== j * 100000 + cyc && K.invT <= 0) {
+        // the jet's first slap: knocked sideways
+        K.soak = j * 100000 + cyc;
+        K.vx += nx * (6 + 7 * f); K.vz += nz * (6 + 7 * f);
+        K.wobT = Math.max(K.wobT, 0.6);
+        this.emit({ k: 'soak', i: K.i, s: j });
+      }
+      K.vx += nx * 14 * f * DT; K.vz += nz * 14 * f * DT;
     }
   }
 
