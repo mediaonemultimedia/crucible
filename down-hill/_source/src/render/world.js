@@ -473,7 +473,7 @@ export class World {
         const inWell = x > STAIRS.x0 && x < STAIRS.x1 && z > STAIRS.z0 && z < STAIRS.z1;
         const bottom = inWell ? -60 : 0, L = y - bottom;
         const b = mesh(new THREE.CylinderGeometry(0.9, 1.1, L, 10), bal, x, bottom + L / 2, z, root); b.userData.cast = true;
-        if (i % 36 === 0) { const np = mesh(rbox(5, y + 4, 5, 0.8), rail, x, (y + 4) / 2 - 1, z, root); np.userData.cast = true; mesh(new THREE.SphereGeometry(3, 14, 10), rail, x, y + 4, z, root); }
+        if (i % 36 === 0) for (const sd of [-1, 1]) { const off = (T.w[k] + T.m[k] + 2.2) * sd, nx = x + rightX(T, k) * off, nz = z + rightZ(T, k) * off; const np = mesh(rbox(3.6, y + 6.2, 3.6, 0.8), rail, nx, (y + 6.2) / 2 - 3, nz, root); np.userData.cast = true; mesh(new THREE.SphereGeometry(2.2, 14, 10), rail, nx, y + 3.6, nz, root); }
       }
     }
     // the toy planks (a giant wooden ruler) up and down

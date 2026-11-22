@@ -73,7 +73,7 @@ const SCENES = {
   },
   async banister() {
     const p = await open('?hold&webgl&p1=zach&p1cpu=hard&seed=6');
-    await p.evaluate(() => { const A = __dh, T = A.race.T, K = () => A.race.karts[A.me]; for (let n = 0; n < 60 * 120; n++) { A.frame(1 / 60, false); if (T.def.points[T.sec[K().k]].tag === 'banister' && K().x > 230) { A.step(0.3); return; } } });
+    await p.evaluate(() => { const A = __dh, T = A.race.T, K = () => A.race.karts[A.me]; for (let n = 0; n < 60 * 120; n++) { A.frame(1 / 60, false); if (T.def.points[T.sec[K().k]].tag === 'banister' && K().x > 290 && K().spinT <= 0 && !K().fish) { A.step(0.3); return; } } });
     await snap(p, 'banister'); await p.close();
   },
   async podium() {

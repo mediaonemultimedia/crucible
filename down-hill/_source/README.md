@@ -31,12 +31,23 @@ race), `p1cpu=LEVEL` (the player's kart drives itself), `seed=N`, `laps=N`,
 
 | # | Stage 1 item | State |
 |---|---|---|
-| 1 | Karts and the cast: 7 fighters × OG/ALT = 14 looks, themed karts, light racing plush, LOD | done — `render/karts.js`, `render/racer.js`; shots `shots/karts-*.png` |
-| 2 | Driving feel: chase cam + FOV kick, drift (3 tiers), ramps + TAUNT tricks, pads, off-track, the sock | in progress |
-| 3 | Items: Feather Slick, Pillow Missile, Espresso Shot, Fuzzy Handcuffs, Pillowcase, Alarm Clock | in progress |
-| 4 | Track 1, The Landing | in progress |
-| 5 | Race flow, CPUs, HUD, input, audio, deep links | in progress |
-| — | Quality bar (check, shots) and shipping | not yet |
+| 1 | Karts and the cast: 7 fighters × OG/ALT = 14 looks, themed karts, light racing plush, LOD | done — `render/karts.js`, `render/racer.js`; `shots/karts-*.png` |
+| 2 | Driving feel: chase cam + speed FOV kick, drift (white/gold/mint tiers, wiggle charge), ramps + TAUNT tricks with landing boost, feather pads, fluff/cereal slowdown, the sock on a string | done — `race/sim.js`; `test/race.test.mjs`; `shots/drift.png` |
+| 3 | Items: Feather Slick, Pillow Missile, Espresso Shot, Fuzzy Handcuffs, Pillowcase, Alarm Clock; odds by place | done — `shots/item-*.png` |
+| 4 | Track 1, The Landing: duvet → book ramp → rug → under the bed → banister → sock drawer → pillow pile | done — `render/world.js`; `shots/underbed.png`, `shots/banister.png` |
+| 5 | Race flow (title, select with portraits + turntable, countdown, race, podium results), 7 CPUs × 3 levels, HUD, keyboard + gamepad, audio, deep links | done |
+| — | Quality bar (`tools/check.mjs`, `tools/shots.mjs`) and shipping (`kart-release-1`) | see the PR |
+
+### Performance (the hard rule)
+- Racing plush are frozen: no soft body, cloth or fur sim runs during a race
+  (measured: one woken PF2 plush costs ~10 ms of JS per frame on the test
+  machine — that is PF2's lag). Trick, taunt and hit poses are the rig's:
+  stand up, spin, barrel roll, squash, wobble. The podium and the select
+  turntable wake the soft bodies (no race running then).
+- Fur: 12 shells near, 5 past 26 units, over a velvet base; far karts hide
+  their small parts. The room and each kart body are merged by material.
+- `tools/check.mjs` measures the JS per frame over a whole 8-CPU race and
+  the render call's CPU time and draw stats (numbers in the PR).
 
 ## How it works
 

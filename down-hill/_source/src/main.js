@@ -514,7 +514,7 @@ class App {
     const W = R.karts[R.finishOrder[0]];
     this.podiumBubble = this.podium[0].v;
     this.bubbles.forEach((b) => dismiss(b.el)); this.bubbles = [];
-    setTimeout(() => { if (this.screen === 'results') { this.bubble(-1, koLine(W.id, W.alt, this.raceN), 99); } }, 900);
+    this.bubble(-1, koLine(W.id, W.alt, this.raceN), 99);
     this.audio.music(null);
     this.podT = 0;
   }
@@ -529,9 +529,9 @@ class App {
     }
     const a = -0.25 + Math.sin(this.podT * 0.3) * 0.18;
     this.camera.fov = 50; this.camera.updateProjectionMatrix();
-    this.camera.position.set(-84 + Math.sin(a) * 26, 12, 52 + Math.cos(a) * 26);
+    this.camera.position.set(-84 + Math.sin(a) * 17, 10, 52 + Math.cos(a) * 17);
     this.cam.pos.copy(this.camera.position);
-    this.camera.lookAt(-84, 6.5, 51);
+    this.camera.lookAt(-84, 7.2, 51);
   }
 
   /* ── the frame ── */

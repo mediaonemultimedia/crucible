@@ -112,9 +112,9 @@ const key = (p, code, ms = 40) => p.evaluate(async ([c, t]) => {
     }
     out.sort((a, b) => a - b);
     A.renderer.info.autoReset = true;
-    A.renderer.render(A.scene, A.camera);
+    A.renderer.info.reset(); A.renderer.render(A.scene, A.camera);
     const I = A.renderer.info.render;
-    return { renderCallMs: { p50: +out[30].toFixed(2), p95: +out[57].toFixed(2) }, drawCallsPerFrame: I.drawCalls ?? I.calls, trianglesPerFrame: I.triangles, awakeMax: Math.max(...drv), lod: A.rviews.map((v) => v.lod).join('') };
+    return { renderCallMsSwiftShader: { p50: +out[30].toFixed(2) }, drawCallsPerFrame: I.drawCalls ?? I.calls, trianglesPerFrame: I.triangles, awakeMax: Math.max(...drv), lod: A.rviews.map((v) => v.lod).join('') };
   });
   results.render = r;
   await p.close();
