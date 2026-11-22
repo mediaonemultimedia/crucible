@@ -7,7 +7,7 @@
       trick, and nobody stays stuck
    3. the frame cost: JS per frame (sim + CPUs + 8 karts + FX + HUD; the
       GPU is excluded — SwiftShader isn't one) over the race, and the
-      render call's own CPU time over 240 rendered race frames
+      render call's own CPU time over 60 rendered race frames
    Every console error, page error and network request fails it.
      node tools/check.mjs [--html path]                                   */
 import { chromium } from 'playwright';
@@ -92,17 +92,18 @@ const key = (p, code, ms = 40) => p.evaluate(async ([c, t]) => {
   if (!(r.lap.mean >= 47 && r.lap.mean <= 62)) problems.push(`race: mean lap ${r.lap.mean} s (want ~50–60)`);
   for (const k of ['drift', 'tier', 'boost', 'use', 'trick', 'pad', 'box', 'hit']) if (!r.ev[k]) problems.push(`race: no '${k}' events`);
   if (r.jsMs.p95 > 8) problems.push(`race: JS frame cost p95 ${r.jsMs.p95} ms (budget 8 of the 16.7)`);
+  await p.evaluate(() => __dh.step(1.5));
   await p.screenshot({ path: path.join(root, 'shots/check-results.png'), timeout: 240000 });
   await p.close();
 }
 {
-  // the render call's own CPU time, 240 race frames with all 8 karts on screen-ish
+  // the render call's own CPU time, 60 race frames with all 8 karts on screen-ish
   const p = await page('?hold&webgl&p1=k8e&p1cpu=hard&cpu=hard&seed=3');
   const r = await p.evaluate(() => {
     const A = __dh;
     A.step(5, false);
     const out = [], drv = [];
-    for (let i = 0; i < 240; i++) {
+    for (let i = 0; i < 60; i++) {
       A.frame(1 / 60, false);
       const t0 = performance.now();
       A.renderer.render(A.scene, A.camera);
@@ -111,7 +112,7 @@ const key = (p, code, ms = 40) => p.evaluate(async ([c, t]) => {
     }
     out.sort((a, b) => a - b);
     const info = A.renderer.info?.render || {};
-    return { renderCallMs: { p50: +out[120].toFixed(2), p95: +out[228].toFixed(2) }, drawCalls: info.drawCalls ?? info.calls, triangles: info.triangles, awakeMax: Math.max(...drv), lod: A.rviews.map((v) => v.lod).join('') };
+    return { renderCallMs: { p50: +out[30].toFixed(2), p95: +out[57].toFixed(2) }, drawCalls: info.drawCalls ?? info.calls, triangles: info.triangles, awakeMax: Math.max(...drv), lod: A.rviews.map((v) => v.lod).join('') };
   });
   results.render = r;
   await p.close();

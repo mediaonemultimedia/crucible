@@ -249,4 +249,6 @@ export function dismiss(b) {
   if (!b.isConnected) return;
   b.classList.remove('slap'); b.classList.add('out');
   b.addEventListener('animationend', () => b.remove(), { once: true });
+  // (Down Hill: and gone regardless — a stepped or hidden page may never end the animation)
+  setTimeout(() => b.remove(), 400);
 }

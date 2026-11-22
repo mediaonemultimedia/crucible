@@ -321,7 +321,7 @@ class App {
       case 'trick': {
         V.taunt(true);
         if (near) { A.play('dh-trick', { gain: g(1) }); A.play('dh-grunt', { rate: RACERS[K.id].voice * 1.25, gain: g(0.7) }); }
-        if (mine || near) this.bubble(e.i, tauntLine(K.id, K.alt, this.raceN * 7 + R.tick), 1.6);
+        if (mine || (this._dist(K) < 30 && !this.bubbles.some((b) => b.i !== me))) this.bubble(e.i, tauntLine(K.id, K.alt, this.raceN * 7 + R.tick), 1.6);
         this.fx.sparks(K.x, K.y + 2, K.z, '#ffffff', 10, 6, 0.8, 0.5);
         break;
       }
@@ -329,7 +329,7 @@ class App {
       case 'taunt': {
         V.taunt(false);
         if (near) { A.play('dh-honk', { gain: g(0.8), rate: RACERS[K.id].voice }); A.play('dh-grunt', { rate: RACERS[K.id].voice * 1.2, gain: g(0.6) }); }
-        this.bubble(e.i, tauntLine(K.id, K.alt, this.raceN * 5 + R.tick), 2.0);
+        if (mine || this._dist(K) < 40) this.bubble(e.i, tauntLine(K.id, K.alt, this.raceN * 5 + R.tick), 2.0);
         break;
       }
       case 'fall': if (near) A.play('crowd-ooh', { gain: g(0.7) }); if (mine) this.toast('OOPS!', '#9b5cff'); break;
@@ -397,8 +397,8 @@ class App {
     const back = this.lookBack ? -1 : 1;
     const sp = Math.abs(K.fwd), top = K.S.top;
     const intro = R.phase === 'count' ? Math.max(0, 1 - R.tick / (COUNT_TICKS - 30)) : 0;
-    const dist = (7.6 + sp * 0.06) * (1 + intro * 2.5);
-    const h = 3.3 + intro * 9 + (K.air ? 1.2 : 0);
+    const dist = (8.6 + sp * 0.06) * (1 + intro * 2.5);
+    const h = 4.3 + intro * 9 + (K.air ? 1.2 : 0);
     const fx = Math.sin(yaw), fz = Math.cos(yaw);
     const want = new THREE.Vector3(pose.x - fx * dist * back, pose.y + h, pose.z - fz * dist * back);
     // under the bed: the camera stays under the slats
@@ -597,12 +597,53 @@ class App {
       this.camera.lookAt(x - 0.4, 0.2, z);
       return;
     }
-    // title: a slow drift over the duvet towards the window
-    const a = this.t * 0.04;
-    this.camera.fov = 55; this.camera.updateProjectionMatrix();
-    this.camera.position.set(-10 + Math.sin(a) * 40, 46 + Math.sin(a * 1.3) * 4, 100 + Math.cos(a) * 10);
-    this.camera.lookAt(-40, 14, -10);
+    // title: the whole house as a diorama, swaying slowly
+    const a = Math.sin(this.t * 0.07) * 0.22;
+    this.camera.fov = 50; this.camera.updateProjectionMatrix();
+    this.camera.position.set(135 + Math.sin(a) * 300, 400, Math.cos(a) * 300 - 20);
+    this.camera.lookAt(130, 0, 10);
     this.cam.pos.copy(this.camera.position);
+  }
+
+  /* tools/shots.mjs: stage one item mid-effect, in front of the camera */
+  shotItem(it) {
+    const A = this, R = this.race, T = R.T, N = T.N, me = this.me;
+    A.step(3.8, false);
+    const k0 = R._nearest([-64 * 1.8, 0, 30 * 1.8]);
+    const put = (i, dk, d) => {
+      const K = R.karts[i], k = (k0 + dk + N) % N;
+      K.x = T.x[k] + rightX(T, k) * d; K.z = T.z[k] + rightZ(T, k) * d; K.y = T.y[k]; K.k = k;
+      K.yaw = Math.atan2(T.tx[k], T.tz[k]); K.vx = K.vz = K.fwd = 0; K.kc = (k0 - R.startK + N) % N + dk; K.air = 0; K.drift = 0; K.boostT = 0; K.invT = 0;
+      this.prev[i] = { x: K.x, y: K.y, z: K.z, yaw: K.yaw };
+    };
+    const still = () => ({ steer: 0, gas: false, brake: false, drift: false, item: false, taunt: false, back: false });
+    const drive = (i) => ({ think: () => ({ ...still(), gas: true, steer: 0 }), level: 'stub', i });
+    // everyone off to the side, far behind, except the actors
+    R.karts.forEach((K, i) => { if (i !== me) { put(i, -160 - i * 8, (i % 2 ? 1 : -1) * 4); this.cpus[i] = { think: still }; } });
+    put(me, 0, 0);
+    const others = R.karts.map((K) => K.i).filter((i) => i !== me);
+    const [a, b, c] = others;
+    let pre = 0.05, post = 0.3;
+    this.controls.sample = () => ({ ...still(), item: this._fire > 0 && this._fire-- > 0, back: !!this._back });
+    if (it === 'slick') { put(a, -16, 0); this.cpus[a] = drive(a); this._back = true; post = 0.75; }
+    else if (it === 'missile') { put(a, 20, 0); post = 0.28; }
+    else if (it === 'espresso') { this.controls.sample = () => ({ ...still(), gas: true, item: this._fire > 0 && this._fire-- > 0 }); post = 0.45; }
+    else if (it === 'cuffs') { put(a, 9, -3); put(b, 12, 3); post = 1.4; }
+    else if (it === 'case') { put(a, 9, 0); post = 0.7; }
+    else if (it === 'alarm') { put(a, 22, 0); post = 0; }
+    R._place();
+    void c;
+    const K = R.karts[me];
+    K.item = it; K.roulette = 0;
+    A.step(pre, false);
+    this._fire = 2;
+    if (it === 'alarm') {
+      let n = 0;
+      while (!this.fx.scares.length && n++ < 600) A.frame(1 / 60, false);
+      A.step(0.25, false);
+    } else A.step(post, false);
+    A.step(1 / 60);
+    return it === 'alarm' ? this.fx.scares.length > 0 : true;
   }
 
   loop() {

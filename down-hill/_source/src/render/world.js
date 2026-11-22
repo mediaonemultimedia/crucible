@@ -190,7 +190,7 @@ export class World {
       const wl = mesh(new THREE.PlaneGeometry(w, depth), well, x, -depth / 2, z, this.root); wl.rotation.y = ry;
     }
     const steps = mat('#7a4b33', { roughness: 0.7 });
-    for (let i = 0; i < 14; i++) mesh(new THREE.BoxGeometry(34, 6, 9), steps, S.x1 - 22, -6 - i * 6, S.z0 + 6 + i * 9, this.root);
+    for (let i = 0; i < 10; i++) mesh(new THREE.BoxGeometry(34, 6, 8.5), steps, S.x1 - 22, -6 - i * 6, S.z0 + 6 + i * 8.5, this.root);
     const pit = mesh(new THREE.PlaneGeometry(S.x1 - S.x0, S.z1 - S.z0), mat('#120b12'), (S.x0 + S.x1) / 2, -depth, (S.z0 + S.z1) / 2, this.root);
     pit.rotation.x = -Math.PI / 2;
 
