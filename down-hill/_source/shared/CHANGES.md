@@ -51,3 +51,7 @@ new back end (`src/render/crow.js`) and the refined muzzles
 - `grommet/fur.js`: a `gloss` uniform scaling the strands' specular (1 by
   default: every fighter unchanged). The hockey goon's near-black pile uses
   less, so the white highlights don't grey it out.
+
+
+## Down Hill (kart-source)
+- `grommet/fur.js`: two new uniforms for the race's light plush, `solid` (below this fraction of the shells the strand cut is skipped: a velvet base, no speckle at racing distance) and `rootLift` (lightens the dark roots). Both default to 0 — PF2's look unchanged.

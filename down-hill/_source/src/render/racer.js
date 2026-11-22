@@ -21,7 +21,7 @@ import { buildKart } from './karts.js';
 import { KEY, FILL } from '../../shared/grommet/fur.js';
 import { RACERS } from '../race/roster.js';
 
-export const SHELLS_NEAR = 14, SHELLS_FAR = 5;
+export const SHELLS_NEAR = 12, SHELLS_FAR = 5;
 const still = (id, act = 'idle') => ({ id, act, face: 1, fx: 0, fz: 1024, x: 0, y: 0, z: 0, t: 0, mv: '', back: 0, down: 0, kr: 0, kb: 0, air: 0, vy: 0 });
 
 export class Driver {
@@ -44,7 +44,11 @@ export class Driver {
     if (this.shells === n) return;
     this.shells = n;
     this.p.body.geometry.instanceCount = n;
-    this.p.fur.uniforms.shells.value = n;
+    const U = this.p.fur.uniforms;
+    U.shells.value = n;
+    // a velvet base under a soft fuzz (race LOD): no strand speckle at distance
+    U.solid.value = n >= SHELLS_NEAR ? 0.5 : 0.85;
+    U.rootLift.value = n >= SHELLS_NEAR ? 0.3 : 0.45;
   }
 
   /* wake the soft body for a pose: 'win' (the taunt / podium), 'hitstun', 'jump', 'lose' */

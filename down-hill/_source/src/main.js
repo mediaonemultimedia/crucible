@@ -24,6 +24,7 @@ import { Hum } from './audio/hum.js';
 import { say, dismiss, place } from './ui/bubble.js';
 import { tauntLine, koLine } from './ui/lines.js';
 import { ICONS, FEATHER, CLOCK_SCARE } from './ui/icons.js';
+import { unpackRows } from './render/readback.js';
 
 const Q = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -168,6 +169,46 @@ class App {
     this.clearRace();
     this.setScreen('select');
     this.pick(this.sel);
+    if (!Q.has('noportraits')) this.portraits();
+  }
+
+  /* the cards' portraits: each racer in their kart, rendered once from the
+     front three-quarter into a small target and read back into the card */
+  async portraits() {
+    if (this._portraits) return this._portraits;
+    this._portraits = (async () => {
+      const W = 240, H = 300, r = this.renderer;
+      const rt = new THREE.RenderTarget(W, H, { samples: 4 });
+      rt.texture.colorSpace = THREE.SRGBColorSpace;
+      const cam = new THREE.PerspectiveCamera(34, W / H, 0.3, 400);
+      const webgl = !r.backend.isWebGPUBackend;
+      const spot = [-40, 0.2, 90];
+      for (let i = 0; i < SLOTS.length; i++) {
+        const S = SLOTS[i];
+        const v = this.view(S.id, S.alt);
+        const vis = v.group.visible, inRace = this.screen === 'race';
+        if (inRace) break;
+        const old = v.group.position.clone(), oldR = v.group.rotation.y;
+        v.update(1 / 60, { fwd: 0, drift: 0, steer: 0, air: 0, spinT: 0, boostT: 0, caseT: 0, wobT: 0 }, { x: spot[0], y: spot[1], z: spot[2], yaw: 0.55 }, cam.position, cam.quaternion);
+        v.group.visible = true;
+        const tall = S.id === 'k8e' ? 1.3 : 1;
+        cam.position.set(spot[0] + 2.0, spot[1] + 3.6 * tall, spot[2] + 5.6 * tall);
+        cam.lookAt(spot[0] + 0.1, spot[1] + 2.0 * tall, spot[2]);
+        v.update(0, { fwd: 0, drift: 0, steer: 0, air: 0, spinT: 0, boostT: 0, caseT: 0, wobT: 0 }, { x: spot[0], y: spot[1], z: spot[2], yaw: 0.55 }, cam.position, cam.quaternion);
+        r.setRenderTarget(rt); r.render(this.scene, cam); r.setRenderTarget(null);
+        v.group.position.copy(old); v.group.rotation.y = oldR; v.group.visible = vis && v === this.turn;
+        const px = await r.readRenderTargetPixelsAsync(rt, 0, 0, W, H);
+        const c = document.createElement('canvas'); c.width = W; c.height = H;
+        const g = c.getContext('2d'), img = g.createImageData(W, H);
+        img.data.set(unpackRows(px, W, H, { flip: webgl, stride: webgl ? W * 4 : Math.ceil(W * 4 / 256) * 256 }));
+        g.putImageData(img, 0, 0);
+        const card = document.querySelector(`.card[data-slot="${i}"]`);
+        if (card && !card.querySelector('img')) { const im = new Image(); im.src = c.toDataURL('image/png'); card.insertBefore(im, card.querySelector('.lab')); }
+        if (this.turn) this.turn.group.visible = this.screen === 'select';
+      }
+      rt.dispose();
+    })();
+    return this._portraits;
   }
   pick(i) {
     this.sel = i;
@@ -551,9 +592,9 @@ class App {
       const v = this.turn, x = -84, z = 52;
       v.update(dt, { fwd: 0, drift: 0, steer: Math.sin(this.t * 0.8) * 0.4, air: 0, spinT: 0, boostT: 0, caseT: 0, wobT: 0, x, y: 0.2, z }, { x, y: 0.2, z, yaw: this.turnA }, this.camera.position, this.camera.quaternion);
       if (Math.floor(this.t / 3.2) !== Math.floor((this.t - dt) / 3.2)) v.taunt(false);
-      this.camera.fov = 42; this.camera.updateProjectionMatrix();
-      this.camera.position.set(x + 2.5, 5.2, z + 13.5);
-      this.camera.lookAt(x - 2.6, 2.0, z);
+      this.camera.fov = 40; this.camera.updateProjectionMatrix();
+      this.camera.position.set(x + 1.2, 4.4, z + 11.5);
+      this.camera.lookAt(x - 0.4, 0.2, z);
       return;
     }
     // title: a slow drift over the duvet towards the window

@@ -254,12 +254,12 @@ function washtub(alt) {
   for (const s of [-1, 1]) for (const z of [0.55, -0.55]) {
     const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.45, -0.1, 0), new THREE.Vector3(0.7, -0.6, 0.1), new THREE.Vector3(0.75, -1.1, 0.25)]);
     const t = mesh(new THREE.TubeGeometry(curve, 10, 0.13, 7), mat(tc, { roughness: 0.85 }), 0, 0, 0);
-    const pv = new THREE.Group(); pv.position.set(s * 1.45, 1.75, z); pv.scale.x = s; pv.add(t); B.add(pv);
+    const pv = new THREE.Group(); pv.position.set(s * 1.45, 1.75, z); pv.rotation.y = s > 0 ? 0 : Math.PI; pv.add(t); B.add(pv);
     K.parts.paddles.push({ g: pv, s, ph: z > 0 ? 0 : Math.PI });
     K.detail.push(pv);
   }
   addWheels(K, { r: 0.38, w: 0.32, x: 1.1, zf: 1.05, zb: -1.05, hub: S.hub, y: 0.38 });
-  K.plush = { scale: 0.62, y: 0.7, z: 0 };
+  K.plush = { scale: 0.64, y: 1.3, z: 0 };
   K.exhaust.push(new THREE.Vector3(0, 0.5, -1.5));
   return K;
 }
@@ -284,7 +284,9 @@ function ballmachine(alt) {
   bar.rotation.x = Math.PI / 2 - 0.25;
   K.parts.barrel = new THREE.Vector3(0, 1.35, -2.9);
   // white court lines round the deck, net trim
-  mesh(rbox(2.56, 0.08, 4.16, 0.04), mat(S.trim), 0, 1.22, 0, B);
+  for (const sx of [-1, 1]) mesh(rbox(0.1, 0.06, 4.12, 0.03), mat(S.trim), sx * 1.22, 1.25, 0, B);
+  for (const sz of [-1, 1]) mesh(rbox(2.5, 0.06, 0.1, 0.03), mat(S.trim), 0, 1.25, sz * 2.02, B);
+  mesh(rbox(2.5, 0.06, 0.1, 0.03), mat(S.trim), 0, 1.25, 0.9, B);
   if (alt) {
     // the padel laser: red light strips along the flanks
     for (const s of [-1, 1]) mesh(rbox(0.04, 0.08, 3.6, 0.02), glowMat(S.glow, 3), s * 1.27, 0.85, 0, B);
@@ -336,7 +338,7 @@ function cart(alt) {
   addWheels(K, { r: 0.32, w: 0.28, x: 1.1, zf: 1.7, zb: -1.7, hub: S.hub, y: 0.32 });
   // casters: small, on little forks
   for (const w of K.wheels) mesh(rbox(0.1, 0.5, 0.1, 0.03), frame, w.position.x, 0.65, w.position.z, B);
-  K.plush = { scale: 0.6, y: 0.85, z: -0.5 };
+  K.plush = { scale: 0.66, y: 2.1, z: -0.4 };
   K.exhaust.push(new THREE.Vector3(0, 0.6, -2.2));
   return K;
 }

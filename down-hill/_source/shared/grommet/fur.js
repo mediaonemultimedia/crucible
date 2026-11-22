@@ -48,6 +48,11 @@ export function makeFurMaterial(groomTex, maskTex, patTex) {
     key: uniform(KEY.clone()),
     fill: uniform(FILL.clone()),
     meshView: uniform(0),
+    // Down Hill: the race's light plush — below `solid` (a fraction of the
+    // pile) the shells are a solid velvet (no strand cut: no speckle at
+    // racing distance), and `rootLift` lightens the dark roots. 0, 0: PF2's look
+    solid: uniform(0),
+    rootLift: uniform(0),
     // a glossy sheen on the pile (a crow's blue-violet); black: none at all
     sheen: uniform(new THREE.Color(0, 0, 0)),
     // Bolster: the spots glow (an anglerfish's lights): 0 none, 1 the spot
@@ -130,7 +135,7 @@ export function makeFurMaterial(groomTex, maskTex, patTex) {
     const sA = strand(p, float(0));
     const sB = strand(p.add(vec2(0.5, 0.37)), float(41));
     const hit = max(sA.x, sB.x);
-    Discard(hh.greaterThan(0.001).and(hit.lessThan(0.5)).and(U.meshView.lessThan(0.5)));
+    Discard(hh.greaterThan(0.001).and(hh.greaterThan(U.solid)).and(hit.lessThan(0.5)).and(U.meshView.lessThan(0.5)));
     Discard(hh.greaterThan(vPile.add(0.02)).and(U.meshView.lessThan(0.5)));
     const strandRand = sA.x.greaterThan(0.5).select(sA.y, sB.y);
 
@@ -144,7 +149,7 @@ export function makeFurMaterial(groomTex, maskTex, patTex) {
     base.assign(mix(base, vec3(0.95, 0.42, 0.45), m.g.mul(0.7)));            // blush
     base.assign(mix(base, vec3(U.stitch), m.b));                               // stitching
     base.mulAssign(strandRand.mul(0.16).add(0.92));
-    base.mulAssign(mix(float(0.5), float(1.0), pow(he, float(0.8))));          // dark roots
+    base.mulAssign(mix(float(0.5).add(U.rootLift), float(1.0), pow(he, float(0.8))));          // dark roots
     base.assign(mix(base, base.mul(1.18).add(0.04), smoothstep(0.72, 1.0, he).mul(0.35))); // frosted tips
 
     // ── lighting ────────────────────────────────────────────────────────────
