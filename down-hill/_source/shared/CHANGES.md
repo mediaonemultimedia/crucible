@@ -1,0 +1,53 @@
+# Changes to the shared modules
+
+Everything under `shared/` is copied from another piece's source branch (the
+header of each file names the branch, commit and path) and kept as close to
+unmodified as possible. Bolster extends the rigs from outside (`src/render/`).
+The only edits:
+
+| file | change | why |
+|---|---|---|
+| `grommet/fur.js` | the shading varyings (normal, strand, groom tangents) are multiplied by `modelWorldMatrix` | a fighter's mesh is turned to face the other and moved along the stage; lighting was computed in mesh-local space. For Grommet's untransformed mesh the matrix is the identity, so nothing changes there |
+| `grommet/cloth.js` | the same for the cloth normal | same |
+| `grommet/athletes/panda.rig.js` | adds `buildPandaSolo()` (one panda, the champion, at the origin facing +z) | Grommet's rig is two pandas in one ring; Sumaura is one |
+| `grommet/athletes/standing.js` | adds `sunk()` and `remap()` | Pillow Fight polish: where a biped's arm socket goes (inside the torso) and how a fraction along the old arm maps onto the longer chain |
+| `grommet/athletes/bear.rig.js`, `leopard.rig.js`, `panda.rig.js` | the arm chains start at a socket sunk ~0.24 into the torso (the hand ends where it did); the bear's gloves and fur mask, the leopard's sleeves and fur mask remapped so they sit where they did along the visible arm | the arms read as separate pieces when turned far from their sewn pose (a punch, a guard): their round ends stood off the body. Grommet's own copies are untouched |
+| `flock/rigs.js` | `buildWolf({ fighter })`: with `fighter`, the front legs are free chains (not in the torso's cloud; bend 2.6, mem 5, stretch 1.14, like a biped's arms) and the toy names them `armR` / `armL`; `frontLegs` takes `inCloud`, `bend`, `mem`, `stretch` | Sebas Perra punches, slides and grabs with them. Without the option it is Flock's wolf exactly |
+| `grommet/crowprops.js` | exports `makeCap` | Zach Sparrow's Bottle Cap Flick is Grommet's bottle cap |
+| `grommet/fur.js` | a `glow` uniform (default 0: unchanged): the pattern's spots lit from within in the spot colour | the anglerfish twin's luminous spots (Pillow Fight keys) |
+
+Roster 2 also copied, unmodified (headers only): `grommet/athletes/crow.rig.js`,
+`grommet/athletes/crow.game.js` (for `BEAK_OPEN`, and `crowprops.js`'s imports),
+`grommet/crowprops.js` — all from grommet-source @ b6164e2, which carries the
+crow's fixed beak and wings (PRs #20, #24, #25).
+
+Not copied (not needed): the athletes' games other than `leopard.game.js`
+(its racquet frame and constants are used), `main.js`, `tools.js`, `net.js`,
+`otterprops.js`, the other rigs; Flock's renderer (Grommet's
+`softbody.js`, `body.js` and `fur.js` are Flock's, extended, and run the
+octopus rig unchanged).
+
+Flock's source branch has no README; its rig (`flock/rig.js`), face and
+colourways (`flock/characters.js`) and arm-grasp state machine
+(`flock/grasp.js`, for reference) come from `flock/_source/src/`.
+
+## bolster-polish
+
+- `grommet/cloth.js`: a `band` colour and a `bandOn` switch on the cloth
+  material — the terry (style 3) headband can be its own colour (the Sith
+  Johnny's red headband over black tennis whites). Off by default:
+  every other kit unchanged.
+
+## bolster-models
+
+No shared file changed. The rebuilt wolf (`src/render/wolf.js`), the crow's
+new back end (`src/render/crow.js`) and the refined muzzles
+(`src/render/muzzles.js`) are built from outside with the shared builders
+(`rigbuilder.js`, `athletes/standing.js`, `crow.rig.js`'s `CROW`).
+`flock/rigs.js`'s `buildWolf({ fighter })` is no longer used by Bolster.
+
+## bolster-goon
+
+- `grommet/fur.js`: a `gloss` uniform scaling the strands' specular (1 by
+  default: every fighter unchanged). The hockey goon's near-black pile uses
+  less, so the white highlights don't grey it out.
