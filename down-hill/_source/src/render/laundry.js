@@ -16,7 +16,7 @@ import { rbox, mat, mesh, canvasTex, srand } from './geo.js';
 import { rightX, rightZ, podPos } from '../race/track.js';
 
 const TAU = Math.PI * 2;
-export const ROOM = { x0: -300, x1: 285, z0: -195, z1: 165, h: 150 };
+export const ROOM = { x0: -300, x1: 285, z0: -195, z1: 190, h: 150 };
 
 function concreteTex() {
   return canvasTex(512, 512, (g, w, h) => {
@@ -86,7 +86,7 @@ export class LaundryWorld extends World {
   build() {
     this.noDash = new Set(['belt', 'ramp']);
     this.runnerTags = new Set(['floor', 'bulge', 'pods', 'socks', 'suds']);
-    this.runnerColor = '#3a3550';
+    this.runnerColor = '#7a5a8e';
     this.dashLift = () => 0;
     this.scene.background = new THREE.Color('#14121c');
     this._lightsL();
@@ -127,7 +127,7 @@ export class LaundryWorld extends World {
   _lightsL() {
     const S = (this.lightsG = new THREE.Group());
     this.scene.add(S);
-    this.hemi = new THREE.HemisphereLight('#8f9bc0', '#3a3028', 1.15);
+    this.hemi = new THREE.HemisphereLight('#a8b0d0', '#5a4636', 1.5);
     S.add(this.hemi);
     // daylight down the window well: the one shadow-casting light
     const sun = (this.moon = new THREE.DirectionalLight('#dfe8ff', 1.7));
@@ -137,7 +137,7 @@ export class LaundryWorld extends World {
     sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.6; sun.shadow.autoUpdate = false;
     S.add(sun, sun.target);
     // the bare bulb over the infield
-    this.bulb = new THREE.PointLight('#ffb36a', 5200, 360, 1.5);
+    this.bulb = new THREE.PointLight('#ffb36a', 7000, 420, 1.4);
     this.bulb.position.set(-20, 110, 0);
     S.add(this.bulb);
     // the fluorescent tube over the machines (cool, flickers now and then)
@@ -156,7 +156,7 @@ export class LaundryWorld extends World {
 
   _roomL() {
     const R = ROOM, root = this.root;
-    const floor = new THREE.MeshStandardMaterial({ map: concreteTex(), roughness: 0.82, color: '#a8a39b' });
+    const floor = new THREE.MeshStandardMaterial({ map: concreteTex(), roughness: 0.78, color: '#ece4d6' });
     const f = mesh(new THREE.PlaneGeometry(R.x1 - R.x0, R.z1 - R.z0), floor, (R.x0 + R.x1) / 2, 0, (R.z0 + R.z1) / 2, root);
     f.rotation.x = -Math.PI / 2;
     // a floor drain by the water heater
@@ -206,7 +206,7 @@ export class LaundryWorld extends World {
     if (!ks.length) return;
     // the belt surface: a ribbon over the belt samples, its texture scrolling with the belt
     this.beltTex = beltTex();
-    const beltMat = new THREE.MeshStandardMaterial({ map: this.beltTex, roughness: 0.95 });
+    const beltMat = new THREE.MeshStandardMaterial({ map: this.beltTex, roughness: 0.95, side: THREE.DoubleSide });
     const pos = [], uv = [], idx = [];
     let v = 0;
     ks.forEach((k, i) => {
@@ -253,9 +253,12 @@ export class LaundryWorld extends World {
     const glass = mat('#2a3550', { roughness: 0.1, metalness: 0.3, emissive: '#101828', emissiveIntensity: 0.6 });
     const chrome = mat('#cfd3d8', { roughness: 0.2, metalness: 0.9 });
     const knob = mat('#3a3a40', { roughness: 0.5 });
+    // vintage pastels: cream, mint, avocado, powder blue, butter
+    const shells = [white, mat('#bfe8d4', { roughness: 0.35 }), mat('#c8cf8a', { roughness: 0.35 }), mat('#b8d4ee', { roughness: 0.35 }), mat('#f2e2a4', { roughness: 0.35 })];
+    let nM = 0;
     const machine = (x, z, ry, front = true, kind = 0) => {
       const g = new THREE.Group();
-      const body = mesh(rbox(28, 38, 30, 2.2), white, 0, 19, 0, g); body.userData.cast = true;
+      const body = mesh(rbox(28, 38, 30, 2.2), shells[nM++ % shells.length], 0, 19, 0, g); body.userData.cast = true;
       mesh(rbox(28.2, 6, 4, 1), grey, 0, 35, -13.5, g);
       if (front) {
         const ring = mesh(new THREE.TorusGeometry(8.4, 1.4, 10, 28), chrome, 0, 17, 15.2, g); void ring;
@@ -268,7 +271,7 @@ export class LaundryWorld extends World {
       return g;
     };
     // along the north wall, behind the folding table
-    for (let x = -60; x <= 200; x += 30) machine(x, ROOM.z1 - 18, Math.PI, true, (x / 30) % 2);
+    for (let x = -60; x <= 200; x += 30) machine(x, ROOM.z1 - 17, Math.PI, true, (x / 30) % 2);
     // the island: two rows facing out, with the gap (the shortcut) between them
     if (C) {
       const N2 = new THREE.Vector3(-C.uz, 0, C.ux);       // the corridor's left

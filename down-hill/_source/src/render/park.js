@@ -217,7 +217,7 @@ export class ParkWorld extends World {
     if (!dk.length) return;
     // the trunk: just outside the deck's inner edge at its middle
     const km = dk[Math.floor(dk.length / 2)], side = T.curv[km] > 0 ? -1 : 1;
-    const off = (T.w[km] + T.m[km] + 16) * side;
+    const off = (T.w[km] + T.m[km] + 24) * side;
     const tx = T.x[km] + rightX(T, km) * off, tz = T.z[km] + rightZ(T, km) * off;
     const bark = new THREE.MeshStandardMaterial({ map: barkTex(), roughness: 0.95 });
     const trunk = mesh(new THREE.CylinderGeometry(11, 16, 150, 18), bark, tx, 75, tz, root); trunk.userData.cast = true;
@@ -226,7 +226,7 @@ export class ParkWorld extends World {
     const r = srand(31);
     for (let i = 0; i < 12; i++) { const a = r() * TAU, d = r() * 60; const s = mesh(new THREE.IcosahedronGeometry(30 + r() * 22, 1), leaf[i % 3], tx + Math.cos(a) * d, 160 + r() * 50, tz + Math.sin(a) * d, root); s.userData.cast = true; }
     // the hut up the trunk, the rope ladder, a little flag
-    const hy = T.y[km] + 14;
+    const hy = T.y[km] + 34;
     const hut = new THREE.Group(); hut.position.set(tx, hy, tz); hut.rotation.y = Math.atan2(T.tx[km], T.tz[km]);
     mesh(new THREE.BoxGeometry(34, 2, 30), mat('#7a5a3c'), 0, 0, 0, hut);
     const wall = new THREE.MeshStandardMaterial({ map: planksTexP(), roughness: 0.8 });
@@ -249,7 +249,7 @@ export class ParkWorld extends World {
     const T = this.T, root = this.root;
     const P = T.def.patches.find((p) => p.kind === 'pool');
     if (!P) return;
-    const R = P.r + 3;
+    const R = P.r + 2;
     this.waterTex = waterTex();
     const water = mesh(new THREE.CircleGeometry(R, 40), new THREE.MeshStandardMaterial({ map: this.waterTex, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.85, color: '#bfeeff' }), P.x, 0.35, P.z, root);
     water.rotation.x = -Math.PI / 2; water.userData.noShadow = true; water.userData.keep = true;

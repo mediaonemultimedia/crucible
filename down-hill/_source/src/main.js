@@ -59,6 +59,9 @@ const MAXP = 4;
 /* the track menu: each track, then the cup */
 const CHOICES = [...Object.keys(TRACKS).map((id) => ({ id, name: TRACKS[id].name })), { id: 'cup', name: 'The Pillow Cup' }];
 const lookKey = (id, alt) => `${id}:${alt ? 1 : 0}`;
+/* the ghost's samples ↔ a localStorage string */
+const encode16 = (a) => { const b = new Uint8Array(a.buffer, a.byteOffset, a.byteLength); let s = ''; for (let i = 0; i < b.length; i += 8192) s += String.fromCharCode(...b.subarray(i, i + 8192)); return btoa(s); };
+const decode16 = (s) => { const b = Uint8Array.from(atob(s), (c) => c.charCodeAt(0)); return new Int16Array(b.buffer, 0, b.length >> 1); };
 
 /* split screen: the views' rectangles (fractions of the window) */
 export function layout(n) {
@@ -401,7 +404,8 @@ class App {
     this.hum.stop();
     this._views(0);
     $('roast')?.classList.remove('on');
-    document.body.classList.remove('looking');
+    document.body.classList.remove('looking', 'photo');
+    this.slowmo = null;
   }
 
   /* the HUD panels and cameras, one per human (n = 0 clears them) */
@@ -500,7 +504,8 @@ class App {
       H.cam.look.set(K.x, K.y + 2, K.z);
     }
     this.cam = this.hv[0].cam;
-    this.ghostStart?.();
+    this.ghostStart();
+    this.slowmo = null; this.photoDone = false; document.body.classList.remove('photo');
     this.setScreen('race');
     this.audio.music(null);
     this.audio.setIntense(false);
@@ -1104,6 +1109,108 @@ class App {
     }
     v.fid = S.id; v.skin = skinId(S.id, S.alt);
     return v;
+  }
+
+  /* ── the ghost: your best lap on this track, replayed beside you ──────
+     Single-player races record P1's kart every other tick; a lap faster
+     than the stored best replaces it (localStorage, per track). The next
+     lap, a pale see-through kart drives the best one in step with you. */
+  ghostStart() {
+    const G = (this.ghost = this.ghost || { mesh: this._ghostMesh(), best: {} });
+    G.on = this.hv.length === 1;
+    G.mesh.visible = false;
+    G.rec = null; G.pos = null;
+    if (!G.on) return;
+    const id = this.trackId;
+    if (!(id in G.best)) {
+      G.best[id] = null;
+      try { const j = JSON.parse(globalThis.localStorage?.getItem(`downhill.ghost.${id}`) || 'null'); if (j && j.t > 0 && typeof j.d === 'string') G.best[id] = { t: j.t, d: decode16(j.d) }; } catch { /* no storage: no ghost */ }
+    }
+  }
+  _ghostMesh() {
+    const g = new THREE.Group();
+    const m = new THREE.MeshBasicMaterial({ color: '#bfe8ff', transparent: true, opacity: 0.32, depthWrite: false });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.4, 4.6), m); body.position.y = 1.1; g.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(1.1, 14, 10), m); head.position.set(0, 2.9, -0.4); g.add(head);
+    for (const [x, z] of [[-1.6, 1.5], [1.6, 1.5], [-1.6, -1.5], [1.6, -1.5]]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.6, 12), m); w.rotation.z = Math.PI / 2; w.position.set(x, 0.7, z); g.add(w); }
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.12, 6, 18), new THREE.MeshBasicMaterial({ color: '#e8f8ff', transparent: true, opacity: 0.6, depthWrite: false })); halo.rotation.x = Math.PI / 2; halo.position.set(0, 4.4, -0.4); g.add(halo);
+    g.visible = false; g.renderOrder = 5;
+    this.scene.add(g);
+    return g;
+  }
+  ghostTick() {
+    const G = this.ghost;
+    if (!G?.on || !this.race) return;
+    const R = this.race, K = R.karts[this.me], N = R.T.N;
+    if (R.phase !== 'race' || K.fin && !G.rec) return;
+    const lap = Math.floor(K.kc / N);
+    if (!G.rec || lap !== G.rec.lap) {
+      // a lap just ended: the best one on this track is kept
+      if (G.rec && lap === G.rec.lap + 1 && G.rec.lap >= 0 && !G.rec.fished) {
+        const t = R.tick - G.rec.t0, best = G.best[this.trackId];
+        if (!best || t < best.t) {
+          const d = Int16Array.from(G.rec.buf);
+          G.best[this.trackId] = { t, d };
+          try { globalThis.localStorage?.setItem(`downhill.ghost.${this.trackId}`, JSON.stringify({ t, d: encode16(d) })); } catch { /* full or blocked: fine */ }
+          if (best) this.toast(this.hv[0], 'NEW BEST LAP!', '#bfe8ff');
+        }
+      }
+      G.rec = K.fin ? null : { lap, t0: R.tick, buf: [], fished: false };
+      if (!G.rec) { G.mesh.visible = false; return; }
+    }
+    if (K.fish) G.rec.fished = true;
+    if ((R.tick - G.rec.t0) % 2 === 0 && G.rec.buf.length < 60 * 300 * 2) G.rec.buf.push(Math.round(K.x * 8), Math.round(K.y * 8), Math.round(K.z * 8), Math.round(K.yaw * 1000) % 32000);
+    // play the best lap back in step
+    const best = G.best[this.trackId];
+    if (!best || G.rec.lap < 0) { G.mesh.visible = false; G.pos = null; return; }
+    const f = (R.tick - G.rec.t0) / 2, i = Math.floor(f), n = best.d.length / 4;
+    if (i + 1 >= n) { G.mesh.visible = false; G.pos = null; return; }
+    const a = f - i, d = best.d, q = i * 4, q2 = q + 4;
+    const x = lerp(d[q], d[q2], a) / 8, y = lerp(d[q + 1], d[q2 + 1], a) / 8, z = lerp(d[q + 2], d[q2 + 2], a) / 8, yaw = angLerp(d[q + 3] / 1000, d[q2 + 3] / 1000, a);
+    G.mesh.visible = true;
+    G.mesh.position.set(x, y, z); G.mesh.rotation.y = yaw;
+    G.pos = { x, z };
+    // fade out when you're on top of it
+    const dd = Math.hypot(K.x - x, K.z - z);
+    G.mesh.children.forEach((c) => { c.material.opacity = Math.min(0.32, 0.06 + dd * 0.03); });
+  }
+  ghostEnd() { if (this.ghost) { this.ghost.mesh.visible = false; this.ghost.rec = null; } }
+
+  /* ── the photo finish: a human and a rival about to cross the line
+     together on the last lap → slow motion, a side-on camera at the line,
+     and the flash. Once a race. */
+  photoCheck() {
+    const R = this.race;
+    if (this.slowmo || this.photoDone || R.phase !== 'race' || this.cpus[this.me]) return;
+    const N = R.T.N, end = R.laps * N;
+    for (const H of this.hv) {
+      const K = R.karts[H.i];
+      if (K.fin || end - K.kc > 22 || end - K.kc < 2) continue;
+      const rival = R.karts.find((O) => O !== K && !O.fin && Math.abs(O.kc - K.kc) < 6 && end - O.kc < 24);
+      if (rival) { this.slowmo = { k: 0.22, t: 2.2, i: H.i, j: rival.i }; this.photoDone = true; this.audio.play('dh-tier', { rate: 0.5, gain: 0.8 }); document.body.classList.add('photo'); return; }
+    }
+  }
+  slowmoStep(dt) {
+    if (!this.slowmo) { this.photoCheck?.(); return; }
+    const S = this.slowmo;
+    S.t -= dt;
+    if (S.t <= 0) {
+      this.slowmo = null;
+      document.body.classList.remove('photo');
+      const f = $('flash'); if (f) { f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); }
+      this.audio.play('dh-bonk', { rate: 2.2, gain: 0.7 });
+    }
+  }
+  /* the side-on camera at the line, for the photo finish */
+  slowmoCam(H) {
+    const R = this.race, T = R.T, k = R.startK, S = this.slowmo;
+    if (!S || (H.i !== S.i && !H.tv)) return;
+    const side = T.w[k] + T.m[k] + 6;
+    const cx = T.x[k] + rightX(T, k) * side, cz = T.z[k] + rightZ(T, k) * side, cy = T.y[k] + 3.2;
+    const K = R.karts[S.i];
+    H.camera.position.set(cx - T.tx[k] * 4, cy, cz - T.tz[k] * 4);
+    H.camera.lookAt(K.x * 0.5 + T.x[k] * 0.5, T.y[k] + 1.6, K.z * 0.5 + T.z[k] * 0.5);
+    H.camera.fov = 46; H.camera.updateProjectionMatrix();
   }
 
   /* tools/shots.mjs: stage one item mid-effect, in front of the camera */

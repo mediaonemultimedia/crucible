@@ -193,7 +193,7 @@ export const PARK = {
     W(-114, 0, 34, { tag: 'lawn', w: 10, m: 5 }),
   ],
   patches: [
-    { x: 62, z: -30, r: 6.5, kind: 'pool' },
+    { x: 63, z: -29, r: 10, kind: 'pool' },
     { x: -30, z: 70, r: 3.6, kind: 'mulch' },
     { x: 54, z: 34, r: 3.6, kind: 'mulch' },
   ],

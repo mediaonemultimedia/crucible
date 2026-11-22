@@ -295,15 +295,22 @@ export function runPad(params) {
     if (!quiet) { sheet(); paintSel(); }
     send();
   }
-  // iPhone: the permission prompt must come from a tap
-  tiltBtn.addEventListener('pointerdown', async (e) => {
+  // iPhone: the permission prompt must come from a tap (a touchend or a click: iOS
+  // doesn't count a pointerdown as one)
+  let asking = false;
+  const ask = async (e) => {
     e.preventDefault(); e.stopPropagation();
+    if (asking) return;
+    asking = true; setTimeout(() => { asking = false; }, 800);
     snd(800);
     let res = 'denied';
     try { res = await DeviceOrientationEvent.requestPermission(); } catch { res = 'denied'; }
     tiltBtn.classList.remove('on');
     if (res === 'granted') { T.granted = true; listen(); status('Tilt on — hold it like a wheel', 2200); } else { status('No tilt permission — using the stick', 2600); setMode('stick'); }
-  });
+  };
+  tiltBtn.addEventListener('touchend', ask, { passive: false });
+  tiltBtn.addEventListener('click', ask);
+  tiltBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); });
   let listening = false, tiltCheck = 0;
   function listen() {
     T.want = true;

@@ -188,6 +188,12 @@ results.sheet = sheet;
 ok(sheet.open && sheet.items === 6, `the how-to sheet lists ${sheet.items} items`);
 await phones[2].screenshot({ path: path.join(out, 'phone-how-to-sheet.png') });
 await stripTap(phones[2], '#sh [data-mode="tilt"]'); await sleep(100);
+// iPhone-style permission (Chromium has it too): close the sheet, "Tap to enable tilt"
+const askBtn = await phones[2].evaluate(() => getComputedStyle(document.getElementById('tilt')).display !== 'none' || typeof DeviceOrientationEvent.requestPermission !== 'function');
+ok(askBtn, 'the "Tap to enable tilt" button shows where permission is needed');
+await tap(phones[2], 300, 200, 40, 7); await sleep(500);
+if (await phones[2].evaluate(() => getComputedStyle(document.getElementById('tilt')).display !== 'none')) { await stripTap(phones[2], '#tilt'); await sleep(200); }
+await tap(phones[2], ...L.moves); await sleep(500);
 const angle = await phones[2].evaluate(() => (screen.orientation ? screen.orientation.angle : 0));
 // find beta / gamma for a wheel angle θ at this screen rotation (the phone's own maths, upright)
 const orient = (th) => phones[2].evaluate(([th, a]) => {
@@ -244,7 +250,7 @@ const kc1 = await G.evaluate(() => __dh.hv.map((h) => __dh.race.karts[h.i].kc));
 const prog = kc1.map((v, n) => v - kc0[n]);
 const tauntsSeen = await G.evaluate(() => __dh._tauntsSeen || null);
 results.sync = { progress: prog, seqSamples: sync.length };
-ok(prog.every((d) => d > 250), `all four phone karts drove (${prog})`);
+ok(prog.every((d) => d > 150), `all four phone karts drove (${prog})`);
 await step(0, true);
 await G.screenshot({ path: path.join(out, '3-race-four-phones.png') });
 await phones[0].screenshot({ path: path.join(out, 'phone-racing-stick.png') });

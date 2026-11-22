@@ -20,6 +20,8 @@ npm run build                 # → final.html (self-contained; fails on any net
 node tools/check.mjs          # in the real page: menus → race, a whole 3-lap 8-CPU race, frame cost
 node tools/shots.mjs [scene]  # → shots/: select, grid, drift, items, underbed, banister, podium, karts
 node tools/peek.mjs out.png '?hold&webgl&p1=zach' '__dh.step(5)'   # one screenshot
+node tools/pad-test.mjs       # four simulated phones: pairing, menus, latency, tilt, in-sync race, loss, haptics → shots/pad/
+node tools/tour.mjs laundry   # a screenshot at each section of a track → shots/tracks/
 ```
 
 Deep links: `?p1=kevalanche&alt1=1&cpu=hard&track=landing` (straight into a
@@ -81,6 +83,17 @@ race), `p1cpu=LEVEL` (the player's kart drives itself), `seed=N`, `laps=N`,
 - `karts.js`: the seven karts and their ALT re-skins, from primitives.
 - `world.js`: the room, built around the spline. `fx.js`: pooled,
   instanced particles, the item boxes, items in flight, the sock.
+
+## Status — stage 2 of 2 (`docs/stage-2.md`)
+
+| # | Stage 2 item | State |
+|---|---|---|
+| 0 | Stage 1 finished and shipped | done — PR #55 merged before stage 2 began |
+| 1 | Phone controllers (up to 4): PF2's pad ported (QR, wire, padlink, skins, wake lock, reconnect, haptics), Kevin's 14 backgrounds, kart button map (GAS DRIFT ITEM / BRAKE LOOK-BACK TAUNT, pill = USE ITEM, HOW-TO sheet with the items), auto-gas, hit buzz, STICK or TILT steering (calibrated roll, dead zone, 3 sensitivities, smoothing, re-centre, iPhone permission tap, falls back to STICK), steering in the stick-X byte | done — `src/pad/`; `test/pad.test.mjs`; `tools/pad-test.mjs` (4 phones) |
+| 2 | Split screen 2–4 (own camera + HUD each, CPUs fill to 8; keyboard halves, gamepads, phones mix), LOD / pixel ratio per view count | done — `main.js` `_views`, `_render`; `tools/check.mjs` split-2 / split-4 |
+| 3 | Laundry Day (conveyor, rolling pods, dryer-drum shortcut, sock piles), Sprinkler Park (sprinklers, hose jump, kiddie pool, treehouse ramp), The Pillow Cup (3 races, points, overall podium) | done — `race/track.js`, `race/sim.js`, `render/laundry.js`, `render/park.js`; `tools/tour.mjs` |
+| 4 | Polish: best-lap ghost per track, photo-finish slow-mo, last-place roast | done — `main.js` ghost / photo; `ui/lines.js` LAST_LINES |
+| — | Quality bar + ship (`kart-release-2`) | in progress |
 
 ## Stage 2 hooks
 - `input/controls.js` has `extra`: a function returning another input to

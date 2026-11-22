@@ -182,6 +182,13 @@ body[data-screen=select] #players{top:100px}
 #pause{background:rgba(10,7,20,.72)}
 #pause .box{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px 30px;box-shadow:0 0 26px rgba(155,92,255,.35)}
 #pause .box p{font-family:var(--cond);font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);font-size:13px}
+/* the photo finish: slow motion in sepia, then the flash */
+#flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:8}
+#flash.on{animation:flashb .7s ease-out}
+@keyframes flashb{0%{opacity:.95}100%{opacity:0}}
+body.photo #stage{filter:sepia(.6) contrast(1.1) saturate(.85)}
+#photo{position:absolute;left:50%;top:16%;transform:translate(-50%,-50%) rotate(-3deg);display:none;font-family:var(--heavy);font-size:clamp(30px,5vw,64px);color:#fff6e0;text-shadow:0 4px 0 #5a3a1a,0 0 24px rgba(255,220,160,.8);letter-spacing:.04em;white-space:nowrap;pointer-events:none;z-index:7}
+body.photo #photo{display:block;animation:jig .3s steps(2) infinite}
 /* select: the players, the track menu, the cursors on the cards */
 #players{position:absolute;left:50%;top:84px;transform:translateX(-50%);display:flex;gap:8px;align-items:stretch}
 #players .pp{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:120px;padding:5px 12px;border-radius:8px;background:rgba(18,13,31,.86);border:2px solid var(--pc,var(--line));font-family:var(--cond);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:14px}
@@ -225,6 +232,7 @@ body[data-screen=select] #players{top:100px}
 <div id="loading">Fluffing the pillows…</div>
 <div id="ui">
   <div id="mark">Crucible</div>
+  <div id="flash"></div><div id="photo">PHOTO FINISH</div>
   <div id="pads"></div>
 
   <section class="screen on" id="title">
