@@ -103,7 +103,7 @@ export function panelSVG(skin, art) {
  <g id="wrot"><circle r="${R}" fill="none" stroke="#0c0c0e" stroke-width="34"/><circle r="${R}" fill="none" stroke="${rim}" stroke-width="24"/>
  <path d="M${-R} 0 H${R} M0 0 V${R}" stroke="${rim}" stroke-width="20" stroke-linecap="round"/><circle r="34" fill="${hub}" stroke="#0c0c0e" stroke-width="6"/>
  <rect x="-9" y="${-R - 16}" width="18" height="30" rx="6" fill="${C.led}"/></g>
- <text y="${R + 78}" text-anchor="middle" font-size="34" font-weight="600" letter-spacing="2" fill="${C.lab}">TILT · TAP TO RE-CENTRE</text></g>`;
+ <rect x="-250" y="${R + 40}" width="500" height="56" rx="28" fill="#000" opacity=".62"/><text y="${R + 78}" text-anchor="middle" font-size="34" font-weight="600" letter-spacing="2" fill="#fff">TILT · TAP TO RE-CENTRE</text></g>`;
   }
   function controls() {
     const cols = C.caps;
@@ -188,6 +188,7 @@ body.pad *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .set .btn{padding:calc(.7*var(--u)) calc(1.5*var(--u));border-radius:99px;background:#c4520f;color:#fff}
 #sel .st2{display:flex;border-radius:99px;overflow:hidden;border:2px solid #ffffff40}#sel .st2 b{padding:.8vh 1.4vh;font-size:.7em;opacity:.55}#sel .st2 b.on{background:#3ff0c8;color:#06221a;opacity:1}
 #sel .trk{padding:1vh 1.6vh;border-radius:99px;background:#ffffff22;font-size:.62em;max-width:24vh;text-align:center;line-height:1.05}
+.sheet .mv small{white-space:normal;line-height:1.05}
 #hud{position:fixed;right:3vh;top:2.5vh;z-index:5;pointer-events:none;display:none;align-items:center;gap:1.4vh;padding:.6vh 1.8vh;border-radius:99px;background:#000a;color:#fff;font:700 max(13px,3.4vh) "Bolster Condensed",Oswald,sans-serif;letter-spacing:.06em;text-transform:uppercase}
 #hud.on{display:flex}#hud .pl{font-family:"Bolster Display",sans-serif;font-size:1.3em}
 `;

@@ -101,7 +101,7 @@ export class RacerView {
   setLod(l) {
     if (this.lod === l) return;
     this.lod = l;
-    this.driver.setShells(l ? SHELLS_FAR : SHELLS_NEAR);
+    this.driver.setShells(l ? RacerView.shellsFar : RacerView.shellsNear);
     for (const o of this.kart.detail) o.visible = !l;
   }
 
@@ -191,3 +191,5 @@ export class RacerView {
 /* the LOD distances; split screen lowers them (main.js) */
 RacerView.lodNear = 26;
 RacerView.farCull = 260;
+RacerView.shellsNear = SHELLS_NEAR;
+RacerView.shellsFar = SHELLS_FAR;

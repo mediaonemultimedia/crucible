@@ -446,6 +446,10 @@ class App {
     // fewer, cheaper fur shells further out when the room is drawn several times
     RacerView.lodNear = n > 2 ? 14 : n > 1 ? 19 : 26;
     RacerView.farCull = n > 2 ? 170 : n > 1 ? 210 : 260;
+    // and thinner fur: fewer shells near and far (re-applied to every kart)
+    RacerView.shellsNear = n > 2 ? 7 : n > 1 ? 9 : 12;
+    RacerView.shellsFar = n > 2 ? 3 : n > 1 ? 4 : 5;
+    for (const v of this.views.values()) { const l = v.lod; v.lod = -1; v.setLod(l === 1 ? 1 : 0); }
     document.body.dataset.views = String(n);
     this.resize();
   }
