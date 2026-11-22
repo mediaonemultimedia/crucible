@@ -73,3 +73,53 @@ export function srand(seed = 1) {
   let s = seed >>> 0;
   return () => { s = (s + 0x6d2b79f5) >>> 0; let t = Math.imul(s ^ (s >>> 15), s | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
+
+/* merge the static meshes under `root` that share a material into one mesh
+   each (their world transforms baked in): hundreds of primitives → a few
+   dozen draws. Skips sprites, instanced meshes, anything flagged
+   userData.keep, and geometry whose attributes don't match the first. */
+export function mergeStatic(root, { keep = () => false } = {}) {
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  const groups = new Map();
+  root.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh || o.isSprite || o.userData.keep || keep(o) || Array.isArray(o.material)) return;
+    let p = o.parent, ok = true;
+    while (p && p !== root) { if (p.userData.keep) ok = false; p = p.parent; }
+    if (!ok) return;
+    const key = o.material.uuid + '|' + (o.userData.cast ? 1 : 0) + (o.userData.noShadow ? 1 : 0);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(o);
+  });
+  let merged = 0;
+  for (const list of groups.values()) {
+    if (list.length < 2) continue;
+    const names = ['position', 'normal', 'uv'];
+    const geos = [];
+    for (const o of list) {
+      let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+      if (!g.attributes.normal) g.computeVertexNormals();
+      if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+      const M = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
+      g.applyMatrix4(M);
+      geos.push(g);
+    }
+    let n = 0;
+    for (const g of geos) n += g.attributes.position.count;
+    const out = new THREE.BufferGeometry();
+    for (const a of names) {
+      const size = a === 'uv' ? 2 : 3, arr = new Float32Array(n * size);
+      let off = 0;
+      for (const g of geos) { const src = g.attributes[a]; for (let i = 0; i < src.count; i++) for (let c = 0; c < size; c++) arr[off++] = src.getComponent(i, c); }
+      out.setAttribute(a, new THREE.BufferAttribute(arr, size));
+    }
+    out.computeBoundingSphere();
+    const m = new THREE.Mesh(out, list[0].material);
+    Object.assign(m.userData, { cast: list[0].userData.cast, noShadow: list[0].userData.noShadow, merged: list.length });
+    m.castShadow = list[0].castShadow; m.receiveShadow = list[0].receiveShadow;
+    for (const o of list) o.removeFromParent();   // (geometry may be shared by a kept mesh: not disposed)
+    root.add(m);
+    merged += list.length;
+  }
+  return merged;
+}

@@ -499,7 +499,7 @@ class App {
     // the top three on a podium of books by the rug, in their winning poses
     const spots = [[-84, 6, 52], [-92, 4, 50], [-76, 3, 50]];
     this.podium = R.finishOrder.slice(0, 3).map((i, p) => ({ i, v: this.rviews[i], spot: spots[p] }));
-    for (const v of this.rviews) v.group.visible = false;
+    for (const v of this.rviews) { v.group.visible = false; v.racing = false; v.mayWake = true; }
     this.podium.forEach((P, p) => { P.v.group.visible = true; P.v.driver.pose(p === 0 ? 'win' : 'idle', 60); });
     if (!this.podiumMeshes) {
       this.podiumMeshes = new THREE.Group();
@@ -553,6 +553,10 @@ class App {
       const alpha = this.paused ? 1 : Math.min(1, this.acc / DT);
       const R = this.race;
       this._camera(dt, alpha);
+      // the soft-body budget: none in a race. Every plush is frozen and the
+      // trick / taunt / hit poses are the rig's (render/racer.js); the soft
+      // bodies wake only on the podium and the select turntable
+      this.rviews.forEach((v) => { v.mayWake = false; v.racing = true; });
       R.karts.forEach((K, i) => {
         const v = this.rviews[i], pose = this._pose(K, this.prev[i], alpha);
         v.update(this.paused ? 0 : dt, K, pose, this.camera.position, this.camera.quaternion);

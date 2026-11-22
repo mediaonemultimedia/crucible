@@ -63,13 +63,17 @@ export class Driver {
     U.fill.value.copy(FILL).applyQuaternion(camQ);
   }
 
-  update(dt, near) {
+  /* `half`: the soft body steps every other frame (30 Hz, twice the dt) */
+  update(dt, near, half = false) {
     if (this.awake <= 0) return false;
     this.awake -= dt;
     if (this.actT > 0) { this.actT -= dt; if (this.actT <= 0) { this.F.act = 'idle'; this.F.t = 0; } }
     this.F.t++;
     if (!near) return false;
-    this.p.update(Math.min(dt, 1 / 30), this.F, this.F, [0, 0, 0], [0, 0, 3], false);
+    this._acc = (this._acc || 0) + dt;
+    if (half && (this._flip = !this._flip)) return false;
+    this.p.update(Math.min(this._acc, 1 / 20), this.F, this.F, [0, 0, 0], [0, 0, 3], false);
+    this._acc = 0;
     return true;
   }
 
@@ -103,7 +107,10 @@ export class RacerView {
 
   hit() { this.squashV -= 6; this.driver.pose('hitstun', 0.5); }
   land(h) { this.squashV -= 3 + h * 6; }
-  taunt(air) { this.driver.pose(air ? 'jump' : 'win', air ? 0.75 : 1.4); if (this.kart.parts.hydraulics && !air) this.hyd = 1.1; if (air) this.trickT = 0.75; }
+  /* the showy pose: the plush stands up in its seat and spins once round
+     (a rig-level pose every racer gets; the player's own also wakes its
+     soft body for the arms-up taunt) */
+  taunt(air) { this.driver.pose(air ? 'jump' : 'win', air ? 0.75 : 1.4); if (this.kart.parts.hydraulics && !air) this.hyd = 1.1; if (air) this.trickT = 0.75; this.showT = air ? 0.75 : 1.2; this.showLen = this.showT; }
 
   /* place it from the sim's kart K (interpolated pose passed in) */
   update(dt, K, pose, camPos, camQ) {
@@ -142,6 +149,13 @@ export class RacerView {
     d.rotation.z = -(K.steer || 0) * 0.16 * Math.min(1, Math.abs(K.fwd) / 12) + (K.caseT > 0 || K.wobT > 0 ? Math.sin(this.t * 14) * 0.18 : 0);
     d.rotation.x = Math.max(-0.15, Math.min(0.2, (K.boostT > 0 ? -0.12 : 0) + this.pitch * 0.4));
     d.rotation.y = (K.steer || 0) * 0.25 + (K.spinT > 0 ? Math.sin(this.t * 20) * 0.3 : 0);
+    if (this.showT > 0) {
+      this.showT -= dt;
+      const u = 1 - Math.max(0, this.showT) / this.showLen, up = Math.sin(Math.min(1, u * 1.3) * Math.PI);
+      d.position.y += up * 0.55;
+      d.rotation.y += (u < 0.75 ? u / 0.75 : 1) * Math.PI * 2;
+      d.scale.setScalar(P.scale * (1 + up * 0.12));
+    } else d.scale.setScalar(P.scale);
 
     // wheels: roll with the speed; the front ones steer
     this.wheelA += (K.fwd * dt) / 0.45;
@@ -156,9 +170,10 @@ export class RacerView {
 
     // LOD by distance to the camera
     const dist = camPos.distanceTo(g.position);
-    this.setLod(dist > 38 ? 1 : 0);
+    this.dist = dist;
+    this.setLod(dist > 26 ? 1 : 0);
     this.driver.light(camQ);
-    this.driver.update(dt, dist < 45);
+    this.driver.update(dt, dist < 45 && this.mayWake !== false, !!this.racing);
     g.visible = dist < 260;
   }
 

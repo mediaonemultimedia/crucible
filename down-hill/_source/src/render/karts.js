@@ -8,7 +8,7 @@
    exhaust, detail (hidden at the far LOD), parts: {…per-kart moving bits} } */
 
 import * as THREE from 'three/webgpu';
-import { rbox, mat, glowMat, mesh, canvasTex } from './geo.js';
+import { rbox, mat, glowMat, mesh, canvasTex, mergeStatic } from './geo.js';
 
 const TAU = Math.PI * 2;
 
@@ -394,6 +394,11 @@ function sailTex() {
 const BUILD = { zamboni, bus, roadster, lowrider, washtub, ballmachine, cart };
 export function buildKart(kind, alt = false) {
   const K = BUILD[kind](alt);
-  K.group.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+  // the body's fixed parts merge by material (the wheels, the seat, the
+  // moving bits and the far-LOD details stay their own)
+  const moving = new Set([K.seat, ...K.detail, ...Object.values(K.parts).filter((p) => p && p.isObject3D), ...(K.parts.paddles || []).map((p) => p.g)]);
+  for (const o of moving) o.userData.keep = true;
+  mergeStatic(K.body);
+  K.group.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
   return K;
 }

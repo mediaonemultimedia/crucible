@@ -88,7 +88,7 @@ export const LANDING = {
   boxes: [0.1, 0.33, 0.52, 0.68, 0.86],
 };
 
-/* the room was laid out in a compact sketch; the race runs it 1.8× wider
+/* the room was laid out in a compact sketch; the race runs it 1.9× wider
    and 1.25× taller (a lap of ~55 s at racing speed) */
 function scaled(def, sxz, sy) {
   const P = (p) => ({ ...p, x: p.x * sxz, z: p.z * sxz });
@@ -101,7 +101,7 @@ function scaled(def, sxz, sy) {
     posts: def.posts.map(P),
   };
 }
-export const TRACKS = { landing: scaled(LANDING, 1.8, 1.25) };
+export const TRACKS = { landing: scaled(LANDING, 1.9, 1.25) };
 
 /* ── sampling ─────────────────────────────────────────────────────────── */
 function cr(p0, p1, p2, p3, t) {

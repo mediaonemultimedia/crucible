@@ -13,7 +13,7 @@
    is x −144…126, z −112…112; the landing x 126…414.                    */
 
 import * as THREE from 'three/webgpu';
-import { rbox, pillowGeo, mat, glowMat, mesh, canvasTex, srand } from './geo.js';
+import { rbox, pillowGeo, mat, glowMat, mesh, canvasTex, srand, mergeStatic } from './geo.js';
 import { rightX, rightZ } from '../race/track.js';
 
 const TAU = Math.PI * 2;
@@ -127,6 +127,7 @@ export class World {
     this._trackParts();
     this._guides();
     root.traverse((o) => { if (o.isMesh && !o.userData.noShadow) { o.receiveShadow = true; o.castShadow = !!o.userData.cast; } });
+    this.merged = mergeStatic(root, { keep: (o) => o === this.startLine || this.padMeshes.has(o) });
     this.moon.shadow.needsUpdate = true;
   }
 
@@ -560,7 +561,7 @@ export class World {
       g.strokeStyle = '#fff'; g.lineWidth = 12; g.lineCap = 'round';
       for (const y of [30, 64, 98]) { g.beginPath(); g.moveTo(22, y + 18); g.lineTo(64, y - 14); g.lineTo(106, y + 18); g.stroke(); }
     });
-    this.pads = [];
+    this.pads = []; this.padMeshes = new Set();
     for (let k = 0; k < N; k++) {
       if (!T.pad[k] || T.pad[(k - 1 + N) % N]) continue;
       const m = new THREE.MeshBasicMaterial({ map: padTex, color: '#ffd84a', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
@@ -570,7 +571,7 @@ export class World {
       p.userData.noShadow = true;
       const base = mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshBasicMaterial({ color: '#ff3b6b', transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }), T.x[k], T.y[k] + 0.25, T.z[k], root);
       base.rotation.copy(p.rotation); base.userData.noShadow = true;
-      this.pads.push(m);
+      this.pads.push(m); this.padMeshes.add(p); this.padMeshes.add(base);
     }
     void neon; void neon2;
   }
