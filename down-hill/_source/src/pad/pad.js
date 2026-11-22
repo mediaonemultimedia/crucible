@@ -223,8 +223,8 @@ export function runPad(params) {
 <div class="sheet" id="sh"></div><div id="ko"><div class="card"></div></div>
 <div id="rot"><svg viewBox="0 0 96 96" fill="none" stroke="#fff" stroke-width="5" stroke-linejoin="round"><rect x="28" y="10" width="40" height="76" rx="8"/><circle cx="48" cy="76" r="3" fill="#fff"/></svg>Rotate your phone<small style="font-size:14px;opacity:.6;letter-spacing:.1em">the pad plays sideways</small></div>`;
   for (const ev of ['contextmenu', 'selectstart', 'dragstart', 'gesturestart', 'dblclick']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
-  document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
-  document.addEventListener('touchstart', (e) => { if (e.touches.length > 1 || !e.target.closest?.('#sh')) e.preventDefault(); }, { passive: false });
+  document.addEventListener('touchmove', (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false });
+  document.addEventListener('touchstart', (e) => { if (e.cancelable && (e.touches.length > 1 || !e.target.closest?.('#sh'))) e.preventDefault(); }, { passive: false });
 
   const svg = document.getElementById('s');
   const fit = () => svg.setAttribute('preserveAspectRatio', innerWidth / innerHeight >= 1956 / 1100 ? 'xMidYMid slice' : 'xMidYMid meet');
@@ -318,8 +318,7 @@ export function runPad(params) {
     T.recentre = true;
     // no events at all within a couple of seconds: not supported here
     clearTimeout(tiltCheck);
-    const since = performance.now();
-    tiltCheck = setTimeout(() => { if (SET.mode === 'tilt' && T.heard < since) { status('No tilt sensor found — using the stick', 2600); setMode('stick'); } }, 2500);
+    tiltCheck = setTimeout(() => { if (SET.mode === 'tilt' && !T.heard) { status('No tilt sensor found — using the stick', 2600); setMode('stick'); } }, 4000);
   }
   const angleNow = () => (screen.orientation && typeof screen.orientation.angle === 'number' ? screen.orientation.angle : typeof window.orientation === 'number' ? window.orientation : 90);
   function onTilt(e) {

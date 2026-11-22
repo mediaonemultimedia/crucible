@@ -76,3 +76,16 @@ test('tilt: dead zone, three sensitivities, full lock, wrap', () => {
   assert.ok(Math.abs(tiltSteer(25, 10, 1) - tiltSteer(15, 0, 1)) < 1e-9, 'relative to the calibrated centre');
   assert.ok(tiltSteer(-175, 175, 1) > 0, 'wraps round ±180');
 });
+
+test('wire: a button held through a quiet spell is not pressed twice', () => {
+  const P = new PadState();
+  const c = new Array(TAPS.length).fill(0);
+  P.take(decode(encodeInput(1, 0, c, 0)), 0);
+  c[TAPS.indexOf(ITEM)]++;
+  assert.ok(P.take(decode(encodeInput(2, ITEM, c, 0)), 10) & ITEM);
+  P.stale(10 + STALE_MS + 1);
+  assert.equal(P.take(decode(encodeInput(3, ITEM, c, 0)), 2000) & ITEM, 0, 'same hold, no new press');
+  assert.ok(P.take(decode(encodeInput(4, 0, c, 0)), 2010) === 0);
+  c[TAPS.indexOf(ITEM)]++;
+  assert.ok(P.take(decode(encodeInput(5, ITEM, c, 0)), 2020) & ITEM, 'a real second press');
+});

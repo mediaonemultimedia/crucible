@@ -62,7 +62,9 @@ export class PadState {
     if (this.seq >= 0 && !newer(p.seq, this.seq)) return 0;
     this.seq = p.seq;
     this.heard = now;
-    let pressed = p.mask & ~this.held;
+    // a bit still held from before a quiet spell (dropped as stale) isn't a new press
+    this.wasHeld &= p.mask;
+    let pressed = p.mask & ~this.held & ~this.wasHeld;
     if (this.counts) TAPS.forEach((bit, i) => { if (((p.counts[i] - this.counts[i]) & 15) !== 0) pressed |= bit; });
     this.counts = p.counts;
     this.held = p.mask;
@@ -70,7 +72,7 @@ export class PadState {
     this.tapped |= pressed;
     return pressed;
   }
-  stale(now) { if ((this.held || this.steer) && now - this.heard > STALE_MS) { this.held = 0; this.steer = 0; } }
+  stale(now) { if ((this.held || this.steer) && now - this.heard > STALE_MS) { this.wasHeld |= this.held; this.held = 0; this.steer = 0; } }
   /* the kart's input this tick (a tap shorter than a tick still counts once) */
   sample() {
     const m = this.held | this.tapped;
@@ -81,5 +83,5 @@ export class PadState {
     };
   }
   clear() { this.tapped = 0; }
-  reset() { this.held = 0; this.tapped = 0; this.seq = -1; this.counts = null; this.steer = 0; }
+  reset() { this.held = 0; this.tapped = 0; this.seq = -1; this.counts = null; this.steer = 0; this.wasHeld = 0; }
 }

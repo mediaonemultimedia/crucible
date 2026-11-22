@@ -191,7 +191,7 @@ await stripTap(phones[2], '#sh [data-mode="tilt"]'); await sleep(100);
 // iPhone-style permission (Chromium has it too): close the sheet, "Tap to enable tilt"
 const askBtn = await phones[2].evaluate(() => getComputedStyle(document.getElementById('tilt')).display !== 'none' || typeof DeviceOrientationEvent.requestPermission !== 'function');
 ok(askBtn, 'the "Tap to enable tilt" button shows where permission is needed');
-await tap(phones[2], 300, 200, 40, 7); await sleep(500);
+await stripTap(phones[2], '#sh .x'); await sleep(500);
 if (await phones[2].evaluate(() => getComputedStyle(document.getElementById('tilt')).display !== 'none')) { await stripTap(phones[2], '#tilt'); await sleep(200); }
 await tap(phones[2], ...L.moves); await sleep(500);
 const angle = await phones[2].evaluate(() => (screen.orientation ? screen.orientation.angle : 0));
@@ -218,7 +218,7 @@ ok(tRight > 0.9, `tilt turned right 30° → steer ${tRight.toFixed(2)}`);
 ok(tLeft < -0.4 && tLeft > -0.95, `tilt turned left 18° → steer ${tLeft.toFixed(2)}`);
 ok(tiltUI.wheel !== 'none' && tiltUI.stick === 'none', 'TILT: the wheel replaces the stick');
 // close the sheet, wheel level again
-await tap(phones[2], 300, 200, 40, 7); await sleep(500);
+await stripTap(phones[2], '#sh .x'); await sleep(500);
 await fire(phones[2], await orient(4), 8);
 await phones[2].screenshot({ path: path.join(out, 'phone-tilt-wheel.png') });
 
@@ -227,6 +227,7 @@ await phones[2].screenshot({ path: path.join(out, 'phone-tilt-wheel.png') });
 const inject = (on) => Promise.all(phones.map((p) => p.evaluate((on) => { const q = new URLSearchParams(location.search); if (on) { q.set('lag', '40'); q.set('jitter', '30'); q.set('loss', '0.2'); } return on; }, on)));
 void inject;
 await G.evaluate(() => __dh.step(4.2, false));    // past the countdown
+ok((await Promise.all(phones.map((p) => p.evaluate(() => __pad.sheetOpen)))).every((o) => !o), 'every sheet closed before the race');
 for (const p of phones) await down(p, 3, ...L.btn[B.GAS]);
 const kc0 = await G.evaluate(() => __dh.hv.map((h) => __dh.race.karts[h.i].kc));
 const tapsSent = [0, 0, 0, 0];
@@ -291,13 +292,13 @@ ok(buzzed[1].fresh && buzzed[1].kind === 'missile' && !buzzed[0].fresh && !buzze
 // 7. auto-gas from the sheet (phone 4): GAS held without a finger
 await tap(phones[3], ...L.moves); await sleep(500);
 await stripTap(phones[3], '#sh [data-auto="1"]'); await sleep(100);
-await tap(phones[3], 300, 200, 40, 7); await sleep(500);
+await stripTap(phones[3], '#sh .x'); await sleep(500);
 await tick(6);
 const auto = await G.evaluate(() => { const s = __dh.pads.state[3]; return { held: s.held, gas: !!(s.held & 16) }; });
 results.autoGas = auto;
 ok(auto.gas, 'auto-gas: GAS held with no finger on it');
 await stripTap(phones[3], '#hf'); // no-op
-await tap(phones[3], ...L.moves); await sleep(400); await stripTap(phones[3], '#sh [data-auto="0"]'); await tap(phones[3], 300, 200, 40, 7); await sleep(400);
+await tap(phones[3], ...L.moves); await sleep(400); await stripTap(phones[3], '#sh [data-auto="0"]'); await stripTap(phones[3], '#sh .x'); await sleep(400);
 
 // 8. the phone page's frame rate while playing
 const fps = await phones[0].evaluate(() => new Promise((res) => { let n = 0; const t0 = performance.now(); const f = () => { n++; if (performance.now() - t0 < 1000) requestAnimationFrame(f); else res(n); }; requestAnimationFrame(f); }));
