@@ -93,7 +93,19 @@ race), `p1cpu=LEVEL` (the player's kart drives itself), `seed=N`, `laps=N`,
 | 2 | Split screen 2–4 (own camera + HUD each, CPUs fill to 8; keyboard halves, gamepads, phones mix), LOD / pixel ratio per view count | done — `main.js` `_views`, `_render`; `tools/check.mjs` split-2 / split-4 |
 | 3 | Laundry Day (conveyor, rolling pods, dryer-drum shortcut, sock piles), Sprinkler Park (sprinklers, hose jump, kiddie pool, treehouse ramp), The Pillow Cup (3 races, points, overall podium) | done — `race/track.js`, `race/sim.js`, `render/laundry.js`, `render/park.js`; `tools/tour.mjs` |
 | 4 | Polish: best-lap ghost per track, photo-finish slow-mo, last-place roast | done — `main.js` ghost / photo; `ui/lines.js` LAST_LINES |
-| — | Quality bar + ship (`kart-release-2`) | in progress |
+| — | Quality bar + ship (`kart-release-2`) | check passes on the release build (all three tracks: 8/8 finish, mean laps 55.1 / 51.5 / 52.3 s, JS p95 ≤ 0.8 ms; zero errors, zero network); pad test passes with 4 phones in sync |
+
+### Split-screen frame cost (`tools/check.mjs`, SwiftShader, 1280×720)
+| views | JS / frame (mean, p95) | draws / frame | triangles / frame | render call (CPU, SwiftShader) |
+|---|---|---|---|---|
+| 1 | 0.31, 0.8 ms | 395 | 1.52 M | 12 ms |
+| 2 | 1.07, 3.8 ms | 772 (386 / view) | 2.15 M | 18 ms |
+| 4 | 1.17, 2.4 ms | 1,436 (359 / view) | 3.68 M | 35.5 ms |
+
+Per view count: pixel ratio 1.75 → 1.25 → 1, fur shells 12/5 → 9/4 → 7/3, LOD
+switch 26 → 19 → 14 units, far cull 260 → 210 → 170; the moonlight/sun
+shadow map is static (drawn once). SwiftShader's render times are a CPU
+rasteriser's, not a GPU's.
 
 ## Stage 2 hooks
 - `input/controls.js` has `extra`: a function returning another input to
