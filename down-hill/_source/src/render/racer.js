@@ -126,6 +126,14 @@ export class RacerView {
     let trickRoll = 0;
     if (this.trickT > 0) { this.trickT -= dt; trickRoll = (1 - Math.max(0, this.trickT) / 0.75) * Math.PI * 2; }
     g.rotation.set(0, pose.yaw + this.driftA + this.spin, 0);
+    // Laundry Day's dryer drum: up the wall and round once, as the sim carries you through
+    let drumRoll = 0;
+    if (K.drum > 0) {
+      const th = K.drum * Math.PI * 2, R = 5.4;
+      drumRoll = th;
+      g.position.y += R * (1 - Math.cos(th));
+      g.position.x += Math.cos(pose.yaw) * Math.sin(th) * R * 0.9; g.position.z -= Math.sin(pose.yaw) * Math.sin(th) * R * 0.9;
+    }
     // pitch with the slope / the vertical speed in the air; roll with the steer
     const pitchT = K.air ? Math.max(-0.5, Math.min(0.45, -K.vy * 0.025)) : Math.max(-0.4, Math.min(0.4, -(K.slopeVy || 0) / Math.max(6, Math.abs(K.fwd)) * 0.9));
     this.pitch += (pitchT - this.pitch) * Math.min(1, dt * 8);
@@ -139,7 +147,7 @@ export class RacerView {
     if (this.hyd > 0) { this.hyd -= dt; hy = Math.abs(Math.sin(this.hyd * 11)) * 0.9 * Math.min(1, this.hyd); }
     const hop = K.hop > 0 ? Math.sin((K.hop / 0.18) * Math.PI) * 0.35 : 0;
     B.position.y = hy + hop + Math.sin(this.t * 9) * 0.02 * Math.min(1, Math.abs(K.fwd) / 10);
-    B.rotation.set(this.pitch + (hy ? Math.sin(this.hyd * 11) * 0.12 : 0), 0, this.roll + trickRoll);
+    B.rotation.set(this.pitch + (hy ? Math.sin(this.hyd * 11) * 0.12 : 0), 0, this.roll + trickRoll + drumRoll);
     const sq = Math.max(-0.3, Math.min(0.2, this.squash * 0.08));
     B.scale.set(1 - sq * 0.5, 1 + sq, 1 - sq * 0.5);
 

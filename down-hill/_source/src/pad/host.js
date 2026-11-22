@@ -166,6 +166,7 @@ export class PadHost {
   paint(force = false) {
     const el = document.querySelector('#pads');
     if (!el) return;
+    if (this.status === 'off') { if (el.innerHTML) { el.innerHTML = ''; this._qrFor = null; this._paintKey = ''; } return; }
     const leds = ALL.map((k) => this.led(k));
     const key = `${this.status}|${this.code}|${leds.join()}|${ALL.map((k) => Math.round(this.rtt(k) / 5)).join()}|${ALL.map((k) => this.app.padSeatName?.(k) || '').join()}`;
     if (!force && key === this._paintKey) return;

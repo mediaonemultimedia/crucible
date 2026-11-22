@@ -118,14 +118,9 @@ export class World {
     scene.add(root);
     this.glowTex = glowTex();
     this.anim = [];
-    scene.background = new THREE.Color('#0b0a1a');
-    this._lights();
-    this._rooms();
-    this._bed();
-    this._furniture();
-    this._landing();
-    this._trackParts();
-    this._guides();
+    this.noDash = new Set(['banister', 'plank', 'books']);
+    this.runnerTags = new Set(['rug', 'landing', 'door', 'underbed']);
+    this.build();
     root.traverse((o) => { if (o.isMesh && !o.userData.noShadow) { o.receiveShadow = true; o.castShadow = !!o.userData.cast; } });
     this.merged = mergeStatic(root, { keep: (o) => o === this.startLine || this.padMeshes.has(o) });
     this.moon.shadow.needsUpdate = true;
@@ -147,6 +142,17 @@ export class World {
   /* 0…1: how dark it is here (under the bed) */
   darkAt(pose) { return pose.y < BED.under && pose.x > BED.x0 && pose.x < BED.x1 && pose.z > BED.z0 && pose.z < BED.z1 ? 1 : 0; }
   dispose() { this.root.removeFromParent(); this.lightsG.removeFromParent(); }
+
+  build() {
+    this.scene.background = new THREE.Color('#0b0a1a');
+    this._lights();
+    this._rooms();
+    this._bed();
+    this._furniture();
+    this._landing();
+    this._trackParts();
+    this._guides();
+  }
 
   add(o) { this.root.add(o); return o; }
 
@@ -534,19 +540,19 @@ export class World {
     const dash = new THREE.MeshBasicMaterial({ color: '#f6f1e8', transparent: true, opacity: 0.85 });
     const neon = new THREE.MeshBasicMaterial({ color: '#ff3b6b' });
     const neon2 = new THREE.MeshBasicMaterial({ color: '#3ff0c8' });
-    const runner = new THREE.MeshStandardMaterial({ color: '#2c2440', roughness: 1, transparent: true, opacity: 0.55, depthWrite: false });
+    const runner = new THREE.MeshStandardMaterial({ color: this.runnerColor || '#2c2440', roughness: 1, transparent: true, opacity: 0.55, depthWrite: false });
     const dg = new THREE.PlaneGeometry(0.5, 2.2);
     const insts = [];
     for (let k = 0; k < N; k += 4) {
       const tag = def.points[T.sec[k]].tag;
-      if (tag === 'banister' || tag === 'plank' || tag === 'books') continue;
+      if (this.noDash.has(tag)) continue;
       for (const s of [-1, 1]) insts.push([k, s]);
     }
     const im = new THREE.InstancedMesh(dg, dash, insts.length);
     const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), P = new THREE.Vector3(), S = new THREE.Vector3(1, 1, 1);
     insts.forEach(([k, s], i) => {
       const w = T.w[k];
-      P.set(T.x[k] + rightX(T, k) * w * s, T.y[k] + 0.22 + (T.y[k] > 19 ? 0.9 : 0), T.z[k] + rightZ(T, k) * w * s);
+      P.set(T.x[k] + rightX(T, k) * w * s, T.y[k] + 0.22 + (this.dashLift ? this.dashLift(k) : T.y[k] > 19 ? 0.9 : 0), T.z[k] + rightZ(T, k) * w * s);
       E.set(-Math.PI / 2, 0, -Math.atan2(T.tx[k], T.tz[k]) + Math.PI, 'YXZ');
       E.set(-Math.PI / 2, 0, 0); Q.setFromEuler(E);
       const qy = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(T.tx[k], T.tz[k]));
@@ -560,7 +566,7 @@ export class World {
     let n = 0;
     for (let k = 0; k <= N; k += 2) {
       const kk = k % N, tag = def.points[T.sec[kk]].tag;
-      const on = tag === 'rug' || tag === 'landing' || tag === 'door' || tag === 'underbed';
+      const on = this.runnerTags.has(tag);
       const w = T.w[kk] + 0.6;
       pos.push(T.x[kk] - rightX(T, kk) * w, T.y[kk] + 0.12 + (on ? 0 : -50), T.z[kk] - rightZ(T, kk) * w, T.x[kk] + rightX(T, kk) * w, T.y[kk] + 0.12 + (on ? 0 : -50), T.z[kk] + rightZ(T, kk) * w);
       if (n) idx.push((n - 1) * 2, n * 2, (n - 1) * 2 + 1, (n - 1) * 2 + 1, n * 2, n * 2 + 1);

@@ -144,7 +144,7 @@ await G.evaluate(() => { __dh.choice = 0; __dh._diff(); __dh._trackPreview(); })
 await tick(10);
 results.select = await G.evaluate(() => __dh.players.map((p) => ({ sel: p.sel, id: __dh.constructor ? null : null, look: [p.sel] })));
 const looks = await G.evaluate(() => __dh.players.map((p) => p.sel));
-const views = await Promise.all(phones.map((p) => p.evaluate(() => ({ skin: __pad.S.skin, strip: document.querySelector('#sel').classList.contains('on'), name: document.querySelector('#sel .nm span').textContent, who: document.querySelector('#sel .nm small').textContent }))));
+const views = await Promise.all(phones.map((p) => p.evaluate(() => ({ view: JSON.stringify(__pad.S.view), seat: __pad.S.seat, link: !!__pad.S.link, skin: __pad.S.skin, strip: document.querySelector('#sel').classList.contains('on'), name: document.querySelector('#sel .nm span').textContent, who: document.querySelector('#sel .nm small').textContent }))));
 results.select = { looks, views };
 ok(new Set(looks).size === 4, `four different looks ${looks}`);
 ok(views.every((v) => v.strip), 'every phone shows its select strip');

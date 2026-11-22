@@ -906,6 +906,7 @@ class App {
     this.t += dt;
     this._menuPads();
     this.pads.frame(dt);
+    this._lostPhones();
     let rdt = dt;
     if (this.screen === 'race' && this.race) {
       rdt = this.slowmo ? dt * this.slowmo.k : dt;
@@ -1037,25 +1038,31 @@ class App {
   padSeat(k, on) {
     if (on) {
       if (this.playerOfPhone(k)) return;
+      // a phone coming back (it slept, the page reloaded): its own player again
+      const lost = this.players.find((p) => p.lostPhone === k);
       const p1 = this.players[0];
-      if (p1.phone < 0 && !this.players.some((p) => p.phone >= 0) && this.players.length === 1) p1.phone = k;
+      if (lost) { lost.phone = k; lost.lostPhone = undefined; }
+      else if (p1.phone < 0 && p1.lostPhone === undefined && !this.players.some((p) => p.phone >= 0 || p.lostPhone !== undefined) && this.players.length === 1) p1.phone = k;
       else if (this.screen !== 'race' && this.players.length < MAXP) this.addPlayer({ phone: k });
-      else if (this.screen === 'race') {
-        // a phone coming back mid-race to a player that lost it
-        const lost = this.players.find((p) => p.lostPhone === k);
-        if (lost) { lost.phone = k; lost.lostPhone = undefined; }
-      }
       const p = this.playerOfPhone(k);
       if (p) this.pads.send(k, { t: 'seat', k, who: `P${this.num(p) + 1}` });
       else this.pads.send(k, { t: 'full' });
     } else {
       const p = this.playerOfPhone(k);
       if (!p) return;
-      if (this.screen === 'race') { p.lostPhone = k; p.phone = -1; return; }
-      p.phone = -1;
-      if (this.num(p) > 0 && p.ctl.map === 'none' && p.ctl.gp === null) this.removePlayer(p);
+      // keep the player a while: phones drop and come back
+      p.lostPhone = k; p.lostAt = this.t; p.phone = -1;
     }
     this._playersChanged();
+  }
+  /* a phone that hasn't come back in 8 s (outside a race): its player goes */
+  _lostPhones() {
+    if (this.screen === 'race') return;
+    for (const p of this.players.slice()) {
+      if (p.lostPhone === undefined || this.t - p.lostAt < 8) continue;
+      p.lostPhone = undefined;
+      if (this.num(p) > 0 && p.ctl.map === 'none' && p.ctl.gp === null) this.removePlayer(p);
+    }
   }
   padSeatName(k) { const p = this.playerOfPhone(k); return p ? `P${this.num(p) + 1}` : ''; }
   padMode() { /* the phone steers by stick or tilt: its own business (the stick-X byte either way) */ }

@@ -195,7 +195,45 @@ const race = {
   },
 };
 
-export const TRACKS = { menu, fight, vs, round: roundStart, win, lose, race };
+/* Laundry Day's loop: E minor, a shuffling spin-cycle groove, 126 bpm. Original. */
+const LA = ['Em', 'Em', 'C', 'D', 'Em', 'Em', 'Am', 'B7'];
+const LAUNDRY_CHORDS = [...LA, 'C', 'Em', 'C', 'D', 'Em', 'Em', 'Am', 'B7'];
+const laundry = {
+  name: 'laundry', bpm: 126, swing: 0.6, loop: true,
+  channels: {
+    lead: { grid: 8, gain: 0.8, bars: bars(`
+      e5 . g5 e5 b4 . e5 . | g5 a5 b5 . a5 g5 e5 . | c5 . e5 g5 c6 . b5 g5 | a5 - f#5 . d5 . f#5 a5 |
+      b5 . a5 g5 e5 . g5 . | e5 . b4 . e5 g5 b5 . | c6 . b5 a5 e5 . a5 c6 | b5 - - . d#5 . f#5 b5 |
+      e6 . b5 . g5 . e5 . | g5 . e5 . b4 . e5 g5 | c6 . g5 . e5 . c5 e5 | d5 . f#5 . a5 . d6 . |
+      b5 . g5 . e5 . b4 . | e5 g5 b5 . e6 - b5 g5 | a5 . c6 . e6 . c6 a5 | b5 - - - . . . .`) },
+    arp: { grid: 16, gain: 0.4, bars: LAUNDRY_CHORDS.map((c, i) => (i >= 8 ? arpBar(c, [0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 1, 2, 8, 2, 1, 2], 4) : ['.'])) },
+    bass: { grid: 8, gain: 1, bars: LAUNDRY_CHORDS.map((c, i) => bassBar(c, i % 4 === 3 ? 'R R O . 5 5 A .' : 'R . O R 5 . R A', LAUNDRY_CHORDS[(i + 1) % 16])) },
+    drums: { grid: 16, gain: 0.85, bars: LAUNDRY_CHORDS.map((_, i) => (i % 8 === 7 ? 'k . s . k s s . s s . s s s s s' : 'k . h k s . h . k . h k s . h h').split(' ')) },
+    hats: { grid: 16, gain: 0.45, hype: true, drum: true, bars: LAUNDRY_CHORDS.map(() => 'h h h h h h h h h h h h h h h h'.split(' ')) },
+    arp2: { grid: 16, gain: 0.35, hype: true, inst: 'arp', bars: LAUNDRY_CHORDS.map((c, i) => (i < 8 ? arpBar(c, [0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 1, 2, 8, 2, 1, 2], 5) : ['.'])) },
+  },
+};
+
+/* Sprinkler Park's loop: F major, sunny and skipping, 152 bpm. Original. */
+const PA = ['F', 'C', 'Dm', 'Bb', 'F', 'C', 'Bb', 'C'];
+const PARK_CHORDS = [...PA, 'Dm', 'Bb', 'F', 'C', 'Dm', 'Bb', 'Gm', 'C7'];
+const park = {
+  name: 'park', bpm: 152, swing: 0.55, loop: true,
+  channels: {
+    lead: { grid: 8, gain: 0.85, bars: bars(`
+      c5 f5 a5 . c6 . a5 f5 | g5 . e5 . c5 . e5 g5 | a5 . f5 . d5 . f5 a5 | bb5 - d5 . f5 . bb5 . |
+      a5 . c6 . f6 - c6 a5 | g5 . c6 . e6 - c6 g5 | f5 . bb5 . d6 . bb5 f5 | e5 - - . g5 . c6 . |
+      d6 . a5 . f5 . a5 d6 | bb5 . f5 . d5 . f5 bb5 | a5 . c6 . f6 . c6 a5 | g5 - e5 . c5 . e5 g5 |
+      f5 . a5 . d6 . a5 f5 | d5 . f5 . bb5 . f5 d5 | g5 . bb5 . d6 . bb5 g5 | e5 - - - . . . .`) },
+    arp: { grid: 16, gain: 0.42, bars: PARK_CHORDS.map((c, i) => (i >= 8 ? arpBar(c, [0, 1, 2, 8, 2, 1, 0, 1, 0, 1, 2, 8, 9, 8, 2, 1], 4) : ['.'])) },
+    bass: { grid: 8, gain: 1, bars: PARK_CHORDS.map((c, i) => bassBar(c, i % 4 === 3 ? 'R O R O 5 5 A A' : 'R . 5 . O . 5 .', PARK_CHORDS[(i + 1) % 16])) },
+    drums: { grid: 16, gain: 0.85, bars: PARK_CHORDS.map((_, i) => (i % 8 === 7 ? 'k . h . s . s s . s s . s s s s' : 'k . h . s . h . k k h . s . h .').split(' ')) },
+    hats: { grid: 16, gain: 0.5, hype: true, drum: true, bars: PARK_CHORDS.map(() => 'h h h h h h h h h h h h h h h h'.split(' ')) },
+    arp2: { grid: 16, gain: 0.38, hype: true, inst: 'arp', bars: PARK_CHORDS.map((c, i) => (i < 8 ? arpBar(c, [0, 1, 2, 8, 2, 1, 0, 1, 0, 1, 2, 8, 9, 8, 2, 1], 5) : ['.'])) },
+  },
+};
+
+export const TRACKS = { menu, fight, vs, round: roundStart, win, lose, race, laundry, park };
 
 /* ── compile: a track → { beats, events: [{ beat, dur, ch, inst, note, drum, gain, hype }] } ── */
 export function compile(track) {
