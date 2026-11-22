@@ -36,7 +36,7 @@ race), `p1cpu=LEVEL` (the player's kart drives itself), `seed=N`, `laps=N`,
 | 3 | Items: Feather Slick, Pillow Missile, Espresso Shot, Fuzzy Handcuffs, Pillowcase, Alarm Clock; odds by place | done — `shots/item-*.png` |
 | 4 | Track 1, The Landing: duvet → book ramp → rug → under the bed → banister → sock drawer → pillow pile | done — `render/world.js`; `shots/underbed.png`, `shots/banister.png` |
 | 5 | Race flow (title, select with portraits + turntable, countdown, race, podium results), 7 CPUs × 3 levels, HUD, keyboard + gamepad, audio, deep links | done |
-| — | Quality bar (`tools/check.mjs`, `tools/shots.mjs`) and shipping (`kart-release-1`) | see the PR |
+| — | Quality bar (`tools/check.mjs`, `tools/shots.mjs`) and shipping | done — check passes (JS p95 0.8 ms, 395 draws, laps 47–63 s); shipped PR #55 (`kart-release-1`, merged) |
 
 ### Performance (the hard rule)
 - Racing plush are frozen: no soft body, cloth or fur sim runs during a race
