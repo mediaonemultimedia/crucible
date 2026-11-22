@@ -131,6 +131,23 @@ export class World {
     this.moon.shadow.needsUpdate = true;
   }
 
+  /* the places the app frames: the podium, the select turntable, the title diorama */
+  get info() {
+    return {
+      podium: [[-84, 6, 52], [-92, 4, 50], [-76, 3, 50]], podLook: [-84, 7.2, 51], podCam: { c: [-84, 52], r: 17, y: 10 },
+      turn: [-84, 0.2, 52], title: { c: [135, -20], r: 300, y: 400, look: [130, 0, 10] }, bounds: [-141, 411, -109, 109],
+    };
+  }
+  /* the chase camera's wish, kept out of the furniture: under the bed it stays under the slats */
+  camFix(want, pose) {
+    const ub = want.x > BED.x0 - 4 && want.x < BED.x1 + 4 && want.z > BED.z0 && want.z < BED.z1 + 4;
+    if (pose.y < BED.under && ub) want.y = Math.min(want.y, BED.under - 1.4);
+    if (pose.y > BED.top - 1 && ub) want.y = Math.max(want.y, BED.top + 2.2);
+  }
+  /* 0…1: how dark it is here (under the bed) */
+  darkAt(pose) { return pose.y < BED.under && pose.x > BED.x0 && pose.x < BED.x1 && pose.z > BED.z0 && pose.z < BED.z1 ? 1 : 0; }
+  dispose() { this.root.removeFromParent(); this.lightsG.removeFromParent(); }
+
   add(o) { this.root.add(o); return o; }
 
   glow(color, size, x, y, z, op = 0.8) {
@@ -142,7 +159,8 @@ export class World {
   }
 
   _lights() {
-    const S = this.scene;
+    const S = (this.lightsG = new THREE.Group());
+    this.scene.add(S);
     this.hemi = new THREE.HemisphereLight('#5d63b8', '#2a1c22', 1.25);
     S.add(this.hemi);
     // the moon through the west window: low and cool, casting the furniture's shadows (once)

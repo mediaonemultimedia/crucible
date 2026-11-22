@@ -75,12 +75,27 @@ const NS_ALLOW = [
   'http://www.w3.org/1999/xlink',
 ];
 
-const PEERJS_TEXT = [];
+/* Stage 2's one exception to "no network", as in Pillow Fight 2: the
+   phone pads. The title and select screens open a pad room for the QR
+   (?pads=off keeps it shut; the test harness's ?hold does too unless
+   ?pads=1), so the page may reach exactly the PeerJS cloud broker
+   (0.peerjs.com, the handshake), public STUN (stun.l.google.com:19302) and
+   the phones themselves. The phone pad loads its painted background from
+   controller/backgrounds/ beside the page. PeerJS is bundled (no script
+   fetch). Its own strings below are links in its log text and package
+   metadata, never requested; its built-in TURN defaults are overridden by
+   src/pad/padlink.js (our STUN only), so never contacted. */
+const PEERJS_TEXT = [
+  'https://peerjs.com',
+  'https://github.com/peers/peerjs',
+  'https://github.com/peers/peerjs/issues',
+  'https://opencollective.com/peer',
+];
 
 const urlLiterals = [...new Set([...js.matchAll(/["'`](https?:\/\/[^"'`\s]+)["'`]/gi)].map((m) => m[1]))]
   .filter((u) => !NS_ALLOW.includes(u) && !PEERJS_TEXT.includes(u));
 
-const NET_ALLOW = [];
+const NET_ALLOW = ['0.peerjs.com', 'stun:stun.l.google.com:19302', 'turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'];
 const netLiterals = [...new Set([
   ...[...js.matchAll(/["'`]((?:wss?:\/\/|stuns?:|turns?:)[^"'`\s]+)["'`]/gi)].map((m) => m[1]),
   ...[...js.matchAll(/["'`]([a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|net|org|io))["'`]/gi)].map((m) => m[1]),
@@ -94,7 +109,7 @@ console.log(`final    ${(fs.statSync(dest).size / 1024).toFixed(1)} KB  -> ${des
 console.log(`fetched refs   ${fetched.length ? fetched.join(', ') : 'none'}`);
 console.log(`dynamic import ${dynImports.length ? dynImports.join(', ') : 'none'}`);
 console.log(`url literals   ${urlLiterals.length ? urlLiterals.join(', ') : 'none'} (in script)`);
-console.log(`fetch sites    ${netCalls.length} (three's loaders, never reached)`);
+console.log(`fetch sites    ${netCalls.length} (three's loaders and PeerJS's, never reached)`);
 console.log(`net hosts      ${netLiterals.length ? `NOT ALLOWED: ${netLiterals.join(', ')}` : 'none'}`);
 
 const fail = [];

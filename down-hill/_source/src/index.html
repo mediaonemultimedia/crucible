@@ -106,7 +106,7 @@ body.racing #hud{display:block}
 .drift i.t3{background:#4dffc3;box-shadow:0 0 14px #4dffc3}
 .drift .fill{width:120px;height:6px;border-radius:3px;background:#2a2140;overflow:hidden}
 .drift .fill b{display:block;height:100%;width:0;background:linear-gradient(90deg,#fff,var(--gold),#4dffc3)}
-#minimap{position:absolute;left:24px;bottom:20px;width:230px;height:170px;border-radius:12px;background:rgba(18,13,31,.55);border:1px solid rgba(155,92,255,.45);box-shadow:0 0 16px rgba(155,92,255,.25)}
+.minimap{position:absolute;left:24px;bottom:20px;width:230px;height:170px;border-radius:12px;background:rgba(18,13,31,.55);border:1px solid rgba(155,92,255,.45);box-shadow:0 0 16px rgba(155,92,255,.25)}
 .count{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-family:var(--heavy);font-size:clamp(90px,16vw,200px);color:#fff;text-shadow:0 6px 0 var(--p1),0 0 40px rgba(255,59,107,.7);pointer-events:none}
 .count.go{color:var(--p2);text-shadow:0 6px 0 #11735d,0 0 40px rgba(63,240,200,.8)}
 .toast{position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);font-family:var(--heavy);font-size:clamp(28px,4vw,52px);color:#fff;white-space:nowrap;pointer-events:none;opacity:0}
@@ -120,9 +120,40 @@ body.racing #hud{display:block}
 @keyframes scare{0%{transform:translate(-50%,-50%) scale(.2) rotate(-10deg)}10%{transform:translate(-50%,-50%) scale(1.25) rotate(8deg)}20%{transform:translate(-50%,-50%) scale(1) rotate(-6deg)}30%{transform:translate(-50%,-50%) scale(1.05) rotate(5deg)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(1.1)}}
 .scare b{position:absolute;left:50%;top:92%;transform:translateX(-50%);font-family:var(--heavy);font-size:8vmin;color:#fff;text-shadow:0 4px 0 #c00,0 0 20px #f00;white-space:nowrap}
 .lookback{position:absolute;left:50%;top:20px;transform:translateX(-50%);font-family:var(--cond);font-weight:700;letter-spacing:.3em;font-size:13px;text-transform:uppercase;background:var(--violet);padding:3px 10px;border-radius:4px;display:none}
-body.looking .lookback{display:block}
 
-/* the speech bubbles (ui/bubble.js) */
+/* the phone-pad pairing card (title + select): the QR, the room code, a ping LED per phone */
+#pads{position:fixed;right:22px;bottom:22px;z-index:9;display:none;align-items:center;gap:12px;padding:10px 14px 10px 10px;background:rgba(18,13,31,.9);border:1px solid var(--line);border-radius:10px;box-shadow:0 0 18px rgba(155,92,255,.25);pointer-events:auto}
+body[data-screen=title] #pads,body[data-screen=select] #pads{display:flex}
+#pads:empty{display:none!important}
+#pads .qr{width:112px;height:112px;border-radius:4px;overflow:hidden;background:#fff}
+#pads .qr svg{display:block;width:100%;height:100%}
+#pads .pi{display:flex;flex-direction:column;gap:3px;font-family:var(--cond);font-weight:700;text-transform:uppercase;letter-spacing:.14em;color:var(--ink)}
+#pads .h{font-size:11px;color:var(--dim)}
+#pads .code{font-size:30px;letter-spacing:.22em;line-height:1;text-shadow:var(--glow-v)}
+#pads .how{font-size:10px;color:var(--dim);letter-spacing:.1em}
+#pads .seats{display:flex;flex-direction:column;gap:2px;margin-top:4px;font-size:11px;letter-spacing:.1em}
+#pads .seat{display:flex;align-items:center;gap:6px;color:var(--dim)}
+#pads .seat i{width:9px;height:9px;border-radius:50%;background:#4a4458;box-shadow:inset 0 0 0 1px #0006}
+#pads .seat.green i{background:#3fdc7a;box-shadow:0 0 8px #3fdc7a}#pads .seat.amber i{background:#ffb020;box-shadow:0 0 8px #ffb020}#pads .seat.red i{background:#ff3030;box-shadow:0 0 8px #ff3030}
+#pads .seat.green,#pads .seat.amber,#pads .seat.red{color:var(--ink)}
+body[data-screen=select] #pads{top:12px;bottom:auto;right:16px;padding:6px 10px 6px 6px;gap:8px}
+body[data-screen=select] #pads .qr{width:84px;height:84px}
+body[data-screen=select] #pads .code{font-size:22px}
+body[data-screen=select] #pads .seats{flex-direction:row;flex-wrap:wrap;gap:2px 10px;max-width:300px}
+body[data-screen=select] #players{top:100px}
+
+/* split screen: one panel per player (main.js _views) */
+#hud .view{position:absolute;overflow:hidden;box-shadow:inset 0 0 0 2px #120d1f}
+#hud .view>*{position:absolute}
+.view.v2>:not(.vdark):not(.fabric){zoom:.74}
+.view.v4>:not(.vdark):not(.fabric){zoom:.56}
+.vdark{inset:0;pointer-events:none;opacity:0;background:radial-gradient(70% 70% at 50% 55%,rgba(5,3,12,.55),rgba(2,1,6,.97))}
+.ptag{left:50%;top:10px;transform:translateX(-50%);font-family:var(--heavy);font-size:22px;color:var(--on-neon);background:var(--pc);padding:2px 12px 0;border-radius:6px;box-shadow:0 0 14px var(--pc)}
+.ptag:empty{display:none}
+.view.tv .ptag{background:#fff;box-shadow:none;font-family:var(--cond);font-weight:700;letter-spacing:.2em;font-size:14px;padding:4px 10px;text-transform:uppercase}
+.wait{left:50%;top:46%;transform:translateX(-50%);font-family:var(--cond);font-weight:700;letter-spacing:.2em;text-transform:uppercase;font-size:18px;color:#fff;text-shadow:var(--glow-v);white-space:nowrap}
+.view.looking .lookback{display:block}
+
 #bubbles{position:fixed;inset:0;pointer-events:none;z-index:6;overflow:visible}
 /* speech bubbles (cardboard) ------------------------------------------------- */
 .bubble{position:absolute;pointer-events:none;transform-origin:var(--ox,50%) var(--oy,100%)}
@@ -150,7 +181,41 @@ body.looking .lookback{display:block}
 #pause{background:rgba(10,7,20,.72)}
 #pause .box{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px 30px;box-shadow:0 0 26px rgba(155,92,255,.35)}
 #pause .box p{font-family:var(--cond);font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);font-size:13px}
-@media (max-width:700px){.keys{grid-template-columns:repeat(2,auto)}.plate{width:60vw}.diff{top:auto;bottom:52%}#minimap{width:150px;height:110px}}
+/* select: the players, the track menu, the cursors on the cards */
+#players{position:absolute;left:50%;top:84px;transform:translateX(-50%);display:flex;gap:8px;align-items:stretch}
+#players .pp{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:120px;padding:5px 12px;border-radius:8px;background:rgba(18,13,31,.86);border:2px solid var(--pc,var(--line));font-family:var(--cond);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:14px}
+#players .pp b{font-family:var(--heavy);font-size:18px;color:var(--pc);line-height:1}
+#players .pp em{font-style:normal;color:var(--violet);font-size:11px}
+#players .pp small{font-size:10px;letter-spacing:.12em;color:var(--dim)}
+#players .pp.lk{box-shadow:0 0 16px var(--pc)}
+#players .pp.lk small{color:var(--p2)}
+#players .pp.join{border-style:dashed;border-color:var(--line);max-width:260px;text-align:center}
+#players .pp.join kbd{font-size:9px;padding:1px 4px}
+.card .cur{position:absolute;left:4px;top:4px;display:flex;flex-direction:column;gap:2px;z-index:2}
+.card .cur b{font-family:var(--heavy);font-size:12px;line-height:1;color:var(--on-neon);padding:2px 5px 1px;border-radius:3px}
+.card.c1{border-color:var(--pc);box-shadow:0 0 0 2px var(--pc),0 0 22px var(--pc)}
+#tracks{margin-top:14px}
+#tracks .pill{font-size:14px;padding:6px 14px}
+#tracks .pill.cup{border-color:var(--gold);color:var(--gold)}
+#tracks .pill.cup.sel{color:var(--ink);box-shadow:0 0 10px var(--gold),0 0 22px rgba(255,201,58,.4)}
+#s-flash{position:absolute;left:50%;top:150px;transform:translateX(-50%);font-family:var(--cond);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:14px;color:var(--gold);opacity:0;white-space:nowrap}
+#s-flash.on{animation:flash 2.2s ease-out forwards}
+@keyframes flash{0%,70%{opacity:1}100%{opacity:0}}
+
+/* results: the last-place roast, the cup's table */
+.roast{position:absolute;left:3.5vw;bottom:9%;width:min(36vw,420px);background:#fff6e0;color:#1a0f05;border-radius:8px;padding:14px 18px 12px;transform:rotate(-2deg) scale(.5);opacity:0;box-shadow:0 14px 40px #000c;font-family:var(--hand);font-size:clamp(18px,2vw,26px);line-height:1.1}
+.roast.on{animation:roast .5s cubic-bezier(.25,1.5,.45,1) .9s forwards}
+@keyframes roast{to{opacity:1;transform:rotate(-2deg) scale(1)}}
+.roast small{display:block;font-family:var(--cond);font-weight:700;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:#8b1a1a;margin-bottom:4px}
+.roast i{display:block;font-style:normal;font-family:var(--cond);font-weight:700;font-size:12px;letter-spacing:.14em;text-transform:uppercase;margin-top:6px;text-align:right;color:#5a4030}
+.board.cupb{top:52%;max-height:86vh;overflow:hidden}
+.board.cupb .row{padding:2px 4px;font-size:13px}
+.board .cuph{margin:8px 0 2px;font-family:var(--cond);font-weight:700;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold)}
+.board .cupr .t{color:var(--gold)}
+.ptg{display:inline-block;font-family:var(--heavy);font-size:11px;line-height:1;color:var(--on-neon);padding:2px 4px 1px;border-radius:3px;vertical-align:middle;margin-left:4px}
+#cup .head{position:absolute;top:22px;left:0;right:0;text-align:center}
+#cup .panel-title{color:var(--gold);text-shadow:0 0 10px rgba(255,201,58,.8),0 0 26px rgba(255,201,58,.4)}
+@media (max-width:700px){.keys{grid-template-columns:repeat(2,auto)}.plate{width:60vw}.diff{top:auto;bottom:52%}.minimap{width:150px;height:110px}#players{top:70px;flex-wrap:wrap}}
 </style>
 </head>
 <body data-screen="title">
@@ -159,6 +224,7 @@ body.looking .lookback{display:block}
 <div id="loading">Fluffing the pillows…</div>
 <div id="ui">
   <div id="mark">Crucible</div>
+  <div id="pads"></div>
 
   <section class="screen on" id="title">
     <div class="logo"><span class="l1">DOWN <em>HILL</em></span><span class="sub">a Pillow Fight kart race</span><span class="feather">🪶</span></div>
@@ -173,13 +239,16 @@ body.looking .lookback{display:block}
       <div><kbd>T</kbd> / <kbd>L</kbd><b>Taunt · trick</b></div>
       <div><kbd>Q</kbd> / <kbd>C</kbd><b>Look back</b></div>
       <div><kbd>Esc</kbd> <kbd>M</kbd><b>Pause · mute</b></div>
+      <h4 style="margin-top:6px">Up to 4 players · split screen</h4>
+      <div style="grid-column:1/-1;white-space:normal;max-width:640px;color:var(--dim)">Two on one keyboard (<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> and <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> — press <kbd>/</kbd> on the select screen), gamepads, and phones: scan the QR to race with your phone (stick or tilt to steer).</div>
     </div>
   </section>
 
   <section class="screen" id="select">
-    <div class="head"><h2 class="panel-title">Pick your racer</h2><span class="eyebrow">← → fighter · ↑ ↓ OG or ALT · Enter to race</span></div>
+    <div class="head"><h2 class="panel-title">Pick your racer</h2><span class="eyebrow">← → fighter · ↑ ↓ OG or ALT · Enter to lock in · Tab: track</span></div>
+    <div id="players"></div><div id="s-flash"></div>
     <div class="plate">
-      <span class="who">P1</span>
+      <span class="who" id="s-who">P1</span>
       <div class="nm" id="s-name"></div>
       <div class="an" id="s-animal"></div>
       <div class="kart" id="s-kart"></div>
@@ -187,28 +256,23 @@ body.looking .lookback{display:block}
       <div class="stats" id="s-stats"></div>
     </div>
     <div class="diff" id="diff"><span class="eyebrow">CPU · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></span></div>
+    <div class="diff" id="tracks" style="top:calc(max(16%,120px) + 170px)"><span class="eyebrow">Track · <kbd>Tab</kbd></span></div>
     <div class="cards" id="cards"></div>
   </section>
 
-  <section class="screen" id="hud">
-    <div class="item" id="h-item"></div>
-    <div class="item-name" id="h-itemname"></div>
-    <div class="lap"><div class="l">Lap</div><div class="n" id="h-lap">1/3</div><div class="tm" id="h-time">0:00.00</div></div>
-    <canvas id="minimap" width="460" height="340"></canvas>
-    <div class="place" id="h-place">8<sup>th</sup></div>
-    <div class="drift" id="h-drift"><span>Drift</span><i></i><i></i><i></i></div>
-    <div class="final" id="h-final">FINAL LAP!</div>
-    <div class="count" id="h-count"></div>
-    <div class="toast" id="h-toast"></div>
-    <div class="lookback">Look back</div>
-  </section>
-  <div class="fabric" id="fabric"></div>
-  <div class="scare" id="scare">⏰<b>BRRRRING!</b></div>
+  <section class="screen" id="hud"></section>
 
   <section class="screen" id="results">
     <div class="head"><h2 class="panel-title" id="r-title">Results</h2></div>
     <div class="board" id="board"></div>
-    <div class="again">Enter: race again · Esc: pick a racer</div>
+    <div class="roast" id="roast"></div>
+    <div class="again" id="again">Enter: race again · Esc: pick a racer</div>
+  </section>
+
+  <section class="screen" id="cup">
+    <div class="head"><h2 class="panel-title" id="c-title">The Pillow Cup</h2></div>
+    <div class="board" id="c-board"></div>
+    <div class="again">Enter: pick racers for another go</div>
   </section>
 
   <section class="screen" id="pause">

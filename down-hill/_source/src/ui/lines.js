@@ -49,3 +49,16 @@ export const KO_LINES_ALT = {
 export const pickLine = (list, n) => list[((n % list.length) + list.length) % list.length];
 export const tauntLine = (id, alt, n) => pickLine(alt && n % 2 ? TAUNT_LINES_ALT[id] : TAUNT_LINES[id], n >> (alt ? 1 : 0));
 export const koLine = (id, alt, n) => pickLine(alt && n % 2 ? KO_LINES_ALT[id] : KO_LINES[id], n >> (alt ? 1 : 0));
+
+/* the results roast for LAST place: the winner's voice, at whoever came 8th
+   (the board's last row and, if that's a phone player, their phone) */
+export const LAST_LINES = {
+  kevalanche: ['Dead last, eh? Even the Zamboni lapped you.', 'Last place. Go sit in the penalty box, bud.', 'You drove like a moose on ice, sweetheart.'],
+  rubberta: ['Last? Querido, I had eight arms free and still waved bye.', 'Even the bathwater finished ahead of you.', 'Sink back to the bottom, darling.'],
+  johnny: ['Last. That’s a double fault on four wheels.', 'You finished after the ball boy. On foot.', 'Love–eight. You’re the love.'],
+  sumaura: ['Dead last, love. Did you stop for tea?', 'The bus timetable beat you, sunshine.', 'Absolutely last. Frightfully on brand.'],
+  k8e: ['I could see you from the finish line. Way back there.', 'Last place. Get some neck, get some speed.', 'You drive like a shorty.'],
+  sebas: ['¡Último! Your mask is crying again, cachorro.', 'Last place, perra. Ándale next time.', 'My abuela drives faster, and she’s a chihuahua.'],
+  zach: ['Last? I’d steal your trophy but there isn’t one.', 'Arre yaar, even my cart has more shine than your driving.', 'Caw-caw-crawled in last, loser.'],
+};
+export const lastLine = (id, n) => pickLine(LAST_LINES[id], n);

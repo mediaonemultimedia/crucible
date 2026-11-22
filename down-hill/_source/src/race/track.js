@@ -102,6 +102,8 @@ function scaled(def, sxz, sy) {
   };
 }
 export const TRACKS = { landing: scaled(LANDING, 1.9, 1.25) };
+/* the Pillow Cup: three races, points for every place */
+export const CUP = ['landing'];
 
 /* ── sampling ─────────────────────────────────────────────────────────── */
 function cr(p0, p1, p2, p3, t) {

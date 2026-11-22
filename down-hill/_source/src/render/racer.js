@@ -171,11 +171,15 @@ export class RacerView {
     // LOD by distance to the camera
     const dist = camPos.distanceTo(g.position);
     this.dist = dist;
-    this.setLod(dist > 26 ? 1 : 0);
+    this.setLod(dist > RacerView.lodNear ? 1 : 0);
     this.driver.light(camQ);
     this.driver.update(dt, dist < 45 && this.mayWake !== false, !!this.racing);
-    g.visible = dist < 260;
+    g.visible = dist < RacerView.farCull;
   }
 
   dispose(scene) { this.driver.dispose(scene); this.group.removeFromParent(); }
 }
+
+/* the LOD distances; split screen lowers them (main.js) */
+RacerView.lodNear = 26;
+RacerView.farCull = 260;
