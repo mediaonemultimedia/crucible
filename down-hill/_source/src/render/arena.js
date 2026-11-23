@@ -25,6 +25,7 @@ import { KEY, FILL } from '../../shared/grommet/fur.js';
 import { makeCap } from '../../shared/grommet/crowprops.js';
 import { ITEMS } from '../../shared/grommet/athletes/crow.game.js';
 import { RING, BED } from '../sim/sim.js';
+import { stepSpring } from '../../shared/grommet/spring.js';
 
 export const U = 1000;
 export const RING_W = RING / U;          // 7.6: the mattress top's half-width the sim plays on
@@ -623,7 +624,7 @@ export class Arena {
     const N = C.nudge;
     if (N && (N.x || N.v)) {
       const kn = 600;
-      N.v += (kn * (0 - N.x) - 2 * 0.35 * Math.sqrt(kn) * N.v) * dt; N.x += N.v * dt;
+      stepSpring(N, 0, kn, 0.35, dt, -4, 4);
       if (Math.abs(N.x) < 1e-4 && Math.abs(N.v) < 1e-3) N.x = N.v = 0;
       jx += N.x; jy -= Math.abs(N.x) * 0.25;
     }

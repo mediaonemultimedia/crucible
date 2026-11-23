@@ -94,8 +94,11 @@ test('wire: a phone that (re)joins holding a button does not press it', () => {
   const P = new PadState();
   P.reset(true);
   const c = new Array(TAPS.length).fill(0);
-  assert.equal(P.take(decode(encodeInput(1, ITEM, c, 0)), 0) & ITEM, 0);
-  assert.equal(P.sample().item, true, 'still held for driving');
+  assert.equal(P.take(decode(encodeInput(1, ITEM | GAS, c, 0)), 0) & ITEM, 0);
+  const s0 = P.sample();
+  assert.equal(s0.gas, true, 'GAS still held for driving');
+  assert.equal(s0.item, false, 'the held ITEM is latched off (the race would see it as a press)');
   P.take(decode(encodeInput(2, 0, c, 0)), 10);
+  c[TAPS.indexOf(ITEM)]++;                        // (the phone counts every press)
   assert.ok(P.take(decode(encodeInput(3, ITEM, c, 0)), 20) & ITEM, 'pressed after letting go');
 });

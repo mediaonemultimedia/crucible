@@ -12,6 +12,7 @@
 import * as THREE from 'three/webgpu';
 import { Fn, vec3, vec4, normalWorld, normalize, positionLocal, mix, step, fract, float, uniform } from 'three/tsl';
 import { SoftBody } from '../../shared/grommet/softbody.js';
+import { stepSpring } from '../../shared/grommet/spring.js';
 import { Body } from '../../shared/grommet/body.js';
 import { Groom } from '../../shared/grommet/groom.js';
 import { makeFurMaterial, makeMaskTexture, makeGroomTexture, makeEyeMaterial } from '../../shared/grommet/fur.js';
@@ -361,8 +362,7 @@ export class Plush {
     let want = free ? (F.face > 0 ? L.yaw : -L.yaw) * this.yawScale : Math.atan2(F.fx, F.fz) + (this.yawCheat || 0);
     const k = 120;
     const diff = Math.atan2(Math.sin(want - this.yaw.x), Math.cos(want - this.yaw.x));
-    this.yaw.v += (k * diff - 2 * Math.sqrt(k) * this.yaw.v) * dt;
-    this.yaw.x += this.yaw.v * dt;
+    stepSpring(this.yaw, this.yaw.x + diff, k, 1, dt);   // (dt-safe: spring.js)
     const c = Math.cos(this.yaw.x), s = Math.sin(this.yaw.x);
     // a throw (fight.js): the one held is drawn on the throw's path — his
     // middle, his spin about the thrower's cross axis — not where the sim holds him
@@ -419,8 +419,7 @@ export class Plush {
     } else { g.quaternion.copy(this._qy); g.position.set(nx, ny + (this.hop || 0), nz); }
     // hit squash
     const ks = 260;
-    this.squash.v += (ks * (0 - this.squash.x) - 2 * Math.sqrt(ks) * 0.5 * this.squash.v) * dt;
-    this.squash.x += this.squash.v * dt;
+    stepSpring(this.squash, 0, ks, 0.5, dt, -6, 6);
     const sq = Math.max(-0.25, Math.min(0.2, this.squash.x * 0.06));
     // (Sumaura's Panda Roll: squashed round into a ball)
     const ballT = this.puppet.ballT || 0;
@@ -446,8 +445,7 @@ export class Plush {
     let cx = 1, cy = 1;
     if (this.crunch && (this.crunch.x || this.crunch.v)) {
       const C = this.crunch, kc = 1400;
-      C.v += (kc * (0 - C.x) - 2 * 0.32 * Math.sqrt(kc) * C.v) * dt;
-      C.x += C.v * dt;
+      stepSpring(C, 0, kc, 0.32, dt, -0.5, 0.5);
       if (Math.abs(C.x) < 1e-4 && Math.abs(C.v) < 1e-3) C.x = C.v = 0;
       const q = Math.max(-0.16, Math.min(0.12, C.x));
       cx = 1 - q; cy = 1 + q * 0.6;

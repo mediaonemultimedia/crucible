@@ -20,6 +20,7 @@ import { Plush } from './plush.js';
 import { buildKart } from './karts.js';
 import { KEY, FILL } from '../../shared/grommet/fur.js';
 import { RACERS } from '../race/roster.js';
+import { stepSpring } from '../../shared/grommet/spring.js';
 
 export const SHELLS_NEAR = 12, SHELLS_FAR = 5;
 const still = (id, act = 'idle') => ({ id, act, face: 1, fx: 0, fz: 1024, x: 0, y: 0, z: 0, t: 0, mv: '', back: 0, down: 0, kr: 0, kb: 0, air: 0, vy: 0 });
@@ -147,9 +148,12 @@ export class RacerView {
     this.pitch += (pitchT - this.pitch) * Math.min(1, dt * 8);
     const rollT = (K.steer || 0) * Math.min(1, Math.abs(K.fwd) / 20) * 0.1 + (K.drift ? -K.drift * 0.06 : 0);
     this.roll += (rollT - this.roll) * Math.min(1, dt * 7);
-    const ks = 320;
-    this.squashV += (ks * (0 - this.squash) - 2 * Math.sqrt(ks) * 0.35 * this.squashV) * dt;
-    this.squash += this.squashV * dt;
+    // (dt-safe: ≤ 1/120 s substeps — one step per frame went unstable under ~12 fps, the
+    // kart bouncing and squashing over and over; bounded to its drawn range)
+    const ks = 320, SQ = this._sq || (this._sq = { x: 0, v: 0 });
+    SQ.x = this.squash; SQ.v = this.squashV;
+    stepSpring(SQ, 0, ks, 0.35, dt, -5, 5);
+    this.squash = SQ.x; this.squashV = SQ.v;
     // the lowrider's hydraulics
     let hy = 0;
     if (this.hyd > 0) { this.hyd -= dt; hy = Math.abs(Math.sin(this.hyd * 11)) * 0.9 * Math.min(1, this.hyd); }

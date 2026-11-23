@@ -17,6 +17,7 @@
 import * as THREE from 'three/webgpu';
 import { Fn, vec3, vec4, normalWorld, normalize, positionLocal, smoothstep, abs, float, uniform, mix, fract, mx_noise_float, pow, dot, cameraPosition, positionWorld } from 'three/tsl';
 import { shade } from '../../shared/grommet/props.js';
+import { substeps } from '../../shared/grommet/spring.js';
 
 export const CUFF = 0.45;   // the cloth tube keeps this much of the old glove, from its wrist end
 
@@ -316,8 +317,13 @@ export class Gloves {
       if (G && dt > 0) {
         // the glove's lag: its axis eased toward the forearm's (underdamped)
         const L = A.lag || (A.lag = { x: T.clone(), v: new THREE.Vector3() }), k = 700;
-        L.v.addScaledVector(T.clone().sub(L.x), k * dt).multiplyScalar(Math.max(0, 1 - 2 * 0.45 * Math.sqrt(k) * dt));
-        L.x.addScaledVector(L.v, dt);
+        // (dt-safe: ≤ 1/120 s substeps; one step per frame went unstable under ~20 fps)
+        const n = substeps(dt), h = dt / n, d = this._lagD || (this._lagD = new THREE.Vector3());
+        for (let j = 0; j < n; j++) {
+          L.v.addScaledVector(d.copy(T).sub(L.x), k * h).multiplyScalar(Math.max(0, 1 - 2 * 0.45 * Math.sqrt(k) * h));
+          L.x.addScaledVector(L.v, h);
+        }
+        if (!Number.isFinite(L.x.x + L.x.y + L.x.z + L.v.x + L.v.y + L.v.z)) { L.x.copy(T); L.v.set(0, 0, 0); }
         if (L.x.angleTo(T) > 0.5) L.x.copy(T);
         T.copy(L.x).normalize();
       }
