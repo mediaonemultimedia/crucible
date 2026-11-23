@@ -482,19 +482,15 @@ export class World {
       mesh(rbox(drw[1] - drw[0] + 24, 15, 1.5, 0.6), mat('#b98a60', { roughness: 0.5 }), (drw[0] + drw[1]) / 2, 14 + i * 17, -85.5, root);
       for (const s of [-1, 1]) mesh(new THREE.SphereGeometry(1.4, 10, 8), mat('#e9c349', { metalness: 0.8, roughness: 0.3 }), (drw[0] + drw[1]) / 2 + s * 22, 14 + i * 17, -84.3, root);
     }
-    // the drawer itself: a floor at 3.1, low sides, a front panel you drive over
+    // the drawer's sides and lining; the deck itself follows the track spline
     const dfx0 = drw[0] - 24, dfx1 = drw[1] + 24;
     // its sides sit just outside the road's own edge (stage 5: one road width everywhere)
     let half = 11.5;
     for (let k = 0; k < T.N; k++) if (T.def.points[T.sec[k]].tag === 'drawer') half = Math.max(half, T.w[k] + T.m[k] + 0.6);
-    mesh(new THREE.BoxGeometry(dfx1 - dfx0, 3.1, half * 2), mat('#c99a6c', { roughness: 0.6 }), (dfx0 + dfx1) / 2, 1.55, dz, root);
     for (const s of [-1, 1]) mesh(rbox(dfx1 - dfx0, 5, 1.6, 0.5), oak, (dfx0 + dfx1) / 2, 4.5, dz + s * half, root);
     // the drawer's lining: a striped paper
     const lining = canvasTex(256, 64, (g, w, h) => { g.fillStyle = '#f3e7d3'; g.fillRect(0, 0, w, h); g.fillStyle = '#e3b9c3'; for (let x = 0; x < w; x += 24) g.fillRect(x, 0, 10, h); }, { repeat: [6, 1] });
-    const ln = mesh(new THREE.PlaneGeometry(dfx1 - dfx0 - 2, half * 2 - 2), new THREE.MeshStandardMaterial({ map: lining, roughness: 0.9 }), (dfx0 + dfx1) / 2, 3.15, dz, root);
-    ln.rotation.x = -Math.PI / 2;
-    // little ramps in and out (drawer's lip)
-    for (const [x, s] of [[dfx0 - 3, 1], [dfx1 + 3, -1]]) { const rp = mesh(new THREE.BoxGeometry(8, 1, half * 2), oak, x, 1.4, dz, root); rp.rotation.z = s * -0.36; }
+    this.drawerLining = new THREE.MeshStandardMaterial({ map: lining, roughness: 0.9 });
     // the rolled socks: stripy balls (the slalom posts) and a few loose ones
     const sockTex = (a, b) => canvasTex(64, 64, (g, w, h) => { g.fillStyle = a; g.fillRect(0, 0, w, h); g.fillStyle = b; for (let y = 0; y < h; y += 16) g.fillRect(0, y, w, 8); });
     const socks = [['#e85d75', '#f4efe6'], ['#6fd3b8', '#1b1840'], ['#f4c84a', '#7e72d8'], ['#9b5cff', '#f4efe6']];
@@ -518,14 +514,18 @@ export class World {
     for (let k = 0; k < N; k++) { const t = secOf(k); (runs[t] = runs[t] || []).push(k); }
     const ribbon = (ks, material, thick, widen = 0) => {
       // a slab along the samples: top at the track's y, width 2(w+m)
-      const pos = [], idx = [];
+      const pos = [], uv = [], idx = [];
       ks.forEach((k, i) => {
         const w = T.w[k] + T.m[k] + widen, rx = rightX(T, k), rz = rightZ(T, k), y = T.y[k];
-        for (const [s, dy] of [[-1, 0], [1, 0], [-1, -thick], [1, -thick]]) pos.push(T.x[k] + rx * w * s, y + dy, T.z[k] + rz * w * s);
+        for (const [s, dy] of [[-1, 0], [1, 0], [-1, -thick], [1, -thick]]) {
+          pos.push(T.x[k] + rx * w * s, y + dy, T.z[k] + rz * w * s);
+          uv.push(i / Math.max(1, ks.length - 1), (s + 1) / 2);
+        }
         if (i) { const a = (i - 1) * 4, b = i * 4; idx.push(a, b, a + 1, a + 1, b, b + 1, a + 2, a + 3, b + 2, a + 3, b + 3, b + 2, a, a + 2, b, a + 2, b + 2, b, a + 1, b + 1, a + 3, a + 3, b + 1, b + 3); }
       });
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
       // The road's upper face must face the camera from above.
       for (let i = 0; i < idx.length; i += 3) [idx[i + 1], idx[i + 2]] = [idx[i + 2], idx[i + 1]];
       g.setIndex(idx); g.computeVertexNormals();
@@ -538,11 +538,10 @@ export class World {
     const rail = new THREE.MeshStandardMaterial({ color: landingLookdev ? '#9a6e46' : '#7a4428', roughness: 0.28, metalness: 0.05 });
     const bal = mat('#efe6d6', { roughness: 0.45 });
     for (const run of contiguous(runs.banister || [])) {
-      const ext = [run[0] - 3, ...run, run[run.length - 1] + 3].map((k) => (k + N) % N);
-      ribbon(ext, rail, 3.2);
+      ribbon(run, rail, 3.2);
       // a rounded lip either side
       for (const s of [-1, 1]) {
-        const pts = ext.map((k) => new THREE.Vector3(T.x[k] + rightX(T, k) * (T.w[k] + T.m[k]) * s, T.y[k] - 0.3, T.z[k] + rightZ(T, k) * (T.w[k] + T.m[k]) * s));
+        const pts = run.map((k) => new THREE.Vector3(T.x[k] + rightX(T, k) * (T.w[k] + T.m[k]) * s, T.y[k] - 1.05, T.z[k] + rightZ(T, k) * (T.w[k] + T.m[k]) * s));
         mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), pts.length * 2, 1.0, 8), rail, 0, 0, 0, root);
       }
       for (let i = 0; i < run.length; i += 6) {
@@ -555,7 +554,23 @@ export class World {
     }
     // the toy planks (a giant wooden ruler) up and down
     const plank = new THREE.MeshStandardMaterial({ map: canvasTex(512, 64, (g, w, h) => { g.fillStyle = '#e9c98f'; g.fillRect(0, 0, w, h); g.fillStyle = '#5a3a1e'; for (let x = 0; x < w; x += 16) g.fillRect(x, 0, 2, x % 80 ? 14 : 26); g.font = '700 16px sans-serif'; for (let x = 0; x < w; x += 80) g.fillText(String(x / 80), x + 4, 44); }, { repeat: [1, 1] }), roughness: 0.5 });
-    for (const run of contiguous(runs.plank || [])) { const ext = [run[0] - 2, ...run, run[run.length - 1] + 2].map((k) => (k + N) % N); ribbon(ext, plank, 1.6); }
+    // Neighboring decks own separate spans and meet at exactly one cross section.
+    // Continue the ramps over elevated approach samples, stopping above the flat room floor.
+    for (const run of contiguous(runs.plank || [])) {
+      let first = run[0], last = run.at(-1);
+      while (first > 0 && secOf(first - 1) === 'landing' && T.y[first - 1] > 0.08) first--;
+      while (last + 1 < N && secOf(last + 1) === 'landing' && T.y[last + 1] > 0.08) last++;
+      if (first > 0 && secOf(first - 1) === 'banister') first--;
+      if (last + 1 < N && secOf(last + 1) === 'banister') last++;
+      const deck = Array.from({ length: last - first + 1 }, (_, i) => first + i);
+      ribbon(deck, plank, 1.6);
+    }
+    for (const run of contiguous(runs.drawer || [])) {
+      let first = run[0], last = run.at(-1);
+      while (first > 0 && secOf(first - 1) === 'landing' && T.y[first - 1] > 0.08) first--;
+      while (last + 1 < N && secOf(last + 1) === 'landing' && T.y[last + 1] > 0.08) last++;
+      ribbon(Array.from({ length: last - first + 1 }, (_, i) => first + i), this.drawerLining, 0.85);
+    }
     // the book stairs: a tumble of fat books, each top flush with the track
     const books = landingLookdev ? ['#7e3e36', '#36525e', '#567568', '#a27843', '#65546a', '#894e39', '#496756', '#965b58']
       : ['#c0392b', '#2e86de', '#16a085', '#f39c12', '#8e44ad', '#d35400', '#27ae60', '#e84393'];

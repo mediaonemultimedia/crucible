@@ -299,6 +299,9 @@ export function buildTrack(def) {
     const a = dense[j], b = dense[(j + 1) % dense.length];
     const f = (s - acc[j]) / Math.max(1e-6, acc[j + 1] - acc[j]);
     T.x[k] = a.x + (b.x - a.x) * f; T.y[k] = a.y + (b.y - a.y) * f; T.z[k] = a.z + (b.z - a.z) * f;
+    // The Landing's room and hallway both have a floor at zero.
+    // Spline overshoot on the approach to a ramp must stay above it.
+    if (def.id === 'landing') T.y[k] = Math.max(0, T.y[k]);
     T.w[k] = a.w + (b.w - a.w) * f; T.m[k] = a.m + (b.m - a.m) * f;
     const sec = a.t < 0.5 ? a.from : (a.from + 1) % n;
     T.sec[k] = sec;

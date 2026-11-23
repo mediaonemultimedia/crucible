@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Race, noInput } from '../src/race/sim.js';
-import { lateral, rightX, rightZ } from '../src/race/track.js';
+import { buildTrack, lateral, rightX, rightZ, TRACKS } from '../src/race/track.js';
 
 test('a side impact cannot shove a kart through the banister rail between ticks', () => {
   const race = new Race({ track: 'landing', racers: [{ id: 'kevalanche' }, { id: 'zach' }], seed: 7 });
@@ -18,4 +18,9 @@ test('a side impact cannot shove a kart through the banister rail between ticks'
   });
   race.step([noInput(), noInput()]);
   assert(lateral(T, k, race.karts[0].x, race.karts[0].z) <= rail - 1.54);
+});
+
+test('The Landing road never dips below the bedroom or hallway floor', () => {
+  const track = buildTrack(TRACKS.landing);
+  assert.equal(Math.min(...track.y), 0);
 });
