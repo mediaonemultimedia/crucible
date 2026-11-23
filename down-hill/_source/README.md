@@ -116,6 +116,20 @@ rasteriser's, not a GPU's.
 | 3 | Clear where to go: skinny sections widened (banister 6.5 → 8.5, planks 8 → 9, doorways 8 + 1 → 9 + 2.5, under-bed 8 → 9, conveyor 7 → 8.5, park ramp / deck → 8.5; nothing under 8.5), bolder and closer edge lines (now on the banister, planks, conveyor and deck too), kerbs and sticky-note chevron signs on every sharp turn, a faint glowing arrow trail through the junctions, a stronger road runner | done — before / after race-camera shots of every waypoint: `shots/stage3/before`, `shots/stage3/after` (`node tools/tour.mjs <track> <dir> --all`) |
 | 4 | Light kart refinement: a number plate with the driver's flag on the back of every kart (far-LOD detail), Kevalanche's hockey stick on the OG too | done — frame cost below |
 
+### Stage 3 frame cost (`node tools/framecost.mjs a.html b.html`, The Landing, 8 karts, 90 race frames, SwiftShader 1280×720)
+| build | views | JS / frame (mean, p95) | render call p50 | draws / frame | triangles |
+|---|---|---|---|---|---|
+| main (stage 2) | 1 | 0.57, 1.4 ms | 8.6 ms | 401 | 1.70 M |
+| stage 3, no plates | 1 | 0.81, 2.4 ms | 8.9 ms | 410 | 1.71 M |
+| stage 3 (shipped) | 1 | 0.69, 1.4 ms | 8.7 ms | 415 | 1.71 M |
+| main (stage 2) | 4 | 1.17, 2.7 ms | 25.7 ms | 1,441 | 3.53 M |
+| stage 3, no plates | 4 | 0.89, 2.7 ms | 32.8 ms | 1,478 | 3.58 M |
+| stage 3 (shipped) | 4 | 1.00, 4.6 ms | 31.0 ms | 1,494 | 3.58 M |
+
+The rails, kerbs, signs and arrows add ~9 draws per view (merged by material); the plates
+add one small plane per near kart and cost nothing measurable (inside run-to-run noise), so
+they stay. SwiftShader render times are a CPU rasteriser's and swing a few ms between runs.
+
 ## Stage 2 hooks
 - `input/controls.js` has `extra`: a function returning another input to
   merge (the phone pads plug in there); `Race` takes `humans: [...]`, the
