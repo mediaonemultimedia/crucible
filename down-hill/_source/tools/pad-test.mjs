@@ -19,7 +19,7 @@
       + jitter + loss injected on every phone; every phone's taps land,
       and every kart makes progress
    6. haptics: an item hit buzzes that player's phone (and only theirs)
-   7. the "how to race" sheet: the six items; auto-gas
+   7. the "how to race" sheet: the ten items; auto-gas
    8. reconnect: a phone's page closes mid-race; it comes back on the same
       player
    9. zero console errors and zero network requests on every page
@@ -186,7 +186,7 @@ ok(steerR > 0.9 && steerL < -0.3 && steerL > -0.8, `stick → steer (full right 
 await tap(phones[2], ...L.moves); await sleep(500);
 const sheet = await phones[2].evaluate(() => ({ items: document.querySelectorAll('#sh .it').length, names: [...document.querySelectorAll('#sh .it b')].map((b) => b.textContent), open: __pad.sheetOpen }));
 results.sheet = sheet;
-ok(sheet.open && sheet.items === 6, `the how-to sheet lists ${sheet.items} items`);
+ok(sheet.open && sheet.items === 10, `the how-to sheet lists ${sheet.items} items`);
 await phones[2].screenshot({ path: path.join(out, 'phone-how-to-sheet.png') });
 await stripTap(phones[2], '#sh [data-mode="tilt"]'); await sleep(100);
 // iPhone-style permission (Chromium has it too): close the sheet, "Tap to enable tilt"

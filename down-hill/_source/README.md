@@ -22,6 +22,8 @@ node tools/shots.mjs [scene]  # → shots/: select, grid, drift, items, underbed
 node tools/peek.mjs out.png '?hold&webgl&p1=zach' '__dh.step(5)'   # one screenshot
 node tools/pad-test.mjs       # four simulated phones: pairing, menus, latency, tilt, in-sync race, loss, haptics → shots/pad/
 node tools/tour.mjs laundry   # a screenshot at each section of a track → shots/tracks/
+node tools/items-test.mjs     # every item fires, hits and resolves, 1P and 4-way split (stage 5)
+node tools/avgdriver.mjs normal 0 40   # the difficulty curve: an "average driver" vs 7 CPUs, finishing places
 ```
 
 Deep links: `?p1=kevalanche&alt1=1&cpu=hard&track=landing` (straight into a
@@ -153,6 +155,24 @@ the final-lap switch; `shots/music/before/` has the old loops. Measured on 40 s 
 top (old → new): RMS −18.6 → −21.2 dBFS (Landing), −19.5 → −21.8 (Laundry), −20.1 →
 −21.0 (Park); energy above 6 kHz about −45 → −58 to −60 dB; the "brightness" (first-difference / RMS)
 0.10–0.12 → 0.05–0.06.
+
+## Status — stage 5, items, difficulty curve and feel (`docs/stage-5.md`)
+
+Kevin's second playtest: the boost should hit harder, the CPUs were a little too hard for a
+first race, he "didn't get any items", didn't know what the Alarm Clock did, never noticed the
+taunt tricks, and loves the toy scale.
+
+| # | Item | State |
+|---|---|---|
+| 1 | Boost kick: a boost's peak 1.4 → 1.62 × top speed (+16 %), longer tails (drift tiers 0.6 / 1.0 / 1.45 → 0.7 / 1.15 / 1.65 s, pads 1.05 → 1.2, trick 1.15 → 1.3, the tail bleeds off at 17 u/s² not 30); on every boost an FOV punch, a camera pull-back, a feather burst out the back, a whoosh, speed lines | done — `race/sim.js` `BOOST_TOP`, `main.js` `_camera` (`punch`), `fx.tailBurst`, `index.html` `.speed` |
+| 2 | Difficulty curve: a single race is each level's gentle version (lower top speed, late-braking mistakes into tight corners, slower and sloppier items, a milder catch-up band); the Pillow Cup ramps race 1 gentle → race 2 medium → race 3 at full strength; easy / normal / hard / **Champion** (hard plus a bit, never eased) | done — `race/cpu.js` `levelAt`, `GENTLE`, `cupStrength`; tuned with `node tools/avgdriver.mjs` (the "average driver": no drift, wandering lines, slow hands, early lifts; it laps at today's normal-CPU pace) — numbers below |
+| 3 | Items: why Kevin got none — he starts at the back and the CPUs ahead emptied every row (a grabbed box was gone for 3.3 s). Now a row is never used up (a grabbed box pops and grows back; everyone driving through gets one), 6 rows a lap (7 on Laundry Day), 5 boxes spanning the road, bigger (3.6), glowing, bobbing, a ding and a roulette. Every item explains itself (HUD name + tip for 2 s, a caption the first time each item hits someone, the alarm clock flies high over the field, ticking, then rings). Four new items: **Sugar Rush**, **Paper Plane**, **Hot Wash**, **Spring Cushion**; a 10-item odds table by place; the phone's how-to sheet lists all ten with marker-drawn icons | done — `race/sim.js`, `race/cpu.js`, `render/fx.js`, `render/racer.js`, `ui/icons.js`, `pad/sheet.js`; `tools/items-test.mjs` |
+| 4 | Taunt discoverable: a big TAUNT! prompt (with the key) whenever you're airborne off a ramp, a TAUNT badge by the item slot that lights up in the air, a one-time tip on the first ramp, gold feathers + "STYLE BOOST!" on the landing | done — `main.js` `_hud`, `onEvent` |
+| 5 | Toy-scale charm: crayons, building blocks, a toy car on the rug, a sleeping cat's tail (The Landing); clothes pegs, a lost coin, lint balls (Laundry Day); acorns, garden gnomes, ants (Sprinkler Park) — one merged vertex-coloured mesh per track (one draw) | done — `render/props.js` |
+| 6 | Bigger phone-pad QR (PF2 / PR #57 sizes): 112 → clamp(200px, 24vh, 320px), select 84 → clamp(160px, 17vh, 240px), bigger code / labels | done — `src/index.html` |
+| 7 | One road width everywhere: half-width `ROAD` = 10.5 on every waypoint of all three tracks (was 8.5–11); the sock drawer's sides follow the road's edge | done — `race/track.js` |
+| 8 | See your item on your kart: the held item rides above the rear bumper (one shared low-poly mesh per item type, instanced: ≤ 1 draw per type), flickers through the roulette, pops in with a bounce; a missile or slick held behind on LOOK BACK dangles off the back (and now blocks one missile or paper plane from behind); every kart shows its item, hidden past 72 units; the HUD slot is bottom-centre with the icon + name, in every split view | done — `fx._heldUpdate` |
+| 9 | Kevalanche is number 88 (`KEV 88`, back plate `88`); Sumaura's bus sign unchanged | done — `render/karts.js` |
 
 ## Stage 2 hooks
 - `input/controls.js` has `extra`: a function returning another input to

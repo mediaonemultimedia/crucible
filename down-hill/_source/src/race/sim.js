@@ -26,7 +26,7 @@ export const ITEM_NAMES = {
 /* the 3-to-5-word tip the HUD shows with the name when you get one */
 export const ITEM_TIPS = {
   slick: 'drop it, they spin', missile: 'throw it, bonk someone', espresso: 'big boost, shaky hands', cuffs: 'chains the two ahead',
-  case: 'blinds whoever is ahead', alarm: "wakes up whoever's in 1st", sugar: 'unstoppable candy speed', plane: 'homes in on the racer ahead',
+  case: 'blinds whoever is ahead', alarm: "wakes up whoever's in 1st", sugar: 'unstoppable candy speed', plane: "homes in on whoever's ahead",
   wash: 'shrinks everyone else', spring: 'lock on, launch them out',
 };
 export const TIER_AT = [0, 1.0, 2.0, 3.0];          // drift charge (s) for each spark tier
