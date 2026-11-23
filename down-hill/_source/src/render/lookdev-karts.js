@@ -287,11 +287,11 @@ export function driverStances(driver, body) {
   const start = new THREE.Vector3();
   const point = new THREE.Vector3();
   const middle = new THREE.Vector3();
+  const curl = new THREE.Vector3();
   const end = new THREE.Vector3();
   const steeringUp = new THREE.Vector3(0, Math.cos(steering.tilt), Math.sin(steering.tilt));
-  const gripAngle = Math.PI / 9;
-
   const octopus = plush.rig.name === 'octopus';
+  const gripAngle = octopus ? -Math.PI / 7 : Math.PI / 9;
   const giraffe = plush.rig.name === 'giraffe';
   const tentacles = octopus ? plush.puppet.armsToward([0, 0, 1]) : [];
   const gripChains = new Set(tentacles.map((arm) => arm.k));
@@ -303,6 +303,7 @@ export function driverStances(driver, body) {
     const side = Math.sign(start.x);
     const grips = chain.kind === 'arm' || gripChains.has(chain.k)
       || (giraffe && chain.name.includes('fore leg'));
+    const steeringTentacle = gripChains.has(chain.k);
     if (grips) {
       end.copy(steering.center).addScaledVector(steeringUp, Math.sin(gripAngle) * steering.radius);
       end.x += side * Math.cos(gripAngle) * steering.radius;
@@ -310,9 +311,10 @@ export function driverStances(driver, body) {
       middle.copy(start).lerp(end, 0.46);
       middle.x += side * 0.32;
       middle.y -= 0.32;
-      if (octopus) {
-        // Sweep out over the tub rim, then curl down onto the steering rim.
-        middle.set(side * 0.96, 1.72, 0.60).applyMatrix4(toPlush);
+      if (steeringTentacle) {
+        // Flare past the tub's sides, then turn inward below the eyes.
+        middle.set(side * 1.64, 1.15, 0.06).applyMatrix4(toPlush);
+        curl.set(side * 1.25, 1.22, 0.97).applyMatrix4(toPlush);
       }
     } else if (octopus) {
       end.set(0.79 * Math.sin(chain.angle), 0.66, -0.39 + 0.63 * Math.cos(chain.angle)).applyMatrix4(toPlush);
@@ -338,8 +340,17 @@ export function driverStances(driver, body) {
     }
     for (let i = 1; i < indices.length; i++) {
       const t = i / (indices.length - 1);
-      point.copy(start).multiplyScalar((1 - t) ** 2)
-        .addScaledVector(middle, 2 * t * (1 - t)).addScaledVector(end, t * t);
+      const u = 1 - t;
+      if (steeringTentacle) {
+        point.copy(start).multiplyScalar(u ** 3)
+          .addScaledVector(middle, 3 * u * u * t)
+          .addScaledVector(curl, 3 * u * t * t)
+          .addScaledVector(end, t ** 3);
+      } else {
+        point.copy(start).multiplyScalar(u * u)
+          .addScaledVector(middle, 2 * t * u)
+          .addScaledVector(end, t * t);
+      }
       point.toArray(x, indices[i] * 3);
     }
   }
