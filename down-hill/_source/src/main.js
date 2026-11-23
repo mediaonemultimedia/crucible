@@ -1365,7 +1365,7 @@ class App {
     else if (it === 'case') { put(a, 9, 0); post = 0.7; }
     else if (it === 'alarm') { put(a, 22, 0); post = 0; }
     else if (it === 'sugar') { ctl.sample = () => ({ ...still(), gas: true, item: this._fire > 0 && this._fire-- > 0 }); post = 0.9; }
-    else if (it === 'plane') { put(a, 26, 2); post = 0.5; }
+    else if (it === 'plane') { put(a, 70, 2); post = 0.5; }
     else if (it === 'wash') { put(a, 7, -4); put(b, 10, 4); post = 0.75; }
     else if (it === 'spring') { put(a, 14, 0); post = 0.55; }
     R._place();

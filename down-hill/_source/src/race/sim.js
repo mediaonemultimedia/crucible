@@ -665,7 +665,7 @@ export class Race {
         // it runs the track's centreline to the leader and rings
         const lead = this.karts[this.order[0]];
         S.kc += 95 * DT;
-        const kk = ((Math.floor(S.kc) % N) + N) % N;
+        const kk = (((Math.floor(S.kc) + this.startK) % N) + N) % N;   // (kc counts from the start line)
         S.d += (lead.d - S.d) * 0.06;
         S.x = T.x[kk] + rightX(T, kk) * S.d; S.z = T.z[kk] + rightZ(T, kk) * S.d; S.y = T.y[kk] + 3.5 + Math.sin(S.age * 0.3) * 0.6;
         S.k = kk;
@@ -701,7 +701,7 @@ export class Race {
     if (!O || O.fin || O.fish) { S.dead = 1; this.emit({ k: 'fizzle', id: S.id, x: S.x, y: S.y, z: S.z }); return; }
     const gap = O.kc - S.kc;
     S.kc += Math.max(30, Math.min(66, 30 + gap * 2.2)) * DT;
-    const kk = ((Math.floor(S.kc) % N) + N) % N;
+    const kk = (((Math.floor(S.kc) + this.startK) % N) + N) % N;   // (kc counts from the start line)
     const near = gap < 30 ? 1 - Math.max(0, gap) / 30 : 0;
     S.d += (O.d - S.d) * (0.04 + near * 0.2);
     const lim = T.w[kk] + T.m[kk] - 1;
