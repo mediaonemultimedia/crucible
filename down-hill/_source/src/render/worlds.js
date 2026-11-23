@@ -5,10 +5,10 @@
    (darkAt). Switching tracks disposes one world and builds the next.   */
 
 import { World } from './world.js';
-import { LaundryWorld } from './laundry.js';
-import { ParkWorld } from './park.js';
+import { VenueWorld } from './venues.js';
 
-const BUILDERS = { landing: (scene, T) => new World(scene, T), laundry: (scene, T) => new LaundryWorld(scene, T), park: (scene, T) => new ParkWorld(scene, T) };
+const venue = (scene, T) => new VenueWorld(scene, T);
+const BUILDERS = { landing: (scene, T) => new World(scene, T), laundry: venue, park: venue, hockey: venue };
 export const registerWorld = (id, make) => { BUILDERS[id] = make; };
 
 export function makeWorld(scene, T) {

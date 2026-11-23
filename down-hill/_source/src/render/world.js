@@ -180,7 +180,7 @@ function spineTex() {
 }
 
 export class World {
-  constructor(scene, T) {
+  constructor(scene, T, { roomProps = true } = {}) {
     this.scene = scene; this.T = T;
     const root = (this.root = new THREE.Group());
     scene.add(root);
@@ -189,7 +189,7 @@ export class World {
     this.noDash = new Set(['books']);
     this.runnerTags = new Set(['rug', 'landing', 'door', 'underbed']);
     this.build();
-    this.props = addProps(this);
+    if (roomProps) this.props = addProps(this);
     root.traverse((o) => { if (o.isMesh && !o.userData.noShadow) { o.receiveShadow = true; o.castShadow = !!o.userData.cast; } });
     this.merged = mergeStatic(root, { keep: (o) => o === this.startLine || this.padMeshes.has(o) });
     this.moon.shadow.needsUpdate = true;

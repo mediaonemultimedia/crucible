@@ -60,9 +60,10 @@ const MAXP = 4;
 const CHOICES = [...Object.keys(TRACKS).map((id) => ({ id, name: TRACKS[id].name })), { id: 'cup', name: 'The Pillow Cup' }];
 const COURSE_NOTES = {
   landing: 'Quilt grid · book drop · banister jump',
-  laundry: 'Conveyor launch · switchback · dryer shortcut',
-  park: 'Hose kicker · patio chicane · treehouse drop',
-  cup: 'Race all three courses, starting on The Landing',
+  laundry: 'Clay-court flyover · switchbacks · championship jump',
+  hockey: 'Rink crossover · icy bends · penalty-box jump',
+  park: 'Canopy climb · slick downhill flume · splash jump',
+  cup: 'Race all four courses, starting on The Landing',
 };
 const lookKey = (id, alt) => `${id}:${alt ? 1 : 0}`;
 /* the ghost's samples ↔ a localStorage string */
@@ -1319,7 +1320,7 @@ class App {
     const id = this.trackId;
     if (!(id in G.best)) {
       G.best[id] = null;
-      try { const j = JSON.parse(globalThis.localStorage?.getItem(`downhill.ghost.v2.${id}`) || 'null'); if (j && j.t > 0 && typeof j.d === 'string') G.best[id] = { t: j.t, d: decode16(j.d) }; } catch { /* no storage: no ghost */ }
+      try { const j = JSON.parse(globalThis.localStorage?.getItem(`downhill.ghost.v${id === 'landing' ? 2 : 3}.${id}`) || 'null'); if (j && j.t > 0 && typeof j.d === 'string') G.best[id] = { t: j.t, d: decode16(j.d) }; } catch { /* no storage: no ghost */ }
     }
   }
   _ghostMesh() {
@@ -1346,7 +1347,7 @@ class App {
         if (!best || t < best.t) {
           const d = Int16Array.from(G.rec.buf);
           G.best[this.trackId] = { t, d };
-          try { globalThis.localStorage?.setItem(`downhill.ghost.v2.${this.trackId}`, JSON.stringify({ t, d: encode16(d) })); } catch { /* full or blocked: fine */ }
+          try { globalThis.localStorage?.setItem(`downhill.ghost.v${this.trackId === 'landing' ? 2 : 3}.${this.trackId}`, JSON.stringify({ t, d: encode16(d) })); } catch { /* full or blocked: fine */ }
           if (best) this.toast(this.hv[0], 'NEW BEST LAP!', '#bfe8ff');
         }
       }

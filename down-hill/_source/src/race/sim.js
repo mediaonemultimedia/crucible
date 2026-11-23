@@ -194,15 +194,18 @@ export class Race {
     let surf = 'track';
     if (!K.air) {
       if (Math.abs(K.d) > T.w[K.k] + 0.6) surf = 'fluff';
+      const tag = T.def.points[T.sec[K.k]].tag;
+      if (surf === 'track' && (tag === 'flume' || tag === 'ice')) surf = tag;
       for (const P of T.def.patches) if ((K.x - P.x) ** 2 + (K.z - P.z) ** 2 < P.r * P.r) surf = P.kind;
     }
     if (K.cut || K.sugarT > 0) surf = 'track';      // a sugar rush ignores the fluff
-    if (surf === 'pool' && K.surf !== 'pool' && !K.air) this.emit({ k: 'splash', i: K.i, x: K.x, y: K.y, z: K.z, big: Math.abs(K.fwd) > 14 });
+    if ((surf === 'pool' || surf === 'flume') && K.surf !== surf && !K.air) this.emit({ k: 'splash', i: K.i, x: K.x, y: K.y, z: K.z, big: Math.abs(K.fwd) > 14 });
     K.surf = surf;
     let top = S.top * (K.topMul || 1);
     if (surf === 'fluff' || surf === 'mulch') top *= 0.58;
     else if (surf === 'cereal') top *= 0.64;
     else if (surf === 'pool') top *= 0.66;
+    else if (surf === 'flume') top *= 1.10;
     if (K.cuff >= 0) top *= 0.86;
     if (K.caseT > 0) top *= 0.9;
     if (K.shrinkT > 0) top *= 0.84;                  // shrunk in the wash: little wheels
@@ -266,7 +269,7 @@ export class Race {
     if (K.hop > 0) K.hop = Math.max(0, K.hop - DT);
 
     // grip: the sideways slip bleeds away (less in a drift, less in the air, less on fluff)
-    const grip = K.air ? 1.5 : K.drift ? 4.5 : surf === 'suds' ? 3.2 : surf === 'fluff' || surf === 'mulch' || surf === 'pool' ? 7 : 13;
+    const grip = K.air ? 1.5 : surf === 'flume' ? 4 : surf === 'ice' ? 6 : K.drift ? 4.5 : surf === 'suds' ? 3.2 : surf === 'fluff' || surf === 'mulch' || surf === 'pool' ? 7 : 13;
     lat *= Math.exp(-grip * DT);
     const nfx = Math.sin(K.yaw), nfz = Math.cos(K.yaw), nrx = -nfz, nrz = nfx;
     K.vx = nfx * fwd + nrx * lat; K.vz = nfz * fwd + nrz * lat;

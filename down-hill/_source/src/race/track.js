@@ -96,130 +96,83 @@ export const LANDING = {
   boxes: [0.08, 0.235, 0.39, 0.55, 0.71, 0.865],
 };
 
-/* ── Laundry Day ─────────────────────────────────────────────────────────
-   The basement laundry room, under one bare bulb and a buzzing tube. Start
-   on the concrete by the washers heading east, up a cardboard ramp onto
-   the folding table's conveyor of folded towels (it carries you: ride it
-   and you're quicker), off its end in a jump, round the soap-sudsy corner
-   by the water heater, then west along the far wall — the road bulges
-   round the bank of machines, or take the SHORTCUT: straight through the
-   gap and the open dryer drum, which tumbles you round once and spits you
-   out with a kick. Up the west wall the detergent pods roll back and forth
-   across the floor, then kick through the sock piles to the line.        */
-export const LAUNDRY = {
+/* The advanced courses keep their original IDs for race links and Cup order. */
+const route = (tag, x, y, z, options) => W(x, y, z, { tag, edge: 'rail', m: 2, ...options });
+const court = (...p) => route('court', ...p);
+const ice = (...p) => route('ice', ...p);
+const boardwalk = (...p) => route('boardwalk', ...p);
+const flume = (...p) => route('flume', ...p);
+
+export const CENTRE_COURT = {
   id: 'laundry',
-  name: 'Laundry Day',
+  name: 'Sumaura’s Centre Court',
   laps: 3,
-  start: [-100, 0, 71],
+  start: [-150, 0, 108],
   points: [
-    W(-140, 0, 60, { tag: 'floor', w: ROAD, m: 5 }),
-    W(-112, 0, 70, { tag: 'floor', w: ROAD, m: 5 }),
-    W(-80, 0, 72, { tag: 'floor', w: ROAD, m: 5 }),
-    W(-56, 0, 72, { tag: 'floor', w: ROAD, m: 4, pad: 1 }),
-    W(-38, 5, 72, { tag: 'ramp', w: ROAD, m: 1.5, edge: 'rail' }),
-    W(-20, 10, 72, { tag: 'belt', w: ROAD, m: 1.2, edge: 'rail', belt: 9 }),
-    W(16, 10, 72, { tag: 'belt', w: ROAD, m: 1.2, edge: 'rail', belt: 9 }),
-    W(52, 10, 72, { tag: 'belt', w: ROAD, m: 1.2, edge: 'rail', belt: 9 }),
-    W(74, 12, 72, { tag: 'belt', w: ROAD, m: 1.2, edge: 'rail', belt: 9, launch: 18 }),
-    W(100, 0, 66, { tag: 'floor', w: ROAD, m: 5 }),
-    W(124, 0, 44, { tag: 'floor', w: ROAD, m: 5 }),
-    W(117, 0, 8, { tag: 'suds', w: ROAD, m: 5 }),
-    W(130, 0, -21, { tag: 'floor', w: ROAD, m: 5, pad: 1 }),
-    W(112, 0, -62, { tag: 'floor', w: ROAD, m: 5 }),
-    W(84, 0, -80, { tag: 'floor', w: ROAD, m: 3 }),
-    W(58, 0, -82, { tag: 'bulge', w: ROAD, m: 2 }),
-    W(41, 0, -48, { tag: 'bulge', w: ROAD, m: 2 }),
-    W(13, 0, -29, { tag: 'bulge', w: ROAD, m: 2 }),
-    W(-21, 0, -43, { tag: 'bulge', w: ROAD, m: 2 }),
-    W(-42, 0, -80, { tag: 'bulge', w: ROAD, m: 2 }),
-    W(-72, 0, -86, { tag: 'floor', w: ROAD, m: 4 }),
-    W(-104, 0, -82, { tag: 'floor', w: ROAD, m: 4 }),
-    W(-128, 0, -62, { tag: 'pods', w: ROAD, m: 3 }),
-    W(-140, 0, -30, { tag: 'pods', w: ROAD, m: 3 }),
-    W(-146, 0, 0, { tag: 'socks', w: ROAD, m: 4 }),
-    W(-148, 0, 30, { tag: 'socks', w: ROAD, m: 4 }),
+    court(-185, 0, 108), court(-113, 0, 108, { pad: 1 }),
+    court(-65, 7, 75), court(-37, 20, 38), court(0, 30, 0),
+    court(49, 33, -47), court(102, 30, -82), court(153, 20, -99, { launch: 16 }),
+    court(206, 0, -109), court(232, 0, -76), court(204, 0, -45),
+    court(147, 0, -48), court(102, 0, -22),
+    court(62, 0, 5), court(0, 0, 5), court(-68, 0, -3), court(-119, 0, -52),
+    court(-165, 0, -71), court(-207, 0, -48), court(-210, 0, 1),
+    court(-169, 0, 36), court(-117, 0, 35), court(-91, 0, 6),
+    court(-105, 9, -24), court(-145, 19, -19), court(-164, 24, 13),
+    court(-201, 22, 51), court(-224, 11, 83),
   ],
-  /* the shortcut: a corridor (from, to, half-width) through the gap in the
-     machines, the dryer drum on it (its span, as fractions of the corridor) */
-  cut: { from: [80, -84.5], to: [-58, -85.5], w: 4.6, drum: [0.42, 0.6] },
-  patches: [
-    { x: 118, z: 8, r: 6, kind: 'suds' },
-    { x: 120, z: -46, r: 4, kind: 'suds' },
-    { x: -90, z: -84, r: 4.5, kind: 'fluff' },
-  ],
-  posts: [
-    { x: 112, z: 38, r: 2.4, kind: 'bottle' }, { x: -96, z: 66, r: 2.2, kind: 'bottle' },
-  ],
-  /* detergent pods rolling back and forth across the road: where, how far
-     across (× the half-width), the period (ticks) and phase */
-  pods: [
-    { at: [-130, -56], amp: 0.85, period: 170, phase: 0, r: 2.0 },
-    { at: [-137, -38], amp: 0.85, period: 136, phase: 2.1, r: 2.0 },
-    { at: [-142, -18], amp: 0.85, period: 190, phase: 4.2, r: 2.0 },
-  ],
-  /* sock piles: kick through them (a little slower, socks everywhere) */
-  piles: [
-    { x: -147, z: 8, r: 3.2 }, { x: -142, z: 18, r: 2.8 }, { x: -151, z: 22, r: 2.8 }, { x: -146, z: 36, r: 3.2 },
-  ],
-  boxes: [0.04, 0.19, 0.34, 0.46, 0.6, 0.72, 0.87],
-  mapHigh: [5, 30],
+  patches: [], posts: [],
+  boxes: [0.05, 0.18, 0.33, 0.48, 0.64, 0.79, 0.9],
+  mapHigh: [4, 36],
   music: 'laundry',
 };
 
-/* ── Sprinkler Park ──────────────────────────────────────────────────────
-   The back garden at golden hour, at plush scale: the lawn is a meadow,
-   the hose a log. Start on the lawn heading east past the first
-   sprinkler, over the garden-hose jump, across the patio pavers, through
-   the kiddie pool's splash zone (wet: slow), up the plank ramp onto the
-   treehouse deck round the old oak, off its end in a big jump, and back
-   along the west lawn past the sprinklers — when one's on, its jet knocks
-   you sideways.                                                          */
-export const PARK = {
+export const RUBBERTA_RAPIDS = {
   id: 'park',
-  name: 'Sprinkler Park',
+  name: 'Rubberta’s Rapids',
   laps: 3,
-  start: [-74, 0, 63],
+  start: [-158, 0, 142],
   points: [
-    W(-112, 0, 50, { tag: 'lawn', w: ROAD, m: 5 }),
-    W(-82, 0, 62, { tag: 'lawn', w: ROAD, m: 5 }),
-    W(-48, 0, 66, { tag: 'lawn', w: ROAD, m: 5 }),
-    W(-14, 0, 63, { tag: 'lawn', w: ROAD, m: 5 }),
-    W(0, 1.5, 62, { tag: 'hose', w: ROAD, m: 4 }),
-    W(14, 4.2, 54, { tag: 'hose', w: ROAD, m: 4, launch: 15 }),
-    W(40, 0, 42, { tag: 'lawn', w: ROAD, m: 5 }),
-    W(62, 0, 22, { tag: 'patio', w: ROAD, m: 2, pad: 1 }),
-    W(53, 0, 9, { tag: 'patio', w: ROAD, m: 2 }),
-    W(70, 0, -4, { tag: 'patio', w: ROAD, m: 2 }),
-    W(64, 0, -28, { tag: 'pool', w: ROAD, m: 3 }),
-    W(46, 0, -46, { tag: 'lawn', w: ROAD, m: 4 }),
-    W(22, 0, -56, { tag: 'lawn', w: ROAD, m: 3 }),
-    W(4, 3.5, -60, { tag: 'ramp', w: ROAD, m: 1.2, edge: 'rail' }),
-    W(-14, 9, -60, { tag: 'ramp', w: ROAD, m: 1.2, edge: 'rail' }),
-    W(-32, 15, -55, { tag: 'deck', w: ROAD, m: 1.2, edge: 'rail' }),
-    W(-46, 16, -44, { tag: 'deck', w: ROAD, m: 1.2, edge: 'rail', launch: 18 }),
-    W(-62, 0, -26, { tag: 'lawn', w: ROAD, m: 5 }),
-    W(-84, 0, -8, { tag: 'lawn', w: ROAD, m: 5 }),
-    W(-102, 0, 14, { tag: 'lawn', w: ROAD, m: 5, pad: 1 }),
-    W(-114, 0, 34, { tag: 'lawn', w: ROAD, m: 5 }),
+    boardwalk(-200, 0, 140), boardwalk(-126, 0, 143, { pad: 1 }),
+    boardwalk(-75, 9, 114), boardwalk(-53, 23, 73),
+    boardwalk(-13, 42, 35), boardwalk(26, 59, -13),
+    boardwalk(32, 69, -68), boardwalk(75, 78, -121),
+    flume(139, 79, -137), flume(193, 70, -100),
+    flume(197, 57, -42), flume(148, 43, -5),
+    flume(97, 30, -24), flume(57, 19, -53), flume(5, 13, -54),
+    flume(-37, 8, -26), flume(-34, 5, 24),
+    flume(13, 5, 61), flume(75, 7, 62, { launch: 15 }),
+    boardwalk(129, 0, 59), boardwalk(180, 0, 80), boardwalk(173, 0, 124),
+    boardwalk(116, 0, 148), boardwalk(57, 0, 130),
+    boardwalk(3, 0, 132), boardwalk(-42, 0, 175),
+    boardwalk(-110, 0, 191), boardwalk(-183, 0, 187),
+    boardwalk(-226, 0, 177),
   ],
-  patches: [
-    { x: 63, z: -29, r: 10, kind: 'pool' },
-    { x: -30, z: 70, r: 3.6, kind: 'mulch' },
-    { x: 54, z: 34, r: 3.6, kind: 'mulch' },
-  ],
-  posts: [
-    { x: 30, z: 52, r: 1.6, kind: 'gnome' }, { x: -96, z: 2, r: 1.6, kind: 'flamingo' },
-  ],
-  /* lawn sprinklers: where, the jet's reach (world units), on for `dur` of every `period` ticks */
-  sprinklers: [
-    { x: -28, z: 70, reach: 22, period: 170, dur: 75, phase: 0 },
-    { x: 34, z: -54, reach: 20, period: 150, dur: 64, phase: 60 },
-    { x: -86, z: -18, reach: 22, period: 180, dur: 80, phase: 110 },
-    { x: -112, z: 22, reach: 20, period: 140, dur: 60, phase: 30 },
-  ],
-  boxes: [0.05, 0.23, 0.37, 0.52, 0.73, 0.88],
-  mapHigh: [4, 16],
+  patches: [], posts: [],
+  boxes: [0.06, 0.19, 0.32, 0.46, 0.62, 0.75, 0.91],
+  mapHigh: [6, 78],
   music: 'park',
+};
+
+export const HOCKEY = {
+  id: 'hockey',
+  name: 'Overtime at Rink 88',
+  laps: 3,
+  start: [-139, 0, 104],
+  points: [
+    ice(-181, 0, 104), ice(-99, 0, 104, { pad: 1 }),
+    ice(-73, 1, 63), ice(-107, 5, 20), ice(-163, 8, -18),
+    ice(-158, 17, -74), ice(-99, 27, -107), ice(-16, 31, -95),
+    ice(43, 33, -48), ice(55, 32, 13), ice(27, 27, 66),
+    ice(72, 21, 104, { launch: 14 }), ice(140, 0, 109),
+    ice(196, 0, 72), ice(204, 0, 14), ice(169, 0, -29),
+    ice(110, 0, -18), ice(54, 0, 3), ice(-16, 0, 8),
+    ice(-75, 0, -25), ice(-118, 0, -63), ice(-173, 0, -89),
+    ice(-223, 0, -51), ice(-238, 0, 15), ice(-224, 0, 70),
+  ],
+  patches: [], posts: [],
+  boxes: [0.06, 0.19, 0.33, 0.46, 0.6, 0.76, 0.9],
+  mapHigh: [4, 34],
+  music: 'laundry',
 };
 
 /* the room was laid out in a compact sketch; the race runs it 1.9× wider
@@ -239,9 +192,9 @@ function scaled(def, sxz, sy) {
     sprinklers: (def.sprinklers || []).map(P),
   };
 }
-export const TRACKS = { landing: scaled(LANDING, 1.9, 1.25), laundry: scaled(LAUNDRY, 1.78, 1.0), park: scaled(PARK, 2.9, 1.6) };
-/* the Pillow Cup: three races, points for every place */
-export const CUP = ['landing', 'laundry', 'park'];
+export const TRACKS = { landing: scaled(LANDING, 1.9, 1.25), laundry: scaled(CENTRE_COURT, 1, 1), hockey: scaled(HOCKEY, 1, 1), park: scaled(RUBBERTA_RAPIDS, 1, 1) };
+/* the Pillow Cup: four races, points for every place */
+export const CUP = ['landing', 'laundry', 'hockey', 'park'];
 
 /* ── sampling ─────────────────────────────────────────────────────────── */
 function cr(p0, p1, p2, p3, t) {

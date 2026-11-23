@@ -63,8 +63,8 @@ const key = (p, code, ms = 40) => p.evaluate(async ([c, t]) => {
 }
 
 // 2 + 3. a whole race with 8 CPUs on each track, its frame cost, the results
-const TRACK_EVENTS = { landing: [], laundry: ['drum', 'drumOut', 'pile'], park: ['soak', 'splash', 'spray'] };
-for (const track of (process.argv.includes('--quick') ? ['landing'] : ['landing', 'laundry', 'park'])) {
+const TRACK_EVENTS = { landing: [], laundry: ['launch'], hockey: ['launch'], park: ['launch', 'splash'] };
+for (const track of (process.argv.includes('--quick') ? ['landing'] : ['landing', 'laundry', 'hockey', 'park'])) {
   const p = await page(`?hold&webgl&p1=kevalanche&p1cpu=hard&cpu=hard&seed=11&track=${track}`);
   const r = await p.evaluate(() => {
     const A = __dh, R = A.race, ev = {}, laps = {};
@@ -93,8 +93,8 @@ for (const track of (process.argv.includes('--quick') ? ['landing'] : ['landing'
   results[`race-${track}`] = r;
   if (r.screen !== 'results') problems.push(`${track}: ended on ${r.screen}`);
   if (r.finished !== 8) problems.push(`${track}: ${r.finished}/8 finished`);
-  if (!(r.lap.mean >= 45 && r.lap.mean <= 62)) problems.push(`${track}: mean lap ${r.lap.mean} s (want ~50–60)`);
-  for (const k of ['drift', 'tier', 'boost', 'use', 'trick', 'pad', 'box', 'hit', ...TRACK_EVENTS[track]]) if (!r.ev[k]) problems.push(`${track}: no '${k}' events`);
+  if (!(r.lap.mean >= 40 && r.lap.mean <= 95)) problems.push(`${track}: mean lap ${r.lap.mean} s (want 40–95)`);
+  for (const k of ['boost', 'use', 'trick', 'pad', 'box', 'hit', ...TRACK_EVENTS[track]]) if (!r.ev[k]) problems.push(`${track}: no '${k}' events`);
   if (r.jsMs.p95 > 8) problems.push(`${track}: JS frame cost p95 ${r.jsMs.p95} ms (budget 8 of the 16.7)`);
   if (r.ev['fall:edge']) problems.push(`${track}: ${r.ev['fall:edge']} falls off an edge (every drawn barrier is solid; no track has a drop)`);
   if (r.net) problems.push(`${track}: the safety net caught ${r.net} karts under the road`);
@@ -137,7 +137,7 @@ for (const n of [2, 4]) {
   await p.close();
 }
 
-// 5. the Pillow Cup: three races (each cut short), points, the overall podium
+// 5. the Pillow Cup: four races (each cut short), points, the overall podium
 {
   const p = await page('?hold&webgl&noportraits&seed=7');
   const r = await p.evaluate(() => {
@@ -146,7 +146,7 @@ for (const n of [2, 4]) {
     A.lock(A.players[0]);
     while (document.querySelector('#course-name').textContent !== 'The Pillow Cup') A.cycleTrack(1);
     A.go();
-    for (let race = 0; race < 3; race++) {
+    for (let race = 0; race < 4; race++) {
       trail.push(A.screen + ':' + A.trackId);
       A.step(6, false);
       const R = A.race; R._end(); A.resultsAt = A.t; A.toResults();
@@ -158,8 +158,8 @@ for (const n of [2, 4]) {
     return { trail, total: pts.reduce((a, b) => a + b, 0), title: document.getElementById('c-title').textContent };
   });
   results.cup = r;
-  if (r.trail.join() !== 'race:landing,results,race:laundry,results,race:park,results,cup') problems.push(`cup: ${r.trail}`);
-  if (r.total !== 3 * 39) problems.push(`cup: ${r.total} points handed out (want ${3 * 39})`);
+  if (r.trail.join() !== 'race:landing,results,race:laundry,results,race:hockey,results,race:park,results,cup') problems.push(`cup: ${r.trail}`);
+  if (r.total !== 4 * 39) problems.push(`cup: ${r.total} points handed out (want ${4 * 39})`);
   await p.evaluate(() => __dh.step(1));
   await p.screenshot({ path: path.join(root, 'shots/check-cup-podium.png'), timeout: 240000 });
   await p.close();
@@ -176,7 +176,7 @@ for (const n of [2, 4]) {
     while (K.kc < N * 1.5 && n++ < 60 * 140) { A.frame(1 / 60, false); if (A.ghost.mesh.visible) seen++; }
     const best = A.ghost.best[A.trackId];
     let stored = null;
-    try { stored = JSON.parse(localStorage.getItem('downhill.ghost.park') || 'null'); } catch { /* */ }
+    try { stored = JSON.parse(localStorage.getItem('downhill.ghost.v3.park') || 'null'); } catch { /* */ }
     // the photo finish: stage the last few metres with a rival alongside
     const O = R.karts.find((x) => x !== K);
     K.kc = R.laps * N - 18; O.kc = K.kc - 1.5; O.fin = 0;

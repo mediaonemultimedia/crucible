@@ -46,7 +46,7 @@ function torture(track, seed, { speed = 1, lvl = 'hard' } = {}) {
   return out;
 }
 
-for (const track of ['landing', 'laundry', 'park']) {
+for (const track of ['landing', 'laundry', 'hockey', 'park']) {
   test(`${track}: 24+ laps at racing and at high speed, items on: never below the road, no layer jumps, no falls`, () => {
     const tot = { net: 0, below: 0, falls: 0, stuck: 0, laps: 0, layerJumps: 0, scrapes: 0, items: 0, maxBelow: 0, where: [] };
     for (const [seed, speed] of [[1, 1], [2, 1.25], [3, 1.4]]) {
@@ -66,7 +66,7 @@ for (const track of ['landing', 'laundry', 'park']) {
 }
 
 test('every drawn barrier is solid: no drop sections on any track; rails on the raised runs', () => {
-  for (const id of ['landing', 'laundry', 'park']) {
+  for (const id of ['landing', 'laundry', 'hockey', 'park']) {
     const T = buildTrack(TRACKS[id]);
     assert.equal(T.drop.filter(Boolean).length, 0, id);
     assert.ok(T.rail.filter(Boolean).length > 50, id);
@@ -76,7 +76,7 @@ test('every drawn barrier is solid: no drop sections on any track; rails on the 
 });
 
 test('nothing is skinnier than 8.5 half-width', () => {
-  for (const id of ['landing', 'laundry', 'park']) for (const p of TRACKS[id].points) assert.ok(p.w >= 8.5, `${id} ${p.tag} w ${p.w}`);
+  for (const id of ['landing', 'laundry', 'hockey', 'park']) for (const p of TRACKS[id].points) assert.ok(p.w >= 8.5, `${id} ${p.tag} w ${p.w}`);
 });
 
 /* drive a kart into the banister's rail at speed */
