@@ -57,12 +57,12 @@ function carpetTex(c1, c2) {
 }
 function wallpaperTex() {
   return canvasTex(256, 256, (g, w, h) => {
-    const base = landingLookdev ? '#55768b' : '#3a3566';
+    const base = landingLookdev ? '#174ab6' : '#3a3566';
     g.fillStyle = base; g.fillRect(0, 0, w, h);
-    g.fillStyle = landingLookdev ? '#608399' : '#433d74';
+    g.fillStyle = landingLookdev ? '#205dcc' : '#433d74';
     for (let x = 0; x < w; x += 32) g.fillRect(x, 0, 14, h);
     // little stars and moons
-    g.fillStyle = landingLookdev ? '#bfd4e3' : '#f3d98b';
+    g.fillStyle = landingLookdev ? '#ffcb35' : '#f3d98b';
     const star = (x, y, s) => { g.beginPath(); for (let i = 0; i < 10; i++) { const a = (i / 10) * TAU - Math.PI / 2, rr = i % 2 ? s * 0.45 : s; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } g.fill(); };
     star(40, 50, 9); star(170, 120, 7); star(90, 200, 8); star(220, 30, 5);
     g.beginPath(); g.arc(200, 210, 12, 0, TAU); g.fill(); g.fillStyle = base; g.beginPath(); g.arc(206, 205, 11, 0, TAU); g.fill();
@@ -77,7 +77,7 @@ function hallPaperTex() {
 }
 function quiltTex() {
   return canvasTex(512, 512, (g, w, h) => {
-    const cols = landingLookdev ? ['#2f8090', '#efc584', '#c96d55', '#376785']
+    const cols = landingLookdev ? ['#125be0', '#ffc01a', '#ef3434', '#079f66']
       : ['#2f4a8a', '#3a5aa0', '#27407a', '#33509a'];
     const n = landingLookdev ? 6 : 8, s = w / n;
     for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
@@ -120,13 +120,13 @@ function quiltTex() {
 function rugTex() {
   return canvasTex(512, 512, (g, w, h) => {
     const cx = w / 2, cy = h / 2;
-    const rings = landingLookdev ? ['#294b61', '#ead0a0', '#317c7e', '#317c7e', '#317c7e', '#317c7e', '#317c7e', '#317c7e', '#317c7e']
+    const rings = landingLookdev ? ['#123e97', '#ffb814', '#08774e', '#08774e', '#08774e', '#08774e', '#08774e', '#08774e', '#08774e']
       : ['#e86f7d', '#f4c06a', '#6fd3b8', '#7e72d8', '#f4efe6', '#e86f7d', '#f4c06a', '#6fd3b8', '#7e72d8'];
     for (let i = 0; i < rings.length; i++) { g.fillStyle = rings[i]; g.beginPath(); g.arc(cx, cy, w / 2 - i * 26, 0, TAU); g.fill(); }
     if (landingLookdev) {
       g.save();
       g.beginPath(); g.arc(cx, cy, 203, 0, TAU); g.clip();
-      g.fillStyle = 'rgba(255,234,195,0.18)';
+      g.fillStyle = 'rgba(135,255,94,0.26)';
       for (let x = -h; x < w; x += 37) {
         g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 7, 0);
         g.lineTo(x + h + 7, h); g.lineTo(x + h, h); g.fill();
@@ -232,7 +232,7 @@ export class World {
     this._trackParts();
     this._guides();
     if (landingLookdev) dressLanding(this);
-    this.readable = buildReadable(this, { railCols: landingLookdev ? ['#b4523e', '#f9e7be'] : undefined, arrowTags: new Set(['door', 'drawer', 'pillows', 'underbed', 'landing', 'books']) });
+    this.readable = buildReadable(this, { railCols: landingLookdev ? ['#e5242e', '#fff9e8'] : undefined, arrowTags: new Set(['door', 'drawer', 'pillows', 'underbed', 'landing', 'books']) });
   }
 
   add(o) { this.root.add(o); return o; }
@@ -286,7 +286,7 @@ export class World {
     const f = mesh(new THREE.PlaneGeometry(R.x1 - R.x0, R.z1 - R.z0), floor, (R.x0 + R.x1) / 2, 0, 0, this.root);
     f.rotation.x = -Math.PI / 2;
     // the landing's runner carpet: the floor round the stairwell hole
-    const carpet = new THREE.MeshStandardMaterial({ map: carpetTex(landingLookdev ? '#754d61' : '#6b3242', landingLookdev ? '#563344' : '#4a1f2c'), roughness: 0.95 });
+    const carpet = new THREE.MeshStandardMaterial({ map: carpetTex(landingLookdev ? '#512288' : '#6b3242', landingLookdev ? '#331453' : '#4a1f2c'), roughness: 0.95 });
     const S = STAIRS;
     const pieces = [[H.x0, H.x1, H.z0, S.z0], [H.x0, H.x1, S.z1, H.z1], [H.x0, S.x0, S.z0, S.z1], [S.x1, H.x1, S.z0, S.z1]];
     for (const [x0, x1, z0, z1] of pieces) { const p = mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), carpet, (x0 + x1) / 2, 0, (z0 + z1) / 2, this.root); p.rotation.x = -Math.PI / 2; }
@@ -357,7 +357,7 @@ export class World {
     mesh(new THREE.BoxGeometry(2.5, 2.5, wz1 - wz0), fr, fx + 1, (wy0 + wy1) / 2, (wz0 + wz1) / 2, this.root);
     mesh(new THREE.BoxGeometry(9, 2.5, wz1 - wz0 + 14), fr, fx + 4, wy0 - 2.5, (wz0 + wz1) / 2, this.root);
     // curtains, gathered at the sides
-    const cur = mat(landingLookdev ? '#bc665a' : '#7b3a6a', { roughness: 0.9, side: THREE.DoubleSide });
+    const cur = mat(landingLookdev ? '#e62c35' : '#7b3a6a', { roughness: 0.9, side: THREE.DoubleSide });
     for (const z of [wz0 - 9, wz1 + 9]) {
       const g = new THREE.CylinderGeometry(7, 9, wy1 - wy0 + 30, 16, 1, true);
       const p = g.attributes.position;
@@ -461,8 +461,8 @@ export class World {
     this.glow('#8ff0d0', 40, -122, 9, 108, 0.7);
     this.glow('#8ff0d0', 110, -122, 4, 100, 0.2);
     // a toy box, blocks, a ball, a rocket poster
-    const tb = mesh(rbox(40, 24, 26, 2), mat('#4f7fd1', { roughness: 0.6 }), -118, 12, -88, root); tb.userData.cast = true;
-    mesh(rbox(42, 3, 28, 1.2), mat('#f4c84a', { roughness: 0.5 }), -118, 25, -88, root);
+    const tb = mesh(rbox(40, 24, 26, 2), mat(landingLookdev ? '#1257dc' : '#4f7fd1', { roughness: 0.6 }), -118, 12, -88, root); tb.userData.cast = true;
+    mesh(rbox(42, 3, 28, 1.2), mat(landingLookdev ? '#ffbd15' : '#f4c84a', { roughness: 0.5 }), -118, 25, -88, root);
     const cols = ['#e85d75', '#f4c84a', '#6fd3b8', '#7e72d8'];
     const r = srand(9);
     for (let i = 0; i < 10; i++) {
@@ -606,14 +606,14 @@ export class World {
       ribbon(Array.from({ length: last - first + 1 }, (_, i) => first + i), this.drawerLining, 0.85);
     }
     // the book stairs: a tumble of fat books, each top flush with the track
-    const books = landingLookdev ? ['#bf604a', '#437c9d', '#4b9a83', '#d3a252', '#7b6892', '#b97549', '#609251', '#b66175']
+    const books = landingLookdev ? ['#ed2339', '#1461e1', '#07976a', '#ffb41c', '#7529c6', '#f4781c', '#60ac20', '#e73585']
       : ['#c0392b', '#2e86de', '#16a085', '#f39c12', '#8e44ad', '#d35400', '#27ae60', '#e84393'];
     const spine = spineTex();
     const bookMaterials = books.map((color) => new THREE.MeshStandardMaterial({ color, map: spine, roughness: 0.74 }));
     const bk = runs.books || [];
     for (const run of contiguous(bk)) {
       const ext = [(run[0] - 1 + N) % N, ...run, (run[run.length - 1] + 1) % N];
-      ribbon(ext, mat(landingLookdev ? '#cfa16c' : '#a17454', { roughness: 0.82 }), 0.6);
+      ribbon(ext, mat(landingLookdev ? '#ffb225' : '#a17454', { roughness: 0.82 }), 0.6);
     }
     const r = srand(4);
     for (let i = 0; i < bk.length; i += 4) {

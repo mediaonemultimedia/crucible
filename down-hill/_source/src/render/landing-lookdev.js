@@ -1,11 +1,11 @@
 import * as THREE from 'three/webgpu';
 import { canvasTex, mat, mesh, rbox } from './geo.js';
 
-const navy = '#254b62';
-const red = '#c75237';
-const cream = '#fff0cf';
-const blue = '#63b3bd';
-const gold = '#efb74e';
+const navy = '#12388c';
+const red = '#ed2537';
+const cream = '#fff9e8';
+const blue = '#1572ed';
+const gold = '#ffba12';
 
 const panels = [
   { title: 'FLUFFED AND FURIOUS', note: 'THE PILLOW FORT GRAND PRIX', base: navy, ink: cream },
@@ -55,7 +55,7 @@ function sign(parent, material, panel, width, height, x, y, z) {
 export function dressLanding(world) {
   const { T, root } = world;
   const signMat = new THREE.MeshBasicMaterial({ map: panelAtlas() });
-  const cardboard = mat('#bf8d58', { roughness: 0.86 });
+  const cardboard = mat('#b17426', { roughness: 0.86 });
   const painted = [red, cream, blue, gold].map((color) => mat(color, { roughness: 0.76 }));
   const sections = new Map();
   for (let k = 0; k < T.N; k++) {
