@@ -12,6 +12,7 @@
   --stage:#120d1f;--panel:#1d1630;--panel2:#2a2140;--line:#4a3b78;--ink:#ffffff;--dim:#bdb3dc;
   --p1:#ff3b6b;--p2:#3ff0c8;--violet:#9b5cff;--gold:#ffc93a;--on-neon:#120d1f;
   --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",Arial,sans-serif;
+  --race-display:"Bungee",var(--heavy);
   --heavy:"Bolster Display","Arial Black","Helvetica Neue",Helvetica,Arial,sans-serif;
   --cond:"Bolster Condensed","Oswald","Arial Narrow","Roboto Condensed","Helvetica Neue",Arial,sans-serif;
   --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
@@ -39,7 +40,7 @@ body.racing #mark{display:none}
 
 /* title: the logo is type, neon, with a feather */
 .logo{position:absolute;left:50%;top:27%;transform:translate(-50%,-50%) rotate(-4deg);text-align:center;white-space:nowrap}
-.logo .l1{font-family:var(--heavy);font-size:clamp(64px,11vw,150px);line-height:.86;letter-spacing:.02em;color:#fff;
+.logo .l1{font-family:var(--race-display);font-size:clamp(34px,10.5vw,144px);line-height:.96;letter-spacing:0;color:#fff;
   text-shadow:0 3px 0 #ff3b6b,0 6px 0 #b51f4c,0 9px 0 #5c1031,0 0 30px rgba(255,59,107,.55),0 0 70px rgba(155,92,255,.45);display:block}
 .logo .l1 em{font-style:normal;color:var(--p2);text-shadow:0 3px 0 #1fae8e,0 6px 0 #11735d,0 9px 0 #0a3d33,0 0 30px rgba(63,240,200,.55)}
 .logo .sub{display:inline-block;margin-top:22px;font-family:var(--hand);font-size:clamp(20px,2.6vw,34px);color:#fff;transform:rotate(3deg);background:var(--violet);padding:2px 16px 4px;border-radius:8px;box-shadow:var(--glow-v)}
@@ -132,7 +133,7 @@ body.racing #hud{display:block}
 .drift .fill{width:120px;height:6px;border-radius:3px;background:#2a2140;overflow:hidden}
 .drift .fill b{display:block;height:100%;width:0;background:linear-gradient(90deg,#fff,var(--gold),#4dffc3)}
 .minimap{position:absolute;left:24px;bottom:20px;width:230px;height:170px;border-radius:12px;background:rgba(18,13,31,.55);border:1px solid rgba(155,92,255,.45);box-shadow:0 0 16px rgba(155,92,255,.25)}
-.count{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-family:var(--heavy);font-size:clamp(90px,16vw,200px);color:#fff;text-shadow:0 6px 0 var(--p1),0 0 40px rgba(255,59,107,.7);pointer-events:none}
+.count{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-family:var(--race-display);font-size:clamp(72px,14vw,172px);line-height:1;color:#fff;text-shadow:0 6px 0 var(--p1),0 0 40px rgba(255,59,107,.7);pointer-events:none}
 .count.go{color:var(--p2);text-shadow:0 6px 0 #11735d,0 0 40px rgba(63,240,200,.8)}
 .toast{position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);font-family:var(--heavy);font-size:clamp(28px,4vw,52px);color:#fff;white-space:nowrap;pointer-events:none;opacity:0}
 .toast.on{animation:pop 1.3s ease-out forwards}

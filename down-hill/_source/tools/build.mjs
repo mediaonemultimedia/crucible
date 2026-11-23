@@ -35,11 +35,16 @@ if (!html.includes('/*FONTFACE*/')) throw new Error('index.html is missing the /
    family name (a modified OFL font doesn't carry its Reserved Font Name). */
 const font = fs.readFileSync(path.join(src, 'assets/gochi-hand-subset.woff2')).toString('base64');
 const font2 = fs.readFileSync(path.join(src, 'assets/lilita-one-subset.woff2')).toString('base64');
+const bungee = fs.readFileSync(path.join(src, 'assets/bungee-latin.woff2')).toString('base64');
+const bungeeLicense = fs.readFileSync(path.join(src, 'assets/bungee-OFL.txt'), 'utf8').trim();
 const cond = fs.readFileSync(path.join(src, 'assets/oswald-subset.woff2')).toString('base64');
-const face = `/* Bubble lettering: a subset of Gochi Hand, Copyright (c) 2011 HT Fonts, SIL Open Font License 1.1.
+const face = `/* ${bungeeLicense} */
+/* Bubble lettering: a subset of Gochi Hand, Copyright (c) 2011 HT Fonts, SIL Open Font License 1.1.
    Display type: a subset of Lilita One, Copyright (c) 2011 Juan Montoreano, SIL Open Font License 1.1.
+   Race title and countdown: Bungee, Copyright 2023 The Bungee Project Authors, SIL Open Font License 1.1.
    HUD condensed caps: a subset of Oswald, Copyright 2016 The Oswald Project Authors, SIL Open Font License 1.1. */
 @font-face{font-family:"Bolster Hand";src:url(data:font/woff2;base64,${font}) format("woff2");font-display:block}
+@font-face{font-family:"Bungee";src:url(data:font/woff2;base64,${bungee}) format("woff2");font-display:block}
 @font-face{font-family:"Bolster Display";src:url(data:font/woff2;base64,${font2}) format("woff2");font-display:block}
 @font-face{font-family:"Bolster Condensed";src:url(data:font/woff2;base64,${cond}) format("woff2");font-weight:700;font-display:block}`;
 html = html.replace('/*FONTFACE*/', () => face);
