@@ -24,6 +24,7 @@ node tools/pad-test.mjs       # four simulated phones: pairing, menus, latency, 
 node tools/tour.mjs laundry   # a screenshot at each section of a track → shots/tracks/
 node tools/items-test.mjs     # every item fires, hits and resolves, 1P and 4-way split (stage 5)
 node tools/avgdriver.mjs normal 0 40   # the difficulty curve: an "average driver" vs 7 CPUs, finishing places
+node tools/bounce-repro.mjs [--html final.html]   # the bounce repro: slow frames + bad-network phones → shots/bounce/
 ```
 
 Deep links: `?p1=kevalanche&alt1=1&cpu=hard&track=landing` (straight into a
@@ -198,6 +199,19 @@ Boxes for the average driver: a row every 7.9–9.2 s on average (the longest ga
 The instanced boxes take ~33 draws off a view; the held items add ≤ 1 draw per item type in view, the props 1. The Hot Wash is a scale on each kart's existing group (no new draws), so it stays. JS per frame is up ~0.4–0.5 ms (the extra items in play, the held-item and box matrices) and still well inside a 16.7 ms frame. `tools/check.mjs` on the release build: ALL CHECKS PASS (8/8 finish on all three tracks, mean laps 53.1 / 54.4 / 54.8 s, race JS p95 ≤ 1.0 ms, 0 safety-net catches; split-4 253 draws per view, JS p95 4.0 ms); `tools/items-test.mjs`: all 10 items fire, hit and resolve in 1P and 4-way split, zero errors; `npm test` 46/46 (stage 3's fall-through regression included: 0 below the road, 0 layer jumps, 0 edge falls on all three tracks).
 
 Also fixed: the alarm clock's flight path was drawn 42–118 units behind where the sim had it (the lap counter counts from the start line); a handcuff chain between two karts far apart (one fished out) used to yank the other across the room — it snaps now.
+
+## Status — the bounce-and-squish fix (`docs/bounce-glitch.md`)
+
+Kevin: "when the connection isn't great, the characters are bouncing up and down, like they're
+getting squished, repeatedly, and it just doesn't end."
+
+| # | Item | State |
+|---|---|---|
+| 1 | **Root cause (confirmed): unstable render springs on slow frames.** The kart body's squash (k 320, ζ 0.35) and the PF2 plush's crunch / hit squash / yaw / glove springs took one semi-implicit Euler step per frame; past dt·√k ≈ 2 that step gains energy every frame. With the 0.1 s frame clamp the kart squash grows ×2.6 per frame at 10 fps: the kart squashes and stretches on alternate frames at its clamp (0.7 ↔ 1.2) and keeps ringing for seconds after the frames recover | fixed — `shared/grommet/spring.js` `stepSpring` (equal substeps of ≤ 1/120 s; NaN-safe; bounded state), used by `render/racer.js`, `plush.js`, `gloves.js`, `arena.js`, `feel.js`, `pose.js` |
+| 2 | Spring test: every render spring kicked and run at dt 0.1 for 10 s: energy falls every frame, settled | `test/spring.test.mjs` |
+| 3 | Repro in the real page: an 8-kart race, two phones on a 300 ms-jitter / 15 %-loss link, every kart hit + a hard landing, 5 s of 85 ms frames, a 3 s phone dropout + reconnect, then 60 fps. Before (main): kart squash up to 4 × 10⁷, sign flipping on 57 of 59 slow frames, scale y 0.70 ↔ 1.20, still 1.7 × 10⁶ three seconds after recovery. After: ≤ 0.47 in the slow frames, 0.008 from 0.5 s after recovery | `tools/bounce-repro.mjs`; `shots/bounce/before-main.json`, `after.json` |
+| 4 | **Pad input (confirmed, secondary):** TAUNT / ITEM held through a > 400 ms quiet spell came back as a second press (the race's own edge detection saw it drop and return: a TAUNT bounce); an outage of > ~2 s ran the phone's 8-bit seq past half its window, freezing input until it wrapped. Now: counted bits press only on their counters (one physical press = one press, whatever is lost, reordered or repeated); a press-to-act bit (ITEM TAUNT START SUPER) that went stale stays off until released or pressed again (GAS, BRAKE, DRIFT, LOOK and the steering come straight back); a seq far behind (or any after a quiet spell) resyncs | `src/pad/wire.js`; `test/padnet.test.mjs` (loss, 300 ms jitter, duplicates, 3 s / 2.5 s / 1 s outages, a reconnect, 5 seeds; before: 8 TAUNT presses for 6 physical) |
+| 5 | Checked, not a cause: the pad host's main-thread cost on a bad link (0.02–0.03 ms a frame, 0.004 ms a packet; the pairing card repaints only on change) | `bounce-repro` `padHostCost` |
 
 ## Stage 2 hooks
 - `input/controls.js` has `extra`: a function returning another input to
