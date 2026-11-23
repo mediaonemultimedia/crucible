@@ -144,6 +144,7 @@ export class Fx {
     this.balls = new Pool(scene, 60, mat('#ffffff', { roughness: 0.8 }), new THREE.SphereGeometry(0.28, 10, 8));
     this.t = 0;
     this.itemGeo = itemGeos();
+    this.tmp = { M: new THREE.Matrix4(), L: new THREE.Matrix4(), P: new THREE.Vector3(), Q: new THREE.Quaternion(), S: new THREE.Vector3(), E: new THREE.Euler(), C: new THREE.Color(), C2: new THREE.Color() };
     this._boxes();
     this.shotMeshes = new Map();
     this.hazMeshes = new Map();
@@ -173,8 +174,8 @@ export class Fx {
   _heldUpdate(dt, karts, views) {
     const R = this.race, n = {};
     for (const k in this.heldMesh) n[k] = 0;
-    const M = new THREE.Matrix4(), L = new THREE.Matrix4(), P = new THREE.Vector3(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), E = new THREE.Euler();
-    const KINDS = Object.keys(this.heldMesh);
+    const { M, L, P, Q, S, E } = this.tmp;
+    const KINDS = this.kinds || (this.kinds = Object.keys(this.heldMesh));
     for (const K of karts) {
       const v = views[K.i];
       if (this.pops[K.i] > 0) this.pops[K.i] = Math.max(0, this.pops[K.i] - dt);
@@ -264,7 +265,7 @@ export class Fx {
   }
   _boxesUpdate(t, camQ) {
     const R = this.race, { body, ribbon, halo } = this.boxI;
-    const M = new THREE.Matrix4(), P = new THREE.Vector3(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), E = new THREE.Euler();
+    const { M, P, Q, S, E } = this.tmp;
     R.boxes.forEach((B, i) => {
       const ph = this.boxPh[i];
       // a grabbed box pops and grows straight back
@@ -484,11 +485,11 @@ export class Fx {
     for (const [i, m] of this.reticles) if (!locks.has(i)) { m.removeFromParent(); this.reticles.delete(i); }
     // a sugar rush: the kart glows rainbow-candy and sheds sparkles
     for (const K of karts) if (K.sugarT > 0 && !K.fish) {
-      const hue = (t * 0.9 + K.i * 0.1) % 1, c = '#' + new THREE.Color().setHSL(hue, 0.9, 0.62).getHexString();
+      const hue = (t * 0.9 + K.i * 0.1) % 1, c = '#' + this.tmp.C.setHSL(hue, 0.9, 0.62).getHexString();
       const v = views[K.i].group.position;
       if (this.r() < Math.min(1, dt * 60)) {
         this.glows.add({ x: v.x + (this.r() - 0.5) * 3.4, y: v.y + 0.5 + this.r() * 3, z: v.z + (this.r() - 0.5) * 3.4, vx: 0, vy: 1, vz: 0, g: 0, drag: 2, age: 0, life: 0.45, size: 1 + this.r(), rot: 0, c, fade: 1 });
-        if (this.r() < 0.5) this.glows.add({ x: v.x, y: v.y + 1.4, z: v.z, vx: 0, vy: 0, vz: 0, g: 0, drag: 0, age: 0, life: 0.1, size: 5, rot: 0, c: '#' + new THREE.Color(c).multiplyScalar(0.22).getHexString() });
+        if (this.r() < 0.5) this.glows.add({ x: v.x, y: v.y + 1.4, z: v.z, vx: 0, vy: 0, vz: 0, g: 0, drag: 0, age: 0, life: 0.1, size: 5, rot: 0, c: '#' + this.tmp.C2.set(c).multiplyScalar(0.22).getHexString() });
       }
     }
     this.feathers.update(dt, camQ);

@@ -213,5 +213,6 @@ for (const n of [2, 4]) {
 
 await browser.close();
 console.log(JSON.stringify(results, null, 1));
+try { (await import('fs')).writeFileSync(path.join(root, 'shots/check-results.json'), JSON.stringify(results, null, 1)); } catch { /* fine */ }
 console.log(problems.length ? `\nPROBLEMS (${problems.length})\n  ${problems.join('\n  ')}` : '\nALL CHECKS PASS: zero console errors, zero network requests');
 process.exit(problems.length ? 1 : 0);
