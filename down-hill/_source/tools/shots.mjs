@@ -59,7 +59,7 @@ const SCENES = {
     await snap(p, 'drift'); await p.close();
   },
   async items() {
-    for (const it of ['slick', 'missile', 'espresso', 'cuffs', 'case', 'alarm']) {
+    for (const it of (process.env.ITEMS || 'slick,missile,espresso,cuffs,case,alarm,sugar,plane,wash,spring').split(',')) {
       const p = await open('?hold&webgl&p1=johnny&cpu=normal&seed=12');
       const r = await p.evaluate((it) => window.__dh.shotItem(it), it);
       if (!r) problems.push(`items: ${it} not staged`);

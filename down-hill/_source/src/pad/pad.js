@@ -177,9 +177,9 @@ body.pad *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 #tilt.on{display:block}
 .cols{display:grid;grid-template-columns:52% 1fr;gap:calc(3*var(--u))}
 .sheet h3{margin:0 0 calc(.6*var(--u));font:400 calc(4.4*var(--u)) "Bolster Hand",cursive;color:#8b1a1a}
-.it{display:grid;grid-template-columns:calc(7*var(--u)) 1fr;column-gap:calc(1.4*var(--u));align-items:center;padding:calc(.5*var(--u)) 0;border-bottom:calc(.3*var(--u)) dashed #24170a33}
-.it .ic{grid-row:span 2;width:calc(7*var(--u));height:calc(7*var(--u))}.it .ic svg{width:100%;height:100%}
-.it b{font:700 calc(3.3*var(--u)) "Bolster Condensed",Oswald,sans-serif;line-height:1}.it small{font-size:calc(2.6*var(--u));line-height:1.05;opacity:.8}
+.it{display:grid;grid-template-columns:calc(6*var(--u)) 1fr;column-gap:calc(1.2*var(--u));align-items:center;padding:calc(.3*var(--u)) 0;border-bottom:calc(.3*var(--u)) dashed #24170a33}
+.it .ic{grid-row:span 2;width:calc(6*var(--u));height:calc(6*var(--u))}.it .ic svg{width:100%;height:100%;filter:url(#dhHand) drop-shadow(0 calc(.3*var(--u)) 0 #24170a44)}
+.it b{font:700 calc(3*var(--u)) "Bolster Condensed",Oswald,sans-serif;line-height:1}.it small{font-size:calc(2.3*var(--u));line-height:1.05;opacity:.8}
 .sp{display:inline-flex;gap:calc(.5*var(--u))}.sp i{width:calc(3.4*var(--u));height:calc(1.4*var(--u));border-radius:99px;background:#fff;box-shadow:0 0 0 1px #0003}.sp .t2{background:#ffc93a}.sp .t3{background:#4dffc3}
 .set{margin-top:calc(1*var(--u));display:flex;flex-direction:column;gap:calc(.9*var(--u));font:700 calc(3*var(--u)) "Bolster Condensed",Oswald,sans-serif;text-transform:uppercase}
 .opt{display:flex;align-items:center;gap:calc(1.2*var(--u))}.opt>span:first-child{min-width:calc(12*var(--u))}.opt.off{opacity:.4}

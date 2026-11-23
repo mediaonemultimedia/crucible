@@ -106,6 +106,8 @@ export class RacerView {
   }
 
   hit() { this.squashV -= 6; this.driver.pose('hitstun', 0.5); }
+  /* the spring cushion: the plush is launched high out of its seat, flails, and drops back in */
+  eject(secs) { this.ejT = secs; this.ejLen = secs; this.driver.pose('hitstun', secs); }
   land(h) { this.squashV -= 3 + h * 6; }
   /* the showy pose: the plush stands up in its seat and spins once round
      (a rig-level pose every racer gets; the player's own also wakes its
@@ -117,6 +119,12 @@ export class RacerView {
     const g = this.group, B = this.kart.body;
     this.t += dt;
     g.position.set(pose.x, pose.y, pose.z);
+    // shrunk in the hot wash (60 %), squashed flat by a full-size kart (a pancake)
+    const sWant = (K.shrinkT > 0 ? 0.6 : 1);
+    this.size = (this.size ?? 1) + (sWant - (this.size ?? 1)) * Math.min(1, dt * 7);
+    const flat = K.flatT > 0 ? Math.min(1, K.flatT * 4) : 0;
+    this.flat = (this.flat || 0) + (flat - (this.flat || 0)) * Math.min(1, dt * 18);
+    g.scale.set(this.size * (1 + this.flat * 0.35), this.size * (1 - this.flat * 0.72), this.size * (1 + this.flat * 0.35));
     // drift: the body swings into the slide (the sim's heading is the motion's)
     const driftA = K.drift ? K.drift * -0.42 : 0;
     this.driftA = (this.driftA || 0) + (driftA - (this.driftA || 0)) * Math.min(1, dt * 9);
@@ -164,6 +172,14 @@ export class RacerView {
       d.rotation.y += (u < 0.75 ? u / 0.75 : 1) * Math.PI * 2;
       d.scale.setScalar(P.scale * (1 + up * 0.12));
     } else d.scale.setScalar(P.scale);
+    // launched out of the seat: up high, flailing, and back down into it
+    if (this.ejT > 0) {
+      this.ejT = Math.max(0, this.ejT - dt);
+      const u = 1 - this.ejT / this.ejLen, arc = 4 * u * (1 - u);
+      d.position.y += arc * 9 + Math.sin(u * 40) * 0.1 * (1 - u);
+      d.rotation.x += Math.sin(u * 23) * 0.9 * arc + u * Math.PI * 2;
+      d.rotation.z += Math.sin(u * 31) * 0.7 * arc;
+    }
 
     // wheels: roll with the speed; the front ones steer
     this.wheelA += (K.fwd * dt) / 0.45;

@@ -18,8 +18,8 @@ import { makeRenderer } from './render/renderer.js';
 import { makeWorld } from './render/worlds.js';
 import { RacerView } from './render/racer.js';
 import { Fx, TIER_COLORS } from './render/fx.js';
-import { Race, DT, ITEMS, ITEM_NAMES, COUNT_TICKS } from './race/sim.js';
-import { CPU } from './race/cpu.js';
+import { Race, DT, ITEMS, ITEM_NAMES, ITEM_TIPS, COUNT_TICKS } from './race/sim.js';
+import { CPU, LEVEL_NAMES, cupStrength } from './race/cpu.js';
 import { buildTrack, TRACKS, CUP, rightX, rightZ } from './race/track.js';
 import { RACERS, ORDER, racerId, WEIGHTS } from './race/roster.js';
 import { Controls, MENU_KEYS, gamepads } from './input/controls.js';
@@ -71,7 +71,9 @@ export function layout(n) {
 }
 
 const VIEW_HTML = `<div class="vdark"></div><div class="fabric"></div>
-<div class="item"></div><div class="item-name"></div>
+<div class="speed"></div>
+<div class="islot"><div class="item"></div><div class="item-name"></div><div class="taunt-ic"><b>Taunt</b><kbd class="tk">T</kbd></div></div>
+<div class="tip"></div><div class="tprompt">TAUNT! <kbd class="tk">T</kbd></div><div class="warn">LOCKED ON — SPRING CUSHION!</div><div class="caption"></div>
 <div class="lap"><div class="l">Lap</div><div class="n">1/3</div><div class="tm">0:00.00</div></div>
 <canvas class="minimap" width="460" height="340"></canvas>
 <div class="place">8<sup>th</sup></div>
@@ -92,7 +94,9 @@ class App {
     this.hum = new Hum(this.audio);
     this.screen = 'title';
     this.t = 0;
-    this.level = ['easy', 'normal', 'hard'].includes(Q.get('cpu')) ? Q.get('cpu') : 'normal';
+    this.level = LEVEL_NAMES.includes(Q.get('cpu')) ? Q.get('cpu') : 'normal';
+    this.seenHit = new Set();      // items whose first hit this session has been captioned
+    this.tipsShown = new Set();    // one-time tips (the first ramp's TAUNT)
     this.seed = +(Q.get('seed') || 0) || ((Date.now() & 0xffff) + 1);
     this.bubbles = [];
     this.cam = { pos: new THREE.Vector3(-30, 40, 120), look: new THREE.Vector3(-18, 20, 0), fov: 64, shake: 0 };
@@ -198,7 +202,7 @@ class App {
     }
     if (this.screen === 'select') {
       if (c === 'Tab') { e.preventDefault?.(); this.cycleTrack(e.shiftKey ? -1 : 1); return; }
-      if (c === 'Digit1' || c === 'Digit2' || c === 'Digit3') { this.level = ['easy', 'normal', 'hard'][+c.slice(5) - 1]; this._diff(); this.audio.ui('tick'); return; }
+      if (c === 'Digit1' || c === 'Digit2' || c === 'Digit3' || c === 'Digit4') { this.level = LEVEL_NAMES[+c.slice(5) - 1]; this._diff(); this.audio.ui('tick'); return; }
       // the keyboard's other half joins (and leaves)
       const kb2 = this.players.find((p) => p.ctl.map === 'right');
       if ((c === 'Slash' || c === 'ShiftRight') && !kb2) { if (this.players.length < MAXP) { this.players[0].ctl.map = 'left'; this.addPlayer({ kb: 'right' }); this.audio.ui('confirm'); } return; }
@@ -265,7 +269,7 @@ class App {
   _diff() {
     const box = $('diff');
     for (const p of box.querySelectorAll('.pill')) p.remove();
-    for (const l of ['easy', 'normal', 'hard']) {
+    for (const l of LEVEL_NAMES) {
       const b = document.createElement('div');
       b.className = 'pill' + (l === this.level ? ' sel' : ''); b.textContent = l;
       b.addEventListener('click', () => { this.level = l; this._diff(); });
@@ -427,10 +431,11 @@ class App {
       return {
         j, i, rect: rects[j], el, q,
         place: q('.place'), lap: q('.lap .n'), time: q('.lap .tm'), item: q('.item'), itemName: q('.item-name'), drift: q('.drift'), final: q('.final'),
+        tip: q('.tip'), tprompt: q('.tprompt'), tauntIc: q('.taunt-ic'), warn: q('.warn'), caption: q('.caption'), speed: q('.speed'), islot: q('.islot'),
         count: q('.count'), toastEl: q('.toast'), fabric: q('.fabric'), scare: q('.scare'), dark: q('.vdark'), mm: q('.minimap'), wait: q('.wait'),
         camera: new THREE.PerspectiveCamera(64, 1, 0.3, 1400),
         cam: { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 64, shake: 0 },
-        lastItem: null, lookBack: false, lb: false, darkV: 0,
+        lastItem: null, lookBack: false, lb: false, darkV: 0, tipUntil: 0, capUntil: 0, hud: {},
       };
     });
     // three players: the fourth quarter is a TV camera on the leader
@@ -491,7 +496,10 @@ class App {
     this.humanP = humans.map((i, j) => picks[j]?.p || this.players[j] || null);
     this.me = humans[0];
     this.race = new Race({ track, racers, seed, humans: p1cpu ? [] : humans, laps: o.laps || +Q.get('laps') || null });
-    this.cpus = this.race.karts.map((K) => (K.cpu ? new CPU(this.race, K.i, K.cpu, seed) : null));
+    // stage 5's difficulty curve: a single race is the level's gentle version;
+    // the Pillow Cup ramps up race by race (gentle, medium, full strength)
+    this.strength = o.strength ?? (this.cup ? cupStrength(this.cup.race) : 0);
+    this.cpus = this.race.karts.map((K) => (K.cpu ? new CPU(this.race, K.i, K.cpu, seed, racers[K.i].human ? 1 : this.strength) : null));
     this.auto = null;
     this.hideViews();
     this.rviews = this.race.karts.map((K) => this.view(K.id, K.alt));
@@ -535,6 +543,32 @@ class App {
     for (const e of R.events) this.onEvent(e);
     R.events.length = 0;
   }
+  /* the key (or button) for an action, as this view's player would press it */
+  keyFor(H, act) {
+    const p = this.humanP?.[H.j];
+    if (p && p.phone >= 0 && p.ctl.map === 'none') return act === 'item' ? 'ITEM' : 'TAUNT';
+    if (p && p.ctl.map === 'none' && p.ctl.gamepad?.()) return act === 'item' ? 'LB' : 'Y';
+    const m = p ? p.ctl.map : 'all';
+    if (act === 'item') return m === 'right' ? 'Enter' : 'Space';
+    return m === 'right' ? 'L' : 'T';
+  }
+  /* a tip under the item slot (an item's name and what it does; the first ramp's TAUNT) */
+  tip(H, html, secs = 2, cls = '') {
+    if (!H) return;
+    const el = H.tip;
+    el.innerHTML = html; el.className = 'tip on ' + cls;
+    H.hud.tip = true;
+    H.tipUntil = this.t + secs;
+  }
+  /* a small caption naming an item the first time it hits someone this session */
+  caption(kind, i) {
+    const it = ['plane', 'sugar', 'missile', 'slick', 'alarm', 'wash', 'spring', 'cuffs', 'case'].includes(kind) ? kind : null;
+    if (!it || this.seenHit.has(it)) return;
+    this.seenHit.add(it);
+    const who = RACERS[this.race.karts[i].id].name;
+    for (const H of this.hv) { H.caption.innerHTML = `<i>${ICONS[it] || ''}</i><span><b>${esc(ITEM_NAMES[it])}</b> · ${esc(ITEM_TIPS[it])}<small>${esc(who)} got hit</small></span>`; H.caption.className = 'caption on'; H.hud.cap = true; H.capUntil = this.t + 3; }
+  }
+
   _autopilot(i) { if (!this.auto) this.auto = {}; if (!this.auto[i]) this.auto[i] = new CPU(this.race, i, 'normal', 3); return this.auto[i].think(); }
 
   hvOf(i) { return this.hv.find((H) => H.i === i) || null; }
@@ -557,19 +591,66 @@ class App {
         if (e.kind === 'missile' && near) A.play('dh-bonk', { gain: g(1) });
         if (mine) {
           H.cam.shake = 0.6;
-          this.toast(H, { slick: 'SLICKED!', alarm: 'WAKE UP!', pod: 'PODDED!', splash: 'SOAKED!' }[e.kind] || 'BONK!', '#ff3b6b');
+          this.toast(H, { slick: 'SLICKED!', alarm: 'WAKE UP!', pod: 'PODDED!', splash: 'SOAKED!', plane: 'PAPER CUT!', sugar: 'SUGAR CRASH!' }[e.kind] || 'BONK!', '#ff3b6b');
           this.buzz(e.i, e.kind);
         }
+        if (e.kind === 'plane' && near) A.play('dh-bonk', { gain: g(0.9), rate: 1.2 });
+        if (e.kind === 'sugar' && near) A.play('dh-candy', { gain: g(0.6), rate: 0.8 });
+        this.caption(e.kind, e.i);
         break;
       }
-      case 'use': if (near) A.play(e.item === 'espresso' ? 'dh-boost' : e.item === 'cuffs' ? 'dh-clink' : e.item === 'alarm' ? 'dh-tick' : 'dh-throw', { gain: g(1) }); if (e.item === 'espresso') this.fx.burst(K.x, K.y + 3, K.z, ['#5a3218', '#f4efe6'], 10, 4); break;
-      case 'gotItem': if (mine) A.play('dh-get'); break;
-      case 'box': { const B = R.boxes[e.b]; this.fx.sparks(B.x, B.y, B.z, '#ffd84a', 12, 7, 0.9, 0.5); this.fx.burst(B.x, B.y, B.z, ['#ff3b6b', '#3ff0c8', '#ffd84a'], 8, 5); if (near) A.play('dh-pad', { gain: g(0.5), rate: 1.3 }); break; }
-      case 'boost': if (near) A.play('dh-boost', { gain: g(e.tier ? 0.9 : 0.7) }); if (e.tier) this.fx.sparks(K.x, K.y + 1, K.z, TIER_COLORS[e.tier], 14, 6, 1.0, 0.45); break;
+      case 'sugar': if (near) A.play('dh-candy', { gain: g(1) }); if (mine) { this.toast(H, 'SUGAR RUSH!', '#ff6fb5'); } this.fx.burst(K.x, K.y + 2, K.z, ['#ff6fb5', '#ffd84a', '#3ff0c8', '#9b5cff', '#ffffff'], 26, 7); break;
+      case 'wash': {
+        A.play('dh-steam', { gain: 0.9 });
+        this.fx.wash(e);
+        for (const i of e.hit) { const h = this.hvOf(i); if (h) { this.toast(h, 'SHRUNK IN THE WASH!', '#3ab7ff'); this.buzz(i, 'wash'); } }
+        const hw = this.hvOf(e.from); if (hw) this.toast(hw, 'HOT WASH!', '#3ab7ff');
+        if (e.hit.length) this.caption('wash', e.hit[0]);
+        break;
+      }
+      case 'flat': if (near) A.play('dh-squash', { gain: g(1) }); if (mine) { this.toast(H, 'SQUASHED!', '#3ab7ff'); this.buzz(e.i, 'bump'); } this.fx.burst(K.x, K.y + 0.5, K.z, ['#ffffff', '#bfe8ff'], 10, 5); break;
+      case 'eject': {
+        V.eject(1.5);
+        A.play('dh-boing', { gain: mine ? 1 : near ? 0.8 : 0.4 });
+        if (near) A.play('dh-grunt', { rate: RACERS[K.id].voice * 1.4, gain: g(0.8) });
+        this.fx.burst(K.x, K.y + 2, K.z, ['#ff3b6b', '#ffc0d0', '#ffffff'], 18, 7);
+        if (mine) { this.toast(H, 'SPRUNG!', '#ff3b6b'); this.buzz(e.i, 'missile'); H.cam.shake = 0.5; }
+        const hf = this.hvOf(e.from); if (hf) this.toast(hf, 'BOING!', '#ffd84a');
+        this.caption('spring', e.i);
+        break;
+      }
+      case 'ejectLand': if (near) A.play('land', { gain: g(0.8) }); V.land(1); break;
+      case 'block': if (near) A.play('dh-bonk', { gain: g(0.8), rate: 1.5 }); this.fx.burst(e.x, e.y, e.z, ['#ffffff', '#ffd1e0'], 12, 6); if (mine) this.toast(H, 'BLOCKED!', '#3ff0c8'); break;
+      case 'unCuff': break;
+      case 'use': if (near) A.play(e.item === 'espresso' ? 'dh-boost' : e.item === 'cuffs' ? 'dh-clink' : e.item === 'alarm' ? 'dh-tick' : e.item === 'plane' ? 'dh-plane' : e.item === 'wash' ? 'dh-steam' : e.item === 'spring' ? 'dh-lock' : e.item === 'sugar' ? 'dh-candy' : 'dh-throw', { gain: g(1) }); if (e.item === 'espresso') this.fx.burst(K.x, K.y + 3, K.z, ['#5a3218', '#f4efe6'], 10, 4); break;
+      case 'gotItem':
+        if (mine) {
+          A.play('dh-get');
+          this.tip(H, `<b>${esc(ITEM_NAMES[e.item])}</b>: ${esc(ITEM_TIPS[e.item])} <kbd>${this.keyFor(H, 'item')}</kbd>`, 2.2, 'it');
+        }
+        this.fx.itemPop(e.i);
+        break;
+      case 'box': { const B = R.boxes[e.b]; this.fx.sparks(B.x, B.y, B.z, '#ffd84a', 14, 8, 1.0, 0.5); this.fx.burst(B.x, B.y, B.z, ['#ff3b6b', '#3ff0c8', '#ffd84a'], 10, 6); if (mine) A.play('dh-ding', { gain: 0.9 }); else if (near) A.play('dh-ding', { gain: g(0.35), rate: 1.1 }); break; }
+      case 'boost': {
+        if (near) { A.play('dh-boost', { gain: g(e.tier ? 0.9 : 0.7) }); A.play('dh-whoosh', { gain: g(e.tier === 3 || e.espresso ? 1 : 0.75) }); }
+        if (e.tier) this.fx.sparks(K.x, K.y + 1, K.z, TIER_COLORS[e.tier], 16, 7, 1.0, 0.45);
+        // a feather burst out the back
+        this.fx.tailBurst(K, e.tier === 3 ? '#4dffc3' : e.tier === 2 ? '#ffc93a' : '#ffffff', e.tier === 3 || e.espresso ? 22 : 14);
+        if (mine) H.cam.punch = Math.max(H.cam.punch || 0, e.tier === 3 || e.espresso ? 1 : e.tier === 2 ? 0.8 : 0.6);
+        break;
+      }
       case 'tier': if (mine) A.play('dh-tier', { rate: 0.8 + e.tier * 0.25 }); break;
       case 'drift': if (near) A.play('whoosh-light', { gain: g(0.5) }); break;
-      case 'pad': if (near) A.play('dh-pad', { gain: g(1) }); this.fx.sparks(K.x, K.y + 0.5, K.z, '#ffd84a', 10, 6, 0.8, 0.4); break;
-      case 'launch': if (near) A.play('jump', { gain: g(0.8) }); break;
+      case 'pad':
+        if (near) { A.play('dh-pad', { gain: g(1) }); A.play('dh-whoosh', { gain: g(0.7) }); }
+        this.fx.sparks(K.x, K.y + 0.5, K.z, '#ffd84a', 12, 6, 0.8, 0.4); this.fx.tailBurst(K, '#ffffff', 12);
+        if (mine) H.cam.punch = Math.max(H.cam.punch || 0, 0.7);
+        break;
+      case 'launch':
+        if (near) A.play('jump', { gain: g(0.8) });
+        // the first ramp of the session: a one-time tip about the TAUNT trick
+        if (mine && !this.tipsShown.has('taunt' + H.j)) { this.tipsShown.add('taunt' + H.j); this.tip(H, `In the air? Press <kbd>${this.keyFor(H, 'taunt')}</kbd> to TAUNT: a trick, and a <b>STYLE BOOST</b> when you land`, 3.4, 'big'); }
+        break;
       case 'land': if (near) A.play('land', { gain: g(0.4 + e.hard * 0.6) }); V.land(e.hard); if (e.hard > 0.3) this.fx.burst(K.x, K.y + 0.3, K.z, ['#ffffff', '#e7e0f0'], 6, 4); break;
       case 'trick': {
         V.taunt(true);
@@ -578,7 +659,12 @@ class App {
         this.fx.sparks(K.x, K.y + 2, K.z, '#ffffff', 10, 6, 0.8, 0.5);
         break;
       }
-      case 'trickBoost': if (mine) this.toast(H, 'TRICK!', '#3ff0c8'); this.fx.sparks(K.x, K.y + 1, K.z, '#4dffc3', 14, 7, 0.9, 0.5); break;
+      case 'trickBoost':
+        if (mine) { this.toast(H, 'STYLE BOOST!', '#ffc93a'); H.cam.punch = Math.max(H.cam.punch || 0, 0.8); A.play('dh-whoosh', { gain: 0.9 }); }
+        // gold feathers: the landing boost is clearly visible
+        this.fx.burst(K.x, K.y + 1.5, K.z, ['#ffc93a', '#ffe27a', '#fff2b0', '#ffffff'], 26, 8);
+        this.fx.tailBurst(K, '#ffc93a', 18);
+        break;
       case 'taunt': {
         V.taunt(false);
         if (near) { A.play('dh-honk', { gain: g(0.8), rate: RACERS[K.id].voice }); A.play('dh-grunt', { rate: RACERS[K.id].voice * 1.2, gain: g(0.6) }); }
@@ -591,6 +677,7 @@ class App {
         A.play('dh-ring', { gain: mine ? 1 : near ? 0.8 : 0.4 });
         this.fx.scare(e.i);
         if (mine) { A.play('dh-scare'); const s = H.scare; s.classList.remove('on'); void s.offsetWidth; s.classList.add('on'); H.cam.shake = 1; }
+        this.caption('alarm', e.i);
         break;
       }
       case 'wobble': break;
@@ -599,10 +686,11 @@ class App {
         A.play('dh-clink', { gain: Hs.length ? 1 : 0.5 });
         const X = R.karts[e.a]; this.fx.burst(X.x, X.y + 2, X.z, ['#ff6fb5', '#ffc0e0'], 16, 5);
         for (const h of Hs) { this.toast(h, 'CUFFED!', '#ff6fb5'); this.buzz(h.i, 'cuffs'); }
+        this.caption('cuffs', e.a);
         break;
       }
-      case 'case': if (near) A.play('dh-flap', { gain: g(1) }); if (mine) { this.toast(H, 'PILLOWCASED!', '#f4efe6'); this.buzz(e.i, 'case'); } break;
-      case 'pop': if (e.kind === 'missile' || e.kind === 'case') { this.fx.burst(e.x, e.y, e.z, ['#ffffff', '#ffd1e0'], 12, 6); } break;
+      case 'case': if (near) A.play('dh-flap', { gain: g(1) }); if (mine) { this.toast(H, 'PILLOWCASED!', '#f4efe6'); this.buzz(e.i, 'case'); } this.caption('case', e.i); break;
+      case 'pop': if (e.kind === 'missile' || e.kind === 'case' || e.kind === 'plane') { this.fx.burst(e.x, e.y, e.z, e.kind === 'plane' ? ['#f4efe6', '#dcd3ea', '#ffffff'] : ['#ffffff', '#ffd1e0'], 12, 6); } break;
       case 'bounce': this.fx.sparks(e.x, e.y, e.z, '#ffffff', 4, 4, 0.5); break;
       case 'fizzle': this.fx.burst(e.x, e.y, e.z, ['#ffffff'], 6, 3); break;
       case 'bump': {
@@ -700,8 +788,13 @@ class App {
     const sp = Math.abs(K.fwd), top = K.S.top;
     const intro = R.phase === 'count' ? Math.max(0, 1 - R.tick / (COUNT_TICKS - 30)) : 0;
     const tv = H.tv ? 1 : 0;
-    const dist = (8.6 + sp * 0.06) * (1 + intro * 2.5) + tv * 7;
-    const h = 4.3 + intro * 9 + (K.air ? 1.2 : 0) + tv * 6;
+    // a boost's kick: the camera pulls back and the FOV punches out, then settles
+    C.punch = Math.max(0, (C.punch || 0) - dt * 1.6);
+    const punch = Math.sin(Math.min(1, C.punch) * Math.PI * 0.5);
+    // shrunk in the wash: the camera comes in closer to the little kart
+    C.size = lerp(C.size ?? 1, K.shrinkT > 0 && !tv ? 0.72 : 1, Math.min(1, dt * 4));
+    const dist = ((8.6 + sp * 0.06) * (1 + intro * 2.5) + tv * 7 + punch * 2.6) * C.size;
+    const h = (4.3 + intro * 9 + (K.air ? 1.2 : 0) + tv * 6) * C.size;
     const fx = Math.sin(yaw), fz = Math.cos(yaw);
     const want = new THREE.Vector3(pose.x - fx * dist * back, pose.y + h, pose.z - fz * dist * back);
     this.world.camFix(want, pose);
@@ -713,7 +806,7 @@ class App {
     C.pos.lerp(want, k);
     const look = new THREE.Vector3(pose.x + fx * 5 * back, pose.y + 1.8, pose.z + fz * 5 * back);
     C.look.lerp(look, Math.min(1, dt * 12));
-    const fov = (64 + Math.min(1.3, sp / top) * 9 + (K.boostT > 0 ? 7 : 0)) * (this.hv.length === 2 && !tv ? 0.82 : 1);
+    const fov = (64 + Math.min(1.45, sp / top) * 9 + (K.boostT > 0 ? 8 : 0) + punch * 9) * (this.hv.length === 2 && !tv ? 0.82 : 1);
     C.fov = lerp(C.fov, fov, Math.min(1, dt * 4));
     cam.fov = C.fov; cam.updateProjectionMatrix();
     cam.position.copy(C.pos);
@@ -743,10 +836,23 @@ class App {
       H.lastItem = key;
       H.item.innerHTML = it ? ICONS[it] : '';
       H.item.classList.toggle('spin', spin);
-      const p = this.humanP?.[H.j];
-      const k = !p ? 'Space' : p.phone >= 0 && p.ctl.map === 'none' ? 'ITEM' : p.ctl.map === 'right' ? 'Enter' : p.ctl.map === 'left' ? 'Space' : 'Space';
-      H.itemName.innerHTML = it && !spin ? `${ITEM_NAMES[it]}<br><kbd>${k}</kbd>` : '';
+      H.itemName.innerHTML = it && !spin ? `${ITEM_NAMES[it]} <kbd>${this.keyFor(H, 'item')}</kbd>` : '';
+      H.islot.classList.toggle('has', !!it);
+      if (it && !spin) { H.item.classList.remove('land'); void H.item.offsetWidth; H.item.classList.add('land'); }
     }
+    // only write the DOM when something changed
+    const set = (k, v, f) => { if (H.hud[k] !== v) { H.hud[k] = v; f(v); } };
+    if (!H.hud.keys) { H.hud.keys = 1; for (const el of H.el.querySelectorAll('.tk')) el.textContent = this.keyFor(H, 'taunt'); }
+    set('tip', this.t < H.tipUntil, (v) => H.tip.classList.toggle('on', v));
+    set('cap', this.t < H.capUntil, (v) => H.caption.classList.toggle('on', v));
+    // the TAUNT prompt: airborne off a ramp, no trick yet
+    const tp = !!(K.air && K.ramp && !K.trick && K.airT > 0.06 && K.spinT <= 0 && !K.fin);
+    set('tp', tp, (v) => H.tprompt.classList.toggle('on', v));
+    set('tic', K.air ? (K.trick ? 2 : 1) : 0, (v) => { H.tauntIc.classList.toggle('air', v === 1); H.tauntIc.classList.toggle('done', v === 2); });
+    // someone's spring cushion is locked on you
+    set('warn', R.karts.some((O) => O.lock === K.i), (v) => H.warn.classList.toggle('on', v));
+    // speed lines while a boost runs
+    set('spd', K.boostT > 0 ? Math.min(1, K.boostT * 1.6).toFixed(1) : '0', (v) => { H.speed.style.opacity = v; });
     const tiers = H.drift.querySelectorAll('i');
     tiers.forEach((el, j) => { el.className = K.drift && K.tier > j ? `t${K.tier}` : ''; });
     H.fabric.classList.toggle('on', K.caseT > 0);
@@ -932,6 +1038,8 @@ class App {
         if (n === 6) this.acc = 0;
       }
       this.slowmoStep?.(dt);
+      // the alarm clock ticks all the way across the field
+      if (!this.paused && this.race.shots.some((S) => S.kind === 'alarm') && Math.floor(this.t * 5) !== Math.floor((this.t - dt) * 5)) this.audio.play('dh-tick', { gain: 0.7, rate: Math.floor(this.t * 5) % 2 ? 1 : 0.8 });
       const alpha = this.paused ? 1 : Math.min(1, this.acc / DT);
       const R = this.race;
       for (const H of this.allViews()) this._camera(H, dt, alpha);
@@ -1250,9 +1358,14 @@ class App {
     else if (it === 'cuffs') { put(a, 9, -3); put(b, 12, 3); post = 1.4; }
     else if (it === 'case') { put(a, 9, 0); post = 0.7; }
     else if (it === 'alarm') { put(a, 22, 0); post = 0; }
+    else if (it === 'sugar') { ctl.sample = () => ({ ...still(), gas: true, item: this._fire > 0 && this._fire-- > 0 }); post = 0.9; }
+    else if (it === 'plane') { put(a, 26, 2); post = 0.5; }
+    else if (it === 'wash') { put(a, 7, -4); put(b, 10, 4); post = 0.75; }
+    else if (it === 'spring') { put(a, 14, 0); post = 0.55; }
     R._place();
     const K = R.karts[me];
     K.item = it; K.roulette = 0;
+    if (it === 'spring' && this._lockOnly) { A.step(0.4, false); A.step(1 / 60); return true; }
     A.step(pre, false);
     this._fire = 2;
     if (it === 'alarm') {

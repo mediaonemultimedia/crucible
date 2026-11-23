@@ -9,7 +9,12 @@
      handcuffs (and the fuzzy chain between two cuffed karts), the alarm
      clock (and its jump-scare over the leader); feather slicks on the
      ground;
-   - the sock on a string that fishes a fallen kart back.                */
+   - the sock on a string that fishes a fallen kart back;
+   - stage 5: the boxes are big, glowing and instanced (three draws for every
+     box on the track); every kart carries its held item on its back (one
+     shared low-poly mesh per item type, instanced: at most one draw per
+     type, LOD'd away for far karts); the paper plane, the spring cushion's
+     reticle, the hot wash's steam, the sugar rush's candy glow.          */
 
 import * as THREE from 'three/webgpu';
 import { rbox, pillowGeo, mat, glowMat, mesh, canvasTex } from './geo.js';
@@ -83,6 +88,53 @@ class Pool {
   }
 }
 
+/* low-poly pieces with their own colours, merged into one geometry (a
+   vertex-coloured mesh: one draw for the whole thing) */
+function colorMerge(parts) {
+  const pos = [], nor = [], col = [];
+  const C = new THREE.Color(), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler();
+  for (const [geo, color, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = sx, sz = sx] of parts) {
+    const g = (geo.index ? geo.toNonIndexed() : geo.clone());
+    M.compose(new THREE.Vector3(x, y, z), Q.setFromEuler(E.set(rx, ry, rz)), new THREE.Vector3(sx, sy, sz));
+    g.applyMatrix4(M);
+    if (!g.attributes.normal) g.computeVertexNormals();
+    C.set(color);
+    const P = g.attributes.position, N = g.attributes.normal;
+    for (let i = 0; i < P.count; i++) { pos.push(P.getX(i), P.getY(i), P.getZ(i)); nor.push(N.getX(i), N.getY(i), N.getZ(i)); col.push(C.r, C.g, C.b); }
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  out.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  out.computeBoundingSphere();
+  return out;
+}
+
+/* the ten items as little props (about a unit across): what rides on the
+   back of your kart, and the paper plane in flight */
+function itemGeos() {
+  const S = (r, a = 10, b = 8) => new THREE.SphereGeometry(r, a, b), Cy = (r0, r1, h, n = 10) => new THREE.CylinderGeometry(r0, r1, h, n), B = (w, h, d) => new THREE.BoxGeometry(w, h, d), Tor = (r, t, a = 8, b = 14) => new THREE.TorusGeometry(r, t, a, b);
+  const plane = new THREE.BufferGeometry();
+  // a folded paper dart: two wings off a keel
+  plane.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 1.1, -0.8, 0.12, -0.7, 0, 0, -0.5, 0, 0, 1.1, 0, 0, -0.5, 0.8, 0.12, -0.7, 0, 0, 1.1, 0, -0.3, -0.6, 0, 0, -0.5], 3));
+  plane.computeVertexNormals();
+  const feather = new THREE.BufferGeometry();
+  feather.setAttribute('position', new THREE.Float32BufferAttribute([0, 0.7, 0, -0.28, 0, 0.04, 0, -0.7, 0, 0, 0.7, 0, 0, -0.7, 0, 0.28, 0, 0.04], 3));
+  feather.computeVertexNormals();
+  return {
+    slick: colorMerge([[feather, '#ffffff', -0.25, 0.1, 0, 0, 0, 0.5], [feather, '#ffd1e0', 0.25, 0.1, 0, 0, 0, -0.4], [feather, '#ffffff', 0, 0.2, 0.05, 0, 0, 0.1], [S(0.32, 8, 6), '#f4efe6', 0, -0.45, 0, 0, 0, 0, 1.4, 0.5, 1.4]]),
+    missile: colorMerge([[pillowGeo(1.3, 0.65, 1.0, [6, 2, 6]), '#ffffff'], [B(1.34, 0.16, 0.24), '#ff3b6b']]),
+    espresso: colorMerge([[Cy(0.42, 0.32, 0.6), '#f4efe6'], [Cy(0.4, 0.4, 0.04), '#5a3218', 0, 0.29, 0], [Tor(0.18, 0.06, 6, 10), '#f4efe6', 0.46, 0, 0], [Cy(0.62, 0.62, 0.06, 14), '#f4efe6', 0, -0.32, 0]]),
+    cuffs: colorMerge([[Tor(0.34, 0.15), '#ff6fb5', -0.38, 0, 0, 0, 0.6], [Tor(0.34, 0.15), '#ff6fb5', 0.38, 0, 0, 0, -0.6], [Tor(0.12, 0.04, 5, 8), '#d8d8de']]),
+    case: colorMerge([[pillowGeo(1.2, 0.5, 1.4, [6, 2, 6]), '#f4efe6'], [B(1.24, 0.1, 0.18), '#ffb3c8', 0, 0, 0.55]]),
+    alarm: colorMerge([[Cy(0.55, 0.55, 0.4, 16), '#e2463f', 0, 0, 0, Math.PI / 2], [Cy(0.47, 0.47, 0.05, 16), '#fff7e0', 0, 0, 0.21, Math.PI / 2], [S(0.24, 8, 6), '#e9c349', -0.36, 0.52, 0], [S(0.24, 8, 6), '#e9c349', 0.36, 0.52, 0], [B(0.05, 0.3, 0.04), '#222222', 0, 0.1, 0.25]]),
+    sugar: colorMerge([[Cy(0.6, 0.6, 0.18, 18), '#ff6fb5', 0, 0.45, 0, Math.PI / 2], [Tor(0.38, 0.07, 6, 18), '#fff7e0', 0, 0.45, 0.1], [Tor(0.18, 0.06, 6, 14), '#ffd84a', 0, 0.45, 0.1], [Cy(0.06, 0.06, 0.9, 6), '#f4efe6', 0, -0.3, 0]]),
+    plane: colorMerge([[plane, '#f4efe6'], [plane, '#dcd3ea', 0, -0.02, 0, 0, 0, 0, 0.96]]),
+    wash: colorMerge([[Cy(0.5, 0.4, 0.7, 14), '#3ab7ff'], [Cy(0.5, 0.5, 0.06, 14), '#bfe8ff', 0, 0.36, 0], [S(0.28, 8, 6), '#f4efe6', -0.1, 0.62, 0], [S(0.22, 8, 6), '#f4efe6', 0.16, 0.84, 0], [S(0.16, 8, 6), '#f4efe6', -0.04, 1.02, 0]]),
+    spring: colorMerge([[pillowGeo(1.3, 0.42, 1.1, [6, 2, 6]), '#ff3b6b', 0, 0.42, 0], [Tor(0.36, 0.05, 5, 14), '#d8d8de', 0, 0.08, 0, Math.PI / 2], [Tor(0.36, 0.05, 5, 14), '#d8d8de', 0, -0.14, 0, Math.PI / 2], [Cy(0.55, 0.55, 0.08, 12), '#5a3a1e', 0, -0.3, 0]]),
+  };
+}
+
 export class Fx {
   constructor(scene, race) {
     this.scene = scene; this.race = race; this.T = race.T;
@@ -91,6 +143,7 @@ export class Fx {
     this.glows = new Pool(scene, 900, new THREE.MeshBasicMaterial({ map: dotTex(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), new THREE.PlaneGeometry(1, 1));
     this.balls = new Pool(scene, 60, mat('#ffffff', { roughness: 0.8 }), new THREE.SphereGeometry(0.28, 10, 8));
     this.t = 0;
+    this.itemGeo = itemGeos();
     this._boxes();
     this.shotMeshes = new Map();
     this.hazMeshes = new Map();
@@ -98,29 +151,133 @@ export class Fx {
     this._sock();
     this.scares = [];
     this.caseOn = new Map();
+    this._held();
+    this.reticles = new Map();
+    this.auras = new Map();
+    this.pops = new Float32Array(16);
+  }
+
+  /* ── what each kart holds, on its back: one instanced mesh per item type ── */
+  _held() {
+    const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, emissive: '#ffffff', emissiveIntensity: 0.12, side: THREE.DoubleSide });
+    this.heldMesh = {};
+    for (const k in this.itemGeo) {
+      const im = new THREE.InstancedMesh(this.itemGeo[k], m, 8);
+      im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      im.count = 0; im.frustumCulled = false;
+      this.root.add(im);
+      this.heldMesh[k] = im;
+    }
+  }
+  itemPop(i) { if (i >= 0 && i < this.pops.length) this.pops[i] = 0.45; }
+  _heldUpdate(dt, karts, views) {
+    const R = this.race, n = {};
+    for (const k in this.heldMesh) n[k] = 0;
+    const M = new THREE.Matrix4(), L = new THREE.Matrix4(), P = new THREE.Vector3(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), E = new THREE.Euler();
+    const KINDS = Object.keys(this.heldMesh);
+    for (const K of karts) {
+      const v = views[K.i];
+      if (this.pops[K.i] > 0) this.pops[K.i] = Math.max(0, this.pops[K.i] - dt);
+      if (!K.item || !v || !v.group.visible || v.dist > 72 || K.fish) continue;
+      // the roulette: the slot on the kart flickers through the items
+      const kind = K.roulette > 0 ? KINDS[Math.floor(R.tick / 4) % KINDS.length] : K.item;
+      const im = this.heldMesh[kind];
+      if (!im) continue;
+      const pop = this.pops[K.i] > 0 ? Math.sin((1 - this.pops[K.i] / 0.45) * Math.PI) * 0.45 : 0;
+      const sc = (K.roulette > 0 ? 0.7 : 0.85) * (1 + pop);
+      if (K.held) {
+        // held behind on LOOK BACK: it dangles off the back of the kart
+        const sw = Math.sin(this.t * 7 + K.i) * 0.35;
+        P.set(Math.sin(sw) * 0.6, 1.3 - Math.abs(sw) * 0.2, -3.7); E.set(0.3, 0, sw * 0.6);
+      } else {
+        // above the rear bumper, facing the chase camera, a little bob
+        P.set(0, 1.55 + Math.sin(this.t * 4 + K.i) * 0.06 + pop * 0.5, -2.35); E.set(0, Math.PI + Math.sin(this.t * 1.7 + K.i) * 0.25, 0);
+      }
+      L.compose(P, Q.setFromEuler(E), S.set(sc, sc, sc));
+      M.multiplyMatrices(v.group.matrixWorld, L);
+      im.setMatrixAt(n[kind]++, M);
+    }
+    for (const k in this.heldMesh) { const im = this.heldMesh[k]; im.count = n[k]; if (n[k]) im.instanceMatrix.needsUpdate = true; }
+  }
+
+  /* a burst of feathers out of the back of a boosting kart */
+  tailBurst(K, color, n = 14) {
+    const fx = Math.sin(K.yaw), fz = Math.cos(K.yaw);
+    const x = K.x - fx * 2.4, y = K.y + 1, z = K.z - fz * 2.4;
+    for (let i = 0; i < n; i++) {
+      const a = (this.r() - 0.5) * 1.6, sp = 8 + this.r() * 8;
+      const vx = -fx * sp * Math.cos(a) + fz * sp * Math.sin(a), vz = -fz * sp * Math.cos(a) - fx * sp * Math.sin(a);
+      this.feathers.add({ x, y, z, vx, vy: 2 + this.r() * 5, vz, g: 6, drag: 2.4, sway: 5, ph: this.r() * 9, age: 0, life: 0.9 + this.r() * 0.6, size: 0.7 + this.r() * 0.6, rot: this.r() * TAU, spin: (this.r() - 0.5) * 8, c: i % 3 ? color : '#ffffff' });
+    }
+    this.glows.add({ x, y, z, vx: -fx * 4, vy: 0.5, vz: -fz * 4, g: 0, drag: 3, age: 0, life: 0.35, size: 3.2, grow: 1.2, rot: 0, c: color, fade: 1 });
+  }
+
+  /* the hot wash: a cloud of steam rolls back from the leader, a puff on everyone it shrinks */
+  wash(e) {
+    const R = this.race;
+    for (let i = 0; i < 26; i++) this.glows.add({ x: e.x + (this.r() - 0.5) * 8, y: e.y + 2 + this.r() * 4, z: e.z + (this.r() - 0.5) * 8, vx: (this.r() - 0.5) * 6, vy: 2 + this.r() * 3, vz: (this.r() - 0.5) * 6, g: -1, drag: 1.5, age: 0, life: 1.2 + this.r(), size: 2.2 + this.r() * 2, grow: 1.5, rot: 0, c: i % 2 ? '#3c5a78' : '#56708c', fade: 1 });
+    for (const i of e.hit) {
+      const K = R.karts[i];
+      for (let q = 0; q < 8; q++) this.glows.add({ x: K.x + (this.r() - 0.5) * 3, y: K.y + 1.5 + this.r() * 2, z: K.z + (this.r() - 0.5) * 3, vx: (this.r() - 0.5) * 3, vy: 3 + this.r() * 2, vz: (this.r() - 0.5) * 3, g: -1, drag: 1.5, age: 0, life: 1 + this.r() * 0.6, size: 1.4 + this.r() * 1.2, grow: 1.4, rot: 0, c: q % 2 ? '#4f7fa8' : '#7894b0', fade: 1 });
+    }
+  }
+
+  /* the spring cushion's reticle over its target (every view sees it: a warning) */
+  _reticle() {
+    const g = new THREE.Group();
+    const m = new THREE.MeshBasicMaterial({ color: '#ff3b3b', transparent: true, opacity: 0.95, depthTest: false, depthWrite: false, side: THREE.DoubleSide });
+    mesh(new THREE.RingGeometry(1.7, 2.05, 28), m, 0, 0, 0, g);
+    for (let i = 0; i < 4; i++) { const t = mesh(new THREE.PlaneGeometry(0.28, 1.1), m, 0, 0, 0, g); const a = i * Math.PI / 2; t.position.set(Math.cos(a) * 2.5, Math.sin(a) * 2.5, 0); t.rotation.z = a + Math.PI / 2; }
+    mesh(new THREE.CircleGeometry(0.3, 12), m, 0, 0, 0, g);
+    g.renderOrder = 20;
+    return g;
   }
 
   r() { return Math.random(); }
 
-  /* ── the item boxes: gift-wrapped pillows ── */
+  /* ── the item boxes: big gift-wrapped pillows with a glow, bobbing and
+     turning; instanced (the pillow, the ribbons and bow, the glow: three
+     draws for every box on the track). Stage 5: bigger (3.6 across), a
+     "?" on every face, an additive halo so a row reads from far off ── */
   _boxes() {
-    const geo = pillowGeo(2.6, 1.5, 2.6, [10, 4, 10]);
-    const wraps = [['#ff3b6b', '#ffd84a'], ['#3ff0c8', '#ff3b6b'], ['#9b5cff', '#3ff0c8'], ['#ffd84a', '#9b5cff']];
-    const ribbonG = rbox(2.75, 1.55, 0.36, 0.1), ribbonG2 = rbox(0.36, 1.55, 2.75, 0.1);
-    const bowG = new THREE.TorusGeometry(0.38, 0.13, 8, 16);
-    this.boxMeshes = this.race.boxes.map((B, i) => {
-      const [a, b] = wraps[i % 4];
-      const g = new THREE.Group();
-      mesh(geo, mat(a, { roughness: 0.55, emissive: a, emissiveIntensity: 0.25 }), 0, 0, 0, g);
-      mesh(ribbonG, mat(b, { roughness: 0.4, emissive: b, emissiveIntensity: 0.2 }), 0, 0, 0, g);
-      mesh(ribbonG2, mat(b, { roughness: 0.4, emissive: b, emissiveIntensity: 0.2 }), 0, 0, 0, g);
-      for (const s of [-1, 1]) { const bw = mesh(bowG, mat(b, { roughness: 0.4 }), s * 0.36, 0.92, 0, g); bw.rotation.y = Math.PI / 2; bw.rotation.x = s * 0.5; }
-      // a "?" tag
-      g.position.set(B.x, B.y, B.z);
-      g.userData.ph = i * 0.7;
-      this.root.add(g);
-      return g;
+    const n = this.race.boxes.length;
+    const q = canvasTex(128, 128, (g, w, h) => {
+      g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+      g.fillStyle = 'rgba(255,255,255,0.0)';
+      g.font = '900 92px "Bolster Display","Arial Black",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.lineWidth = 10; g.strokeStyle = '#3a1c4a'; g.strokeText('?', w / 2, h / 2 + 6);
+      g.fillStyle = '#fff7d8'; g.fillText('?', w / 2, h / 2 + 6);
     });
+    const body = new THREE.InstancedMesh(pillowGeo(3.6, 2.2, 3.6, [8, 3, 8]), new THREE.MeshStandardMaterial({ map: q, roughness: 0.45, emissive: '#ffffff', emissiveMap: q, emissiveIntensity: 0.06 }), n);
+    const ribbonG = colorMerge([[rbox(3.78, 2.28, 0.48, 0.12), '#ffffff'], [rbox(0.48, 2.28, 3.78, 0.12), '#ffffff'], [new THREE.TorusGeometry(0.5, 0.17, 6, 12), '#ffffff', -0.5, 1.3, 0, 0.5, Math.PI / 2], [new THREE.TorusGeometry(0.5, 0.17, 6, 12), '#ffffff', 0.5, 1.3, 0, -0.5, Math.PI / 2]]);
+    const ribbon = new THREE.InstancedMesh(ribbonG, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, emissive: '#ffffff', emissiveIntensity: 0.25 }), n);
+    const halo = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: dotTex(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), n);
+    const wraps = [['#ff3b6b', '#ffd84a'], ['#3ff0c8', '#ff3b6b'], ['#9b5cff', '#3ff0c8'], ['#ffd84a', '#9b5cff'], ['#3ab7ff', '#ffd84a']];
+    const C = new THREE.Color();
+    this.race.boxes.forEach((B, i) => {
+      const [a, b] = wraps[i % wraps.length];
+      body.setColorAt(i, C.set(a)); ribbon.setColorAt(i, C.set(b)); halo.setColorAt(i, C.set(a).multiplyScalar(0.55));
+    });
+    for (const m of [body, ribbon, halo]) { m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; this.root.add(m); }
+    this.boxI = { body, ribbon, halo };
+    this.boxPh = this.race.boxes.map((B, i) => i * 0.7 + B.k * 0.013);
+  }
+  _boxesUpdate(t, camQ) {
+    const R = this.race, { body, ribbon, halo } = this.boxI;
+    const M = new THREE.Matrix4(), P = new THREE.Vector3(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), E = new THREE.Euler();
+    R.boxes.forEach((B, i) => {
+      const ph = this.boxPh[i];
+      // a grabbed box pops and grows straight back
+      const s = B.dead ? Math.max(0.05, 1 - B.dead / 24) ** 0.7 : 1;
+      P.set(B.x, B.y + 0.4 + Math.sin(t * 2.2 + ph) * 0.45, B.z);
+      Q.setFromEuler(E.set(0, t * 1.3 + ph, Math.sin(t * 1.7 + ph) * 0.15));
+      M.compose(P, Q, S.set(s, s, s));
+      body.setMatrixAt(i, M); ribbon.setMatrixAt(i, M);
+      const hs = s * (6.4 + Math.sin(t * 3 + ph) * 0.5);
+      M.compose(P, camQ, S.set(hs, hs, hs));
+      halo.setMatrixAt(i, M);
+    });
+    body.instanceMatrix.needsUpdate = ribbon.instanceMatrix.needsUpdate = halo.instanceMatrix.needsUpdate = true;
   }
 
   /* ── the sock on a string ── */
@@ -218,16 +375,7 @@ export class Fx {
     this.t += dt;
     const R = this.race, t = this.t;
     // boxes
-    R.boxes.forEach((B, i) => {
-      const g = this.boxMeshes[i];
-      const show = !B.dead || B.dead < 20;
-      g.visible = show;
-      const s = B.dead ? Math.max(0.05, 1 - B.dead / 20) : 1;
-      g.scale.setScalar(s);
-      g.position.y = B.y + Math.sin(t * 2.2 + g.userData.ph) * 0.35;
-      g.rotation.y = t * 1.3 + g.userData.ph;
-      g.rotation.z = Math.sin(t * 1.7 + g.userData.ph) * 0.15;
-    });
+    this._boxesUpdate(t, camQ);
     // shots in flight
     const seen = new Set();
     for (const S of R.shots) {
@@ -243,9 +391,17 @@ export class Fx {
       } else if (S.kind === 'cuffs') {
         m.rotation.set(t * 9, t * 5, 0);
       } else if (S.kind === 'alarm') {
+        // high over the field, ticking, a trail of sparks so you can follow it to the leader
+        const arc = Math.min(1, S.age / 30);
         m.rotation.set(0, t * 3, Math.sin(t * 40) * 0.25);
-        m.position.y += Math.abs(Math.sin(t * 9)) * 1.4;
-        if (this.r() < 0.5) this.sparks(S.x, S.y + 2, S.z, '#ffe27a', 1, 3, 0.5);
+        m.position.y += arc * 5 + Math.abs(Math.sin(t * 9)) * 1.4;
+        m.scale.setScalar(1.5);
+        if (this.r() < 0.8) this.sparks(S.x, m.position.y + 1, S.z, '#ffe27a', 1, 3, 0.7, 0.5);
+        if (this.r() < 0.3) this.glows.add({ x: S.x, y: m.position.y, z: S.z, vx: 0, vy: 0, vz: 0, g: 0, drag: 0, age: 0, life: 0.5, size: 3.5, rot: 0, c: '#ff6a5a', fade: 1 });
+      } else if (S.kind === 'plane') {
+        const T = this.T, k = S.k, k2 = (k + 2) % T.N;
+        m.rotation.set(Math.sin(t * 9) * 0.15, Math.atan2(T.x[k2] - T.x[k], T.z[k2] - T.z[k]), Math.sin(t * 6 + S.id) * 0.35);
+        if (this.r() < 0.5) this.glows.add({ x: S.x, y: S.y, z: S.z, vx: 0, vy: 0.3, vz: 0, g: 0, drag: 2, age: 0, life: 0.35, size: 0.7, rot: 0, c: '#cdb6ff', fade: 1 });
       }
     }
     for (const [id, m] of this.shotMeshes) if (!seen.has(id)) { m.removeFromParent(); this.shotMeshes.delete(id); }
@@ -312,6 +468,29 @@ export class Fx {
       this.sockString.scale.y = 120; this.sockString.position.y = 7 + 60;
       break;
     }
+    this._heldUpdate(dt, karts, views);
+    // the spring cushion's lock: a red reticle over the target
+    const locks = new Set();
+    for (const K of karts) if (K.lock >= 0) {
+      locks.add(K.i);
+      let m = this.reticles.get(K.i);
+      if (!m) { m = this._reticle(); this.reticles.set(K.i, m); this.root.add(m); }
+      const v = views[K.lock].group.position;
+      m.position.set(v.x, v.y + 5.4 + Math.sin(t * 6) * 0.2, v.z);
+      m.quaternion.copy(camQ);
+      m.rotateZ(t * 2);
+      m.scale.setScalar(1 + Math.sin(t * 12) * 0.08);
+    }
+    for (const [i, m] of this.reticles) if (!locks.has(i)) { m.removeFromParent(); this.reticles.delete(i); }
+    // a sugar rush: the kart glows rainbow-candy and sheds sparkles
+    for (const K of karts) if (K.sugarT > 0 && !K.fish) {
+      const hue = (t * 0.9 + K.i * 0.1) % 1, c = '#' + new THREE.Color().setHSL(hue, 0.9, 0.62).getHexString();
+      const v = views[K.i].group.position;
+      if (this.r() < Math.min(1, dt * 60)) {
+        this.glows.add({ x: v.x + (this.r() - 0.5) * 3.4, y: v.y + 0.5 + this.r() * 3, z: v.z + (this.r() - 0.5) * 3.4, vx: 0, vy: 1, vz: 0, g: 0, drag: 2, age: 0, life: 0.45, size: 1 + this.r(), rot: 0, c, fade: 1 });
+        if (this.r() < 0.5) this.glows.add({ x: v.x, y: v.y + 1.4, z: v.z, vx: 0, vy: 0, vz: 0, g: 0, drag: 0, age: 0, life: 0.1, size: 5, rot: 0, c: '#' + new THREE.Color(c).multiplyScalar(0.22).getHexString() });
+      }
+    }
     this.feathers.update(dt, camQ);
     this.glows.update(dt, camQ);
     this.balls.update(dt, camQ);
@@ -339,6 +518,11 @@ export class Fx {
       mesh(new THREE.TorusGeometry(0.25, 0.08, 6, 12), mat('#d8d8de', { metalness: 0.9, roughness: 0.2 }), 0, 0, 0, g);
     } else if (kind === 'alarm') {
       g.add(this._clock(false));
+    } else if (kind === 'plane') {
+      const p = new THREE.Mesh(this.itemGeo.plane, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, side: THREE.DoubleSide, emissive: '#ffffff', emissiveIntensity: 0.2 }));
+      p.scale.setScalar(3); g.add(p);
+    } else if (kind === 'wash') {
+      g.visible = false;
     }
     return g;
   }

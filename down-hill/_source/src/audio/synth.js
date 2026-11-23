@@ -340,6 +340,15 @@ export function playSynthSfx(ctx, dest, id, t, rate = 1, gain = 1) {
     else if (k === 'flap') { len = 0.45; for (let i = 0; i < 5; i++) N(0.07, 'bandpass', 800, 1400, 1.2, 0.2, 0.004, 1 + i * 0.05); }
     else if (k === 'splat') { len = 0.3; N(0.28, 'lowpass', 1200, 200, 1.2, 0.4, 0.003, 0.8); O(0.1, 'sine', 180, 70, 0.25); }
     else if (k === 'trick') { len = 0.5; O(0.45, 'triangle', 400, 1600, 0.12, 0.01); N(0.4, 'bandpass', 800, 3000, 1.5, 0.16, 0.02, 1); }
+    // stage 5: the box's ding, the boost's whoosh, the four new items
+    else if (k === 'ding') { len = 0.55; O(0.5, 'sine', 1568, 1568, 0.16, 0.002); O(0.4, 'sine', 3136, 3136, 0.05, 0.002); O(0.45, 'triangle', 2093, 2093, 0.06, 0.002, 0.06); }
+    else if (k === 'whoosh') { len = 0.55; N(0.55, 'bandpass', 300, 2600, 0.9, 0.42, 0.03, 1); N(0.4, 'highpass', 2400, 5200, 0.7, 0.07, 0.02, 1.6); }
+    else if (k === 'candy') { len = 0.6; for (const [a2, f] of [[0, 1047], [0.06, 1319], [0.12, 1568], [0.18, 2093], [0.26, 2637]]) O(0.16, 'triangle', f, f, 0.09, 0.003, a2); N(0.5, 'highpass', 5000, 7000, 0.7, 0.05, 0.02, 2); }
+    else if (k === 'plane') { len = 0.5; O(0.45, 'sine', 900, 1400, 0.06, 0.03); N(0.45, 'bandpass', 1500, 2600, 3, 0.12, 0.04, 1.2); }
+    else if (k === 'steam') { len = 1.1; N(1.1, 'highpass', 2200, 3800, 0.6, 0.3, 0.05, 1.3); N(0.8, 'lowpass', 600, 200, 0.7, 0.18, 0.04, 0.5); }
+    else if (k === 'boing') { len = 0.7; O(0.65, 'sine', 140, 620, 0.32, 0.004); O(0.6, 'triangle', 280, 900, 0.08, 0.004); }
+    else if (k === 'squash') { len = 0.3; O(0.25, 'sine', 300, 60, 0.3, 0.003); N(0.2, 'lowpass', 1400, 200, 1, 0.3, 0.003, 0.7); }
+    else if (k === 'lock') { len = 0.22; O(0.08, 'square', 1760, 1760, 0.06, 0.002); O(0.08, 'square', 1760, 1760, 0.06, 0.002, 0.12); }
     else if (k === 'scare') { len = 0.7; O(0.6, 'sawtooth', 110, 55, 0.18, 0.003); N(0.5, 'lowpass', 2000, 300, 0.8, 0.3, 0.003, 0.6); }
     else return null;
     end = t + len + 0.03;
