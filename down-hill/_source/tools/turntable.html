@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Down Hill · Kart Turntable</title>
+<style>
+  :root { color-scheme: light; font-family: system-ui, sans-serif; color: #262521; background: #eeece7; }
+  body { margin: 0; }
+  main { max-width: 1500px; margin: auto; padding: clamp(18px, 4vw, 56px); }
+  header { display: flex; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: 18px; margin-bottom: 25px; }
+  h1 { font-family: Georgia, serif; font-size: clamp(32px, 5vw, 66px); font-weight: 400; letter-spacing: -.045em; margin: 0; }
+  button { font: inherit; font-size: 12px; font-weight: 750; letter-spacing: .08em; border: 1px solid #a49f96; background: transparent; color: inherit; padding: 9px 18px; cursor: pointer; }
+  button[aria-pressed="true"] { background: #282722; color: #fff; border-color: #282722; }
+  .controls { display: flex; flex-wrap: wrap; gap: 6px; }
+  .comparison { overflow-x: auto; }
+  .sheet { min-width: 780px; }
+  canvas { display: block; width: 100%; aspect-ratio: 3 / 1; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid #a49f96; }
+  article { padding: 18px; }
+  article + article { border-left: 1px solid #c7c2b9; }
+  h2 { margin: 0; font: 26px Georgia, serif; }
+  .driver { margin: 4px 0 16px; color: #514e47; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 5px 8px; }
+  th:first-child { text-align: left; padding-left: 0; }
+  [data-look="new"] .new, [data-look="old"] .old { background: #dfdbd2; }
+  #status { color: #514e47; font-size: 13px; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three/webgpu": "../node_modules/three/build/three.webgpu.js",
+    "three/tsl": "../node_modules/three/build/three.tsl.js"
+  }
+}
+</script>
+</head>
+<body>
+<main data-look="new">
+  <header>
+    <h1>Down Hill Kart Turntable</h1>
+    <div class="controls" role="group" aria-label="Turntable controls">
+      <button type="button" data-mode="old" aria-pressed="false" disabled>OLD</button>
+      <button type="button" data-mode="new" aria-pressed="true" disabled>NEW</button>
+      <button type="button" id="rotation" aria-pressed="true" disabled>ROTATE</button>
+    </div>
+  </header>
+  <div class="comparison">
+    <div class="sheet">
+      <canvas aria-label="Three Down Hill karts with their plush drivers"></canvas>
+      <div class="cards"></div>
+    </div>
+  </div>
+  <p id="status" role="status">Loading turntable…</p>
+</main>
+<script type="module">
+import * as THREE from 'three/webgpu';
+import { RacerView } from '../src/render/racer.js';
+import { RACERS } from '../src/race/roster.js';
+import { canvasTex, mat, mergeStatic, mesh, rbox } from '../src/render/geo.js';
+
+const specs = [
+  { id: 'kevalanche', paint: '#eeeee3', stripe: '#c92632', hub: '#254ba2', number: '88', badge: 'KEV 88', sponsor: 'DOWN FEATHER RACING' },
+  { id: 'sumaura', paint: '#c82d30', stripe: '#ffe0a1', hub: '#ead29c', number: '19', badge: '19 LANDING', sponsor: 'FLUFF CO.' },
+  { id: 'sebas', paint: '#19845d', stripe: '#fff5d8', hub: '#e7af53', number: '07', badge: 'EL BAJITO', sponsor: 'DOWN FEATHER RACING' }
+];
+const rubber = mat('#25272a', { roughness: 0.92 });
+const frame = mat('#47494e', { metalness: 0.32, roughness: 0.36 });
+const chrome = mat('#d7e0ea', { metalness: 0.55, roughness: 0.26 });
+const lamp = mat('#fff0c3', { emissive: '#ffe3a7', emissiveIntensity: 0.25 });
+const glass = mat('#302f2c', { roughness: 0.28 });
+const redLens = mat('#ae2533', { emissive: '#790e1a', emissiveIntensity: 0.24 });
+const ivory = mat('#f8e4ae');
+const box = (root, m, size, at, radius = 0.08) => mesh(rbox(...size, radius, Math.min(...size) < 0.2 ? 1 : 2), m, ...at, root);
+
+function tube(root, material, start, end, radius) {
+  const a = new THREE.Vector3(...start);
+  const b = new THREE.Vector3(...end);
+  const axis = b.clone().sub(a);
+  const pipe = mesh(new THREE.CylinderGeometry(radius, radius, axis.length(), 10), material,
+    ...a.lerp(b, 0.5), root);
+  pipe.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis.normalize());
+}
+
+function livery(spec) {
+  const texture = canvasTex(512, 256, (g) => {
+    const type = (label, x, y, size, color) => {
+      g.font = `900 ${size}px Arial, sans-serif`;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillStyle = color;
+      g.fillText(label, x, y);
+    };
+    g.fillStyle = spec.paint;
+    g.fillRect(4, 4, 248, 88);
+    g.fillStyle = spec.stripe;
+    g.fillRect(4, 68, 248, 18);
+    g.fillStyle = '#fff7df';
+    g.beginPath();
+    g.arc(51, 48, 35, 0, Math.PI * 2);
+    g.fill();
+    type(spec.number, 51, 49, 32, '#202022');
+    g.fillStyle = '#242528';
+    g.fillRect(95, 26, 146, 30);
+    type(spec.sponsor, 168, 42, 11, '#fff7df');
+
+    g.fillStyle = '#242528';
+    g.fillRect(260, 4, 248, 58);
+    type(spec.badge, 384, 34, 35, '#fff5d9');
+
+    g.fillStyle = spec.id === 'kevalanche' || spec.id === 'sumaura' ? spec.paint : spec.stripe;
+    g.fillRect(269, 75, 22, 90);
+    g.fillRect(297, 75, 10, 90);
+
+    const word = 'FLUFF CO.';
+    g.font = '900 15px Arial, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillStyle = '#f3ebd8';
+    [...word].forEach((letter, i) => {
+      const angle = (i - (word.length - 1) / 2) * 0.17;
+      g.save();
+      g.translate(69 + Math.sin(angle) * 50, 185 - Math.cos(angle) * 50);
+      g.rotate(angle);
+      g.fillText(letter, 0, 0);
+      g.restore();
+    });
+  });
+  return new THREE.MeshStandardMaterial({ map: texture, alphaTest: 0.5, roughness: 0.56 });
+}
+
+function decal(root, material, rect, size, at, rx = 0, ry = 0) {
+  const geometry = new THREE.PlaneGeometry(...size);
+  const [x, y, w, h] = rect;
+  const uv = geometry.attributes.uv;
+  for (let i = 0; i < uv.count; i++) {
+    uv.setXY(i, (x + uv.getX(i) * w) / 512, 1 - (y + (1 - uv.getY(i)) * h) / 256);
+  }
+  const panel = mesh(geometry, material, ...at, root);
+  panel.rotation.set(rx, ry, 0);
+}
+
+function chassis(root, spec, ink, length) {
+  const hub = mat(spec.hub, { metalness: 0.32, roughness: 0.3 });
+  box(root, frame, [1.64, 0.15, 2.18], [0, 0.29, 0]);
+  box(root, rubber, [1.02, 0.16, 0.76], [0, 0.43, -0.42]);
+  box(root, rubber, [1.02, 0.48, 0.16], [0, 0.63, -0.82]);
+  for (const side of [-1, 1]) {
+    tube(root, frame, [side * 0.92, 0.38, -1.16], [side * 0.92, 0.38, 1.16], 0.074);
+    for (const front of [true, false]) {
+      const radius = front ? 0.34 : 0.49;
+      const width = front ? 0.33 : 0.53;
+      const x = side * 1.06;
+      const z = front ? 1.04 : -0.97;
+      tube(root, frame, [0, radius, z], [x, radius, z], 0.06);
+      mesh(new THREE.CylinderGeometry(radius, radius, width, 24), rubber, x, radius, z, root).rotation.z = Math.PI / 2;
+      const outside = x + side * width / 2;
+      mesh(new THREE.CylinderGeometry(radius * 0.55, radius * 0.55, 0.06, 16), hub,
+        outside, radius, z, root).rotation.z = Math.PI / 2;
+      mesh(new THREE.SphereGeometry(radius * 0.18, 10, 6), chrome, outside + side * 0.032, radius, z, root);
+      decal(root, ink, [5, 121, 128, 128], [radius * 1.9, radius * 1.9],
+        [outside + side * 0.005, radius, z], 0, side * Math.PI / 2);
+    }
+  }
+  for (const end of [-1, 1]) {
+    const z = end * (length / 2 - 0.085);
+    box(root, chrome, [2.16, 0.16, 0.17], [0, 0.42, z]);
+    for (const side of [-1, 1]) {
+      tube(root, chrome, [side * 0.94, 0.42, z], [side * 1.13, 0.42, z - end * 0.19], 0.075);
+    }
+  }
+  tube(root, chrome, [0, 0.45, 0.54], [0, 1.03, 0.34], 0.047);
+  const wheel = mesh(new THREE.TorusGeometry(0.26, 0.041, 8, 24), rubber, 0, 1.05, 0.34, root);
+  wheel.rotation.x = -0.62;
+  tube(root, frame, [-0.22, 1.05, 0.34], [0.22, 1.05, 0.34], 0.032);
+  tube(root, chrome, [0.57, 0.26, -1.03], [0.57, 0.26, -length / 2 + 0.035], 0.075);
+  const outlet = mesh(new THREE.CircleGeometry(0.051, 12), rubber, 0.57, 0.26, -length / 2 + 0.034, root);
+  outlet.rotation.y = Math.PI;
+}
+
+function shell(root, spec, kind, ink, length) {
+  const paint = mat(spec.paint, { roughness: 0.3, metalness: 0.16 });
+  const trim = mat(spec.stripe, { roughness: 0.38 });
+  const nose = length / 2 - 0.13;
+  const bus = kind === 'bus';
+  const ice = kind === 'zamboni';
+  const face = (height, y) => box(root, paint, [1.83, height, nose - 0.58], [0, y, (nose + 0.58) / 2], 0.13);
+
+  if (bus) {
+    face(0.97, 0.96);
+    box(root, paint, [1.87, 0.26, 2.72], [0, 0.55, 0], 0.12);
+    box(root, glass, [1.62, 0.32, 0.065], [0, 1.20, nose - 0.008]);
+    box(root, trim, [0.062, 0.32, 0.074], [0, 1.20, nose + 0.002]);
+    box(root, glass, [0.81, 0.17, 0.065], [0, 0.76, nose + 0.002]);
+    for (const side of [-1, 1]) {
+      for (const [y, depth] of [[0.77, 0.18], [1.19, 0.24]]) {
+        for (const z of [0.76, 1.02, 1.26]) {
+          box(root, glass, [0.032, depth, 0.2], [side * 0.915, y, z], 0.028);
+        }
+      }
+      box(root, trim, [0.039, 0.055, 0.80], [side * 0.92, 0.97, 1.03]);
+    }
+  } else if (ice) {
+    face(0.54, 0.75);
+    box(root, paint, [1.59, 0.41, 0.69], [0, 0.98, nose - 0.46], 0.16);
+    box(root, trim, [1.58, 0.08, 0.65], [0, 1.18, nose - 0.46]);
+    box(root, mat(spec.hub), [1.88, 0.26, 0.44], [0, 0.48, -nose + 0.11], 0.10);
+    tube(root, chrome, [-0.85, 0.19, -nose - 0.04], [0.85, 0.19, -nose - 0.04], 0.12);
+  } else {
+    face(0.39, 0.69);
+    box(root, paint, [1.86, 0.29, 0.48], [0, 0.59, -nose + 0.17], 0.12);
+    box(root, chrome, [1.10, 0.14, 0.06], [0, 0.64, nose + 0.005]);
+    for (const side of [-1, 1]) {
+      const fin = box(root, paint, [0.19, 0.26, 0.64], [side * 0.82, 0.83, -nose + 0.23]);
+      fin.rotation.x = -0.25;
+      mesh(new THREE.SphereGeometry(0.089, 10, 6), redLens, side * 0.76, 0.74, -nose - 0.095, root);
+    }
+  }
+
+  for (const side of [-1, 1]) {
+    box(root, paint, [0.22, 0.36, 1.32], [side * 0.79, 0.62, 0.0], 0.10);
+    decal(root, ink, [6, 6, 244, 84], [1.09, 0.28], [side * 0.904, 0.62, 0.01], 0, side * Math.PI / 2);
+    mesh(new THREE.SphereGeometry(0.155, 14, 8), chrome, side * 0.70, 0.70, nose + 0.01, root);
+    const lens = mesh(new THREE.SphereGeometry(0.125, 14, 8), lamp, side * 0.70, 0.70, nose + 0.096, root);
+    lens.scale.z = 0.56;
+  }
+  decal(root, ink, [262, 6, 244, 54], [bus ? 1.33 : 0.94, bus ? 0.23 : 0.19],
+    [0, bus ? 1.47 : ice ? 0.94 : 0.81, nose + 0.025]);
+  if (bus) box(root, ivory, [1.79, 0.065, 0.79], [0, 1.46, nose - 0.38]);
+  decal(root, ink, [264, 74, 47, 92], [0.42, bus ? 0.49 : ice ? 0.46 : 0.57],
+    [0, bus ? 1.496 : ice ? 1.223 : 0.888, ice ? nose - 0.46 : nose - 0.39], -Math.PI / 2);
+}
+
+function lights(scene) {
+  scene.add(new THREE.HemisphereLight('#fff7e9', '#a2a1a0', 2.1));
+  for (const [color, intensity, x, y, z] of [
+    ['#fff2df', 2.2, -4, 7, 5], ['#e6eeff', 1.3, 5, 3, -5]
+  ]) {
+    const light = new THREE.DirectionalLight(color, intensity);
+    light.position.set(x, y, z);
+    scene.add(light);
+  }
+}
+
+async function start() {
+  const canvas = document.querySelector('canvas');
+  const renderer = new THREE.WebGPURenderer({ canvas, antialias: true, forceWebGL: true });
+  await renderer.init();
+  renderer.setClearColor('#e6e3dd');
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.autoClear = false;
+  const camera = new THREE.OrthographicCamera(-3.6, 3.6, 3.6, -3.6, 0.1, 40);
+  camera.position.set(0, 5.6, 11);
+  camera.lookAt(0, 1.55, 0);
+  const target = new THREE.RenderTarget(256, 256);
+  const cards = document.querySelector('.cards');
+  const stages = specs.map((spec) => {
+    const racer = RACERS[spec.id];
+    const scene = new THREE.Scene();
+    lights(scene);
+    const old = new RacerView(scene, spec.id, false);
+    // Measure the vehicle alone; the seated plush can extend beyond its bodywork.
+    old.driver.root.removeFromParent();
+    const length = new THREE.Box3().setFromObject(old.group).getSize(new THREE.Vector3()).z * 0.7;
+    old.kart.seat.add(old.driver.root);
+    const newBody = new THREE.Group();
+    const ink = livery(spec);
+    chassis(newBody, spec, ink, length);
+    shell(newBody, spec, racer.kart, ink, length);
+    mergeStatic(newBody);
+    const root = new THREE.Group();
+    scene.add(root);
+    root.add(old.group, newBody);
+    old.driver.light(camera.quaternion);
+
+    const article = document.createElement('article');
+    article.innerHTML = `
+      <h2>${racer.kartName}</h2><p class="driver">${racer.name}</p>
+      <table aria-label="${racer.kartName} render cost">
+        <thead><tr><th scope="col">Per kart + driver</th><th scope="col" class="old">OLD</th><th scope="col" class="new">NEW</th></tr></thead>
+        <tbody><tr><th scope="row">Draw calls</th><td class="old"></td><td class="new"></td></tr>
+        <tr><th scope="row">Triangles</th><td class="old"></td><td class="new"></td></tr></tbody>
+      </table>`;
+    cards.append(article);
+    function setLook(mode) {
+      const isNew = mode === 'new';
+      old.group.visible = !isNew;
+      newBody.visible = isNew;
+      (isNew ? newBody : old.kart.seat).add(old.driver.root);
+      const pose = isNew ? { scale: 0.88, y: 0.41, z: -0.36 } : old.kart.plush;
+      old.driver.root.scale.setScalar(pose.scale);
+      old.driver.root.position.set(0, pose.y, pose.z);
+    }
+    root.rotation.y = -0.83;
+    for (const mode of ['old', 'new']) {
+      setLook(mode);
+      renderer.setRenderTarget(target);
+      renderer.clear();
+      renderer.info.reset();
+      renderer.render(scene, camera);
+      const { drawCalls, triangles } = renderer.info.render;
+      const cells = article.querySelectorAll(`tbody .${mode}`);
+      cells[0].textContent = drawCalls.toLocaleString('en');
+      cells[1].textContent = triangles.toLocaleString('en');
+    }
+    // The studio base is outside the measured render.
+    mesh(new THREE.CylinderGeometry(2.87, 2.91, 0.12, 64), mat('#c9c5bd'), 0, -0.07, 0, scene);
+    return { scene, root, setLook };
+  });
+  renderer.setRenderTarget(null);
+  target.dispose();
+
+  const main = document.querySelector('main');
+  const modes = [...document.querySelectorAll('[data-mode]')];
+  const rotation = document.querySelector('#rotation');
+  let spinning = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let angle = -0.83;
+  let previous;
+  for (const button of modes) {
+    button.disabled = false;
+    button.addEventListener('click', () => {
+      main.dataset.look = button.dataset.mode;
+      for (const stage of stages) stage.setLook(button.dataset.mode);
+      for (const mode of modes) mode.setAttribute('aria-pressed', String(mode === button));
+    });
+  }
+  rotation.disabled = false;
+  rotation.setAttribute('aria-pressed', String(spinning));
+  rotation.addEventListener('click', () => {
+    spinning = !spinning;
+    rotation.setAttribute('aria-pressed', String(spinning));
+  });
+
+  const resize = () => {
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+  };
+  new ResizeObserver(resize).observe(canvas);
+  resize();
+  document.querySelector('#status').textContent = 'Counts come from one isolated render per kart, including the plush driver.';
+  renderer.setAnimationLoop((now) => {
+    if (spinning && previous !== undefined) angle += Math.min((now - previous) / 1000, 0.05) * 0.26;
+    previous = now;
+    const viewWidth = canvas.clientWidth / stages.length;
+    renderer.setScissorTest(true);
+    stages.forEach(({ scene, root }, i) => {
+      root.rotation.y = angle;
+      const left = Math.round(i * viewWidth);
+      const width = Math.round((i + 1) * viewWidth) - left;
+      renderer.setViewport(left, 0, width, canvas.clientHeight);
+      renderer.setScissor(left, 0, width, canvas.clientHeight);
+      renderer.clear();
+      renderer.render(scene, camera);
+    });
+  });
+}
+
+start().catch((error) => {
+  document.querySelector('#status').textContent = `Turntable failed to start. ${error.message}`;
+  console.error(error);
+});
+</script>
+</body>
+</html>
