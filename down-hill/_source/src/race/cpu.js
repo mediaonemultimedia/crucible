@@ -16,7 +16,7 @@ export const LEVELS = {
   easy: { top: 0.86, look: 1.0, drift: 0.35, tier: 1, item: 0.012, noise: 0.22, band: [0.09, 0.1], err: 0 },
   normal: { top: 0.94, look: 1.0, drift: 0.75, tier: 2, item: 0.025, noise: 0.12, band: [0.07, 0.06], err: 0 },
   hard: { top: 0.995, look: 1.0, drift: 1.0, tier: 3, item: 0.05, noise: 0.05, band: [0.05, 0.03], err: 0 },
-  champion: { top: 1.012, look: 1.0, drift: 1.0, tier: 3, item: 0.07, noise: 0.035, band: [0.05, 0.02], err: 0 },
+  champion: { top: 1.015, look: 1.0, drift: 1.0, tier: 3, item: 0.05, noise: 0.035, band: [0.06, 0.02], err: 0 },
 };
 export const LEVEL_NAMES = ['easy', 'normal', 'hard', 'champion'];
 

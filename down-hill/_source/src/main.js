@@ -1353,7 +1353,13 @@ class App {
     const ctl = this.humanP[0].ctl;
     ctl.sample = () => ({ ...still(), item: this._fire > 0 && this._fire-- > 0, back: !!this._back });
     if (it === 'slick') { put(a, -16, 0); this.cpus[a] = drive(a); this._back = true; post = 0.75; }
-    else if (it === 'missile') { put(a, 20, 0); post = 0.28; }
+    else if (it === 'missile') {
+      // dead ahead along the thrower's nose (the track may bend away)
+      put(a, 18, 0);
+      const M = R.karts[me], A2 = R.karts[a];
+      A2.x = M.x + Math.sin(M.yaw) * 18; A2.z = M.z + Math.cos(M.yaw) * 18; this.prev[a] = { x: A2.x, y: A2.y, z: A2.z, yaw: A2.yaw };
+      post = 0.28;
+    }
     else if (it === 'espresso') { ctl.sample = () => ({ ...still(), gas: true, item: this._fire > 0 && this._fire-- > 0 }); post = 0.45; }
     else if (it === 'cuffs') { put(a, 9, -3); put(b, 12, 3); post = 1.4; }
     else if (it === 'case') { put(a, 9, 0); post = 0.7; }
