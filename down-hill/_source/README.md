@@ -107,6 +107,15 @@ switch 26 → 19 → 14 units, far cull 260 → 210 → 170; the moonlight/sun
 shadow map is static (drawn once). SwiftShader's render times are a CPU
 rasteriser's, not a GPU's.
 
+## Status — stage 3, Kevin's first-playtest fixes (`docs/stage-3.md`)
+
+| # | Stage 3 item | State |
+|---|---|---|
+| 1 | Every drawn barrier is solid, on all 3 tracks: new `edge: 'rail'` (a drawn rail, solid in the sim). The Landing's planks + banister, Laundry Day's ramp + towel conveyor, Sprinkler Park's ramp + treehouse deck were `drop`; now railed and solid. Hitting one scrapes (sparks, a grind) and slows you; it never bounces you off. No track has a `drop` section now. | done — `race/track.js`, `race/sim.js`, `render/readable.js`; `test/stage3.test.mjs` |
+| 2 | Falling through at the pillows: `locate` is layer-aware (a far-off sample whose road is above the kart or far below it is pushed away, so an airborne kart over the duvet never snaps to the under-bed), the under-bed ceiling only clamps karts actually under it, and a safety net puts any kart below its road back on top (never the sock). The pillow pile is SIMPLIFIED to a railed wooden toy ramp (the ruler) on toy-block piers, pillows heaped beside it. | done — regression: 3 races × 8 karts × 3 laps per track (72 laps each, two of them at 1.25× / 1.4× speed), items on: 0 below the road, 0 safety-net catches, 0 layer jumps, 0 edge falls, 0 stuck fish-outs |
+| 3 | Clear where to go: skinny sections widened (banister 6.5 → 8.5, planks 8 → 9, doorways 8 + 1 → 9 + 2.5, under-bed 8 → 9, conveyor 7 → 8.5, park ramp / deck → 8.5; nothing under 8.5), bolder and closer edge lines (now on the banister, planks, conveyor and deck too), kerbs and sticky-note chevron signs on every sharp turn, a faint glowing arrow trail through the junctions, a stronger road runner | done — before / after race-camera shots of every waypoint: `shots/stage3/before`, `shots/stage3/after` (`node tools/tour.mjs <track> <dir> --all`) |
+| 4 | Light kart refinement: a number plate with the driver's flag on the back of every kart (far-LOD detail), Kevalanche's hockey stick on the OG too | done — frame cost below |
+
 ## Stage 2 hooks
 - `input/controls.js` has `extra`: a function returning another input to
   merge (the phone pads plug in there); `Race` takes `humans: [...]`, the

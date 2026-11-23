@@ -42,20 +42,22 @@ function torture(track, seed, { speed = 1, lvl = 'hard' } = {}) {
     }
   }
   out.done = R.phase === 'done';
+  out.net = R.netCount || 0;
   return out;
 }
 
 for (const track of ['landing', 'laundry', 'park']) {
   test(`${track}: 24+ laps at racing and at high speed, items on: never below the road, no layer jumps, no falls`, () => {
-    const tot = { below: 0, falls: 0, stuck: 0, laps: 0, layerJumps: 0, scrapes: 0, items: 0, maxBelow: 0, where: [] };
+    const tot = { net: 0, below: 0, falls: 0, stuck: 0, laps: 0, layerJumps: 0, scrapes: 0, items: 0, maxBelow: 0, where: [] };
     for (const [seed, speed] of [[1, 1], [2, 1.25], [3, 1.4]]) {
       const r = torture(track, seed, { speed });
       assert.ok(r.done, `${track} seed ${seed} finished`);
-      for (const k of ['below', 'falls', 'stuck', 'laps', 'layerJumps', 'scrapes', 'items']) tot[k] += r[k];
+      for (const k of ['net', 'below', 'falls', 'stuck', 'laps', 'layerJumps', 'scrapes', 'items']) tot[k] += r[k];
       tot.maxBelow = Math.max(tot.maxBelow, r.maxBelow); tot.where.push(...r.where);
     }
-    console.log(`# ${track}: ${tot.laps} laps, ${tot.items} items used, below-road ${tot.below}, layer jumps ${tot.layerJumps}, edge falls ${tot.falls}, stuck fish-outs ${tot.stuck}, scrapes ${tot.scrapes}`);
+    console.log(`# ${track}: ${tot.laps} laps, ${tot.items} items used, below-road ${tot.below}, safety-net catches ${tot.net}, layer jumps ${tot.layerJumps}, edge falls ${tot.falls}, stuck fish-outs ${tot.stuck}, scrapes ${tot.scrapes}`);
     assert.ok(tot.laps >= 24 * 3, `laps ${tot.laps}`);
+    assert.equal(tot.net, 0, 'the safety net never had to catch anyone');
     assert.equal(tot.below, 0, `below the road: ${tot.where.join(' ')}`);
     assert.equal(tot.layerJumps, 0, `layer jumps: ${tot.where.join(' ')}`);
     assert.equal(tot.falls, 0, `falls off an edge (no track has a drop now): ${tot.where.join(' ')}`);

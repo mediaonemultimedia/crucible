@@ -68,7 +68,7 @@ for (const track of (process.argv.includes('--quick') ? ['landing'] : ['landing'
   const r = await p.evaluate(() => {
     const A = __dh, R = A.race, ev = {}, laps = {};
     const old = A.onEvent.bind(A);
-    A.onEvent = (e) => { ev[e.k] = (ev[e.k] || 0) + 1; if (e.k === 'use') ev['use:' + e.item] = (ev['use:' + e.item] || 0) + 1; if (e.k === 'lap' || e.k === 'finish') (laps[e.i] = laps[e.i] || []).push(R.raceTime()); old(e); };
+    A.onEvent = (e) => { ev[e.k] = (ev[e.k] || 0) + 1; if (e.k === 'use') ev['use:' + e.item] = (ev['use:' + e.item] || 0) + 1; if (e.k === 'fall') ev['fall:' + (e.why || 'edge')] = (ev['fall:' + (e.why || 'edge')] || 0) + 1; if (e.k === 'lap' || e.k === 'finish') (laps[e.i] = laps[e.i] || []).push(R.raceTime()); old(e); };
     const js = [];
     let n = 0;
     while (A.screen === 'race' && n < 60 * 300) {
@@ -85,6 +85,8 @@ for (const track of (process.argv.includes('--quick') ? ['landing'] : ['landing'
       lap: { min: +Math.min(...lapT).toFixed(1), max: +Math.max(...lapT).toFixed(1), mean: +(lapT.reduce((a, b) => a + b, 0) / lapT.length).toFixed(1) },
       jsMs: { mean: +(js.reduce((a, b) => a + b, 0) / js.length).toFixed(2), p50: +js[js.length >> 1].toFixed(2), p95: +js[Math.floor(js.length * 0.95)].toFixed(2), p99: +js[Math.floor(js.length * 0.99)].toFixed(2) },
       finished: R.karts.filter((K) => K.fin).length,
+      // stage 3: never under the road, never through it (counted every frame by the sim's safety net)
+      net: R.netCount || 0,
     };
   });
   results[`race-${track}`] = r;
@@ -93,6 +95,8 @@ for (const track of (process.argv.includes('--quick') ? ['landing'] : ['landing'
   if (!(r.lap.mean >= 45 && r.lap.mean <= 62)) problems.push(`${track}: mean lap ${r.lap.mean} s (want ~50–60)`);
   for (const k of ['drift', 'tier', 'boost', 'use', 'trick', 'pad', 'box', 'hit', ...TRACK_EVENTS[track]]) if (!r.ev[k]) problems.push(`${track}: no '${k}' events`);
   if (r.jsMs.p95 > 8) problems.push(`${track}: JS frame cost p95 ${r.jsMs.p95} ms (budget 8 of the 16.7)`);
+  if (r.ev['fall:edge']) problems.push(`${track}: ${r.ev['fall:edge']} falls off an edge (every drawn barrier is solid; no track has a drop)`);
+  if (r.net) problems.push(`${track}: the safety net caught ${r.net} karts under the road`);
   await p.evaluate(() => __dh.step(1.5));
   await p.screenshot({ path: path.join(root, `shots/check-results${track === 'landing' ? '' : '-' + track}.png`), timeout: 240000 });
   await p.close();
