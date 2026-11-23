@@ -58,6 +58,12 @@ export const POINTS = [10, 8, 6, 5, 4, 3, 2, 1];
 const MAXP = 4;
 /* the track menu: each track, then the cup */
 const CHOICES = [...Object.keys(TRACKS).map((id) => ({ id, name: TRACKS[id].name })), { id: 'cup', name: 'The Pillow Cup' }];
+const COURSE_NOTES = {
+  landing: 'Quilt grid · book drop · banister jump',
+  laundry: 'Conveyor launch · switchback · dryer shortcut',
+  park: 'Hose kicker · patio chicane · treehouse drop',
+  cup: 'Race all three courses, starting on The Landing',
+};
 const lookKey = (id, alt) => `${id}:${alt ? 1 : 0}`;
 /* the ghost's samples ↔ a localStorage string */
 const encode16 = (a) => { const b = new Uint8Array(a.buffer, a.byteOffset, a.byteLength); let s = ''; for (let i = 0; i < b.length; i += 8192) s += String.fromCharCode(...b.subarray(i, i + 8192)); return btoa(s); };
@@ -119,6 +125,7 @@ class App {
     addEventListener('pointerdown', () => this.audio.unlock());
     this.resize();
     this._buildCards();
+    this._bindSetup();
     this._diff();
   }
 
@@ -201,8 +208,20 @@ class App {
       else if (this.paused && c === 'KeyQ') { this.togglePause(); this.toSelect(); }
       return;
     }
+    if (this.screen === 'setup') {
+      if (c === 'Escape') {
+        this.toSelect();
+        return;
+      }
+      if (e.target instanceof Element && e.target.closest('button, select')) return;
+      const action = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', Enter: 'confirm' }[c];
+      if (action) {
+        e.preventDefault?.();
+        this.menu(this.players[0], action);
+      }
+      return;
+    }
     if (this.screen === 'select') {
-      if (c === 'Tab') { e.preventDefault?.(); this.cycleTrack(e.shiftKey ? -1 : 1); return; }
       if (c === 'Digit1' || c === 'Digit2' || c === 'Digit3' || c === 'Digit4') { this.level = LEVEL_NAMES[+c.slice(5) - 1]; this._diff(); this.audio.ui('tick'); return; }
       // the keyboard's other half joins (and leaves)
       const kb2 = this.players.find((p) => p.ctl.map === 'right');
@@ -224,7 +243,6 @@ class App {
     if (s === 'title') { if (a === 'confirm' || a === 'start') { this.audio.ui('confirm'); this.toSelect(); } return; }
     if (s === 'select') {
       if (!p) return;
-      if (a === 'next' || a === 'prev') { this.cycleTrack(a === 'next' ? 1 : -1); return; }
       if (p.locked) { if (a === 'cancel') { p.locked = false; this._paintPicks(); this.audio.ui('tick'); } return; }
       const col = p.sel % 7, row = Math.floor(p.sel / 7);
       if (a === 'left') this.pick(p, row * 7 + (col + 6) % 7);
@@ -232,6 +250,17 @@ class App {
       else if (a === 'up' || a === 'down') this.pick(p, (1 - row) * 7 + col);
       else if (a === 'confirm' || a === 'start') this.lock(p);
       else if (a === 'cancel') { if (this.num(p) === 0) this.toTitle(); else if (p.phone < 0 && p.ctl.map !== 'right') this.removePlayer(p); }
+      return;
+    }
+    if (s === 'setup') {
+      if (a === 'left' || a === 'prev') this.cycleTrack(-1);
+      else if (a === 'right' || a === 'next') this.cycleTrack(1);
+      else if (a === 'up' || a === 'down') {
+        const music = $('race-music');
+        music.selectedIndex = (music.selectedIndex + (a === 'up' ? -1 : 1) + music.length) % music.length;
+        this._selectMusic();
+      } else if (a === 'confirm' || a === 'start') this.go();
+      else if (a === 'cancel') this.toSelect();
       return;
     }
     if (s === 'results' || s === 'cup') {
@@ -276,27 +305,68 @@ class App {
       b.addEventListener('click', () => { this.level = l; this._diff(); });
       box.appendChild(b);
     }
-    const tb = $('tracks');
-    if (!tb) return;
-    for (const p of tb.querySelectorAll('.pill')) p.remove();
-    CHOICES.forEach((C, i) => {
-      const b = document.createElement('div');
-      b.className = 'pill' + (i === this.choice ? ' sel' : '') + (C.id === 'cup' ? ' cup' : ''); b.textContent = C.name;
-      b.addEventListener('click', () => { this.choice = i; this._diff(); this._trackPreview(); });
-      tb.appendChild(b);
+  }
+
+  _bindSetup() {
+    const media = JSON.parse($('race-media').textContent);
+    this.courseArt = media.courses;
+    this.recordings = media.recordings;
+    this.recording = null;
+    const music = $('race-music');
+    music.add(new Option('Original game soundtrack', ''));
+    this.recordings.forEach(({ artist, title }, i) => music.add(new Option(`${title} · ${artist}`, String(i))));
+    music.addEventListener('change', () => this._selectMusic());
+    $('music-preview').addEventListener('click', () => {
+      this.audio.unlock();
+      if (this.musicPreview) this.audio.music('menu');
+      else this.audio.music(null, this.recording.url);
+      this.musicPreview = !this.musicPreview;
+      $('music-preview').textContent = this.musicPreview ? 'Stop preview' : 'Preview';
     });
+    $('course-back').addEventListener('click', () => this.cycleTrack(-1));
+    $('course-next').addEventListener('click', () => this.cycleTrack(1));
+    $('setup-back').addEventListener('click', () => this.toSelect());
+    $('setup-start').addEventListener('click', () => this.go());
   }
-  cycleTrack(d) { this.choice = (this.choice + d + CHOICES.length) % CHOICES.length; this._diff(); this.audio.ui('tick'); this._trackPreview(); }
-  _trackPreview() {
-    const C = CHOICES[this.choice];
-    this.setTrack(C.id === 'cup' ? CUP[0] : C.id);
-    if (this.screen === 'select' && this.focus) this.pick(this.focus, this.focus.sel, true);
+
+  _selectMusic() {
+    const value = $('race-music').value;
+    this.recording = value === '' ? null : this.recordings[Number(value)];
+    this.musicPreview = false;
+    this.audio.music('menu');
+    $('music-preview').hidden = !this.recording;
+    $('music-preview').textContent = 'Preview';
   }
+
+  _paintSetup() {
+    const course = CHOICES[this.choice];
+    const image = $('course-art');
+    const track = course.id === 'cup' ? CUP[0] : course.id;
+    image.src = this.courseArt[track];
+    image.alt = `Overhead view of ${TRACKS[track].name}`;
+    $('course-name').textContent = course.name;
+    $('course-note').textContent = COURSE_NOTES[course.id];
+    $('setup-start').textContent = course.id === 'cup' ? 'Start cup' : 'Start race';
+    if (this.screen === 'setup') this.pads.paint(true);
+  }
+
+  cycleTrack(d) {
+    this.choice = (this.choice + d + CHOICES.length) % CHOICES.length;
+    this.audio.ui('tick');
+    this._paintSetup();
+  }
+
+  toSetup() {
+    this.hideViews();
+    this._paintSetup();
+    this._selectMusic();
+    this.setScreen('setup');
+  }
+
   toSelect() {
     this.clearRace();
     this.cup = null;
     for (const p of this.players) p.locked = false;
-    this._trackPreview();
     this.setScreen('select');
     this.pick(this.players[0], this.players[0].sel);
     if (!Q.has('noportraits')) this.portraits();
@@ -390,7 +460,7 @@ class App {
     this.audio.ui('confirm');
     p.locked = true;
     this._paintPicks();
-    if (this.players.every((q) => q.locked)) this.go();
+    if (this.players.every((q) => q.locked)) this.toSetup();
   }
   flash(text) { const el = $('s-flash'); if (!el) return; el.textContent = text; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); }
 
@@ -585,7 +655,7 @@ class App {
     const g = (x) => (mine ? 1 : near ? 0.6 * x : 0);
     switch (e.k) {
       case 'count': for (const v of this.allViews()) { v.count.textContent = e.n; v.count.className = 'count'; } A.play('dh-beep'); break;
-      case 'go': for (const v of this.allViews()) { v.count.textContent = 'GO!'; v.count.className = 'count go'; } A.play('dh-go'); A.music(this.world.music || 'race'); setTimeout(() => { for (const v of this.allViews()) if (v.count.textContent === 'GO!') v.count.textContent = ''; }, 900); break;
+      case 'go': for (const v of this.allViews()) { v.count.textContent = 'GO!'; v.count.className = 'count go'; } A.play('dh-go'); A.music(this.world.music || 'race', this.recording?.url); setTimeout(() => { for (const v of this.allViews()) if (v.count.textContent === 'GO!') v.count.textContent = ''; }, 900); break;
       case 'hit': {
         const c = (K.alt ? ALT_COLORS : COLORS)[K.id];
         this.fx.burst(K.x, K.y + 2, K.z, ['#ffffff', '#ffffff', c[0], c[1], '#ffd1e0'], e.kind === 'alarm' ? 44 : 30, e.kind === 'missile' ? 11 : 8);
@@ -1086,7 +1156,7 @@ class App {
     this.world.update(dt, this.t);
     $('dark').style.opacity = this.screen === 'race' ? '0' : '0';
     const js = performance.now() - t0;
-    if (render) {
+    if (render && this.screen !== 'setup') {
       const r0 = performance.now();
       this._render();
       this.renderMs.push(performance.now() - r0);
@@ -1168,7 +1238,7 @@ class App {
       const p1 = this.players[0];
       if (lost) { lost.phone = k; lost.lostPhone = undefined; }
       else if (p1.phone < 0 && p1.lostPhone === undefined && !this.players.some((p) => p.phone >= 0 || p.lostPhone !== undefined) && this.players.length === 1) p1.phone = k;
-      else if (this.screen !== 'race' && this.players.length < MAXP) this.addPlayer({ phone: k });
+      else if ((this.screen === 'title' || this.screen === 'select') && this.players.length < MAXP) this.addPlayer({ phone: k });
       const p = this.playerOfPhone(k);
       if (p) this.pads.send(k, { t: 'seat', k, who: `P${this.num(p) + 1}` });
       else this.pads.send(k, { t: 'full' });
@@ -1207,8 +1277,13 @@ class App {
   }
   padSelect(k, m) {
     const p = this.playerOfPhone(k);
-    if (!p || this.screen !== 'select') return;
-    if (m.trk && this.num(p) === 0) { this.cycleTrack(1); return; }
+    if (!p) return;
+    if (this.screen === 'setup') {
+      if (this.num(p) === 0 && m.trk) this.cycleTrack(1);
+      else if (this.num(p) === 0 && m.lock) this.go();
+      return;
+    }
+    if (this.screen !== 'select') return;
     if (p.locked) { if (m.lock) this.menu(p, 'cancel'); return; }
     if (m.dx) this.menu(p, m.dx < 0 ? 'left' : 'right');
     if (typeof m.alt === 'boolean' && SLOTS[p.sel].alt !== m.alt) this.menu(p, 'up');
@@ -1222,7 +1297,7 @@ class App {
     let S = SLOTS[p.sel];
     const j = this.num(p);
     const v = { scr, who: `P${j + 1}`, pick: scr === 'select', name: RACERS[S.id].name, locked: p.locked, alt: S.alt };
-    if (scr === 'select' && j === 0) v.trk = CHOICES[this.choice].name;
+    if (scr === 'setup' && j === 0) v.trk = CHOICES[this.choice].name;
     if (scr === 'race' && this.race) {
       const H = this.hv.find((h) => this.humanP[h.j] === p);
       if (H) { const K = this.race.karts[H.i]; S = { id: K.id, alt: K.alt }; v.place = K.place; v.lap = `${this.race.lapOf(K)}/${this.race.laps}`; }
@@ -1244,7 +1319,7 @@ class App {
     const id = this.trackId;
     if (!(id in G.best)) {
       G.best[id] = null;
-      try { const j = JSON.parse(globalThis.localStorage?.getItem(`downhill.ghost.${id}`) || 'null'); if (j && j.t > 0 && typeof j.d === 'string') G.best[id] = { t: j.t, d: decode16(j.d) }; } catch { /* no storage: no ghost */ }
+      try { const j = JSON.parse(globalThis.localStorage?.getItem(`downhill.ghost.v2.${id}`) || 'null'); if (j && j.t > 0 && typeof j.d === 'string') G.best[id] = { t: j.t, d: decode16(j.d) }; } catch { /* no storage: no ghost */ }
     }
   }
   _ghostMesh() {
@@ -1271,7 +1346,7 @@ class App {
         if (!best || t < best.t) {
           const d = Int16Array.from(G.rec.buf);
           G.best[this.trackId] = { t, d };
-          try { globalThis.localStorage?.setItem(`downhill.ghost.${this.trackId}`, JSON.stringify({ t, d: encode16(d) })); } catch { /* full or blocked: fine */ }
+          try { globalThis.localStorage?.setItem(`downhill.ghost.v2.${this.trackId}`, JSON.stringify({ t, d: encode16(d) })); } catch { /* full or blocked: fine */ }
           if (best) this.toast(this.hv[0], 'NEW BEST LAP!', '#bfe8ff');
         }
       }

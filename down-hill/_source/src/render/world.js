@@ -26,6 +26,19 @@ export const ROOM = { x0: -144, x1: 126, z0: -112, z1: 112, h: 130 };
 export const HALL = { x0: 126, x1: 414, z0: -112, z1: 112 };
 export const STAIRS = { x0: 205, x1: 340, z0: -4, z1: 86 };   // the stairwell opening on the landing
 
+export function keepCameraAboveRoad(T, want, hint) {
+  const k = locate(T, want.x, want.z, hint, 40);
+  const tag = T.def.points[T.sec[k]].tag;
+  const d = lateral(T, k, want.x, want.z);
+  if (Math.abs(d) <= T.w[k] + T.m[k] + 3) {
+    const road = groundAt(T, k, d, along(T, k, want.x, want.z));
+    want.y = Math.max(want.y, road + 1.3);
+  }
+  return tag;
+}
+
+const DOORS = [[-108, -66], [8, 48]];
+
 /* ── textures ── */
 function planksTex() {
   return canvasTex(512, 512, (g, w, h) => {
@@ -191,14 +204,7 @@ export class World {
   }
   /* the chase camera's wish, kept out of the furniture: under the bed it stays under the slats */
   camFix(want, pose, hint) {
-    const T = this.T;
-    const k = locate(T, want.x, want.z, hint, 40);
-    const tag = T.def.points[T.sec[k]].tag;
-    const d = lateral(T, k, want.x, want.z);
-    if (Math.abs(d) <= T.w[k] + T.m[k] + 3) {
-      const road = groundAt(T, k, d, along(T, k, want.x, want.z));
-      want.y = Math.max(want.y, road + 1.3);
-    }
+    const tag = keepCameraAboveRoad(this.T, want, hint);
 
     // Pull the camera back through a doorway only while the sightline fits.
     const wall = ROOM.x1;
@@ -207,7 +213,7 @@ export class World {
       const t = (wall - pose.x) / dx;
       const z = pose.z + (want.z - pose.z) * t;
       const y = pose.y + 2 + (want.y - pose.y - 2) * t;
-      const fits = y < 67 && ((z > 17 && z < 41) || (z > -93 && z < -69));
+      const fits = y < 67 && DOORS.some(([low, high]) => z > low + 3 && z < high - 3);
       if (!fits) {
         const safe = Math.max(0, t - 3 / Math.abs(dx));
         want.x = pose.x + dx * safe;
@@ -321,16 +327,17 @@ export class World {
     const wz0 = -14, wz1 = 58, wy0 = 28, wy1 = 92;
     wall(R.x0, R.z1, R.x0, wz1, paper); wall(R.x0, wz0, R.x0, R.z0, paper);
     wall(R.x0, wz1, R.x0, wz0, paper, 0, wy0); wall(R.x0, wz1, R.x0, wz0, paper, wy1, R.h);
-    // the east wall: doorways at z 14…44 (out) and −96…−66 (back in)
+    // Both faces and the camera use the same doorway clearances.
     const ex = R.x1, dh = 70;
-    wall(ex, R.z0, ex, -96, paper); wall(ex, -66, ex, 14, paper); wall(ex, 44, ex, R.z1, paper);
-    wall(ex, -96, ex, -66, paper, dh, R.h); wall(ex, 14, ex, 44, paper, dh, R.h);
-    // (and the landing side of it)
-    wall(ex + 0.2, R.z1, ex + 0.2, 44, hpaper); wall(ex + 0.2, 14, ex + 0.2, -66, hpaper); wall(ex + 0.2, -96, ex + 0.2, R.z0, hpaper);
-    wall(ex + 0.2, 44, ex + 0.2, 14, hpaper, dh, R.h); wall(ex + 0.2, -66, ex + 0.2, -96, hpaper, dh, R.h);
-    // door frames
+    const [[back0, back1], [out0, out1]] = DOORS;
+    for (const [z0, z1] of [[R.z0, back0], [back1, out0], [out1, R.z1]]) {
+      wall(ex, z0, ex, z1, paper);
+      wall(ex + 0.2, z1, ex + 0.2, z0, hpaper);
+    }
     const trim = mat('#f2ece0', { roughness: 0.45 });
-    for (const [z0, z1] of [[14, 44], [-96, -66]]) {
+    for (const [z0, z1] of DOORS) {
+      wall(ex, z0, ex, z1, paper, dh, R.h);
+      wall(ex + 0.2, z1, ex + 0.2, z0, hpaper, dh, R.h);
       for (const z of [z0, z1]) mesh(new THREE.BoxGeometry(5, dh, 3), trim, ex, dh / 2, z, this.root);
       mesh(new THREE.BoxGeometry(5, 4, z1 - z0 + 3), trim, ex, dh, (z0 + z1) / 2, this.root);
     }

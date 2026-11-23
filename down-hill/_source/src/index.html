@@ -176,7 +176,25 @@ body[data-screen=select] #select .head{right:calc(clamp(160px,17vh,240px) + 250p
 body[data-screen=title] #pads{top:auto;bottom:22px;right:22px}
 body[data-screen=title] .keys{left:24px;transform:none}
 body[data-screen=select] #select #diff{top:calc(clamp(160px,17vh,240px) + 44px)}
-body[data-screen=select] #select #tracks{top:calc(clamp(160px,17vh,240px) + 266px)!important}
+
+#setup{background:#13172b;overflow:auto}
+.setup-shell{width:min(1080px,calc(100% - 36px));margin:auto;padding:clamp(14px,3vh,32px) 0}
+.setup-header,.setup-controls{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.setup-header h2{margin:0;font:400 clamp(24px,4vw,48px)/1.1 var(--race-display);color:#fff;text-transform:uppercase}
+#setup button,#race-music{min-height:42px;padding:8px 14px;border:1px solid #646b95;border-radius:5px;background:#252b4b;color:#fff;font:700 15px var(--cond);cursor:pointer}
+#setup button:focus-visible,#race-music:focus-visible{outline:2px solid #ffcd45;outline-offset:3px}
+#setup button[hidden]{display:none}
+.course-shot{margin:14px 0 12px;border:1px solid #4c547f;border-radius:7px;overflow:hidden;background:#0d1020}
+.course-shot img{display:block;width:100%;height:min(52vh,550px);object-fit:contain}
+.course-shot figcaption{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:10px;background:#232945;text-align:center}
+.course-shot strong{display:block;font:400 clamp(16px,2.8vw,28px)/1.1 var(--race-display);color:#fff}
+.course-shot span{display:block;margin-top:5px;color:#d6dcfb;font-size:13px}
+#setup .course-shot button{font-size:27px;line-height:1}
+.setup-controls{justify-content:flex-end;flex-wrap:wrap}
+.setup-controls label{display:flex;align-items:center;gap:10px;margin-right:auto;color:#d6dcfb;font:700 14px var(--cond);text-transform:uppercase}
+#race-music{max-width: min(54vw, 450px);text-transform:none}
+#setup #setup-start{background:#ffcc29;color:#201b2b;border-color:#ffcc29;padding-inline:25px;text-transform:uppercase}
+.setup-keys{margin:9px 0 0;color:#b6bfeb;text-align:right;font:700 12px var(--cond);letter-spacing:.07em}
 
 /* split screen: one panel per player (main.js _views) */
 #hud .view{position:absolute;overflow:hidden;box-shadow:inset 0 0 0 2px #120d1f}
@@ -292,7 +310,7 @@ body.photo #photo{display:block;animation:jig .3s steps(2) infinite}
   </section>
 
   <section class="screen" id="select">
-    <div class="head"><h2 class="panel-title">Pick your racer</h2><span class="eyebrow">← → fighter · ↑ ↓ OG or ALT · Enter to lock in · Tab: track</span></div>
+    <div class="head"><h2 class="panel-title">Pick your racer</h2><span class="eyebrow">← → fighter · ↑ ↓ OG or ALT · Enter to lock in</span></div>
     <div id="players"></div><div id="s-flash"></div>
     <div class="plate">
       <span class="who" id="s-who">P1</span>
@@ -303,8 +321,31 @@ body.photo #photo{display:block;animation:jig .3s steps(2) infinite}
       <div class="stats" id="s-stats"></div>
     </div>
     <div class="diff" id="diff"><span class="eyebrow">CPU · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd></span></div>
-    <div class="diff" id="tracks" style="top:calc(max(16%,120px) + 222px)"><span class="eyebrow">Track · <kbd>Tab</kbd></span></div>
+    
     <div class="cards" id="cards"></div>
+  </section>
+
+  <section class="screen" id="setup" aria-labelledby="setup-heading">
+    <div class="setup-shell">
+      <header class="setup-header">
+        <h2 id="setup-heading">Race setup</h2>
+        <button type="button" id="setup-back">Back to racers</button>
+      </header>
+      <figure class="course-shot">
+        <img id="course-art" alt="">
+        <figcaption>
+          <button type="button" id="course-back" aria-label="Previous course">‹</button>
+          <div aria-live="polite"><strong id="course-name"></strong><span id="course-note"></span></div>
+          <button type="button" id="course-next" aria-label="Next course">›</button>
+        </figcaption>
+      </figure>
+      <div class="setup-controls">
+        <label for="race-music">Race music <select id="race-music"></select></label>
+        <button type="button" id="music-preview" hidden>Preview</button>
+        <button type="button" id="setup-start">Start race</button>
+      </div>
+      <p class="setup-keys">← → course · ↑ ↓ music · Enter to start</p>
+    </div>
   </section>
 
   <section class="screen" id="hud"></section>
@@ -327,6 +368,7 @@ body.photo #photo{display:block;animation:jig .3s steps(2) infinite}
   </section>
 </div>
 <div id="bubbles"></div>
+<!--RACE_MEDIA-->
 <!--BUNDLE-->
 </body>
 </html>

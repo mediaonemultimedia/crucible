@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as esbuild from 'esbuild';
+import { RACE_RECORDINGS } from '../src/audio/playlist.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const src = path.join(root, 'src');
@@ -49,6 +50,19 @@ const face = `/* ${bungeeLicense} */
 @font-face{font-family:"Bolster Condensed";src:url(data:font/woff2;base64,${cond}) format("woff2");font-weight:700;font-display:block}`;
 html = html.replace('/*FONTFACE*/', () => face);
 
+const courses = Object.fromEntries(['landing', 'laundry', 'park'].map((id) => [
+  id, 'data:image/webp;base64,' + fs.readFileSync(path.join(src, 'assets/courses', id + '.webp')).toString('base64')
+]));
+const mi = process.argv.indexOf('--music-dir');
+if (mi >= 0 && (!process.argv[mi + 1] || process.argv[mi + 1].startsWith('--'))) {
+  throw new Error('--music-dir requires a directory containing the six MP3 files');
+}
+const recordings = mi < 0 ? [] : RACE_RECORDINGS.map(([artist, title]) => ({
+  artist, title,
+  url: 'data:audio/mpeg;base64,' + fs.readFileSync(path.join(process.argv[mi + 1], `${artist} - ${title}.mp3`)).toString('base64'),
+}));
+const media = JSON.stringify({ courses, recordings }).replaceAll('<', '\\u003c');
+html = html.replace('<!--RACE_MEDIA-->', () => `<script type="application/json" id="race-media">${media}</script>`);
 const final = html.replace('<!--BUNDLE-->', () => `<script>\n${js}\n</script>`);
 const oi = process.argv.indexOf('--out');
 const dest = oi > 0 ? path.resolve(process.argv[oi + 1]) : lookdev ? path.join(out, 'lookdev-race.html') : path.join(root, 'final.html');

@@ -11,10 +11,10 @@
    World units: the track's. The garden is x −420…330, z −260…290.       */
 
 import * as THREE from 'three/webgpu';
-import { World } from './world.js';
+import { World, keepCameraAboveRoad } from './world.js';
 import { buildReadable } from './readable.js';
 import { rbox, mat, mesh, canvasTex, srand } from './geo.js';
-import { rightX, rightZ, sprinklerOn } from '../race/track.js';
+import { rightX, rightZ, sprinklerOn, sceneryClearsRoad } from '../race/track.js';
 
 const TAU = Math.PI * 2;
 export const YARD = { x0: -420, x1: 330, z0: -260, z1: 290 };
@@ -22,7 +22,7 @@ export const YARD = { x0: -420, x1: 330, z0: -260, z1: 290 };
 function grassTex() {
   return canvasTex(512, 512, (g, w, h) => {
     const r = srand(3);
-    g.fillStyle = '#5f8f34'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#46a631'; g.fillRect(0, 0, w, h);
     // mown stripes
     for (let x = 0; x < w; x += 64) { g.fillStyle = (x / 64) % 2 ? 'rgba(255,255,200,.06)' : 'rgba(0,30,0,.06)'; g.fillRect(x, 0, 64, h); }
     for (let i = 0; i < 16000; i++) {
@@ -58,7 +58,7 @@ function barkTex() {
 function skyTex() {
   return canvasTex(64, 512, (g, w, h) => {
     const gr = g.createLinearGradient(0, 0, 0, h);
-    gr.addColorStop(0, '#3b5fa8'); gr.addColorStop(0.35, '#7d9fd6'); gr.addColorStop(0.55, '#f2b77c'); gr.addColorStop(0.62, '#ff9a5a'); gr.addColorStop(0.7, '#d9784e'); gr.addColorStop(1, '#5a4a3a');
+    gr.addColorStop(0, '#1656c6'); gr.addColorStop(0.42, '#36a8e8'); gr.addColorStop(0.62, '#b4eaff'); gr.addColorStop(0.76, '#ffd680'); gr.addColorStop(1, '#d77b3d');
     g.fillStyle = gr; g.fillRect(0, 0, w, h);
   });
 }
@@ -102,7 +102,7 @@ export class ParkWorld extends World {
       turn: [-40, 0.2, 20], title: { c: [-60, 10], r: 420, y: 420, look: [-60, 0, 10] }, bounds: [YARD.x0 + 6, YARD.x1 - 6, YARD.z0 + 6, YARD.z1 - 6],
     };
   }
-  camFix() {}
+  camFix(want, pose, hint) { keepCameraAboveRoad(this.T, want, hint); }
   darkAt() { return 0; }
 
   _lightsP() {
@@ -135,7 +135,7 @@ export class ParkWorld extends World {
     this.glow('#fff0b0', 200, -860, 150, 80, 0.95);
     this.glow('#ff9a4a', 560, -860, 130, 80, 0.5);
     // the lawn, far past the fence
-    const grass = new THREE.MeshStandardMaterial({ map: grassTex(), roughness: 0.95, color: '#d8e8b0' });
+    const grass = new THREE.MeshStandardMaterial({ map: grassTex(), roughness: 0.95, color: '#ecffa8' });
     const g = mesh(new THREE.PlaneGeometry(2600, 2600), grass, -40, 0, 0, root); g.rotation.x = -Math.PI / 2;
     // the fence: weathered pickets all round
     const wood = mat('#d9c9a8', { roughness: 0.85 });
@@ -182,11 +182,11 @@ export class ParkWorld extends World {
       x0 -= 30; x1 = Y.x1; z0 -= 40; z1 += 40;
       const p = mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), pav, (x0 + x1) / 2, 0.08, (z0 + z1) / 2, root); p.rotation.x = -Math.PI / 2;
       // a table with a sun umbrella, two chairs, a grill
-      const tx = x1 - 45, tz = z1 - 30;
+      const tx = x1 - 42, tz = z1 + 18;
       mesh(new THREE.CylinderGeometry(16, 16, 1.6, 28), mat('#f4f1ea', { roughness: 0.4 }), tx, 28, tz, root);
       mesh(new THREE.CylinderGeometry(1, 1, 28, 8), mat('#555'), tx, 14, tz, root);
       mesh(new THREE.CylinderGeometry(1, 1, 70, 8), mat('#d9d4c4'), tx, 35, tz, root);
-      const um = mesh(new THREE.ConeGeometry(42, 14, 12), mat('#ff6a5a', { roughness: 0.7, side: THREE.DoubleSide }), tx, 72, tz, root); um.userData.cast = true;
+      const um = mesh(new THREE.ConeGeometry(42, 14, 12), mat('#f42c3c', { roughness: 0.7, side: THREE.DoubleSide }), tx, 72, tz, root); um.userData.cast = true;
       for (const s of [-1, 1]) { const ch = mesh(rbox(14, 2, 14, 0.6), mat('#3ab795', { roughness: 0.5 }), tx + s * 24, 16, tz, root); ch.userData.cast = true; mesh(rbox(14, 16, 2, 0.6), mat('#3ab795', { roughness: 0.5 }), tx + s * 24, 24, tz + 7, root); }
       const grill = mesh(new THREE.SphereGeometry(10, 16, 10, 0, TAU, 0, Math.PI / 2), mat('#202024', { roughness: 0.4, metalness: 0.5 }), x1 - 30, 26, z0 + 26, root); grill.rotation.x = Math.PI; grill.userData.cast = true;
       for (const a of [0, 2.1, 4.2]) mesh(new THREE.CylinderGeometry(0.7, 0.7, 26, 6), mat('#202024'), x1 - 30 + Math.cos(a) * 7, 13, z0 + 26 + Math.sin(a) * 7, root);
@@ -208,7 +208,12 @@ export class ParkWorld extends World {
     const dk = []; for (let k = 0; k < N; k++) if (this.tagAt(k) === 'deck') dk.push(k);
     const rk = []; for (let k = 0; k < N; k++) if (this.tagAt(k) === 'ramp') rk.push(k);
     const planks = new THREE.MeshStandardMaterial({ map: planksTexP(), roughness: 0.75 });
-    if (rk.length) this.ribbon([rk[0] - 2, ...rk, ...dk, dk[dk.length - 1] + 2].map((k) => (k + N) % N), planks, 1.8, true);
+    if (rk.length && dk.length) {
+      let first = rk[0], last = dk.at(-1);
+      while (first > 0 && T.y[first - 1] > 0.08) first--;
+      while (last + 1 < N && T.y[last + 1] > 0.08) last++;
+      this.ribbon(Array.from({ length: last - first + 1 }, (_, i) => first + i), planks, 1.8);
+    }
     // the support posts under the ramp and the deck
     const post = mat('#6a4a2e', { roughness: 0.85 });
     for (const k of [...rk, ...dk].filter((_, i) => i % 10 === 0)) for (const s of [-1, 1]) {
@@ -220,7 +225,12 @@ export class ParkWorld extends World {
     // the trunk: just outside the deck's inner edge at its middle
     const km = dk[Math.floor(dk.length / 2)], side = T.curv[km] > 0 ? -1 : 1;
     const off = (T.w[km] + T.m[km] + 24) * side;
-    const tx = T.x[km] + rightX(T, km) * off, tz = T.z[km] + rightZ(T, km) * off;
+    const rx = rightX(T, km), rz = rightZ(T, km);
+    let clearance = off;
+    while (!sceneryClearsRoad(T, T.x[km] + rx * clearance, T.z[km] + rz * clearance, 16, 16)) {
+      clearance += side * 8;
+    }
+    const tx = T.x[km] + rx * clearance, tz = T.z[km] + rz * clearance;
     const bark = new THREE.MeshStandardMaterial({ map: barkTex(), roughness: 0.95 });
     const trunk = mesh(new THREE.CylinderGeometry(11, 16, 150, 18), bark, tx, 75, tz, root); trunk.userData.cast = true;
     for (let i = 0; i < 5; i++) { const a = i * 1.3; const br = mesh(new THREE.CylinderGeometry(3, 6, 70, 8), bark, tx + Math.cos(a) * 26, 128 + i * 6, tz + Math.sin(a) * 26, root); br.rotation.set(Math.sin(a) * 0.9, 0, -Math.cos(a) * 0.9); br.userData.cast = true; }
@@ -233,7 +243,7 @@ export class ParkWorld extends World {
     mesh(new THREE.BoxGeometry(34, 2, 30), mat('#7a5a3c'), 0, 0, 0, hut);
     const wall = new THREE.MeshStandardMaterial({ map: planksTexP(), roughness: 0.8 });
     for (const [x, z, w, d] of [[0, -14, 34, 2], [0, 14, 34, 2], [-16, 0, 2, 30], [16, 0, 2, 30]]) mesh(new THREE.BoxGeometry(w, 22, d), wall, x, 12, z, hut);
-    const roof = mesh(new THREE.ConeGeometry(28, 16, 4), mat('#b5442e', { roughness: 0.7 }), 0, 31, 0, hut); roof.rotation.y = Math.PI / 4;
+    const roof = mesh(new THREE.ConeGeometry(28, 16, 4), mat('#e93136', { roughness: 0.65 }), 0, 31, 0, hut); roof.rotation.y = Math.PI / 4;
     mesh(new THREE.PlaneGeometry(10, 12), new THREE.MeshBasicMaterial({ color: '#ffd9a0' }), 0, 12, 15.2, hut);
     mesh(new THREE.CylinderGeometry(0.4, 0.4, 20, 6), mat('#ddd'), 12, 46, 0, hut);
     mesh(new THREE.PlaneGeometry(9, 6), mat('#ff3b6b', { side: THREE.DoubleSide }), 16.5, 52, 0, hut);
@@ -256,18 +266,20 @@ export class ParkWorld extends World {
     const water = mesh(new THREE.CircleGeometry(R, 40), new THREE.MeshStandardMaterial({ map: this.waterTex, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.85, color: '#bfeeff' }), P.x, 0.35, P.z, root);
     water.rotation.x = -Math.PI / 2; water.userData.noShadow = true; water.userData.keep = true;
     mesh(new THREE.CircleGeometry(R, 40), mat('#2f8fd8', { roughness: 0.6 }), P.x, 0.12, P.z, root).rotation.x = -Math.PI / 2;
-    const cols = ['#ff6a8a', '#ffd84a', '#3ab7ff'];
+    const cols = ['#ec2948', '#ffc718', '#067ff5'];
     const segs = 36;
     for (let i = 0; i < segs; i++) {
       const a = (i / segs) * TAU, x = P.x + Math.cos(a) * R, z = P.z + Math.sin(a) * R;
       // leave the ring open where the road crosses it
-      let near = 1e9;
-      for (let k = 0; k < T.N; k += 2) near = Math.min(near, Math.hypot(T.x[k] - x, T.z[k] - z) - T.w[k]);
-      if (near < 1.5) continue;
+      if (!sceneryClearsRoad(T, x, z, 3.6, 3.6, 0, 0, 6)) continue;
       for (const [h, s] of [[1.6, 1.6], [4.4, 1.5]]) { const t = mesh(new THREE.SphereGeometry(s, 10, 8), mat(cols[(i + (h > 2 ? 1 : 0)) % 3], { roughness: 0.3 }), x, h, z, root); t.scale.set(1, 1, 2.2); t.rotation.y = -a; }
     }
     // a rubber duck
-    const duck = new THREE.Group(); duck.position.set(P.x + R * 0.5, 0.8, P.z - R * 0.3);
+    const duck = new THREE.Group();
+    const angle = Array.from({ length: segs }, (_, i) => i * TAU / segs).find((a) =>
+      sceneryClearsRoad(T, P.x + Math.cos(a) * (R - 6), P.z + Math.sin(a) * (R - 6), 4, 4, 0, 0, 5));
+    if (angle === undefined) return;
+    duck.position.set(P.x + Math.cos(angle) * (R - 6), 0.8, P.z + Math.sin(angle) * (R - 6));
     mesh(new THREE.SphereGeometry(2.4, 14, 10), mat('#ffd84a', { roughness: 0.3 }), 0, 1.4, 0, duck).scale.set(1.3, 0.9, 1);
     mesh(new THREE.SphereGeometry(1.5, 12, 10), mat('#ffd84a', { roughness: 0.3 }), 1.6, 3.2, 0, duck);
     mesh(new THREE.ConeGeometry(0.6, 1.4, 8), mat('#ff8c2a'), 3.2, 3.1, 0, duck).rotation.z = -Math.PI / 2;
@@ -286,9 +298,11 @@ export class ParkWorld extends World {
     // off to the reel by the fence
     pts.push(new THREE.Vector3(pts[pts.length - 1].x + rx * 30, 1.6, pts[pts.length - 1].z + rz * 30 + 20));
     const hose = mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 120, 1.6, 10), mat('#2f9a3a', { roughness: 0.45 }), 0, 0, 0, root); hose.userData.cast = true;
-    // a ramp-y bump of turf where it crosses, so the jump reads
-    const bump = mesh(new THREE.SphereGeometry(1, 24, 10, 0, TAU, 0, Math.PI / 2), mat('#6f9a3c', { roughness: 0.95 }), T.x[k0] - T.tx[k0] * 3, 0, T.z[k0] - T.tz[k0] * 3, root);
-    bump.scale.set(T.w[k0] + 2, 2.2, 6); bump.rotation.y = Math.atan2(T.tx[k0], T.tz[k0]);
+    // Build the turf kicker from the same elevation samples as the road.
+    let first = k0, last = k0;
+    while (first > 0 && T.y[first - 1] > 0.08) first--;
+    while (last + 1 < N && T.y[last + 1] > 0.08) last++;
+    this.ribbon(Array.from({ length: last - first + 1 }, (_, i) => first + i), mat('#66953b', { roughness: 0.95 }), 7);
     const reel = pts[pts.length - 1];
     const rl = new THREE.Group(); rl.position.copy(reel);
     mesh(new THREE.CylinderGeometry(8, 8, 6, 20), mat('#2f9a3a', { roughness: 0.5 }), 0, 9, 0, rl).rotation.x = Math.PI / 2;
@@ -359,7 +373,7 @@ export class ParkWorld extends World {
   }
 
   tagAt(k) { return this.T.def.points[this.T.sec[k]].tag; }
-  ribbon(ks, material, thick, rails = false) {
+  ribbon(ks, material, thick) {
     const T = this.T, pos = [], uv = [], idx = [];
     let v = 0;
     ks.forEach((k, i) => {
@@ -370,9 +384,9 @@ export class ParkWorld extends World {
     });
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    for (let i = 0; i < idx.length; i += 3) [idx[i + 1], idx[i + 2]] = [idx[i + 2], idx[i + 1]];
     g.setIndex(idx); g.computeVertexNormals();
     const m = mesh(g, material, 0, 0, 0, this.root); m.userData.cast = true;
-    void rails;
     return m;
   }
 

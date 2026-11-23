@@ -6,8 +6,8 @@
       phones join: the first shares P1 with the keyboard, the rest are
       P2–P4; ping LEDs lit
    2. menus from the phones: START on the title → select; each phone moves
-      its own cursor on its strip (◀ ▶, OG / ALT), P1's phone picks the
-      track, everyone locks in → a 4-player split-screen race
+      its own cursor on its strip (◀ ▶, OG / ALT), everyone locks in,
+      then P1 picks the track and starts a 4-player split-screen race
    3. loopback latency: a phone's GAS tap → the sim's input, in frames
       (must be ≤ 2), and the stick's X → the kart's steer
    4. TILT: one phone switches to tilt on its strip, simulated
@@ -126,7 +126,7 @@ await tap(phones[0], ...L.start); await tick(4);
 ok(await G.evaluate(() => __dh.screen) === 'select', 'phone START: title → select');
 results.afterStart = { mask: await phones[0].evaluate(() => __pad.mask()), locked: await G.evaluate(() => __dh.players[0].locked) };
 await tick(10);
-// P1: ▶ twice (K8-E); P2: ALT; P3: ◀ once; P4: ▶ once + ALT; P1's phone picks the track (Tab equivalent)
+// P1: ▶ twice (K8-E); P2: ALT; P3: ◀ once; P4: ▶ once + ALT
 await stripTap(phones[0], '#sel [data-dx="1"]'); await tick(3);
 await stripTap(phones[0], '#sel [data-dx="1"]'); await tick(3);
 await stripTap(phones[1], '#sel .alt'); await tick(3);
@@ -136,13 +136,6 @@ await stripTap(phones[3], '#sel .alt'); await tick(3);
 // the stick also moves the cursor (P3: ▶ by stick, then back ◀)
 await down(phones[2], 2, ...L.stick); await move(phones[2], 2, L.stick[0] + 80, L.stick[1]); await tick(3); await up(phones[2], 2); await tick(3);
 await down(phones[2], 2, ...L.stick); await move(phones[2], 2, L.stick[0] - 80, L.stick[1]); await tick(3); await up(phones[2], 2); await tick(3);
-const trkBefore = await G.evaluate(() => __dh.choice);
-await stripTap(phones[0], '#sel .trk'); await tick(3);
-const trkAfter = await G.evaluate(() => __dh.choice);
-ok(trkAfter !== trkBefore, `P1's phone cycles the track (${trkBefore} → ${trkAfter})`);
-// back to the first track (a single race of The Landing) for the rest of the test
-await G.evaluate(() => { __dh.choice = 0; __dh._diff(); __dh._trackPreview(); });
-await tick(10);
 results.select = await G.evaluate(() => __dh.players.map((p) => ({ sel: p.sel, id: __dh.constructor ? null : null, look: [p.sel] })));
 const looks = await G.evaluate(() => __dh.players.map((p) => p.sel));
 const views = await Promise.all(phones.map((p) => p.evaluate(() => ({ view: JSON.stringify(__pad.S.view), seat: __pad.S.seat, link: !!__pad.S.link, skin: __pad.S.skin, strip: document.querySelector('#sel').classList.contains('on'), name: document.querySelector('#sel .nm span').textContent, who: document.querySelector('#sel .nm small').textContent }))));
@@ -154,6 +147,15 @@ await step(0, true);
 await G.screenshot({ path: path.join(out, '2-select-four-players.png') });
 await phones[1].screenshot({ path: path.join(out, 'phone-select-strip.png') });
 for (const p of phones) { await stripTap(p, '#sel .lk'); await tick(2); }
+await tick(10);
+ok(await G.evaluate(() => __dh.screen) === 'setup', 'phones lock all four racers before course setup');
+const trkBefore = await G.evaluate(() => __dh.choice);
+await stripTap(phones[0], '#sel .trk'); await tick(3);
+const trkAfter = await G.evaluate(() => __dh.choice);
+ok(trkAfter !== trkBefore, `P1's phone cycles the track (${trkBefore} → ${trkAfter})`);
+await G.evaluate(() => __dh.cycleTrack(-1));
+await tick(4);
+await stripTap(phones[0], '#sel .lk');
 await tick(10);
 results.race = await G.evaluate(() => ({ screen: __dh.screen, views: __dh.hv.length, humans: __dh.hv.map((h) => h.i), karts: __dh.race?.karts.length }));
 ok(results.race.screen === 'race' && results.race.views === 4 && results.race.karts === 8, `→ race ${JSON.stringify(results.race)}`);

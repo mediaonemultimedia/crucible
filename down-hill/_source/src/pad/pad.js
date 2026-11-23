@@ -157,6 +157,7 @@ body.pad *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 #st.on{opacity:1}
 #sel{position:fixed;left:50%;top:1.5vh;transform:translateX(-50%);z-index:8;display:none;align-items:center;gap:1.2vh;padding:1vh 1.4vh;border-radius:2vh;background:#120a1ee6;border:2px solid #ffffff30;color:#fff;font:700 max(13px,3.6vh) "Bolster Condensed",Oswald,sans-serif;letter-spacing:.04em;text-transform:uppercase;box-shadow:0 1vh 3vh #0009}
 #sel.on{display:flex}
+#sel.setup .arw,#sel.setup .tg,#sel.setup .st2{display:none}
 #sel .arw{width:7.5vh;height:7.5vh;border-radius:50%;border:0;background:#ffffff22;color:#fff;font:700 3.6vh system-ui,sans-serif;display:flex;align-items:center;justify-content:center}
 #sel .nm{min-width:28vh;text-align:center;line-height:1}#sel .nm small{display:block;font-size:.55em;opacity:.7;letter-spacing:.12em}
 #sel .tg{display:flex;border-radius:99px;overflow:hidden;border:2px solid #ffffff40}
@@ -478,8 +479,11 @@ export function runPad(params) {
     else S.link.send('pc', { t: 'sel', lock: true });
   });
   function paintSel() {
-    const v = S.view, on = !!v && v.scr === 'select' && v.pick;
-    selEl.classList.toggle('on', on);
+    const v = S.view;
+    const setup = v?.scr === 'setup' && !!v.trk;
+    const on = setup || (v?.scr === 'select' && v.pick);
+    selEl.classList.toggle('on', !!on);
+    selEl.classList.toggle('setup', !!setup);
     if (!on) return;
     selEl.querySelector('.nm span').textContent = v.name;
     selEl.querySelector('.nm small').textContent = v.who || 'Pick';
@@ -490,8 +494,8 @@ export function runPad(params) {
     const trk = selEl.querySelector('.trk');
     trk.style.display = v.trk ? '' : 'none';
     trk.textContent = v.trk ? `${v.trk} ▸` : '';
-    selEl.classList.toggle('locked', !!v.locked);
-    selEl.querySelector('.lk').textContent = v.locked ? 'Locked' : 'Lock';
+    selEl.classList.toggle('locked', !setup && !!v.locked);
+    selEl.querySelector('.lk').textContent = setup ? 'Start race' : v.locked ? 'Locked' : 'Lock';
   }
   const hudEl = document.getElementById('hud');
   function paintHud() {

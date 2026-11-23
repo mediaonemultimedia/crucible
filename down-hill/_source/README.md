@@ -45,6 +45,13 @@ To jump into four-way split screen, append
 `?p1=zach&p2=sumaura&p3=k8e&p4=kevalanche` to the preview URL.
 Use the two keyboard layouts and two gamepads, or join from the select screen.
 
+Lock in every racer first, then choose the course and music on the race
+setup screen. The course overviews are rendered from the current game.
+To include the six local recordings, use
+`npm run build -- --lookdev --music-dir "/path/to/music"`.
+The folder should contain the MP3s named `Artist - Title.mp3` as listed in
+`src/audio/playlist.js`. The build embeds them for offline playback.
+
 ## Status — stage 1 of 2
 
 | # | Stage 1 item | State |

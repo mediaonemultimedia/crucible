@@ -192,6 +192,7 @@ export class AudioEngine {
     this.voices = [];
     this.want = null;            // the loop the game wants: 'menu', 'fight' or null
     this.loopSeq = null;
+    this.recording = null;
     this.stings = [];
     this.paused = false;
     this.intense = false;
@@ -218,6 +219,7 @@ export class AudioEngine {
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => {
       this.hidden = document.hidden;
       if (document.hidden) ctx.suspend().catch(() => {}); else ctx.resume().catch(() => {});
+      this._syncRecording();
     });
     this._applyWant();
   }
@@ -330,13 +332,36 @@ export class AudioEngine {
 
   /* ── music ── */
   /* the loop the game is in ('menu', 'fight' or null: silence); idempotent */
-  music(name) {
+  music(name, recording = null) {
     this.want = name;
+    this.recording = recording;
     this._applyWant();
+  }
+
+  _syncRecording() {
+    if (!this.recordingPlayer) return;
+    if (!this.recording || this.paused || this.hidden) this.recordingPlayer.pause();
+    else if (this.recordingPlayer.paused) this.recordingPlayer.play().catch(() => {});
   }
 
   _applyWant() {
     if (!this.ctx) return;
+    if (this.recording && typeof Audio !== 'undefined' && this.ctx.createMediaElementSource) {
+      if (this.loopSeq) { this.loopSeq.stop(0.4); this.loopSeq = null; }
+      if (!this.recordingPlayer) {
+        this.recordingPlayer = new Audio();
+        this.recordingPlayer.loop = true;
+        this.ctx.createMediaElementSource(this.recordingPlayer).connect(this.duckNode);
+      }
+      if (this.recordingPlayer.src !== this.recording) this.recordingPlayer.src = this.recording;
+      this._syncRecording();
+      return;
+    }
+    if (this.recordingPlayer?.hasAttribute('src')) {
+      this.recordingPlayer.pause();
+      this.recordingPlayer.removeAttribute('src');
+      this.recordingPlayer.load();
+    }
     const cur = this.loopSeq?.on ? this.loopSeq.name : null;
     if (cur === this.want) return;
     if (this.loopSeq) { this.loopSeq.stop(0.4); this.loopSeq = null; }
@@ -351,7 +376,7 @@ export class AudioEngine {
   /* a sting or jingle over (vs, round) or instead of (win, lose) the loop */
   sting(name) {
     if (!this.ctx) return;
-    if (name === 'win' || name === 'lose' || name === 'vs') { this.want = null; this._applyWant(); }
+    if (name === 'win' || name === 'lose' || name === 'vs') this.music(null);
     if (name === 'round') this.duck(0.45, 1.2);
     const s = new Sequencer(this.ctx, this.musicBus, name).start(this.ctx.currentTime + 0.03);
     s.pump(this.ctx.currentTime + LOOKAHEAD);
@@ -384,6 +409,7 @@ export class AudioEngine {
     on = !!on;
     if (on === this.paused) return;
     this.paused = on;
+    this._syncRecording();
     if (!this.ctx) return;
     const now = this.ctx.currentTime;
     if (on) {

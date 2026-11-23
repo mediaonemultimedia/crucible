@@ -47,13 +47,14 @@ const key = (p, code, ms = 40) => p.evaluate(async ([c, t]) => {
   await key(p, 'ArrowRight'); await key(p, 'ArrowDown'); await key(p, 'Digit3');
   const pick = await p.evaluate(() => ({ sel: __dh.sel, level: __dh.level, turn: [__dh.turn.id, __dh.turn.alt] }));
   await key(p, 'Enter'); trail.push(await p.evaluate(() => __dh.screen));
+  await key(p, 'Enter'); trail.push(await p.evaluate(() => __dh.screen));
   const r = await p.evaluate(() => { const A = __dh, R = A.race, K = R.karts[A.me]; return { me: [K.id, K.alt], cpu: A.cpus.filter(Boolean).map((c) => c.level), n: R.karts.length }; });
   await p.evaluate(() => __dh.step(4));   // the countdown
   const before = await p.evaluate(() => { const K = __dh.race.karts[__dh.me]; return [K.x, K.z, K.yaw]; });
   await p.evaluate(() => { dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowUp' })); dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft' })); __dh.step(1.2, false); dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowLeft' })); dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowUp' })); __dh.step(0.05); });
   const after = await p.evaluate(() => { const K = __dh.race.karts[__dh.me]; return [K.x, K.z, K.yaw]; });
   results.menus = { trail, pick, ...r, moved: Math.hypot(after[0] - before[0], after[1] - before[1]).toFixed(1), turned: (after[2] - before[2]).toFixed(2) };
-  if (trail.join() !== 'title,select,race') problems.push(`menus: ${trail}`);
+  if (trail.join() !== 'title,select,setup,race') problems.push(`menus: ${trail}`);
   if (r.me.join() !== 'sumaura,true' || r.n !== 8 || r.cpu.some((c) => c !== 'hard')) problems.push(`menus: ${JSON.stringify(r)}`);
   if (Math.hypot(after[0] - before[0], after[1] - before[1]) < 5) problems.push('menus: the kart did not move on the gas');
   if (after[2] - before[2] < 0.1) problems.push('menus: the kart did not steer left');
@@ -141,8 +142,10 @@ for (const n of [2, 4]) {
   const p = await page('?hold&webgl&noportraits&seed=7');
   const r = await p.evaluate(() => {
     const A = __dh, trail = [];
-    A.toSelect(); A.choice = A.constructor ? [...document.querySelectorAll('#tracks .pill')].findIndex((e) => e.classList.contains('cup')) : 0; A._diff();
+    A.toSelect();
     A.lock(A.players[0]);
+    while (document.querySelector('#course-name').textContent !== 'The Pillow Cup') A.cycleTrack(1);
+    A.go();
     for (let race = 0; race < 3; race++) {
       trail.push(A.screen + ':' + A.trackId);
       A.step(6, false);

@@ -64,7 +64,7 @@ export const LANDING = {
     W(172, 12, 52, { tag: 'banister', w: ROAD, m: 1.5, edge: 'rail' }),
     W(194, 12, 36, { tag: 'banister', w: ROAD, m: 1.5, edge: 'rail' }),
     W(200, 12, 12, { tag: 'banister', w: ROAD, m: 1.5, edge: 'rail' }),
-    W(196, 5.5, -10, { tag: 'plank', w: ROAD, m: 1.5, edge: 'rail' }),
+    W(196, 5.5, -10, { tag: 'plank', w: ROAD, m: 1.5, edge: 'rail', launch: 13 }),
     W(180, 0, -26, { tag: 'landing', w: ROAD, m: 5 }),
     W(156, 0, -38, { tag: 'landing', w: ROAD, m: 3 }),
     W(140, 2.5, -40, { tag: 'drawer', w: ROAD, m: 1.5 }),
@@ -120,17 +120,17 @@ export const LAUNDRY = {
     W(-20, 10, 72, { tag: 'belt', w: ROAD, m: 1.2, edge: 'rail', belt: 9 }),
     W(16, 10, 72, { tag: 'belt', w: ROAD, m: 1.2, edge: 'rail', belt: 9 }),
     W(52, 10, 72, { tag: 'belt', w: ROAD, m: 1.2, edge: 'rail', belt: 9 }),
-    W(74, 10, 72, { tag: 'belt', w: ROAD, m: 1.2, edge: 'rail', belt: 9, launch: 8 }),
+    W(74, 12, 72, { tag: 'belt', w: ROAD, m: 1.2, edge: 'rail', belt: 9, launch: 18 }),
     W(100, 0, 66, { tag: 'floor', w: ROAD, m: 5 }),
     W(124, 0, 44, { tag: 'floor', w: ROAD, m: 5 }),
-    W(134, 0, 8, { tag: 'suds', w: ROAD, m: 5 }),
-    W(130, 0, -28, { tag: 'floor', w: ROAD, m: 5, pad: 1 }),
+    W(117, 0, 8, { tag: 'suds', w: ROAD, m: 5 }),
+    W(130, 0, -21, { tag: 'floor', w: ROAD, m: 5, pad: 1 }),
     W(112, 0, -62, { tag: 'floor', w: ROAD, m: 5 }),
     W(84, 0, -80, { tag: 'floor', w: ROAD, m: 3 }),
     W(58, 0, -82, { tag: 'bulge', w: ROAD, m: 2 }),
-    W(36, 0, -58, { tag: 'bulge', w: ROAD, m: 2 }),
-    W(8, 0, -46, { tag: 'bulge', w: ROAD, m: 2 }),
-    W(-20, 0, -56, { tag: 'bulge', w: ROAD, m: 2 }),
+    W(41, 0, -48, { tag: 'bulge', w: ROAD, m: 2 }),
+    W(13, 0, -29, { tag: 'bulge', w: ROAD, m: 2 }),
+    W(-21, 0, -43, { tag: 'bulge', w: ROAD, m: 2 }),
     W(-42, 0, -80, { tag: 'bulge', w: ROAD, m: 2 }),
     W(-72, 0, -86, { tag: 'floor', w: ROAD, m: 4 }),
     W(-104, 0, -82, { tag: 'floor', w: ROAD, m: 4 }),
@@ -143,7 +143,7 @@ export const LAUNDRY = {
      machines, the dryer drum on it (its span, as fractions of the corridor) */
   cut: { from: [80, -84.5], to: [-58, -85.5], w: 4.6, drum: [0.42, 0.6] },
   patches: [
-    { x: 134, z: 8, r: 6, kind: 'suds' },
+    { x: 118, z: 8, r: 6, kind: 'suds' },
     { x: 120, z: -46, r: 4, kind: 'suds' },
     { x: -90, z: -84, r: 4.5, kind: 'fluff' },
   ],
@@ -183,18 +183,20 @@ export const PARK = {
     W(-112, 0, 50, { tag: 'lawn', w: ROAD, m: 5 }),
     W(-82, 0, 62, { tag: 'lawn', w: ROAD, m: 5 }),
     W(-48, 0, 66, { tag: 'lawn', w: ROAD, m: 5 }),
-    W(-14, 0, 62, { tag: 'lawn', w: ROAD, m: 5 }),
-    W(14, 0, 54, { tag: 'hose', w: ROAD, m: 4, launch: 10 }),
+    W(-14, 0, 63, { tag: 'lawn', w: ROAD, m: 5 }),
+    W(0, 1.5, 62, { tag: 'hose', w: ROAD, m: 4 }),
+    W(14, 4.2, 54, { tag: 'hose', w: ROAD, m: 4, launch: 15 }),
     W(40, 0, 42, { tag: 'lawn', w: ROAD, m: 5 }),
     W(62, 0, 22, { tag: 'patio', w: ROAD, m: 2, pad: 1 }),
+    W(53, 0, 9, { tag: 'patio', w: ROAD, m: 2 }),
     W(70, 0, -4, { tag: 'patio', w: ROAD, m: 2 }),
     W(64, 0, -28, { tag: 'pool', w: ROAD, m: 3 }),
     W(46, 0, -46, { tag: 'lawn', w: ROAD, m: 4 }),
     W(22, 0, -56, { tag: 'lawn', w: ROAD, m: 3 }),
     W(4, 3.5, -60, { tag: 'ramp', w: ROAD, m: 1.2, edge: 'rail' }),
     W(-14, 9, -60, { tag: 'ramp', w: ROAD, m: 1.2, edge: 'rail' }),
-    W(-32, 12, -55, { tag: 'deck', w: ROAD, m: 1.2, edge: 'rail' }),
-    W(-46, 12, -44, { tag: 'deck', w: ROAD, m: 1.2, edge: 'rail', launch: 11 }),
+    W(-32, 15, -55, { tag: 'deck', w: ROAD, m: 1.2, edge: 'rail' }),
+    W(-46, 16, -44, { tag: 'deck', w: ROAD, m: 1.2, edge: 'rail', launch: 18 }),
     W(-62, 0, -26, { tag: 'lawn', w: ROAD, m: 5 }),
     W(-84, 0, -8, { tag: 'lawn', w: ROAD, m: 5 }),
     W(-102, 0, 14, { tag: 'lawn', w: ROAD, m: 5, pad: 1 }),
@@ -299,9 +301,9 @@ export function buildTrack(def) {
     const a = dense[j], b = dense[(j + 1) % dense.length];
     const f = (s - acc[j]) / Math.max(1e-6, acc[j + 1] - acc[j]);
     T.x[k] = a.x + (b.x - a.x) * f; T.y[k] = a.y + (b.y - a.y) * f; T.z[k] = a.z + (b.z - a.z) * f;
-    // The Landing's room and hallway both have a floor at zero.
+    // The rooms and lawn all have a ground plane at zero.
     // Spline overshoot on the approach to a ramp must stay above it.
-    if (def.id === 'landing') T.y[k] = Math.max(0, T.y[k]);
+    T.y[k] = Math.max(0, T.y[k]);
     T.w[k] = a.w + (b.w - a.w) * f; T.m[k] = a.m + (b.m - a.m) * f;
     const sec = a.t < 0.5 ? a.from : (a.from + 1) % n;
     T.sec[k] = sec;
@@ -413,6 +415,20 @@ export function groundAt(T, k, d, a = 0) {
   const y = T.y[k] + (T.y[k2] - T.y[k]) * f;
   if (T.drop[k] && Math.abs(d) > T.w[k] + T.m[k]) return -Infinity;
   return y;
+}
+
+/* Conservative clearance for stationary scenery. Test its oriented footprint
+   against the full road, including shoulders and the kart's own height. */
+export function sceneryClearsRoad(T, x, z, halfX, halfZ, yaw = 0, bottom = 0, top = Infinity) {
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  for (let k = 0; k < T.N; k++) {
+    if (T.y[k] > top || T.y[k] + 3.5 < bottom) continue;
+    const dx = T.x[k] - x, dz = T.z[k] - z;
+    const rx = Math.max(0, Math.abs(c * dx - s * dz) - halfX);
+    const rz = Math.max(0, Math.abs(s * dx + c * dz) - halfZ);
+    if (Math.hypot(rx, rz) < T.w[k] + T.m[k] + 1.5) return false;
+  }
+  return true;
 }
 
 /* arc length of sample k */

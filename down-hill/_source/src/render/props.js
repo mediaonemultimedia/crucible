@@ -13,7 +13,7 @@
    the road or the podium / turntable spot.                               */
 
 import * as THREE from 'three/webgpu';
-import { rightX, rightZ } from '../race/track.js';
+import { rightX, rightZ, sceneryClearsRoad } from '../race/track.js';
 
 const TAU = Math.PI * 2;
 
@@ -185,8 +185,20 @@ export function addProps(world) {
     const p = place(T, startK, f, side, gap, avoid);
     if (!p) continue;
     kit.at(p.x, 0.02, p.z, p.yaw + spin);
-    spots.push([kind, p.x, p.z]);
+    const first = kit.parts.length;
     P[kind](kit, ...args);
+    const footprint = new THREE.Box3();
+    for (const { g } of kit.parts.slice(first)) {
+      g.computeBoundingBox();
+      footprint.union(g.boundingBox);
+    }
+    const mid = footprint.getCenter(new THREE.Vector3());
+    const size = footprint.getSize(new THREE.Vector3());
+    if (!sceneryClearsRoad(T, mid.x, mid.z, size.x / 2, size.z / 2, 0, footprint.min.y, footprint.max.y)) {
+      for (const { g } of kit.parts.splice(first)) g.dispose();
+      continue;
+    }
+    spots.push([kind, p.x, p.z]);
     n++;
   }
   if (!kit.parts.length) return null;

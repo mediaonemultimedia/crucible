@@ -11,12 +11,13 @@
    World units: the track's. The room is x −300…285, z −195…165.          */
 
 import * as THREE from 'three/webgpu';
-import { World } from './world.js';
+import { World, keepCameraAboveRoad } from './world.js';
 import { buildReadable } from './readable.js';
 import { rbox, mat, mesh, canvasTex, srand } from './geo.js';
-import { rightX, rightZ, podPos } from '../race/track.js';
+import { rightX, rightZ, podPos, sceneryClearsRoad } from '../race/track.js';
 
 const TAU = Math.PI * 2;
+const HEATER = { x: 255, z: -120 };
 export const ROOM = { x0: -300, x1: 285, z0: -195, z1: 190, h: 150 };
 
 function concreteTex() {
@@ -47,7 +48,7 @@ function blockTex() {
 /* the conveyor: folded towels lying flat, end to end, in stripes */
 function beltTex() {
   return canvasTex(256, 512, (g, w, h) => {
-    const cols = ['#e86a6a', '#f2d27a', '#7fc8e8', '#a8e0a0', '#f4f1ea', '#c9a4e8', '#f59ac0', '#7fd8c8'];
+    const cols = ['#ef2940', '#ffc51a', '#2875ed', '#0abb73', '#fff2dc', '#813bea', '#ed368c', '#12bfd5'];
     const n = 8, th = h / n;
     for (let i = 0; i < n; i++) {
       const y = i * th;
@@ -97,7 +98,7 @@ export class LaundryWorld extends World {
     this._dryer();
     this._clutter();
     this._guides();
-    this.readable = buildReadable(this, { arrowTags: new Set(['ramp', 'suds', 'pods', 'socks', 'bulge']), railCols: ['#2f6bd8', '#f4f1ea'] });
+    this.readable = buildReadable(this, { arrowTags: new Set(['ramp', 'suds', 'pods', 'socks', 'bulge']), railCols: ['#1364c8', '#fff5d8'] });
     this._movers();
   }
 
@@ -108,8 +109,9 @@ export class LaundryWorld extends World {
     };
   }
   /* in the shortcut's gap the camera stays in the gap (and low in the drum) */
-  camFix(want, pose) {
+  camFix(want, pose, hint) {
     const C = this.T.cut;
+    keepCameraAboveRoad(this.T, want, hint);
     if (!C) return;
     const s = (pose.x - C.ax) * C.ux + (pose.z - C.az) * C.uz, l = -(pose.x - C.ax) * C.uz + (pose.z - C.az) * C.ux;
     if (s > C.m0 - 10 && s < C.m1 + 10 && Math.abs(l) < C.w + 1.5) {
@@ -152,7 +154,7 @@ export class LaundryWorld extends World {
     S.add(this.lamp);
     // the water heater's pilot glow
     this.pilot = new THREE.PointLight('#5aa8ff', 500, 60, 1.8);
-    this.pilot.position.set(250, 8, 10);
+    this.pilot.position.set(HEATER.x - 5, 8, HEATER.z);
     S.add(this.pilot);
   }
 
@@ -164,8 +166,8 @@ export class LaundryWorld extends World {
     // a floor drain by the water heater
     const drain = mesh(new THREE.CircleGeometry(5, 24), mat('#2b2a2a', { roughness: 0.4, metalness: 0.6 }), 232, 0.05, -40, root); drain.rotation.x = -Math.PI / 2;
     // cinder-block walls, a painted band, a skirting of pipes
-    const wall = new THREE.MeshStandardMaterial({ map: blockTex(), roughness: 0.9 });
-    const band = mat('#5f7f8f', { roughness: 0.8 });
+    const wall = new THREE.MeshStandardMaterial({ map: blockTex(), color: '#d8edff', roughness: 0.9 });
+    const band = mat('#0b60a5', { roughness: 0.8 });
     const walls = [[(R.x0 + R.x1) / 2, R.z0, R.x1 - R.x0, 0], [(R.x0 + R.x1) / 2, R.z1, R.x1 - R.x0, Math.PI], [R.x0, (R.z0 + R.z1) / 2, R.z1 - R.z0, Math.PI / 2], [R.x1, (R.z0 + R.z1) / 2, R.z1 - R.z0, -Math.PI / 2]];
     for (const [x, z, w, ry] of walls) {
       const m = mesh(new THREE.PlaneGeometry(w, R.h), wall, x, R.h / 2, z, root); m.rotation.y = ry;
@@ -194,11 +196,11 @@ export class LaundryWorld extends World {
     // pipes along the east wall to the water heater, and the heater
     const copper = mat('#b8733f', { roughness: 0.35, metalness: 0.7 });
     for (const [y, z0, z1] of [[60, -180, 150], [66, -180, 150]]) { const p = mesh(new THREE.CylinderGeometry(1.4, 1.4, z1 - z0, 10), copper, R.x1 - 6, y, (z0 + z1) / 2, root); p.rotation.x = Math.PI / 2; }
-    const heater = mesh(new THREE.CylinderGeometry(22, 22, 92, 28), mat('#d9d7cf', { roughness: 0.4, metalness: 0.2 }), 255, 46, 10, root); heater.userData.cast = true;
-    mesh(new THREE.CylinderGeometry(22.5, 22.5, 3, 28), mat('#a6a39b', { metalness: 0.4 }), 255, 92, 10, root);
-    mesh(new THREE.CylinderGeometry(4, 4, 60, 12), mat('#9a9a9a', { metalness: 0.6 }), 255, 122, 10, root);
-    mesh(new THREE.BoxGeometry(2, 8, 10), mat('#2b2b2b'), 232.5, 12, 10, root);
-    this.glow('#5aa8ff', 18, 232, 8, 10, 0.8);
+    const heater = mesh(new THREE.CylinderGeometry(22, 22, 92, 28), mat('#d9d7cf', { roughness: 0.4, metalness: 0.2 }), HEATER.x, 46, HEATER.z, root); heater.userData.cast = true;
+    mesh(new THREE.CylinderGeometry(22.5, 22.5, 3, 28), mat('#a6a39b', { metalness: 0.4 }), HEATER.x, 92, HEATER.z, root);
+    mesh(new THREE.CylinderGeometry(4, 4, 60, 12), mat('#9a9a9a', { metalness: 0.6 }), HEATER.x, 122, HEATER.z, root);
+    mesh(new THREE.BoxGeometry(2, 8, 10), mat('#2b2b2b'), HEATER.x - 22.5, 12, HEATER.z, root);
+    this.glow('#5aa8ff', 18, HEATER.x - 23, 8, HEATER.z, 0.8);
   }
 
   /* the folding table and its conveyor of folded towels */
@@ -206,16 +208,19 @@ export class LaundryWorld extends World {
     const T = this.T, N = T.N, root = this.root;
     const ks = []; for (let k = 0; k < N; k++) if (this.tagAt(k) === 'belt') ks.push(k);
     if (!ks.length) return;
+    const tail = ks.at(-1);
+    const deck = [...ks];
+    for (let k = tail + 1; k < N && T.y[k] > 0.08; k++) deck.push(k);
     // the belt surface: a ribbon over the belt samples, its texture scrolling with the belt
     this.beltTex = beltTex();
-    const beltMat = new THREE.MeshStandardMaterial({ map: this.beltTex, roughness: 0.95, side: THREE.DoubleSide });
+    const beltMat = new THREE.MeshStandardMaterial({ map: this.beltTex, roughness: 0.95 });
     const pos = [], uv = [], idx = [];
     let v = 0;
-    ks.forEach((k, i) => {
+    deck.forEach((k, i) => {
       const w = T.w[k] + T.m[k], rx = rightX(T, k), rz = rightZ(T, k);
       pos.push(T.x[k] - rx * w, T.y[k] + 0.05, T.z[k] - rz * w, T.x[k] + rx * w, T.y[k] + 0.05, T.z[k] + rz * w);
       uv.push(0, v / 40, 1, v / 40); v += T.step;
-      if (i) { const a = (i - 1) * 2, b = i * 2; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+      if (i) { const a = (i - 1) * 2, b = i * 2; idx.push(a, a + 1, b, a + 1, b + 1, b); }
     });
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
@@ -224,10 +229,10 @@ export class LaundryWorld extends World {
     this.beltMesh = belt;
     // the table under it: a long top, rollers at the ends, legs
     const k0 = ks[0], k1 = ks[ks.length - 1];
-    const x0 = T.x[k0], x1 = T.x[k1], z = (T.z[k0] + T.z[k1]) / 2, y = T.y[k0], w = (T.w[k0] + T.m[k0]) * 2 + 2;
+    const x0 = T.x[k0], x1 = T.x[k1], z = (T.z[k0] + T.z[k1]) / 2, y = Math.min(...ks.map((k) => T.y[k])) - 0.25, w = (T.w[k0] + T.m[k0]) * 2 + 2;
     const steel = mat('#8f969e', { roughness: 0.35, metalness: 0.75 });
     const top = mesh(rbox(x1 - x0 + 8, 2.4, w, 0.6), mat('#3c3f44', { roughness: 0.6 }), (x0 + x1) / 2, y - 1.3, z, root); top.userData.cast = true;
-    for (const xx of [x0 - 3, x1 + 3]) { const r = mesh(new THREE.CylinderGeometry(1.6, 1.6, w, 16), steel, xx, y - 0.6, z, root); r.rotation.x = Math.PI / 2; }
+    for (const xx of [x0 - 3, x1 + 3]) { const r = mesh(new THREE.CylinderGeometry(1.6, 1.6, w, 16), steel, xx, y - 1.7, z, root); r.rotation.x = Math.PI / 2; }
     for (let x = x0; x <= x1 + 1; x += 26) for (const s of [-1, 1]) { const l = mesh(new THREE.BoxGeometry(1.6, y - 2, 1.6), steel, x, (y - 2) / 2, z + s * (w / 2 - 1.5), root); l.userData.cast = true; }
     // a side rail with stacks of folded towels waiting (decor, low)
     const r = srand(8), cols = ['#e86a6a', '#f2d27a', '#7fc8e8', '#a8e0a0', '#f4f1ea', '#c9a4e8'];
@@ -241,7 +246,9 @@ export class LaundryWorld extends World {
     const rk = []; for (let k = 0; k < N; k++) if (this.tagAt(k) === 'ramp') rk.push(k);
     if (rk.length) {
       const card = new THREE.MeshStandardMaterial({ map: canvasTex(256, 256, (g2, W, H) => { g2.fillStyle = '#c9a26a'; g2.fillRect(0, 0, W, H); g2.fillStyle = '#ff6a2a'; g2.fillRect(0, H * 0.25, W, H * 0.3); g2.fillStyle = '#fff'; g2.font = 'bold 44px sans-serif'; g2.fillText('SUDZ', 60, H * 0.47); g2.fillStyle = '#2f6bd8'; g2.beginPath(); g2.arc(W * 0.8, H * 0.75, 26, 0, TAU); g2.fill(); }), roughness: 0.85 });
-      const ext = [rk[0] - 2, ...rk, rk[rk.length - 1] + 2].map((k) => (k + N) % N);
+      let first = rk[0];
+      while (first > 0 && T.y[first - 1] > 0.08) first--;
+      const ext = Array.from({ length: k0 - first + 1 }, (_, i) => first + i);
       this.ribbon(ext, card, 1.4);
     }
   }
@@ -255,10 +262,11 @@ export class LaundryWorld extends World {
     const glass = mat('#2a3550', { roughness: 0.1, metalness: 0.3, emissive: '#101828', emissiveIntensity: 0.6 });
     const chrome = mat('#cfd3d8', { roughness: 0.2, metalness: 0.9 });
     const knob = mat('#3a3a40', { roughness: 0.5 });
-    // vintage pastels: cream, mint, avocado, powder blue, butter
-    const shells = [white, mat('#bfe8d4', { roughness: 0.35 }), mat('#c8cf8a', { roughness: 0.35 }), mat('#b8d4ee', { roughness: 0.35 }), mat('#f2e2a4', { roughness: 0.35 })];
+    // white enamel alongside painted toy-blue, cherry, turquoise and yellow
+    const shells = [white, mat('#0e75dc', { roughness: 0.35 }), mat('#eb303c', { roughness: 0.35 }), mat('#0bb6a2', { roughness: 0.35 }), mat('#ffc019', { roughness: 0.35 })];
     let nM = 0;
     const machine = (x, z, ry, front = true, kind = 0) => {
+      if (!sceneryClearsRoad(this.T, x, z, 14.2, 17, ry, 0, 40)) return;
       const g = new THREE.Group();
       const body = mesh(rbox(28, 38, 30, 2.2), shells[nM++ % shells.length], 0, 19, 0, g); body.userData.cast = true;
       mesh(rbox(28.2, 6, 4, 1), grey, 0, 35, -13.5, g);
@@ -277,17 +285,15 @@ export class LaundryWorld extends World {
     // the island: two rows facing out, with the gap (the shortcut) between them
     if (C) {
       const N2 = new THREE.Vector3(-C.uz, 0, C.ux);       // the corridor's left
-      const span = C.m1 - C.m0;
       for (let s = C.m0 + 4; s < C.m1 - 4; s += 29.5) {
-        const inDrum = s > C.d0 - 16 && s < C.d1 + 16;
+        const center = s + 14;
+        const inDrum = center > C.d0 - 16 && center < C.d1 + 16;
+        if (inDrum) continue;
         for (const side of [-1, 1]) {
-          if (inDrum && side === 1) continue;
-          const off = (C.w + 15.5) * side, x = C.ax + C.ux * (s + 14) + N2.x * off, z = C.az + C.uz * (s + 14) + N2.z * off;
-          if (inDrum) continue;
+          const off = (C.w + 15.5) * side, x = C.ax + C.ux * center + N2.x * off, z = C.az + C.uz * center + N2.z * off;
           machine(x, z, Math.atan2(N2.x * side, N2.z * side), true, (s | 0) % 2);
         }
       }
-      void span;
       // the gap's floor: worn linoleum, the drum's cradle
       const lino = mat('#6a8f7a', { roughness: 0.6 });
       const L = C.m1 - C.m0 + 20, cx = C.ax + C.ux * (C.m0 + C.m1) / 2, cz = C.az + C.uz * (C.m0 + C.m1) / 2;
@@ -300,7 +306,9 @@ export class LaundryWorld extends World {
         if (inDrum) continue;
         for (const side of [-1, 1]) {
           const off = (C.w + 1.6) * side, x = C.ax + C.ux * (s + 6) + N2.x * off, z = C.az + C.uz * (s + 6) + N2.z * off;
-          const b = mesh(rbox(12, 7 + ((s | 0) % 3) * 2, 2.6, 0.3), box, x, 3.5 + ((s | 0) % 3), z, root); b.rotation.y = Math.atan2(C.ux, C.uz) + Math.PI / 2;
+          const yaw = Math.atan2(C.ux, C.uz) + Math.PI / 2;
+          if (!sceneryClearsRoad(this.T, x, z, 6, 1.3, yaw, 0, 11)) continue;
+          const b = mesh(rbox(12, 7 + ((s | 0) % 3) * 2, 2.6, 0.3), box, x, 3.5 + ((s | 0) % 3), z, root); b.rotation.y = yaw;
         }
       }
     }
@@ -345,6 +353,7 @@ export class LaundryWorld extends World {
     // laundry baskets in the infield, a drying rack, a stray sock or two
     const basket = mat('#e8e0f0', { roughness: 0.6 });
     for (const [x, z, c] of [[-60, 10, '#7fd8c8'], [40, -10, '#f59ac0'], [-180, -100, '#f2d27a']]) {
+      if (!sceneryClearsRoad(T, x, z, 13, 13, 0, 0, 16)) continue;
       const b = mesh(new THREE.CylinderGeometry(13, 11, 12, 20, 1, true), mat(c, { roughness: 0.6, side: THREE.DoubleSide }), x, 6, z, root); b.userData.cast = true;
       mesh(new THREE.CylinderGeometry(11, 11, 0.6, 20), basket, x, 0.3, z, root);
       for (let i = 0; i < 6; i++) { const t = mesh(rbox(9, 2, 6, 0.8), mat(SOCKS[Math.floor(r() * SOCKS.length)], { roughness: 0.95 }), x + (r() - 0.5) * 10, 8 + i * 0.9, z + (r() - 0.5) * 10, root); t.rotation.set((r() - 0.5) * 0.6, r() * 3, (r() - 0.5) * 0.6); }
@@ -401,14 +410,18 @@ export class LaundryWorld extends World {
 
   tagAt(k) { return this.T.def.points[this.T.sec[k]].tag; }
   ribbon(ks, material, thick) {
-    const T = this.T, pos = [], idx = [];
+    const T = this.T, pos = [], uv = [], idx = [];
     ks.forEach((k, i) => {
       const w = T.w[k] + T.m[k], rx = rightX(T, k), rz = rightZ(T, k), y = T.y[k];
       for (const [s, dy] of [[-1, 0], [1, 0], [-1, -thick], [1, -thick]]) pos.push(T.x[k] + rx * w * s, y + dy, T.z[k] + rz * w * s);
+      const v = i / Math.max(1, ks.length - 1);
+      uv.push(0, v, 1, v, 0, v, 1, v);
       if (i) { const a = (i - 1) * 4, b = i * 4; idx.push(a, b, a + 1, a + 1, b, b + 1, a + 2, a + 3, b + 2, a + 3, b + 3, b + 2, a, a + 2, b, a + 2, b + 2, b, a + 1, b + 1, a + 3, a + 3, b + 1, b + 3); }
     });
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    for (let i = 0; i < idx.length; i += 3) [idx[i + 1], idx[i + 2]] = [idx[i + 2], idx[i + 1]];
     g.setIndex(idx); g.computeVertexNormals();
     const m = mesh(g, material, 0, 0, 0, this.root); m.userData.cast = true;
     return m;
