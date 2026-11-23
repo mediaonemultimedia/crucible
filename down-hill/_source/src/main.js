@@ -798,13 +798,14 @@ class App {
     const h = (4.3 + intro * 9 + (K.air ? 1.2 : 0) + tv * 6) * C.size;
     const fx = Math.sin(yaw), fz = Math.cos(yaw);
     const want = new THREE.Vector3(pose.x - fx * dist * back, pose.y + h, pose.z - fz * dist * back);
-    this.world.camFix(want, pose);
     const [bx0, bx1, bz0, bz1] = this.world.info.bounds;
     want.x = Math.max(bx0, Math.min(bx1, want.x)); want.z = Math.max(bz0, Math.min(bz1, want.z));
     if (K.fish) { want.set(pose.x - fx * 14, pose.y + 9, pose.z - fz * 14); }
+    this.world.camFix(want, pose, K.k);
     const k = H.lookBack !== H.lb ? 1 : Math.min(1, dt * (K.fish ? 2.5 : tv ? 3 : 7.5));
     H.lb = H.lookBack;
     C.pos.lerp(want, k);
+    this.world.camFix(C.pos, pose, K.k);
     const look = new THREE.Vector3(pose.x + fx * 5 * back, pose.y + 1.8, pose.z + fz * 5 * back);
     C.look.lerp(look, Math.min(1, dt * 12));
     const fov = (64 + Math.min(1.45, sp / top) * 9 + (K.boostT > 0 ? 8 : 0) + punch * 9) * (this.hv.length === 2 && !tv ? 0.82 : 1);

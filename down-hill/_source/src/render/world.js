@@ -15,10 +15,11 @@
 import * as THREE from 'three/webgpu';
 import { rbox, pillowGeo, mat, glowMat, mesh, canvasTex, srand, mergeStatic } from './geo.js';
 import { addProps } from './props.js';
-import { rightX, rightZ } from '../race/track.js';
+import { along, groundAt, lateral, locate, rightX, rightZ } from '../race/track.js';
 import { buildReadable } from './readable.js';
 
 const TAU = Math.PI * 2;
+const landingLookdev = typeof LOOKDEV_RACE !== 'undefined' && LOOKDEV_RACE;
 export const BED = { x0: -66, x1: 34, z0: -112, z1: 14, top: 20, under: 10.75 };
 export const ROOM = { x0: -144, x1: 126, z0: -112, z1: 112, h: 130 };
 export const HALL = { x0: 126, x1: 414, z0: -112, z1: 112 };
@@ -55,14 +56,15 @@ function carpetTex(c1, c2) {
 }
 function wallpaperTex() {
   return canvasTex(256, 256, (g, w, h) => {
-    g.fillStyle = '#3a3566'; g.fillRect(0, 0, w, h);
-    g.fillStyle = '#433d74';
+    const base = landingLookdev ? '#283a4e' : '#3a3566';
+    g.fillStyle = base; g.fillRect(0, 0, w, h);
+    g.fillStyle = landingLookdev ? '#30455b' : '#433d74';
     for (let x = 0; x < w; x += 32) g.fillRect(x, 0, 14, h);
     // little stars and moons
-    g.fillStyle = '#f3d98b';
+    g.fillStyle = landingLookdev ? '#9eb2b7' : '#f3d98b';
     const star = (x, y, s) => { g.beginPath(); for (let i = 0; i < 10; i++) { const a = (i / 10) * TAU - Math.PI / 2, rr = i % 2 ? s * 0.45 : s; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } g.fill(); };
     star(40, 50, 9); star(170, 120, 7); star(90, 200, 8); star(220, 30, 5);
-    g.beginPath(); g.arc(200, 210, 12, 0, TAU); g.fill(); g.fillStyle = '#3a3566'; g.beginPath(); g.arc(206, 205, 11, 0, TAU); g.fill();
+    g.beginPath(); g.arc(200, 210, 12, 0, TAU); g.fill(); g.fillStyle = base; g.beginPath(); g.arc(206, 205, 11, 0, TAU); g.fill();
   }, { repeat: [12, 5] });
 }
 function hallPaperTex() {
@@ -74,7 +76,8 @@ function hallPaperTex() {
 }
 function quiltTex() {
   return canvasTex(512, 512, (g, w, h) => {
-    const cols = ['#2f4a8a', '#3a5aa0', '#27407a', '#33509a'];
+    const cols = landingLookdev ? ['#30536a', '#4c7481', '#254557', '#3b6170']
+      : ['#2f4a8a', '#3a5aa0', '#27407a', '#33509a'];
     const n = 8, s = w / n;
     for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
       g.fillStyle = cols[(i + j * 3) % 4]; g.fillRect(i * s, j * s, s, s);
@@ -92,8 +95,25 @@ function quiltTex() {
 function rugTex() {
   return canvasTex(512, 512, (g, w, h) => {
     const cx = w / 2, cy = h / 2;
-    const rings = ['#e86f7d', '#f4c06a', '#6fd3b8', '#7e72d8', '#f4efe6', '#e86f7d', '#f4c06a', '#6fd3b8', '#7e72d8'];
+    const rings = landingLookdev ? ['#405c66', '#dac8a0', '#6d8683', '#405c66', '#b6906c', '#dac8a0', '#4e6b76', '#6d8683', '#405c66']
+      : ['#e86f7d', '#f4c06a', '#6fd3b8', '#7e72d8', '#f4efe6', '#e86f7d', '#f4c06a', '#6fd3b8', '#7e72d8'];
     for (let i = 0; i < rings.length; i++) { g.fillStyle = rings[i]; g.beginPath(); g.arc(cx, cy, w / 2 - i * 26, 0, TAU); g.fill(); }
+    if (landingLookdev) {
+      // Herringbone stitches follow the rug's binding, painted into the existing texture.
+      for (const radius of [244, 224, 190, 112]) {
+        const count = Math.round(radius * 0.85);
+        g.strokeStyle = radius > 220 ? 'rgba(244,225,177,0.55)' : 'rgba(37,61,68,0.32)';
+        g.lineWidth = 1.6;
+        g.beginPath();
+        for (let i = 0; i < count; i++) {
+          const a = i * TAU / count;
+          const inner = radius - 4;
+          g.moveTo(cx + inner * Math.cos(a - 0.015), cy + inner * Math.sin(a - 0.015));
+          g.lineTo(cx + radius * Math.cos(a), cy + radius * Math.sin(a));
+        }
+        g.stroke();
+      }
+    }
     const r = srand(11);
     for (let i = 0; i < 9000; i++) { g.fillStyle = r() < 0.5 ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'; g.fillRect(r() * w, r() * h, 2, 2); }
   });
@@ -137,9 +157,32 @@ export class World {
     };
   }
   /* the chase camera's wish, kept out of the furniture: under the bed it stays under the slats */
-  camFix(want, pose) {
+  camFix(want, pose, hint) {
+    const T = this.T;
+    const k = locate(T, want.x, want.z, hint, 40);
+    const tag = T.def.points[T.sec[k]].tag;
+    const d = lateral(T, k, want.x, want.z);
+    if (Math.abs(d) <= T.w[k] + T.m[k] + 3) {
+      const road = groundAt(T, k, d, along(T, k, want.x, want.z));
+      want.y = Math.max(want.y, road + 1.3);
+    }
+
+    // Pull the camera back through a doorway only while the sightline fits.
+    const wall = ROOM.x1;
+    const dx = want.x - pose.x;
+    if ((want.x - wall) * (pose.x - wall) < 0) {
+      const t = (wall - pose.x) / dx;
+      const z = pose.z + (want.z - pose.z) * t;
+      const y = pose.y + 2 + (want.y - pose.y - 2) * t;
+      const fits = y < 67 && ((z > 17 && z < 41) || (z > -93 && z < -69));
+      if (!fits) {
+        const safe = Math.max(0, t - 3 / Math.abs(dx));
+        want.x = pose.x + dx * safe;
+        want.z = pose.z + (want.z - pose.z) * safe;
+      }
+    }
     const ub = want.x > BED.x0 - 4 && want.x < BED.x1 + 4 && want.z > BED.z0 && want.z < BED.z1 + 4;
-    if (pose.y < BED.under && ub) want.y = Math.min(want.y, BED.under - 1.4);
+    if (pose.y < BED.under && ub && tag !== 'books') want.y = Math.min(want.y, BED.under - 1.4);
     if (pose.y > BED.top - 1 && ub) want.y = Math.max(want.y, BED.top + 2.2);
   }
   /* 0…1: how dark it is here (under the bed) */
@@ -155,7 +198,7 @@ export class World {
     this._landing();
     this._trackParts();
     this._guides();
-    this.readable = buildReadable(this, { arrowTags: new Set(['door', 'drawer', 'pillows', 'underbed', 'landing', 'books']) });
+    this.readable = buildReadable(this, { railCols: landingLookdev ? ['#854b43', '#f4e4c5'] : undefined, arrowTags: new Set(['door', 'drawer', 'pillows', 'underbed', 'landing', 'books']) });
   }
 
   add(o) { this.root.add(o); return o; }
@@ -171,10 +214,11 @@ export class World {
   _lights() {
     const S = (this.lightsG = new THREE.Group());
     this.scene.add(S);
-    this.hemi = new THREE.HemisphereLight('#5d63b8', '#2a1c22', 1.25);
+    this.hemi = landingLookdev ? new THREE.HemisphereLight('#abbfd4', '#756552', 1.15)
+      : new THREE.HemisphereLight('#5d63b8', '#2a1c22', 1.25);
     S.add(this.hemi);
     // the moon through the west window: low and cool, casting the furniture's shadows (once)
-    const moon = (this.moon = new THREE.DirectionalLight('#a9bcff', 2.1));
+    const moon = (this.moon = new THREE.DirectionalLight(landingLookdev ? '#c6d9f4' : '#a9bcff', 2.1));
     moon.position.set(-420, 300, 60);
     moon.target.position.set(80, 0, 0);
     moon.castShadow = true;
@@ -189,7 +233,7 @@ export class World {
     this.lamp.position.set(58, 52, -98);
     S.add(this.lamp);
     // the night-light by the skirting (a little moon, mint)
-    this.night = new THREE.PointLight('#8ff0d0', 700, 90, 1.7);
+    this.night = new THREE.PointLight(landingLookdev ? '#b8d6db' : '#8ff0d0', 700, 90, 1.7);
     this.night.position.set(-120, 10, 96);
     S.add(this.night);
     // the landing's sconce, warm
@@ -304,7 +348,7 @@ export class World {
 
   _bed() {
     const B = BED, root = this.root;
-    const wood = new THREE.MeshStandardMaterial({ color: '#8a5a3c', roughness: 0.55 });
+    const wood = new THREE.MeshStandardMaterial({ color: landingLookdev ? '#946b48' : '#8a5a3c', roughness: 0.55 });
     const W = B.x1 - B.x0, D = B.z1 - B.z0, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2;
     // frame and legs
     const frame = mesh(rbox(W + 3, 4, D + 3, 1.2), wood, cx, B.under + 2, cz, root); frame.userData.cast = true;
@@ -482,6 +526,8 @@ export class World {
       });
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      // The road's upper face must face the camera from above.
+      for (let i = 0; i < idx.length; i += 3) [idx[i + 1], idx[i + 2]] = [idx[i + 2], idx[i + 1]];
       g.setIndex(idx); g.computeVertexNormals();
       const m = mesh(g, material, 0, 0, 0, root); m.userData.cast = true;
       return m;
@@ -489,7 +535,7 @@ export class World {
     const contiguous = (ks) => { const out = []; let cur = []; for (const k of ks) { if (cur.length && k !== cur[cur.length - 1] + 1) { out.push(cur); cur = []; } cur.push(k); } if (cur.length) out.push(cur); return out; };
 
     // the banister: a polished handrail as wide as a road, balusters down to the floor
-    const rail = new THREE.MeshStandardMaterial({ color: '#7a4428', roughness: 0.28, metalness: 0.05 });
+    const rail = new THREE.MeshStandardMaterial({ color: landingLookdev ? '#9a6e46' : '#7a4428', roughness: 0.28, metalness: 0.05 });
     const bal = mat('#efe6d6', { roughness: 0.45 });
     for (const run of contiguous(runs.banister || [])) {
       const ext = [run[0] - 3, ...run, run[run.length - 1] + 3].map((k) => (k + N) % N);
@@ -511,18 +557,26 @@ export class World {
     const plank = new THREE.MeshStandardMaterial({ map: canvasTex(512, 64, (g, w, h) => { g.fillStyle = '#e9c98f'; g.fillRect(0, 0, w, h); g.fillStyle = '#5a3a1e'; for (let x = 0; x < w; x += 16) g.fillRect(x, 0, 2, x % 80 ? 14 : 26); g.font = '700 16px sans-serif'; for (let x = 0; x < w; x += 80) g.fillText(String(x / 80), x + 4, 44); }, { repeat: [1, 1] }), roughness: 0.5 });
     for (const run of contiguous(runs.plank || [])) { const ext = [run[0] - 2, ...run, run[run.length - 1] + 2].map((k) => (k + N) % N); ribbon(ext, plank, 1.6); }
     // the book stairs: a tumble of fat books, each top flush with the track
-    const books = ['#c0392b', '#2e86de', '#16a085', '#f39c12', '#8e44ad', '#d35400', '#27ae60', '#e84393'];
+    const books = landingLookdev ? ['#7e3e36', '#36525e', '#567568', '#a27843', '#65546a', '#894e39', '#496756', '#965b58']
+      : ['#c0392b', '#2e86de', '#16a085', '#f39c12', '#8e44ad', '#d35400', '#27ae60', '#e84393'];
     const spine = spineTex();
+    const bookMaterials = books.map((color) => new THREE.MeshStandardMaterial({ color, map: spine, roughness: 0.74 }));
     const bk = runs.books || [];
+    for (const run of contiguous(bk)) {
+      const ext = [(run[0] - 1 + N) % N, ...run, (run[run.length - 1] + 1) % N];
+      ribbon(ext, mat(landingLookdev ? '#b38b5b' : '#a17454', { roughness: 0.82 }), 0.6);
+    }
     const r = srand(4);
     for (let i = 0; i < bk.length; i += 4) {
       const k = bk[i], y = T.y[k], w = T.w[k] + T.m[k] + 3;
       const yaw = Math.atan2(T.tx[k], T.tz[k]);
-      let h = y, n = 0;
+      // Keep the decorative book covers below the continuous drivable surface.
+      let h = Math.min(y, ...[-3, -2, -1, 1, 2, 3].map((q) => T.y[(k + q + N) % N])) - 0.6;
+      let n = 0;
       while (h > 0.5 && n < 10) {
         const t = Math.min(h, 2.6 + r() * 1.6);
-        const b = mesh(rbox(w * 2 + r() * 4, t, 5.5, 0.4), new THREE.MeshStandardMaterial({ color: books[(i + n) % 8], map: spine, roughness: 0.6 }), T.x[k], h - t / 2, T.z[k], root);
-        b.rotation.y = yaw + Math.PI / 2 + (r() - 0.5) * 0.12; b.userData.cast = true;
+        const b = mesh(rbox(w * 2 + r() * 4, t, 5.5, 0.4), bookMaterials[(i + n) % bookMaterials.length], T.x[k], h - t / 2, T.z[k], root);
+        b.rotation.y = yaw + (r() - 0.5) * 0.035; b.userData.cast = true;
         h -= t; n++;
       }
     }

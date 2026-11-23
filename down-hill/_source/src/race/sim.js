@@ -130,12 +130,13 @@ export class Race {
       if (this.phase !== 'race') return;
       for (const K of this.karts) if (K.rev > 0.35 && K.rev < 0.95) { K.boostT = 0.8; this.emit({ k: 'boost', i: K.i, tier: 0, start: 1 }); }
     }
-    if (this.phase === 'done') { for (const K of this.karts) this._kartTick(K, inputs[K.i] || noInput()); this._bumps(); return; }
+    if (this.phase === 'done') { for (const K of this.karts) this._kartTick(K, inputs[K.i] || noInput()); this._bumps(); this._settleContacts(); return; }
     for (const B of this.boxes) if (B.dead > 0) B.dead--;
     this._world();
     for (const K of this.karts) this._kartTick(K, inputs[K.i] || noInput());
     this._bumps();
     this._cuffs();
+    this._settleContacts();
     this._shots();
     this._hazards();
     this._place();
@@ -316,8 +317,10 @@ export class Race {
     for (const P of T.def.posts) {
       const dx = K.x - P.x, dz = K.z - P.z, r = P.r + KART_R * 0.8, dd = dx * dx + dz * dz;
       if (dd < r * r && K.y < 6) {
-        const l = Math.sqrt(dd) || 1, nx = dx / l, nz = dz / l;
+        const l = Math.sqrt(dd);
+        const nx = l ? dx / l : rightX(T, K.k), nz = l ? dz / l : rightZ(T, K.k);
         K.x = P.x + nx * r; K.z = P.z + nz * r;
+        K.contactMoved = true;
         const vn = K.vx * nx + K.vz * nz;
         if (vn < 0) { K.vx -= nx * vn * 1.5; K.vz -= nz * vn * 1.5; if (vn < -6) this.emit({ k: 'post', i: K.i, kind: P.kind }); }
       }
@@ -745,6 +748,7 @@ export class Race {
       else if (B.sugarT > 0 && A.sugarT <= 0) this.hit(A, 'sugar', B.i);
       for (const [P, Q] of [[A, B], [B, A]]) if (P.shrinkT > 0 && Q.shrinkT <= 0 && !P.air && !P.flatCd && P.invT <= 0) { P.flatT = 1.0; P.flatCd = 2.2; P.drift = 0; this.emit({ k: 'flat', i: P.i, by: Q.i }); }
       const ma = A.S.mass * (A.shrinkT > 0 ? 0.5 : 1), mb = B.S.mass * (B.shrinkT > 0 ? 0.5 : 1), wa = mb / (ma + mb), wb = ma / (ma + mb);
+      A.contactMoved = B.contactMoved = true;
       A.x -= nx * over * wa; A.z -= nz * over * wa; B.x += nx * over * wb; B.z += nz * over * wb;
       const vrel = (B.vx - A.vx) * nx + (B.vz - A.vz) * nz;
       if (vrel < 0) {
@@ -754,6 +758,32 @@ export class Race {
         B.vx += (j / mb + shove * wb) * nx; B.vz += (j / mb + shove * wb) * nz;
         if (-vrel > 3 && (this.tick - (A.bumpTick || 0) > 12)) { A.bumpTick = B.bumpTick = this.tick; this.emit({ k: 'bump', i: a, j: b, p: Math.min(1, -vrel / 18), x: (A.x + B.x) / 2, y: (A.y + B.y) / 2, z: (A.z + B.z) / 2 }); }
       }
+    }
+  }
+
+  // Contacts can move a kart after its driving tick has resolved the road.
+  _settleContacts() {
+    const T = this.T;
+    for (const K of this.karts) {
+      if (!K.contactMoved) continue;
+      K.contactMoved = false;
+      if (K.fish || K.cut) continue;
+      const k = K.k;
+      const d = lateral(T, k, K.x, K.z);
+      const a = along(T, k, K.x, K.z);
+      const lim = T.w[k] + T.m[k] - (T.rail[k] ? KART_R : 0);
+      K.d = d;
+      if (!T.drop[k] && Math.abs(d) > lim) {
+        const side = Math.sign(d);
+        const nx = rightX(T, k) * side, nz = rightZ(T, k) * side;
+        const overlap = Math.abs(d) - lim;
+        K.x -= nx * overlap; K.z -= nz * overlap;
+        const outward = K.vx * nx + K.vz * nz;
+        if (outward > 0) { K.vx -= outward * nx; K.vz -= outward * nz; }
+        K.d = side * lim;
+      }
+      const floor = groundAt(T, k, K.d, a);
+      if (K.y < floor && !K.air) K.y = floor;
     }
   }
 
@@ -770,7 +800,11 @@ export class Race {
         const nx = dx / l, nz = dz / l, f = (l - rest) * 6 * DT, ma = A.S.mass, mb = B.S.mass;
         A.vx += nx * f * mb / (ma + mb) * 2; A.vz += nz * f * mb / (ma + mb) * 2;
         B.vx -= nx * f * ma / (ma + mb) * 2; B.vz -= nz * f * ma / (ma + mb) * 2;
-        if (l > rest * 2.4) { const c = Math.min(0.6, (l - rest * 2.4) / 2); A.x += nx * c; A.z += nz * c; B.x -= nx * c; B.z -= nz * c; }
+        if (l > rest * 2.4) {
+          const c = Math.min(0.6, (l - rest * 2.4) / 2);
+          A.contactMoved = B.contactMoved = true;
+          A.x += nx * c; A.z += nz * c; B.x -= nx * c; B.z -= nz * c;
+        }
       }
     }
   }
