@@ -479,7 +479,7 @@ export class World {
       g.fillStyle = '#f4efe6'; g.font = '700 22px sans-serif'; g.fillText('LIGHTS OUT', w / 2, 320);
     });
     mesh(new THREE.PlaneGeometry(26, 36), new THREE.MeshStandardMaterial({ map: poster, roughness: 0.7 }), -100, 70, -111.5, root);
-    const pen = canvasTex(256, 96, (g, w, h) => { g.fillStyle = '#3ff0c8'; g.beginPath(); g.moveTo(0, 0); g.lineTo(w, h / 2); g.lineTo(0, h); g.fill(); g.fillStyle = '#120d1f'; g.font = '900 34px "Bolster Display",sans-serif'; g.fillText('DOWN HILL', 18, h / 2 + 12); });
+    const pen = canvasTex(256, 96, (g, w, h) => { g.fillStyle = '#3ff0c8'; g.beginPath(); g.moveTo(0, 0); g.lineTo(w, h / 2); g.lineTo(0, h); g.fill(); g.fillStyle = '#120d1f'; g.font = '900 27px "Bolster Display",sans-serif'; g.fillText('FLUFFED', 18, h / 2 - 3); g.fillText('AND FURIOUS', 18, h / 2 + 21, 148); });
     const pn = mesh(new THREE.PlaneGeometry(40, 15), new THREE.MeshStandardMaterial({ map: pen, transparent: true, side: THREE.DoubleSide }), 90, 82, -111.5, root);
     pn.rotation.z = -0.08;
     // fairy lights along the north wall

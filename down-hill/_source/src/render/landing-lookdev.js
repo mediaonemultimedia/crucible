@@ -8,7 +8,7 @@ const blue = '#63b3bd';
 const gold = '#efb74e';
 
 const panels = [
-  { title: 'DOWN HILL', note: 'THE PILLOW FORT GRAND PRIX', base: navy, ink: cream },
+  { title: 'FLUFFED AND FURIOUS', note: 'THE PILLOW FORT GRAND PRIX', base: navy, ink: cream },
   { title: 'PIT TUNNEL', note: 'KEEP TO THE TAPE', base: cream, ink: navy },
   { title: 'BANISTER', note: 'HOLD YOUR LINE', base: red, ink: cream },
   { title: 'SOCK DRAWER', note: 'THREAD THE GAPS', base: gold, ink: navy },
@@ -33,7 +33,7 @@ function panelAtlas() {
       g.setLineDash([]);
       g.textAlign = 'center';
       g.font = '900 49px "Bolster Display", sans-serif';
-      g.fillText(panel.title, w / 2, y + 65);
+      g.fillText(panel.title, w / 2, y + 65, w - 96);
       g.font = '700 18px sans-serif';
       g.fillText(panel.note, w / 2, y + 96);
     }

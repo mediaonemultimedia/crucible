@@ -1,6 +1,6 @@
-# Down Hill — source
+# Fluffed and Furious — source
 
-*Down Hill: a Pillow Fight kart race.* The Pillow Fight 2 plush cast race
+*Fluffed and Furious: a Pillow Fight kart race.* The Pillow Fight 2 plush cast race
 karts round **The Landing** — a giant kid's bedroom and the upstairs landing
 at night. This tree lives on the `kart-source` branch only; what ships to
 `main` is the single built file `down-hill/index.html`

@@ -1,4 +1,4 @@
-/* Down Hill — a Pillow Fight kart race. The app: the renderer and the
+/* Fluffed and Furious — a Pillow Fight kart race. The app: the renderer and the
    world, the screens (title → select → countdown → race → results; the
    Pillow Cup's standings and its overall podium), the players (1 to 4 on
    one screen: the keyboard's two halves, gamepads and phone pads mix
@@ -28,7 +28,7 @@ import { CLIPS } from './audio/clips.js';
 import { Hum } from './audio/hum.js';
 import { say, dismiss, place } from './ui/bubble.js';
 import { tauntLine, koLine, lastLine } from './ui/lines.js';
-import { ICONS, FEATHER, CLOCK_SCARE } from './ui/icons.js';
+import { ICONS, CLOCK_SCARE } from './ui/icons.js';
 import { unpackRows } from './render/readback.js';
 import { PadHost } from './pad/host.js';
 import { runPad } from './pad/pad.js';
@@ -1408,7 +1408,6 @@ async function start() {
   const { renderer, canvas } = await makeRenderer($('stage'));
   const app = new App(renderer, canvas);
   window.__dh = app;
-  $('title').querySelector('.feather').innerHTML = FEATHER;
   // the deep links
   const picks = [];
   for (let n = 1; n <= MAXP; n++) {
@@ -1429,4 +1428,4 @@ async function start() {
   if (!app.hold) app.loop();
 }
 
-start().catch((e) => { console.error(e); $('loading').textContent = 'This browser cannot run Down Hill (WebGL 2 needed).'; });
+start().catch((e) => { console.error(e); $('loading').textContent = 'This browser cannot run Fluffed and Furious (WebGL 2 needed).'; });

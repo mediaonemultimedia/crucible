@@ -209,7 +209,7 @@ export function runPad(params) {
   if (SET.mode !== 'tilt') SET.mode = 'stick';
   const saveSet = () => { try { LS?.setItem('downhill.padSet', JSON.stringify(SET)); } catch { /* */ } };
 
-  document.title = 'Down Hill · Phone Pad';
+  document.title = 'Fluffed and Furious · Phone Pad';
   let vp = document.querySelector('meta[name=viewport]');
   if (!vp) { vp = document.createElement('meta'); vp.name = 'viewport'; document.head.appendChild(vp); }
   vp.content = 'width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover';
