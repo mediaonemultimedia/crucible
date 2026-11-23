@@ -89,7 +89,7 @@ export const LANDING = {
     { x: -26, z: -30, r: 1.7, kind: 'bunny' }, { x: 0, z: -21, r: 1.7, kind: 'bunny' },
   ],
   /* item-box rows: along-track fraction (of the lap) */
-  boxes: [0.1, 0.33, 0.52, 0.68, 0.86],
+  boxes: [0.08, 0.235, 0.39, 0.55, 0.71, 0.865],
 };
 
 /* ── Laundry Day ─────────────────────────────────────────────────────────
@@ -157,7 +157,7 @@ export const LAUNDRY = {
   piles: [
     { x: -147, z: 8, r: 3.2 }, { x: -142, z: 18, r: 2.8 }, { x: -151, z: 22, r: 2.8 }, { x: -146, z: 36, r: 3.2 },
   ],
-  boxes: [0.1, 0.34, 0.5, 0.7, 0.86],
+  boxes: [0.04, 0.19, 0.34, 0.46, 0.6, 0.72, 0.87],
   mapHigh: [5, 30],
   music: 'laundry',
 };
@@ -211,7 +211,7 @@ export const PARK = {
     { x: -86, z: -18, reach: 22, period: 180, dur: 80, phase: 110 },
     { x: -112, z: 22, reach: 20, period: 140, dur: 60, phase: 30 },
   ],
-  boxes: [0.12, 0.33, 0.52, 0.74, 0.9],
+  boxes: [0.05, 0.23, 0.37, 0.52, 0.73, 0.88],
   mapHigh: [4, 16],
   music: 'park',
 };

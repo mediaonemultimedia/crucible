@@ -18,21 +18,35 @@ import { makeRng } from '../sim/rng.js';
 export const DT = 1 / 60;
 export const GRAV = 46;
 export const COUNT_TICKS = 220;       // 3, 2, 1, GO
-export const ITEMS = ['slick', 'missile', 'espresso', 'cuffs', 'case', 'alarm'];
-export const ITEM_NAMES = { slick: 'Feather Slick', missile: 'Pillow Missile', espresso: 'Espresso Shot', cuffs: 'Fuzzy Handcuffs', case: 'Pillowcase', alarm: 'Alarm Clock' };
+export const ITEMS = ['slick', 'missile', 'espresso', 'cuffs', 'case', 'alarm', 'sugar', 'plane', 'wash', 'spring'];
+export const ITEM_NAMES = {
+  slick: 'Feather Slick', missile: 'Pillow Missile', espresso: 'Espresso Shot', cuffs: 'Fuzzy Handcuffs', case: 'Pillowcase', alarm: 'Alarm Clock',
+  sugar: 'Sugar Rush', plane: 'Paper Plane', wash: 'Hot Wash', spring: 'Spring Cushion',
+};
+/* the 3-to-5-word tip the HUD shows with the name when you get one */
+export const ITEM_TIPS = {
+  slick: 'drop it, they spin', missile: 'throw it, bonk someone', espresso: 'big boost, shaky hands', cuffs: 'chains the two ahead',
+  case: 'blinds whoever is ahead', alarm: "wakes up whoever's in 1st", sugar: 'unstoppable candy speed', plane: 'homes in on the racer ahead',
+  wash: 'shrinks everyone else', spring: 'lock on, launch them out',
+};
 export const TIER_AT = [0, 1.0, 2.0, 3.0];          // drift charge (s) for each spark tier
-export const TIER_BOOST = [0, 0.6, 1.0, 1.45];      // the boost each tier gives on release (s)
+export const TIER_BOOST = [0, 0.7, 1.15, 1.65];     // the boost each tier gives on release (s)
+export const BOOST_TOP = 1.62;                      // a boost's peak, × the kart's top speed
 export const ROULETTE = 84;                          // ticks the item slot spins
+export const BOX_RESPAWN = 24;                       // ticks a grabbed box is gone (0.4 s: the pack behind still gets one)
+export const BOX_LANES = [-0.72, -0.36, 0, 0.36, 0.72];   // a row's boxes across the road (× half-width)
+export const SUGAR_T = 6, WASH_T = 5, EJECT_T = 1.5, LOCK_RANGE = 60;
 const ODDS = [
-  // slick missile espresso cuffs case alarm, by place 1…8
-  [52, 33, 10, 0, 5, 0],
-  [30, 34, 16, 0, 20, 0],
-  [16, 30, 20, 14, 18, 2],
-  [12, 27, 24, 17, 17, 3],
-  [8, 22, 28, 20, 17, 5],
-  [6, 18, 30, 21, 17, 8],
-  [4, 15, 32, 21, 16, 12],
-  [3, 12, 34, 20, 16, 15],
+  // slick missile espresso cuffs case alarm sugar plane wash spring, by place 1…8
+  // (the leader gets mostly defensive ones; the strong ones go to the back)
+  [50, 34, 9, 0, 7, 0, 0, 0, 0, 0],
+  [26, 26, 12, 0, 12, 0, 0, 14, 0, 10],
+  [14, 20, 14, 10, 12, 1, 0, 15, 3, 11],
+  [9, 15, 16, 12, 11, 3, 0, 14, 7, 13],
+  [6, 11, 16, 12, 10, 5, 5, 12, 10, 13],
+  [4, 8, 16, 11, 9, 8, 9, 10, 12, 13],
+  [3, 6, 15, 10, 8, 11, 13, 8, 13, 13],
+  [2, 4, 14, 9, 7, 13, 17, 7, 14, 13],
 ];
 
 export const KART_R = 1.55;           // kart radius for bumps
@@ -56,7 +70,7 @@ export class Race {
     this.boxes = [];
     for (const f of T.def.boxes) {
       const k = (this.startK + Math.round(f * T.N)) % T.N;
-      for (const u of [-0.62, -0.21, 0.21, 0.62]) {
+      for (const u of BOX_LANES) {
         const d = u * T.w[k];
         this.boxes.push({ k, x: T.x[k] + rightX(T, k) * d, y: T.y[k] + 2.2, z: T.z[k] + rightZ(T, k) * d, dead: 0 });
       }
@@ -95,6 +109,7 @@ export class Race {
       drift: 0, charge: 0, tier: 0, wig: 0, lastSteer: 0, hop: 0, driftT: 0,
       boostT: 0, padT: 0, spinT: 0, spinDir: 1, invT: 0,
       jitterT: 0, caseT: 0, wobT: 0, cuff: -1, cuffT: 0,
+      sugarT: 0, shrinkT: 0, flatT: 0, flatCd: 0, ejectT: 0, lock: -1, held: 0, ramp: 0,
       item: null, roulette: 0, tauntT: 0, bounceT: 0,
       fish: null, lastGood: k, stuckT: 0, wallT: 0, offT: 0, surf: 'track',
       steer: 0, inp: noInput(), prevInp: noInput(),
@@ -140,7 +155,8 @@ export class Race {
     const T = this.T, N = T.N, S = K.S;
     K.prevInp = K.inp; K.inp = I;
     const pressed = (b) => I[b] && !K.prevInp[b];
-    for (const t of ['boostT', 'padT', 'spinT', 'invT', 'jitterT', 'caseT', 'wobT', 'cuffT', 'tauntT', 'trickT', 'bounceT', 'land']) if (K[t] > 0) K[t] = Math.max(0, K[t] - DT);
+    for (const t of ['boostT', 'padT', 'spinT', 'invT', 'jitterT', 'caseT', 'wobT', 'cuffT', 'tauntT', 'trickT', 'bounceT', 'land', 'sugarT', 'shrinkT', 'flatT', 'flatCd']) if (K[t] > 0) K[t] = Math.max(0, K[t] - DT);
+    if (K.ejectT > 0) { K.ejectT = Math.max(0, K.ejectT - DT); if (!K.ejectT) { K.invT = Math.max(K.invT, 0.8); this.emit({ k: 'ejectLand', i: K.i }); } }
     if (K.cuffT <= 0 && K.cuff >= 0) K.cuff = -1;
 
     // fished back up by the sock on a string
@@ -165,9 +181,9 @@ export class Race {
     if (K.caseT > 0) steer = Math.max(-1, Math.min(1, steer * 0.7 + Math.sin(this.tick * 0.16 + K.i) * 0.75));
     if (K.wobT > 0) steer = Math.max(-1, Math.min(1, steer + Math.sin(this.tick * 0.23 + K.i * 2) * 0.5));
     if (K.jitterT > 0) steer = Math.max(-1, Math.min(1, steer + ((this.rng.int(1000) / 1000) - 0.5) * 0.55));
-    if (K.spinT > 0) steer = 0;
+    if (K.spinT > 0 || K.ejectT > 0) steer = 0;
     K.steer = steer;
-    const gas = live && I.gas && K.spinT <= 0, brake = live && I.brake && K.spinT <= 0;
+    const gas = live && I.gas && K.spinT <= 0 && K.ejectT <= 0, brake = live && I.brake && K.spinT <= 0 && K.ejectT <= 0;
 
     // forward and sideways parts of the velocity
     const fx = Math.sin(K.yaw), fz = Math.cos(K.yaw), rx = -fz, rz = fx;
@@ -179,7 +195,7 @@ export class Race {
       if (Math.abs(K.d) > T.w[K.k] + 0.6) surf = 'fluff';
       for (const P of T.def.patches) if ((K.x - P.x) ** 2 + (K.z - P.z) ** 2 < P.r * P.r) surf = P.kind;
     }
-    if (K.cut) surf = 'track';
+    if (K.cut || K.sugarT > 0) surf = 'track';      // a sugar rush ignores the fluff
     if (surf === 'pool' && K.surf !== 'pool' && !K.air) this.emit({ k: 'splash', i: K.i, x: K.x, y: K.y, z: K.z, big: Math.abs(K.fwd) > 14 });
     K.surf = surf;
     let top = S.top * (K.topMul || 1);
@@ -188,14 +204,17 @@ export class Race {
     else if (surf === 'pool') top *= 0.66;
     if (K.cuff >= 0) top *= 0.86;
     if (K.caseT > 0) top *= 0.9;
+    if (K.shrinkT > 0) top *= 0.84;                  // shrunk in the wash: little wheels
+    if (K.flatT > 0) top *= 0.45;                    // squashed flat
     let accel = S.accel;
-    if (K.boostT > 0) { top = Math.max(top, S.top * 1.4); accel = 44; }
-    if (K.spinT > 0) { top = 0; }
+    if (K.sugarT > 0) { top = Math.max(top, S.top * 1.2); accel = Math.max(accel, 24); }
+    if (K.boostT > 0) { top = Math.max(top, S.top * BOOST_TOP); accel = 54; }
+    if (K.spinT > 0 || K.ejectT > 0) { top = 0; }
 
     if (!K.air) {
       if (gas) {
-        if (fwd < top) fwd += accel * DT * (fwd < top * 0.5 ? 1.25 : 1 - 0.6 * (fwd / top) ** 2) + (K.boostT > 0 ? 0 : 0);
-        else fwd = Math.max(top, fwd - 30 * DT);
+        if (fwd < top) fwd += accel * DT * (fwd < top * 0.5 ? 1.25 : 1 - 0.6 * (fwd / top) ** 2);
+        else fwd = Math.max(top, fwd - (K.spinT > 0 || K.ejectT > 0 ? 30 : 17) * DT);   // a boost's tail bleeds off gently
       } else if (brake) {
         fwd -= (fwd > 0 ? 34 : 14) * DT;
         if (fwd < -9) fwd = -9;
@@ -204,6 +223,7 @@ export class Race {
       }
       if (fwd > top && !gas) fwd = Math.max(top, fwd - 30 * DT);
       if (K.spinT > 0) fwd *= 0.95;
+      if (K.ejectT > 0) fwd *= 0.965;              // nobody at the wheel: it rolls to a stop
     }
 
     // steering: a touch tighter at low speed, a touch looser flat out
@@ -313,7 +333,7 @@ export class Race {
       const dk = ((K.k - kPrev + N + N / 2) % N) - N / 2;
       if (dk > 0) for (let q = 1; q <= dk; q++) launch = Math.max(launch, T.launch[(kPrev + q) % N]);
       if (dk > 0 && launch && fwd > 6) {
-        K.air = 1; K.airT = 0; K.vy = launch * Math.min(1, 0.55 + fwd / 50) + Math.max(0, K.slopeVy) * 0.5; K.trick = 0;
+        K.air = 1; K.airT = 0; K.vy = launch * Math.min(1, 0.55 + fwd / 50) + Math.max(0, K.slopeVy) * 0.5; K.trick = 0; K.ramp = 1;
         this.emit({ k: 'launch', i: K.i, big: launch > 10 });
       } else if (g === -Infinity) {
         K.air = 1; K.airT = 0; K.vy = Math.max(0, K.slopeVy) * 0.6; K.trick = 0;
@@ -325,7 +345,7 @@ export class Race {
         K.y = g;
         if (Math.abs(d) < T.w[K.k] + T.m[K.k] * 0.5 && !K.cut) K.lastGood = K.k;
       }
-      if (T.pad[K.k] && K.padT <= 0 && Math.abs(d) < T.w[K.k]) { K.boostT = Math.max(K.boostT, 1.05); K.padT = 0.5; this.emit({ k: 'pad', i: K.i }); }
+      if (T.pad[K.k] && K.padT <= 0 && Math.abs(d) < T.w[K.k]) { K.boostT = Math.max(K.boostT, 1.2); K.padT = 0.5; this.emit({ k: 'pad', i: K.i }); }
     }
     if (K.air) {
       K.airT += DT;
@@ -334,11 +354,11 @@ export class Race {
       // the under-bed slats: only for a kart that is actually under them
       if (T.ceil[K.k] && K.y > T.ceil[K.k] - 3.4 && K.y < T.ceil[K.k] + 1) { K.y = T.ceil[K.k] - 3.4; K.vy = Math.min(0, K.vy); }
       // TAUNT in the air: the trick
-      if (pressed('taunt') && !K.trick && K.spinT <= 0) { K.trick = 1; K.trickT = 0.75; this.emit({ k: 'trick', i: K.i }); }
+      if (pressed('taunt') && !K.trick && K.spinT <= 0 && K.ejectT <= 0) { K.trick = 1; K.trickT = 0.75; this.emit({ k: 'trick', i: K.i }); }
       if (g !== -Infinity && K.y <= g) {
         const hard = -K.vy;
-        K.y = g; K.vy = 0; K.air = 0; K.slopeVy = 0; K.land = 0.35;
-        if (K.trick) { K.boostT = Math.max(K.boostT, 1.15); this.emit({ k: 'trickBoost', i: K.i }); }
+        K.y = g; K.vy = 0; K.air = 0; K.slopeVy = 0; K.land = 0.35; K.ramp = 0;
+        if (K.trick) { K.boostT = Math.max(K.boostT, 1.3); this.emit({ k: 'trickBoost', i: K.i }); }
         this.emit({ k: 'land', i: K.i, hard: Math.min(1, hard / 30), trick: K.trick });
         K.trick = 0;
       } else if ((g === -Infinity && (K.airT > 1.2 || K.y < T.y[K.lastGood] - 9)) || K.y < -12) {
@@ -382,15 +402,22 @@ export class Race {
 
     // ── items: the boxes, and using what you hold ──
     if (this.phase === 'race') {
+      // (stage 5: a grabbed box pops and grows back, but a box is never "used
+      // up" for the karts behind: everyone driving through a row gets one —
+      // Kevin, at the back of the pack, used to find the rows already empty)
       for (const B of this.boxes) {
-        if (B.dead) continue;
-        if ((B.x - K.x) ** 2 + (B.z - K.z) ** 2 < 2.7 * 2.7 && Math.abs(B.y - 1.6 - K.y) < 3.2) {
-          B.dead = 200;
+        if (this.tick - (K.boxTick ?? -99) < 40) break;
+        if ((B.x - K.x) ** 2 + (B.z - K.z) ** 2 < 3.3 * 3.3 && Math.abs(B.y - 1.6 - K.y) < 3.6) {
+          B.dead = BOX_RESPAWN; K.boxTick = this.tick;
           this.emit({ k: 'box', i: K.i, b: this.boxes.indexOf(B) });
           if (!K.item) { K.item = this._roll(K); K.roulette = ROULETTE; }
         }
       }
-      if (pressed('item') && K.item && !K.roulette && K.spinT <= 0) this._use(K, I);
+      // the spring cushion's lock: the racer just ahead, in range along the track
+      K.lock = K.item === 'spring' && !K.roulette ? this._ahead(K, LOCK_RANGE) : -1;
+      // an item held behind you (LOOK BACK with a missile or a slick): it dangles there, a shield
+      K.held = K.item && !K.roulette && I.back && (K.item === 'missile' || K.item === 'slick') ? 1 : 0;
+      if (pressed('item') && K.item && !K.roulette && K.spinT <= 0 && K.ejectT <= 0 && (K.item !== 'spring' || K.lock >= 0)) this._use(K, I);
     }
   }
 
@@ -491,6 +518,9 @@ export class Race {
     // only one alarm clock out at once; handcuffs need two racers ahead
     if (this.shots.some((s) => s.kind === 'alarm')) w[5] = 0;
     if (K.place < 3) w[3] = 0;
+    if (K.place < 2) { w[7] = 0; w[9] = 0; }
+    // one hot wash at a time
+    if (this.karts.some((O) => O.shrinkT > 0) || this.shots.some((s) => s.kind === 'wash')) w[8] = 0;
     const tot = w.reduce((a, b) => a + b, 0);
     let r = this.rng.int(tot);
     for (let j = 0; j < w.length; j++) { if (r < w[j]) return ITEMS[j]; r -= w[j]; }
@@ -529,12 +559,46 @@ export class Race {
       this.shots.push({ kind: 'case', x: K.x + fx * 3, y: K.y + 1.5, z: K.z + fz * 3, vx: fx * sp, vz: fz * sp, k: K.k, owner: K.i, tgt, age: 0, life: 60 * 4, bounces: 0, id: this._id = (this._id || 0) + 1 });
     } else if (it === 'alarm') {
       this.shots.push({ kind: 'alarm', kc: K.kc + 4, x: K.x, y: K.y + 3, z: K.z, owner: K.i, age: 0, life: 60 * 14, id: this._id = (this._id || 0) + 1, d: 0 });
+    } else if (it === 'sugar') {
+      K.sugarT = SUGAR_T; K.boostT = Math.max(K.boostT, 0.6);
+      this.emit({ k: 'sugar', i: K.i });
+    } else if (it === 'plane') {
+      const tgt = this._ahead(K, 1e9);
+      this.shots.push({ kind: 'plane', kc: K.kc + 3, d: K.d, x: K.x, y: K.y + 2, z: K.z, owner: K.i, tgt, age: 0, life: 60 * 9, id: this._id = (this._id || 0) + 1 });
+    } else if (it === 'wash') {
+      // a puff of steam from the leader's direction: everyone else shrinks in the wash
+      this.shots.push({ kind: 'wash', owner: K.i, age: 0, life: 36, x: K.x, y: K.y + 3, z: K.z, id: this._id = (this._id || 0) + 1 });
+    } else if (it === 'spring') {
+      const O = this.karts[K.lock];
+      if (O && !O.fin && !O.fish && O.sugarT <= 0 && O.ejectT <= 0) {
+        O.ejectT = EJECT_T; O.drift = 0; O.charge = 0; O.tier = 0; O.boostT = 0; O.invT = Math.max(O.invT, EJECT_T);
+        this.emit({ k: 'eject', i: O.i, from: K.i });
+      } else this.emit({ k: 'fizzle', id: 0, x: K.x, y: K.y + 2, z: K.z });
+      K.lock = -1;
     }
+  }
+
+  /* the racer just ahead of K (by place), if they're within `range` units along the track */
+  _ahead(K, range) {
+    if (K.place < 2) return -1;
+    const O = this.karts[this.order[K.place - 2]];
+    if (!O || O.fin || O.fish) return -1;
+    const gap = O.kc - K.kc;
+    return gap >= 0 && gap <= range ? O.i : -1;
+  }
+  /* K is holding a missile or a slick behind them: it blocks one thing from behind */
+  _shield(K, x, z) {
+    if (!K.held) return false;
+    const fx = Math.sin(K.yaw), fz = Math.cos(K.yaw);
+    if ((x - K.x) * fx + (z - K.z) * fz > 0.5) return false;
+    K.item = null; K.held = 0;
+    this.emit({ k: 'block', i: K.i, x: K.x - fx * 2.5, y: K.y + 1.4, z: K.z - fz * 2.5 });
+    return true;
   }
 
   /* a kart takes a hit: spin out, lose speed, a burst of feathers */
   hit(K, kind, from = -1) {
-    if (K.invT > 0 || K.fish || K.fin) return false;
+    if (K.invT > 0 || K.fish || K.fin || K.sugarT > 0 || K.ejectT > 0) return false;
     const big = kind === 'alarm' || kind === 'missile';
     K.spinT = kind === 'alarm' ? 1.6 : kind === 'slick' ? 1.1 : 1.2;
     K.spinDir = this.rng.int(2) ? 1 : -1;
@@ -578,7 +642,8 @@ export class Race {
         for (const K of this.karts) {
           if ((K.i === S.owner && S.age < 30) || K.fish) continue;
           if ((K.x - S.x) ** 2 + (K.z - S.z) ** 2 < 2.5 * 2.5 && Math.abs(K.y + 1 - S.y) < 3.2) {
-            if (S.kind === 'missile') { if (this.hit(K, 'missile', S.owner) || K.invT > 0) S.dead = 1; }
+            if (S.kind === 'missile') { if (this._shield(K, S.x, S.z) || this.hit(K, 'missile', S.owner) || K.invT > 0 || K.sugarT > 0) S.dead = 1; }
+            else if (K.sugarT > 0) S.dead = 1;
             else if (K.invT <= 0 && !K.fin) { K.caseT = 2.5; K.invT = 0.6; this.emit({ k: 'case', i: K.i, from: S.owner }); S.dead = 1; }
             if (S.dead) { this.emit({ k: 'pop', id: S.id, kind: S.kind, x: S.x, y: S.y, z: S.z, i: K.i }); break; }
           }
@@ -591,7 +656,7 @@ export class Race {
         S.x += (mx - S.x) * Math.min(1, t * 0.4 + 0.08); S.z += (mz - S.z) * Math.min(1, t * 0.4 + 0.08); S.y += (my + 3 * Math.sin(t * Math.PI) - S.y) * 0.3;
         if (S.age >= S.life) {
           S.dead = 1;
-          if (!A.fin && !B.fin && !A.fish && !B.fish) {
+          if (!A.fin && !B.fin && !A.fish && !B.fish && A.sugarT <= 0 && B.sugarT <= 0) {
             A.cuff = B.i; B.cuff = A.i; A.cuffT = B.cuffT = 4;
             this.emit({ k: 'cuffs', a: A.i, b: B.i, from: S.owner });
           }
@@ -612,9 +677,44 @@ export class Race {
           for (const O of this.karts) if (O !== lead && (O.x - lead.x) ** 2 + (O.z - lead.z) ** 2 < 13 * 13 && !O.fin) { O.wobT = 1.3; O.vx *= 0.7; O.vz *= 0.7; this.emit({ k: 'wobble', i: O.i }); }
         }
       }
+      else if (S.kind === 'plane') this._plane(S);
+      else if (S.kind === 'wash') {
+        if (S.age >= S.life) {
+          S.dead = 1;
+          const lead = this.karts[this.order[0]];
+          const hit = [];
+          for (const O of this.karts) if (O.i !== S.owner && !O.fin && !O.fish && O.sugarT <= 0) { O.shrinkT = WASH_T; O.drift = 0; O.charge = 0; O.tier = 0; hit.push(O.i); }
+          this.emit({ k: 'wash', from: S.owner, hit, x: lead.x, y: lead.y, z: lead.z });
+        }
+      }
       if (S.age > S.life && !S.dead) { S.dead = 1; this.emit({ k: 'fizzle', id: S.id, x: S.x, y: S.y, z: S.z }); }
     }
     this.shots = this.shots.filter((s) => !s.dead);
+  }
+
+  /* the paper plane: it flies the track (never through a wall) a little
+     faster than anyone drives, swings across to its target and bonks them.
+     A missile or slick held behind blocks it; a slick on its path takes it out. */
+  _plane(S) {
+    const T = this.T, N = T.N;
+    const O = this.karts[S.tgt];
+    if (!O || O.fin || O.fish) { S.dead = 1; this.emit({ k: 'fizzle', id: S.id, x: S.x, y: S.y, z: S.z }); return; }
+    const gap = O.kc - S.kc;
+    S.kc += Math.max(30, Math.min(66, 30 + gap * 2.2)) * DT;
+    const kk = ((Math.floor(S.kc) % N) + N) % N;
+    const near = gap < 30 ? 1 - Math.max(0, gap) / 30 : 0;
+    S.d += (O.d - S.d) * (0.04 + near * 0.2);
+    const lim = T.w[kk] + T.m[kk] - 1;
+    S.d = Math.max(-lim, Math.min(lim, S.d));
+    S.x = T.x[kk] + rightX(T, kk) * S.d; S.z = T.z[kk] + rightZ(T, kk) * S.d;
+    S.y = T.y[kk] + 2.4 + Math.sin(S.age * 0.12) * 0.5 + (O.air ? Math.max(0, O.y - T.y[kk]) * near : 0);
+    S.k = kk;
+    for (const H of this.hazards) if (!H.dead && (H.x - S.x) ** 2 + (H.z - S.z) ** 2 < 3.5 * 3.5) { H.dead = 1; S.dead = 1; this.emit({ k: 'pop', id: S.id, kind: 'plane', x: S.x, y: S.y, z: S.z }); return; }
+    if ((O.x - S.x) ** 2 + (O.z - S.z) ** 2 < 2.8 * 2.8 && Math.abs(O.y + 1 - S.y) < 3.6) {
+      S.dead = 1;
+      if (!this._shield(O, S.x, S.z)) this.hit(O, 'plane', S.owner);
+      this.emit({ k: 'pop', id: S.id, kind: 'plane', x: S.x, y: S.y, z: S.z, i: O.i });
+    }
   }
 
   _hazards() {
@@ -640,7 +740,11 @@ export class Race {
       const dd = dx * dx + dz * dz;
       if (dd >= r * r || Math.abs(dy) > 2.6) continue;
       const l = Math.sqrt(dd) || 0.01, nx = dx / l, nz = dz / l, over = r - l;
-      const ma = A.S.mass, mb = B.S.mass, wa = mb / (ma + mb), wb = ma / (ma + mb);
+      // sugar rush: whoever you bump spins out; full-size karts squash the shrunk flat
+      if (A.sugarT > 0 && B.sugarT <= 0) this.hit(B, 'sugar', A.i);
+      else if (B.sugarT > 0 && A.sugarT <= 0) this.hit(A, 'sugar', B.i);
+      for (const [P, Q] of [[A, B], [B, A]]) if (P.shrinkT > 0 && Q.shrinkT <= 0 && !P.air && !P.flatCd && P.invT <= 0) { P.flatT = 1.0; P.flatCd = 2.2; P.drift = 0; this.emit({ k: 'flat', i: P.i, by: Q.i }); }
+      const ma = A.S.mass * (A.shrinkT > 0 ? 0.5 : 1), mb = B.S.mass * (B.shrinkT > 0 ? 0.5 : 1), wa = mb / (ma + mb), wb = ma / (ma + mb);
       A.x -= nx * over * wa; A.z -= nz * over * wa; B.x += nx * over * wb; B.z += nz * over * wb;
       const vrel = (B.vx - A.vx) * nx + (B.vz - A.vz) * nz;
       if (vrel < 0) {
@@ -658,13 +762,15 @@ export class Race {
     for (const A of this.karts) {
       if (A.cuff < 0 || A.cuff < A.i) continue;
       const B = this.karts[A.cuff];
-      if (A.fish || B.fish) continue;
       const dx = B.x - A.x, dz = B.z - A.z, l = Math.hypot(dx, dz) || 0.01, rest = 5.2;
+      // the chain snaps if one of them is fished out, launched from the seat, or far away
+      // (it used to yank the other one across the room)
+      if (A.fish || B.fish || A.ejectT > 0 || B.ejectT > 0 || l > rest * 4 || Math.abs(B.y - A.y) > 8) { A.cuff = B.cuff = -1; A.cuffT = B.cuffT = 0; this.emit({ k: 'unCuff', a: A.i, b: B.i }); continue; }
       if (l > rest) {
         const nx = dx / l, nz = dz / l, f = (l - rest) * 6 * DT, ma = A.S.mass, mb = B.S.mass;
         A.vx += nx * f * mb / (ma + mb) * 2; A.vz += nz * f * mb / (ma + mb) * 2;
         B.vx -= nx * f * ma / (ma + mb) * 2; B.vz -= nz * f * ma / (ma + mb) * 2;
-        if (l > rest * 2.4) { const c = (l - rest * 2.4) / 2; A.x += nx * c; A.z += nz * c; B.x -= nx * c; B.z -= nz * c; }
+        if (l > rest * 2.4) { const c = Math.min(0.6, (l - rest * 2.4) / 2); A.x += nx * c; A.z += nz * c; B.x -= nx * c; B.z -= nz * c; }
       }
     }
   }

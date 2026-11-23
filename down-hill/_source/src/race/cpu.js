@@ -11,17 +11,52 @@ import { rightX, rightZ } from './track.js';
 import { noInput } from './sim.js';
 import { makeRng } from '../sim/rng.js';
 
+/* each level at full strength (stage 4's CPUs; Champion is hard plus a bit) */
 export const LEVELS = {
-  easy: { top: 0.86, look: 1.0, drift: 0.35, tier: 1, item: 0.012, noise: 0.22, band: [0.09, 0.1] },
-  normal: { top: 0.94, look: 1.0, drift: 0.75, tier: 2, item: 0.025, noise: 0.12, band: [0.07, 0.06] },
-  hard: { top: 0.995, look: 1.0, drift: 1.0, tier: 3, item: 0.05, noise: 0.05, band: [0.05, 0.03] },
+  easy: { top: 0.86, look: 1.0, drift: 0.35, tier: 1, item: 0.012, noise: 0.22, band: [0.09, 0.1], err: 0 },
+  normal: { top: 0.94, look: 1.0, drift: 0.75, tier: 2, item: 0.025, noise: 0.12, band: [0.07, 0.06], err: 0 },
+  hard: { top: 0.995, look: 1.0, drift: 1.0, tier: 3, item: 0.05, noise: 0.05, band: [0.05, 0.03], err: 0 },
+  champion: { top: 1.012, look: 1.0, drift: 1.0, tier: 3, item: 0.07, noise: 0.035, band: [0.05, 0.02], err: 0 },
 };
+export const LEVEL_NAMES = ['easy', 'normal', 'hard', 'champion'];
+
+/* Stage 5's difficulty curve. Strength 0 is the gentle version of a level (a
+   single race, and the Pillow Cup's first race): a lower top speed, more
+   late-braking mistakes into the tight corners, slower and sloppier item
+   use, a milder catch-up band. 1 is the level at full strength (the cup's
+   third race). Champion never eases off. */
+export const GENTLE = { top: 0.955, drift: 0.6, item: 0.45, noise: 1.5, band: 0.5, err: 0.4 };
+export function levelAt(level, strength = 1) {
+  const F = LEVELS[level] || LEVELS.normal;
+  const s = level === 'champion' ? 1 : Math.max(0, Math.min(1, strength));
+  const l = (g, f) => g + (f - g) * s;
+  return {
+    ...F,
+    top: l(F.top * GENTLE.top, F.top),
+    drift: l(F.drift * GENTLE.drift, F.drift),
+    item: l(F.item * GENTLE.item, F.item),
+    noise: l(F.noise * GENTLE.noise + 0.03, F.noise),
+    band: [l(F.band[0] * GENTLE.band, F.band[0]), F.band[1]],
+    err: l(GENTLE.err, F.err),
+    slow: l(1, 0),                 // 1: item use waits a beat longer
+  };
+}
+/* the strength of race n (0-based) of the cup; a single race is 0 */
+export const cupStrength = (n) => [0, 0.5, 1][Math.max(0, Math.min(2, n))];
+
+/* the "average driver": a stand-in for a casual human in the tuning runs
+   (tools / tests): full kart speed like any human, but no drift, wandering
+   lines, slow hands on the stick, late into the corners, items whenever */
+export const AVERAGE = { top: 1, look: 0.75, drift: 0, tier: 0, item: 0.01, noise: 0.6, band: [0, 0], err: 0, clip: 0.5, lift: [0.018, 18], human: 1 };
 
 export class CPU {
-  constructor(race, i, level = 'normal', seed = 1) {
+  constructor(race, i, level = 'normal', seed = 1, strength = 1) {
     this.race = race; this.i = i;
-    this.level = LEVELS[level] ? level : 'normal';
-    this.L = LEVELS[this.level];
+    if (typeof level === 'object') { this.level = 'average'; this.L = level; }
+    else {
+      this.level = LEVELS[level] ? level : 'normal';
+      this.L = levelAt(this.level, strength);
+    }
     this.rng = makeRng((seed * 7919 + i * 104729) >>> 0);
     this.sway = this.rng.int(1000) / 1000 * Math.PI * 2;
     this.swayF = 0.004 + this.rng.int(1000) / 1000 * 0.004;
@@ -43,11 +78,12 @@ export class CPU {
       band = gap > 0 ? Math.min(1, gap) * L.band[0] : -Math.min(1, -gap) * L.band[1];
     }
     K.topMul = L.top * (1 + band) * (K.fin ? 0.85 : 1);
+    if (L.human) K.topMul = 1;
 
     if (R.phase === 'count') {
       // rev for the jump start (the hard ones time it)
       const left = 220 - R.tick;
-      I.gas = this.level === 'hard' ? left < 40 : this.level === 'normal' ? left < 25 : false;
+      I.gas = this.level === 'hard' || this.level === 'champion' ? left < 40 : this.level === 'normal' ? left < 25 : false;
       return I;
     }
     // stuck against something: back up a moment
@@ -60,7 +96,8 @@ export class CPU {
     const t = (K.k + la) % N;
     this.sway += this.swayF;
     const careful = T.drop[t] || T.drop[K.k] || T.rail[t];
-    let want = careful ? T.line[t] * 0.4 + this.bias * 0.3 : T.line[t] + this.bias + Math.sin(this.sway) * T.w[t] * 0.28;
+    let want = careful ? T.line[t] * 0.4 + this.bias * 0.3 : T.line[t] + this.bias + Math.sin(this.sway) * T.w[t] * (L.human ? 0.5 : 0.28);
+    if (L.human) want = want * 0.5 + Math.sin(this.sway * 2.3 + 1) * T.w[t] * 0.2;     // wanders rather than hugging the line
     // dodge slicks and posts near the line ahead
     for (const H of R.hazards) {
       const dk = ((H.k - K.k + N) % N);
@@ -76,7 +113,9 @@ export class CPU {
         if (Math.abs(pd - want) < P.r + 2.6) want = pd + (want >= pd ? P.r + 2.8 : -(P.r + 2.8));
       }
     }
-    const lim = T.w[t] - (careful ? 3 : 2);
+    // (a casual human clips the inside of the tight bends, into the fluff)
+    if (L.human && !careful) { let b2 = 0; for (let q = 2; q < 16; q += 2) b2 += T.curv[(t + q) % N]; if (Math.abs(b2 / 7) > 0.025) want -= Math.sign(b2) * T.w[t] * L.clip; }
+    const lim = T.w[t] - (careful ? 3 : L.human ? -1.5 : 2);
     want = Math.max(-lim, Math.min(lim, want));
     let tx = T.x[t] + rightX(T, t) * want, tz = T.z[t] + rightZ(T, t) * want;
     // the shortcut: decided once a lap on the way in (the bold ones take it more)
@@ -96,6 +135,8 @@ export class CPU {
     const diff = Math.atan2(Math.sin(hT - K.yaw), Math.cos(hT - K.yaw));
     let steer = -diff * 2.6 + (this.rng.int(1000) / 1000 - 0.5) * L.noise;
     steer = Math.max(-1, Math.min(1, steer));
+    // slow hands: a casual thumb on the stick lags and overshoots a little
+    if (L.human) { this.st = (this.st || 0) + (steer - (this.st || 0)) * 0.22; steer = Math.max(-1, Math.min(1, this.st * 1.1)); }
     I.steer = steer;
     I.gas = true;
     if (Math.abs(diff) > 1.2 && K.fwd > 14) { I.gas = false; I.brake = Math.abs(diff) > 1.6; }
@@ -106,7 +147,13 @@ export class CPU {
     bend /= 13;
     // a tight corner coming at speed, or already out at the wall on its outside: lift (the rails scrape)
     const outside = K.d * Math.sign(-bend || 1) > T.w[K.k] - 0.5;
-    if (!onCut && !K.drift && K.fwd > 21 && (Math.abs(bend) > 0.034 || (outside && Math.abs(bend) > 0.014))) I.gas = false;
+    // (a braking mistake: now and then a gentle CPU — or a casual human — goes into it too hot)
+    if (Math.abs(bend) > 0.03 && !this.inBend) { this.inBend = 1; this.late = this.rng.int(1000) < L.err * 1000; }
+    else if (Math.abs(bend) < 0.015) this.inBend = 0;
+    if (!onCut && !K.drift && K.fwd > 21 && !this.late && (Math.abs(bend) > 0.034 || (outside && Math.abs(bend) > 0.014))) I.gas = false;
+    if (this.late && this.inBend && Math.abs(bend) > 0.03) I.steer *= 0.72;
+    // a casual human lifts early for the bends (no drift to carry the speed)
+    if (L.lift && Math.abs(bend) > L.lift[0] && K.fwd > L.lift[1]) I.gas = false;
     const wantDrift = Math.abs(bend) > 0.016 && K.fwd > 16 && !K.air && !careful && !onCut;
     if (onCut) { I.drift = false; } else if (K.wallT > 0.1) {
       // against a rail or a wall: let go of any slide and ease off it
@@ -129,7 +176,9 @@ export class CPU {
       const chance = L.item;
       const it = K.item;
       let use = false;
-      if (it === 'alarm' || it === 'cuffs') use = this.holdItem > 20;
+      const beat = 20 + (L.slow || 0) * 50 + (L.human ? 90 : 0);
+      if (it === 'alarm' || it === 'cuffs' || it === 'sugar' || it === 'wash' || it === 'plane') use = this.holdItem > beat;
+      else if (it === 'spring') use = K.lock >= 0 && this.holdItem > beat;
       else if (it === 'espresso') use = Math.abs(bend) < 0.01 || this.holdItem > 400;
       else if (it === 'missile' || it === 'case') {
         for (const O of R.karts) {
@@ -149,7 +198,7 @@ export class CPU {
       if (use && this.rng.int(1000) < chance * 1000 * 4 + 40) { I.item = true; this.holdItem = 0; }
     }
     // a trick off every ramp: the CPUs love to show off too
-    if (K.air && !K.trick && K.airT > 0.12 && this.rng.int(1000) < (this.level === 'easy' ? 30 : 120)) I.taunt = true;
+    if (K.air && !K.trick && K.airT > 0.12 && this.rng.int(1000) < (L.human ? 4 : this.level === 'easy' ? 30 : 120)) I.taunt = true;
     return I;
   }
 }
