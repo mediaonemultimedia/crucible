@@ -23,6 +23,7 @@ node tools/throws-shots.mjs                                  # every throw, both
 node tools/pad-test.mjs                                      # phone pads: two phones, latency, jitter, sheet, skins → shots/pad/
 node tools/pad-online.mjs [--seconds 60]                     # online with a phone on each side, hashes compared
 node tools/build.mjs --out other.html                        # build elsewhere
+node tools/bounce-repro.mjs [--html final.html]              # the bounce repro: slow frames + bad-network phones → shots/bounce/
 ```
 
 Deep links: `final.html?p1=kevalanche&p2=rubberta&cpu=hard` (a fight),
@@ -30,6 +31,19 @@ Deep links: `final.html?p1=kevalanche&p2=rubberta&cpu=hard` (a fight),
 `practice=k8e&dummy=sumaura`, `screen=select`, `alt1=1` / `alt2=1` (the evil
 twins), `seed=N`, `hold` (no free-running loop; tools step `__pf2`),
 `webgl` (force WebGL 2), `noportraits` (skip the card portraits).
+
+## Bounce-and-squish fix (Mon Nov 23) — status
+Kevin: "when the connection isn't great, the characters are bouncing up and
+down, like they're getting squished, repeatedly, and it just doesn't end."
+
+| # | Item | State |
+|---|---|---|
+| 1 | **Root cause (confirmed): unstable render springs on slow frames.** The plush's crunch (k 1400), hit squash, yaw, the glove squash / lag and the camera nudge took one semi-implicit Euler step per frame; past dt·√k ≈ 2 that step gains energy every frame. At 20 fps (dt 0.05, the frame clamp) the crunch grows ×2.8 per frame: the plush squashes and bulges on alternate frames at its clamp, and keeps ringing for seconds after the frames recover (or for good once the state overflows). The feel rig's own springs (k up to 2600) run on the soft body's fixed 1/120 s clock and were already stable. | fixed — `shared/grommet/spring.js` `stepSpring` (equal substeps of ≤ 1/120 s; one step, the old arithmetic, at ≤ 1/120 s; NaN-safe; bounded state), used by `plush.js`, `gloves.js`, `arena.js`, `feel.js` `drive`, `pose.js` `ease` |
+| 2 | Spring test: every render spring kicked and run at dt 0.1 for 10 s: energy falls every frame, settled (old: energy ×10⁵⁹–10³⁰⁰; new: ≤ 10⁻²⁶) | `test/spring.test.mjs` |
+| 3 | Repro in the real page: CPU fight, two phones on a 300 ms-jitter / 15 %-loss link, a blow, 5 s of 85 ms frames, a 3 s phone dropout + reconnect, then 60 fps. Before (main): crunch up to 4 × 10²³, sign flipping on 57 of 59 slow frames, scale y 0.90 ↔ 1.07, still ringing 3 s after recovery. After: crunch ≤ 0.031, at rest within 0.5 s of the frames recovering | `tools/bounce-repro.mjs`; `shots/bounce/before-main.json`, `after.json` |
+| 4 | **Pad input (confirmed, secondary):** a press-to-act bit (LIGHT HEAVY SPECIAL JUMP START TAUNT) held through a > 400 ms quiet spell was dropped as stale and came back as a second press; an outage of > ~2 s ran the phone's 8-bit seq past half its window, freezing input until it wrapped. Now: counted bits press only on their counters (one physical press = one press, whatever is lost, reordered or repeated); a held bit that went stale stays latched off until released or pressed again; a seq far behind (or any after a quiet spell) resyncs. A (re)joining phone's held bits aren't presses | `src/pad/wire.js`; `test/padnet.test.mjs` (loss, 300 ms jitter, duplicates, 3 s / 2.5 s / 1 s outages, a reconnect, 5 seeds; before: 4 HEAVY / 3 TAUNT presses for 3 / 2 physical) |
+| 5 | Checked, not a cause: online rollback fires cosmetic events once per tick key (`net/rollback.js`, asserted in `test/net.test.mjs`); the pad host's main-thread cost on a bad link is 0.03 ms a frame, 0.003 ms a packet, the pairing card repaints only on change (`bounce-repro` `padHostCost`) | — |
+| 6 | Battle Royale ships the same PF2 puppet code (minified `drive`, the hit squash, the crunch) with the same 0.05 clamp: follow-up in its own source tree | listed in the PR |
 
 ## Specials (Run A, Thu Nov 19) — status
 **PF2:** done for all 7 (Kevalanche, Johnny, K8-E, Rubberta, Sumaura, Zach, Sebas): sim + motion inputs (`sim/motion.js`), move data (`fighters/movelist.js`), visuals (`render/specials.js`), SFX, CPU, practice list, legend, tests (`test/specials.test.mjs`), shots (`tools/specials-shots.mjs` → `shots/specials/`). Shipped: PR #49 (`pf2-release-4`, merged). **PF1:** see `bolster-source` (in progress).
