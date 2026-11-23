@@ -15,7 +15,7 @@ const TAU = Math.PI * 2;
 /* skins: OG and ALT colours for each kart */
 const SKIN = {
   zamboni: [
-    { body: '#f3f1ec', trim: '#c8202a', accent: '#1d4fa3', hub: '#c8202a', seat: '#1d4fa3', text: 'KEV 19' },
+    { body: '#f3f1ec', trim: '#c8202a', accent: '#1d4fa3', hub: '#c8202a', seat: '#1d4fa3', text: 'KEV 88' },
     { body: '#14254a', trim: '#ef6a1e', accent: '#ef6a1e', hub: '#ef6a1e', seat: '#0b1530', text: 'GOON 44' },
   ],
   bus: [
@@ -414,7 +414,7 @@ function sailTex() {
 /* stage 3's light refinement: a number plate on the back of every kart with
    its driver's flag (one small plane, a far-LOD detail), where the body ends */
 const PLATE = {
-  zamboni: { flag: 'ca', n: '19', at: [0, 0.98, -2.17] }, bus: { flag: 'gb', n: '07', at: [0, 0.9, -2.31] },
+  zamboni: { flag: 'ca', n: '88', at: [0, 0.98, -2.17] }, bus: { flag: 'gb', n: '07', at: [0, 0.9, -2.31] },
   roadster: { flag: 'ca', n: '08', at: [0, 0.78, -2.32] }, lowrider: { flag: 'mx', n: '13', at: [0, 0.74, -2.47] },
   washtub: { flag: 'br', n: '88', at: [0, 1.02, -1.47], w: 0.95 }, ballmachine: { flag: 'nl', n: '15', at: [0, 0.82, -2.07] },
   cart: { flag: 'ca', n: '00', at: [0, 1.25, -2.05] },
