@@ -87,3 +87,6 @@ Kevin: "When you get an item it should be placed on the back of your cart so you
 - Items that can be held behind you (missile/feather trailing on LOOK BACK) visibly dangle behind the kart while held.
 - Show it on every kart (so you can see what rivals carry), LOD'd away for far karts.
 - Also make the HUD item slot bigger and put it near the bottom-centre, just under where your eyes sit on your kart, with the icon + name, in each split-screen view.
+
+## 9. Kevin's jersey number is 88
+In `render/karts.js`: Kevalanche's livery text `'KEV 19'` → `'KEV 88'`, and his back plate `PLATE.zamboni.n` `'19'` → `'88'`. Leave Sumaura's bus destination sign ("19 LANDING") as is; Kevin likes the bus. Check both in a close kart shot.
