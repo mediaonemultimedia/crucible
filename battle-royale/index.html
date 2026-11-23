@@ -56,20 +56,20 @@ body.fighting #mark{display:none}
 #pads{position:fixed;right:22px;bottom:22px;z-index:9;display:none;align-items:center;gap:12px;padding:10px 14px 10px 10px;background:rgba(18,13,31,.9);border:1px solid var(--line);border-radius:10px;box-shadow:0 0 18px rgba(155,92,255,.25);pointer-events:auto}
 body[data-screen=title] #pads,body[data-screen=select] #pads{display:flex}
 body.vs-on #pads,#pads:empty{display:none!important}
-#pads .qr{width:112px;height:112px;border-radius:4px;overflow:hidden;background:#fff}
+#pads .qr{width:clamp(200px,24vh,320px);height:clamp(200px,24vh,320px);border-radius:6px;overflow:hidden;background:#fff}
 #pads .qr svg{display:block;width:100%;height:100%}
 #pads .pi{display:flex;flex-direction:column;gap:3px;font-family:var(--cond);font-weight:700;text-transform:uppercase;letter-spacing:.14em;color:var(--ink)}
-#pads .h{font-size:11px;color:var(--dim)}
-#pads .code{font-size:30px;letter-spacing:.22em;line-height:1;text-shadow:var(--glow-v)}
-#pads .how{font-size:10px;color:var(--dim);letter-spacing:.1em}
-#pads .seats{display:flex;flex-direction:column;gap:2px;margin-top:4px;font-size:11px;letter-spacing:.1em}
+#pads .h{font-size:14px;color:var(--dim)}
+#pads .code{font-size:44px;letter-spacing:.22em;line-height:1;text-shadow:var(--glow-v)}
+#pads .how{font-size:13px;color:var(--dim);letter-spacing:.1em}
+#pads .seats{display:flex;flex-direction:column;gap:3px;margin-top:6px;font-size:14px;letter-spacing:.1em}
 #pads .seat{display:flex;align-items:center;gap:6px;color:var(--dim)}
 #pads .seat i{width:9px;height:9px;border-radius:50%;background:#4a4458;box-shadow:inset 0 0 0 1px #0006}
 #pads .seat.green i{background:#3fdc7a;box-shadow:0 0 8px #3fdc7a}#pads .seat.amber i{background:#ffb020;box-shadow:0 0 8px #ffb020}#pads .seat.red i{background:#ff3030;box-shadow:0 0 8px #ff3030}
 #pads .seat.green,#pads .seat.amber,#pads .seat.red{color:var(--ink)}
 body[data-screen=select] #pads{top:70px;bottom:auto;right:20px;padding:6px 10px 6px 6px;gap:8px}
-body[data-screen=select] #pads .qr{width:78px;height:78px}
-body[data-screen=select] #pads .code{font-size:20px}
+body[data-screen=select] #pads .qr{width:clamp(160px,17vh,240px);height:clamp(160px,17vh,240px)}
+body[data-screen=select] #pads .code{font-size:32px}
 body[data-screen=select] #pads .how{display:none}
 
 /* title --------------------------------------------------------------------- */
@@ -677,12 +677,12 @@ body.is-ready #title-screen.on .big{animation:titleShake .42s linear .53s both}
 /* Shared TV controller check */
 body.battle-lobby{overflow:auto;background:var(--stage)}
 .bl-arena-preview{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.32) saturate(.78);pointer-events:none}
-.bl-main{position:relative;min-height:100%;max-width:1480px;margin:auto;display:grid;grid-template-columns:minmax(210px,.85fr) minmax(0,2.4fr);gap:clamp(14px,2.7vw,42px);align-items:center;align-content:center;padding:clamp(14px,2.5vw,40px)}
+.bl-main{position:relative;min-height:100%;max-width:1480px;margin:auto;display:grid;grid-template-columns:minmax(260px,1.15fr) minmax(0,2.4fr);gap:clamp(14px,2.7vw,42px);align-items:center;align-content:center;padding:clamp(14px,2.5vw,40px)}
 .bl-join{border:1px solid var(--line);background:linear-gradient(155deg,#2a2140f5,#120d1ff7);padding:clamp(14px,1.8vw,26px);border-radius:8px;box-shadow:0 14px 38px #070411a0}
 .bl-back{color:var(--dim);font:700 12px var(--cond);letter-spacing:.1em;text-transform:uppercase;text-decoration:none}.bl-back:hover{text-decoration:underline}
 .bl-join .logo-sm{width:min(100%,185px);margin:-2px auto -7px}
 .bl-join h1{font-size:clamp(23px,2.35vw,38px);line-height:1;margin:0 0 12px}
-.bl-qr{width:min(100%,174px,22vh);min-width:106px;aspect-ratio:1;margin:auto;background:#fff;border-radius:6px;overflow:hidden;box-shadow:0 0 20px #9871ff44}
+.bl-qr{width:min(100%,300px,30vh);min-width:150px;aspect-ratio:1;margin:auto;background:#fff;border-radius:6px;overflow:hidden;box-shadow:0 0 20px #9871ff44}
 .bl-qr svg{display:block;width:100%;height:100%}
 .bl-code{text-align:center;font:700 28px/1 var(--cond);letter-spacing:.2em;text-shadow:var(--glow-v);margin:11px 0 4px}
 .bl-status{text-align:center;font:700 14px var(--cond);margin:4px 0}
@@ -737,7 +737,7 @@ body.battle-lobby{overflow:auto;background:var(--stage)}
 .battle-reason{margin:0 0 5px;color:var(--dim);font:700 13px var(--cond);letter-spacing:.14em;text-transform:uppercase}
 .battle-winner{margin:0 0 18px;color:var(--winner-color);font:italic 700 clamp(30px,4vw,54px)/1 var(--cond);letter-spacing:.04em;text-transform:uppercase;text-shadow:0 3px 8px #000b}
 .battle-result .opt{display:inline-flex;justify-content:center;font-size:clamp(12px,1.6vw,19px);margin:3px}
-@media(max-width:750px){.bl-main{grid-template-columns:1fr;align-content:start}.bl-join .logo-sm{width:155px}.bl-qr{width:130px}}
+@media(max-width:750px){.bl-main{grid-template-columns:1fr;align-content:start}.bl-join .logo-sm{width:155px}.bl-qr{width:200px}}
 @media(max-width:440px){.bl-players{grid-template-columns:1fr}.bl-room header{flex-wrap:wrap}.battle-header{padding:7px;gap:4px}.battle-exit.opt{padding:7px 9px;font-size:11px}}
 
 </style>
