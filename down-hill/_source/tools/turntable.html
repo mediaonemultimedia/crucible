@@ -60,6 +60,13 @@ import { RacerView } from '../src/render/racer.js';
 import { RACERS } from '../src/race/roster.js';
 import { canvasTex, mat, mergeStatic, mesh, rbox } from '../src/render/geo.js';
 
+const steering = {
+  center: new THREE.Vector3(0, 1.05, 0.34),
+  radius: 0.26,
+  tilt: -0.62
+};
+const seating = { scale: 0.88, y: 0.09, z: -0.44 };
+
 const specs = [
   { id: 'kevalanche', paint: '#eeeee3', stripe: '#c92632', hub: '#254ba2', number: '88', badge: 'KEV 88', sponsor: 'DOWN FEATHER RACING' },
   { id: 'sumaura', paint: '#c82d30', stripe: '#ffe0a1', hub: '#ead29c', number: '19', badge: '19 LANDING', sponsor: 'FLUFF CO.' },
@@ -171,8 +178,9 @@ function chassis(root, spec, ink, length) {
     }
   }
   tube(root, chrome, [0, 0.45, 0.54], [0, 1.03, 0.34], 0.047);
-  const wheel = mesh(new THREE.TorusGeometry(0.26, 0.041, 8, 24), rubber, 0, 1.05, 0.34, root);
-  wheel.rotation.x = -0.62;
+  const wheel = mesh(new THREE.TorusGeometry(steering.radius, 0.041, 8, 24), rubber,
+    ...steering.center, root);
+  wheel.rotation.x = steering.tilt;
   tube(root, frame, [-0.22, 1.05, 0.34], [0.22, 1.05, 0.34], 0.032);
   tube(root, chrome, [0.57, 0.26, -1.03], [0.57, 0.26, -length / 2 + 0.035], 0.075);
   const outlet = mesh(new THREE.CircleGeometry(0.051, 12), rubber, 0.57, 0.26, -length / 2 + 0.034, root);
@@ -232,6 +240,55 @@ function shell(root, spec, kind, ink, length) {
     [0, bus ? 1.496 : ice ? 1.223 : 0.888, ice ? nose - 0.46 : nose - 0.39], -Math.PI / 2);
 }
 
+// Pose the existing plush particles once and keep both stances for the toggle.
+function driverStances(driver, body) {
+  const plush = driver.p;
+  const { x } = plush.soft;
+  const standing = x.slice();
+  driver.root.updateWorldMatrix(true, true);
+  const toPlush = new THREE.Matrix4().copy(plush.group.matrixWorld).invert().multiply(body.matrixWorld);
+  const start = new THREE.Vector3();
+  const point = new THREE.Vector3();
+  const middle = new THREE.Vector3();
+  const end = new THREE.Vector3();
+  const steeringUp = new THREE.Vector3(0, Math.cos(steering.tilt), Math.sin(steering.tilt));
+  const gripAngle = Math.PI / 9;
+
+  for (const chain of plush.rig.arms) {
+    if (chain.kind !== 'arm' && chain.kind !== 'leg') continue;
+    const indices = chain.idx;
+    const socket = indices[0] * 3;
+    start.fromArray(standing, socket);
+    const side = Math.sign(start.x);
+    if (chain.kind === 'arm') {
+      end.copy(steering.center).addScaledVector(steeringUp, Math.sin(gripAngle) * steering.radius);
+      end.x += side * Math.cos(gripAngle) * steering.radius;
+      end.applyMatrix4(toPlush);
+      middle.copy(start).lerp(end, 0.46);
+      middle.x += side * 0.32;
+      middle.y -= 0.32;
+    } else {
+      end.set(side * 0.40, 0.49, 0.61).applyMatrix4(toPlush);
+      middle.set(side * 0.60, 0.91, 0.36).applyMatrix4(toPlush);
+    }
+    for (let i = 1; i < indices.length; i++) {
+      const t = i / (indices.length - 1);
+      point.copy(start).multiplyScalar((1 - t) ** 2)
+        .addScaledVector(middle, 2 * t * (1 - t)).addScaledVector(end, t * t);
+      point.toArray(x, indices[i] * 3);
+    }
+  }
+
+  const seated = x.slice();
+  x.set(standing);
+  return (isNew) => {
+    x.set(isNew ? seated : standing);
+    plush.body.update(0);
+    plush.cloth?.update(0);
+    plush.gloves?.update(0);
+  };
+}
+
 function lights(scene) {
   scene.add(new THREE.HemisphereLight('#fff7e9', '#a2a1a0', 2.1));
   for (const [color, intensity, x, y, z] of [
@@ -273,6 +330,11 @@ async function start() {
     scene.add(root);
     root.add(old.group, newBody);
     old.driver.light(camera.quaternion);
+    const driver = old.driver.root;
+    newBody.add(driver);
+    driver.scale.setScalar(seating.scale);
+    driver.position.set(0, seating.y, seating.z);
+    const poseDriver = driverStances(old.driver, newBody);
 
     const article = document.createElement('article');
     article.innerHTML = `
@@ -288,11 +350,12 @@ async function start() {
       old.group.visible = !isNew;
       newBody.visible = isNew;
       (isNew ? newBody : old.kart.seat).add(old.driver.root);
-      const pose = isNew ? { scale: 0.88, y: 0.41, z: -0.36 } : old.kart.plush;
+      const pose = isNew ? seating : old.kart.plush;
       old.driver.root.scale.setScalar(pose.scale);
       old.driver.root.position.set(0, pose.y, pose.z);
+      poseDriver(isNew);
     }
-    root.rotation.y = -0.83;
+    root.rotation.y = -1.02;
     for (const mode of ['old', 'new']) {
       setLook(mode);
       renderer.setRenderTarget(target);
@@ -315,7 +378,7 @@ async function start() {
   const modes = [...document.querySelectorAll('[data-mode]')];
   const rotation = document.querySelector('#rotation');
   let spinning = !matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let angle = -0.83;
+  let angle = -1.02;
   let previous;
   for (const button of modes) {
     button.disabled = false;
