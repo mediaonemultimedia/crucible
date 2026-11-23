@@ -364,7 +364,9 @@ class App {
     if (!quiet) this.audio.ui('tick');
     this.hideViews();
     this.turn = this.view(S.id, S.alt);
-    this.turnA = this.turnA || 0;
+    this.turn.showT = 0;
+    this.turn.ejT = 0;
+    this.turn.hyd = 0;
     this._paintPicks();
   }
   _paintPicks() {
@@ -1136,14 +1138,12 @@ class App {
     }
   }
 
-  /* title and select: the camera drifts round the world; on select it circles the pick */
+  /* The title camera drifts around the world; the lobby holds a three-quarter view. */
   _idleCam(dt) {
     const I = this.world.info;
     if (this.screen === 'select' && this.turn) {
-      this.turnA += dt * 0.45;
       const v = this.turn, [x, y, z] = I.turn;
-      v.update(dt, { fwd: 0, drift: 0, steer: Math.sin(this.t * 0.8) * 0.4, air: 0, spinT: 0, boostT: 0, caseT: 0, wobT: 0, x, y, z }, { x, y, z, yaw: this.turnA }, this.camera.position, this.camera.quaternion);
-      if (Math.floor(this.t / 3.2) !== Math.floor((this.t - dt) / 3.2)) v.taunt(false);
+      v.update(dt, { fwd: 0, drift: 0, steer: 0, air: 0, spinT: 0, boostT: 0, caseT: 0, wobT: 0, x, y, z }, { x, y, z, yaw: -Math.PI / 6 }, this.camera.position, this.camera.quaternion);
       this.camera.fov = 40; this.camera.updateProjectionMatrix();
       this.camera.position.set(x + 1.2, y + 4.2, z + 11.5);
       this.camera.lookAt(x - 0.4, y, z);
