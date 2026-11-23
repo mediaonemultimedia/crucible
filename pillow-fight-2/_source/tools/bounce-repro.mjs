@@ -61,6 +61,16 @@ for (const name of ['p1', 'p2']) {
 }
 // (SwiftShader: the page is slow to take the joins; best effort, reported)
 try { await G.waitForFunction(() => __pf2.pads.connected(0) && __pf2.pads.connected(1), null, { timeout: 60000 }); } catch { /* reported below */ }
+// the pad host's main-thread cost while the phones are on a bad link (the hitch suspects)
+await G.evaluate(() => {
+  const H = __pf2.pads; window.__cost = {};
+  for (const m of ['frame', 'paint', '_pi', '_ctl', '_seat']) {
+    const f = H[m].bind(H), c = (__cost[m] = { n: 0, ms: 0, max: 0 });
+    H[m] = (...a) => { const t = performance.now(); try { return f(...a); } finally { const d = performance.now() - t; c.n++; c.ms += d; c.max = Math.max(c.max, d); } };
+  }
+  const el = document.querySelector('#pads'); window.__mut = 0;
+  if (el) new MutationObserver((l) => { __mut += l.length; }).observe(el, { subtree: true, childList: true, characterData: true, attributes: true });
+});
 const seatsBefore = await G.evaluate(() => [__pf2.pads.connected(0), __pf2.pads.connected(1)]);
 // the frames: n frames of `ms` each (dt as the page's loop would clamp it), recorded
 await G.evaluate(() => { window.__rec = []; window.__t = 0; });
@@ -90,7 +100,7 @@ await run(180, 1000 / 60);
 await sleep(1500);
 await G.evaluate(() => __pf2.step(0, true));
 await G.screenshot({ path: outFile.replace(/\.json$/, '.png') });
-const R = await G.evaluate(() => ({ rec: window.__rec, seats: [__pf2.pads.connected(0), __pf2.pads.connected(1)] }));
+const R = await G.evaluate(() => ({ rec: window.__rec, cost: window.__cost, mut: window.__mut, seats: [__pf2.pads.connected(0), __pf2.pads.connected(1)] }));
 R.t0 = 0; R.slowAt = slowAt; R.fastAt = fastAt;
 await browser.close();
 
@@ -112,6 +122,7 @@ const res = {
   recovered0to05: stat(win(R.fastAt, R.fastAt + 500)),
   recovered05to3: stat(win(R.fastAt + 500, R.fastAt + 3000)),
   seatsBefore, seatsAfterReconnect: R.seats,
+  padHostCost: Object.fromEntries(Object.entries(R.cost).map(([k, c]) => [k, { calls: c.n, meanMs: +(c.ms / Math.max(1, c.n)).toFixed(4), maxMs: +c.max.toFixed(3) }])), pairingCardMutations: R.mut,
   series: R.rec.map((r) => [+at(r).toFixed(3), ...r.p.flatMap((P) => [+P.c.toPrecision(3), +P.sy.toFixed(4)])]),
   problems,
 };
