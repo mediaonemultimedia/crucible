@@ -37,6 +37,10 @@ function tube(root, material, start, end, radius) {
   pipe.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis.normalize());
 }
 
+// Solid atlas swatches let each articulated wheel share one material and draw.
+const wheelSwatches = ['#25272a', null, '#d7e0ea'];
+const swatchX = (index) => 344 + index * 40;
+
 function livery(spec) {
   const texture = canvasTex(512, 256, (g) => {
     const type = (label, x, y, size, color) => {
@@ -67,6 +71,11 @@ function livery(spec) {
     g.fillRect(269, 75, 22, 90);
     g.fillRect(297, 75, 10, 90);
 
+    wheelSwatches.forEach((color, i) => {
+      g.fillStyle = color ?? spec.hub;
+      g.fillRect(swatchX(i), 192, 32, 32);
+    });
+
     const word = 'FLUFF CO.';
     g.font = '900 15px Arial, sans-serif';
     g.textAlign = 'center';
@@ -95,8 +104,14 @@ function decal(root, material, rect, size, at, rx = 0, ry = 0) {
   panel.rotation.set(rx, ry, 0);
 }
 
-function chassis(root, spec, ink, length) {
-  const hub = mat(spec.hub, { metalness: 0.32, roughness: 0.3 });
+function solidWheelPart(root, ink, geometry, swatch, x) {
+  const uv = geometry.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, (swatchX(swatch) + 16) / 512, 1 - 208 / 256);
+  return mesh(geometry, ink, x, 0, 0, root);
+}
+
+function chassis(root, ink, length, animateWheels) {
+  const wheels = [];
   const wheelbase = Math.min(1, length / 3.1);
   box(root, frame, [1.64, 0.15, 2.18 * wheelbase], [0, 0.29, 0]);
   box(root, rubber, [1.02, 0.16, 0.76], [0, 0.43, -0.42]);
@@ -109,13 +124,24 @@ function chassis(root, spec, ink, length) {
       const x = side * 1.06;
       const z = (front ? 1.04 : -0.97) * wheelbase;
       tube(root, frame, [0, radius, z], [x, radius, z], 0.06);
-      mesh(new THREE.CylinderGeometry(radius, radius, width, 24), rubber, x, radius, z, root).rotation.z = Math.PI / 2;
-      const outside = x + side * width / 2;
-      mesh(new THREE.CylinderGeometry(radius * 0.55, radius * 0.55, 0.06, 16), hub,
-        outside, radius, z, root).rotation.z = Math.PI / 2;
-      mesh(new THREE.SphereGeometry(radius * 0.18, 10, 6), chrome, outside + side * 0.032, radius, z, root);
-      decal(root, ink, [5, 121, 128, 128], [radius * 1.9, radius * 1.9],
-        [outside + side * 0.005, radius, z], 0, side * Math.PI / 2);
+      const pivot = new THREE.Group();
+      pivot.position.set(x, radius, z);
+      const outside = side * width / 2;
+      solidWheelPart(pivot, ink, new THREE.CylinderGeometry(radius, radius, width, 24), 0, 0)
+        .rotation.z = Math.PI / 2;
+      solidWheelPart(pivot, ink, new THREE.CylinderGeometry(radius * 0.55, radius * 0.55, 0.06, 16), 1, outside)
+        .rotation.z = Math.PI / 2;
+      solidWheelPart(pivot, ink, new THREE.SphereGeometry(radius * 0.18, 10, 6), 2, outside + side * 0.032);
+      decal(pivot, ink, [5, 121, 128, 128], [radius * 1.9, radius * 1.9],
+        [outside + side * 0.005, 0, 0], 0, side * Math.PI / 2);
+      if (animateWheels) {
+        mergeStatic(pivot);
+        pivot.userData.keep = true;
+        pivot.userData.front = front;
+        pivot.userData.r = radius;
+        wheels.push(pivot);
+      }
+      root.add(pivot);
     }
   }
   for (const end of [-1, 1]) {
@@ -133,6 +159,7 @@ function chassis(root, spec, ink, length) {
   tube(root, chrome, [0.57, 0.26, -1.03], [0.57, 0.26, -length / 2 + 0.035], 0.075);
   const outlet = mesh(new THREE.CircleGeometry(0.051, 12), rubber, 0.57, 0.26, -length / 2 + 0.034, root);
   outlet.rotation.y = Math.PI;
+  return wheels;
 }
 
 function shell(root, spec, kind, ink, length) {
@@ -331,7 +358,7 @@ export function driverStances(driver, body) {
 
 
 // Build the same models in the turntable and in the opt-in race preview.
-export function buildLookdevKart(kind, alt, original) {
+export function buildLookdevKart(kind, alt, original, { animateWheels = false } = {}) {
   const spec = LOOKDEV_KARTS.find(({ id }) => RACERS[id].kart === kind);
   const skin = alt ? alternateLivery(kind, spec) : spec;
   const length = new THREE.Box3().setFromObject(original.group).getSize(new THREE.Vector3()).z * 0.7;
@@ -340,7 +367,7 @@ export function buildLookdevKart(kind, alt, original) {
   const seat = new THREE.Group();
   group.add(body);
   const ink = livery(skin);
-  chassis(body, skin, ink, length);
+  const wheels = chassis(body, ink, length, animateWheels);
   shell(body, skin, kind, ink, length);
   mergeStatic(body);
   body.add(seat);
@@ -349,7 +376,7 @@ export function buildLookdevKart(kind, alt, original) {
     ? { barrel: new THREE.Vector3(0, 0.84, -length / 2) }
     : { hydraulics: kind === 'lowrider' };
   const exhaust = [new THREE.Vector3(0.57, 0.26, -length / 2)];
-  return { id: kind, group, body, seat, plush, parts, exhaust, wheels: [], detail: [] };
+  return { id: kind, group, body, seat, plush, parts, exhaust, wheels, detail: [] };
 }
 
 function alternateLivery(kind, spec) {

@@ -37,8 +37,8 @@ race), `p1cpu=LEVEL` (the player's kart drives itself), `seed=N`, `laps=N`,
 From this directory, run `npm ci`, then `npm run build -- --lookdev` and
 open `build/lookdev-race.html` in Chrome. The preview uses the seven
 turntable bodies and seated drivers with the normal tracks, controls,
-items and race physics. The preview wheels are merged into the chassis,
-so they stay fixed relative to the body. Phone pairing is disabled for offline play.
+items and race physics. Each wheel rolls at its own radius, and the front
+pair steers. Phone pairing is disabled for offline play.
 The regular build still uses the original kart models.
 
 To jump into four-way split screen, append

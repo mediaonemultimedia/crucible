@@ -89,7 +89,7 @@ export class RacerView {
     const R = RACERS[id];
     this.id = id; this.alt = alt;
     const original = buildKart(R.kart, alt);
-    this.kart = previewKarts ? buildLookdevKart(R.kart, alt, original) : original;
+    this.kart = previewKarts ? buildLookdevKart(R.kart, alt, original, { animateWheels: true }) : original;
     if (previewKarts) {
       const geometries = new Set();
       original.group.traverse((object) => { if (object.isMesh) geometries.add(object.geometry); });
@@ -199,7 +199,9 @@ export class RacerView {
     // wheels: roll with the speed; the front ones steer
     this.wheelA += (K.fwd * dt) / 0.45;
     for (const w of this.kart.wheels) {
-      w.rotation.set(this.wheelA, w.userData.front ? -(K.steer || 0) * 0.45 : 0, 0, 'YXZ');
+      const spin = previewKarts ? this.wheelA * 0.45 / w.userData.r : this.wheelA;
+      const steer = w.userData.front ? -(K.steer || 0) * 0.45 : 0;
+      w.rotation.set(spin, steer, 0, 'YXZ');
     }
     const parts = this.kart.parts;
     if (parts.roller) parts.roller.rotation.x = this.wheelA * 1.5;
