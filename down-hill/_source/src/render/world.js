@@ -15,6 +15,7 @@
 import * as THREE from 'three/webgpu';
 import { rbox, pillowGeo, mat, glowMat, mesh, canvasTex, srand, mergeStatic } from './geo.js';
 import { rightX, rightZ } from '../race/track.js';
+import { buildReadable } from './readable.js';
 
 const TAU = Math.PI * 2;
 export const BED = { x0: -66, x1: 34, z0: -112, z1: 14, top: 20, under: 10.75 };
@@ -118,7 +119,7 @@ export class World {
     scene.add(root);
     this.glowTex = glowTex();
     this.anim = [];
-    this.noDash = new Set(['banister', 'plank', 'books']);
+    this.noDash = new Set(['books']);
     this.runnerTags = new Set(['rug', 'landing', 'door', 'underbed']);
     this.build();
     root.traverse((o) => { if (o.isMesh && !o.userData.noShadow) { o.receiveShadow = true; o.castShadow = !!o.userData.cast; } });
@@ -152,6 +153,7 @@ export class World {
     this._landing();
     this._trackParts();
     this._guides();
+    this.readable = buildReadable(this, { arrowTags: new Set(['door', 'drawer', 'pillows', 'underbed', 'landing', 'books']) });
   }
 
   add(o) { this.root.add(o); return o; }
@@ -519,17 +521,34 @@ export class World {
         h -= t; n++;
       }
     }
-    // the drawer's run and the duvet need nothing; the pillow pile: plump pillows stepped up to the bed
-    const pk = runs.pillows || [];
-    const pcol = ['#f6f1f4', '#e7d6f3', '#d6f0e9', '#fbe3d2', '#f6f1f4'];
-    for (let i = 0; i < pk.length; i += 5) {
-      const k = pk[i], y = T.y[k];
-      if (y < 1) continue;
-      const w = (T.w[k] + T.m[k]) * 2 + 6;
-      const yaw = Math.atan2(T.tx[k], T.tz[k]);
-      const p = mesh(pillowGeo(w, Math.max(4, y * 0.55 + 3), 9), mat(pcol[(i / 5) % 5 | 0], { roughness: 0.95 }), T.x[k], y - Math.max(4, y * 0.55 + 3) / 2 + 1.2, T.z[k], root);
-      p.rotation.y = yaw + Math.PI / 2; p.userData.cast = true;
-      if (y > 3) { const q = mesh(pillowGeo(w * 0.95, y - 1, 10), mat(pcol[((i / 5) + 2) % 5 | 0], { roughness: 0.95 }), T.x[k], (y - 1) / 2, T.z[k], root); q.rotation.y = yaw + Math.PI / 2 + 0.05; }
+    // the drawer's run and the duvet need nothing. Up onto the bed: a plain,
+    // well-lit wooden toy ramp (the giant ruler again) on stacked toy-block
+    // piers, railed (stage 3: the old pillow pile stood above the road, so
+    // karts looked as if they sank into it). The pillows are heaped either
+    // side of it now, clear of the road and below its rails.
+    const pk = (runs.pillows || []).filter((k) => T.y[k] > 0.02);
+    if (pk.length) {
+      const ext = [...pk, ...[1, 2, 3].map((q) => (pk[pk.length - 1] + q) % N)];
+      ribbon(ext, plank, 1.6);
+      const blocks = ['#ff3b6b', '#3ab7ff', '#ffd84a', '#3ff0c8'].map((c) => mat(c, { roughness: 0.55 }));
+      for (let i = 0; i < pk.length; i += 9) {
+        const k = pk[i], y = T.y[k] - 1.6;
+        if (y < 1) continue;
+        for (const sd of [-1, 1]) {
+          const o = (T.w[k] + T.m[k] - 2.2) * sd, x = T.x[k] + rightX(T, k) * o, z = T.z[k] + rightZ(T, k) * o;
+          let h = 0, n = 0;
+          while (h < y - 0.1) { const t = Math.min(4, y - h); const b = mesh(rbox(4, t, 4, 0.3), blocks[(i + n + (sd > 0 ? 1 : 0)) % 4], x, h + t / 2, z, root); b.rotation.y = Math.atan2(T.tx[k], T.tz[k]) + n * 0.12; b.userData.cast = true; h += t; n++; }
+        }
+      }
+      const pcol = ['#f6f1f4', '#e7d6f3', '#d6f0e9', '#fbe3d2'];
+      for (let i = 4; i < pk.length; i += 11) {
+        const k = pk[i], y = T.y[k];
+        for (const sd of [-1, 1]) {
+          const o = (T.w[k] + T.m[k] + 8.5) * sd, h = Math.max(4, Math.min(y + 1, 14));
+          const p = mesh(pillowGeo(13, h, 9), mat(pcol[(i + (sd > 0 ? 2 : 0)) % 4], { roughness: 0.95 }), T.x[k] + rightX(T, k) * o, h / 2 - 0.5, T.z[k] + rightZ(T, k) * o, root);
+          p.rotation.y = Math.atan2(T.tx[k], T.tz[k]) + 0.3 * sd; p.userData.cast = true;
+        }
+      }
     }
   }
 
@@ -537,13 +556,14 @@ export class World {
      floor sections, the start line, the boost pads */
   _guides() {
     const T = this.T, N = T.N, root = this.root, def = T.def;
-    const dash = new THREE.MeshBasicMaterial({ color: '#f6f1e8', transparent: true, opacity: 0.85 });
+    const dash = new THREE.MeshBasicMaterial({ color: '#fffaf0', transparent: true, opacity: 0.95 });
     const neon = new THREE.MeshBasicMaterial({ color: '#ff3b6b' });
     const neon2 = new THREE.MeshBasicMaterial({ color: '#3ff0c8' });
-    const runner = new THREE.MeshStandardMaterial({ color: this.runnerColor || '#2c2440', roughness: 1, transparent: true, opacity: 0.55, depthWrite: false });
-    const dg = new THREE.PlaneGeometry(0.5, 2.2);
+    const runner = new THREE.MeshStandardMaterial({ color: this.runnerColor || '#2c2440', roughness: 1, transparent: true, opacity: 0.78, depthWrite: false });
+    // stage 3: bolder, closer edge lines (the road reads at speed)
+    const dg = new THREE.PlaneGeometry(0.85, 2.4);
     const insts = [];
-    for (let k = 0; k < N; k += 4) {
+    for (let k = 0; k < N; k += 3) {
       const tag = def.points[T.sec[k]].tag;
       if (this.noDash.has(tag)) continue;
       for (const s of [-1, 1]) insts.push([k, s]);

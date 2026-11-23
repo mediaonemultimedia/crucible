@@ -611,6 +611,12 @@ class App {
         for (const i of [e.i, e.j]) { const h = this.hvOf(i); if (h) { h.cam.shake = Math.max(h.cam.shake, e.p * 0.35); if (e.p > 0.5) this.buzz(i, 'bump'); } }
         break;
       }
+      case 'scrape': {
+        // a rail or a wall: sparks off the side you hit, a grind
+        this.fx.sparks(e.x, e.y, e.z, e.rail ? '#ffd27a' : '#ffffff', 3, 5, 0.55, 0.3);
+        if (mine) { A.play('dh-scrape', { gain: 0.25 + e.p * 0.35, rate: 0.9 + e.p * 0.3 }); H.cam.shake = Math.max(H.cam.shake, 0.06); }
+        break;
+      }
       case 'wall': if (mine) { A.play('dh-bump', { gain: 0.3 + e.p * 0.4, rate: 0.8 }); H.cam.shake = Math.max(H.cam.shake, e.p * 0.25); } break;
       case 'lap': if (mine && e.lap === R.laps) { const f = H.final; f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); A.setIntense(true); A.play('dh-tier', { rate: 1.6 }); } break;
       case 'finish': {

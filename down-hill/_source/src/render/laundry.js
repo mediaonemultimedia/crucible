@@ -12,6 +12,7 @@
 
 import * as THREE from 'three/webgpu';
 import { World } from './world.js';
+import { buildReadable } from './readable.js';
 import { rbox, mat, mesh, canvasTex, srand } from './geo.js';
 import { rightX, rightZ, podPos } from '../race/track.js';
 
@@ -84,7 +85,7 @@ const SOCKS = ['#e84a5f', '#2f6bd8', '#f2c14e', '#3ab795', '#f4f1ea', '#9b5cff',
 
 export class LaundryWorld extends World {
   build() {
-    this.noDash = new Set(['belt', 'ramp']);
+    this.noDash = new Set([]);
     this.runnerTags = new Set(['floor', 'bulge', 'pods', 'socks', 'suds']);
     this.runnerColor = '#7a5a8e';
     this.dashLift = () => 0;
@@ -96,6 +97,7 @@ export class LaundryWorld extends World {
     this._dryer();
     this._clutter();
     this._guides();
+    this.readable = buildReadable(this, { arrowTags: new Set(['ramp', 'suds', 'pods', 'socks', 'bulge']), railCols: ['#2f6bd8', '#f4f1ea'] });
     this._movers();
   }
 

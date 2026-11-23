@@ -294,6 +294,7 @@ export function playSynthSfx(ctx, dest, id, t, rate = 1, gain = 1) {
     else if (k === 'go') { len = 0.6; O(0.55, 'square', 1760, 1760, 0.13, 0.003); O(0.55, 'square', 1318, 1318, 0.07, 0.003); }
     else if (k === 'grunt') { len = 0.32; O(0.28, 'sawtooth', 240, 120, 0.12, 0.01); N(0.22, 'bandpass', 900, 500, 3, 0.16, 0.01, 1); O(0.2, 'square', 120, 80, 0.06, 0.01); }
     else if (k === 'clink') { len = 0.5; for (const [a, f] of [[0, 2900], [0.09, 3400], [0.2, 3100]]) O(0.2, 'sine', f, f * 0.98, 0.12, 0.002, a); N(0.4, 'bandpass', 1200, 1600, 2, 0.08, 0.02, 0.7); }
+    else if (k === 'scrape') { len = 0.16; N(0.15, 'bandpass', 3600, 2200, 2.5, 0.22, 0.004, 1.6); N(0.12, 'highpass', 5200, 4200, 0.7, 0.08, 0.002, 2); }   // a rail's grind: gritty, metallic
     else if (k === 'bump') { len = 0.22; O(0.18, 'sine', 150, 60, 0.36, 0.003); N(0.1, 'lowpass', 900, 300, 0.8, 0.2, 0.002); }
     else if (k === 'honk') { len = 0.5; O(0.22, 'square', 392, 392, 0.09, 0.005); O(0.22, 'square', 494, 494, 0.07, 0.005); O(0.24, 'square', 392, 392, 0.09, 0.005, 0.26); O(0.24, 'square', 523, 523, 0.07, 0.005, 0.26); }
     else if (k === 'flap') { len = 0.45; for (let i = 0; i < 5; i++) N(0.07, 'bandpass', 800, 1400, 1.2, 0.2, 0.004, 1 + i * 0.05); }

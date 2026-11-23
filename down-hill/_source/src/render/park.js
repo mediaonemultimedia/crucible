@@ -12,6 +12,7 @@
 
 import * as THREE from 'three/webgpu';
 import { World } from './world.js';
+import { buildReadable } from './readable.js';
 import { rbox, mat, mesh, canvasTex, srand } from './geo.js';
 import { rightX, rightZ, sprinklerOn } from '../race/track.js';
 
@@ -78,7 +79,7 @@ function planksTexP() {
 
 export class ParkWorld extends World {
   build() {
-    this.noDash = new Set(['ramp', 'deck', 'hose']);
+    this.noDash = new Set(['hose']);
     this.runnerTags = new Set(['lawn', 'pool']);
     this.runnerColor = '#9cc46a';
     this.dashLift = () => 0;
@@ -91,6 +92,7 @@ export class ParkWorld extends World {
     this._sprinklers();
     this._garden();
     this._guides();
+    this.readable = buildReadable(this, { arrowTags: new Set(['hose', 'patio', 'pool', 'ramp']), railCols: ['#e8552e', '#fff4e0'] });
     // the chalk lines read white on grass
   }
 
