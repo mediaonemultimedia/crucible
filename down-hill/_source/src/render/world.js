@@ -14,6 +14,7 @@
 
 import * as THREE from 'three/webgpu';
 import { rbox, pillowGeo, mat, glowMat, mesh, canvasTex, srand, mergeStatic } from './geo.js';
+import { addProps } from './props.js';
 import { rightX, rightZ } from '../race/track.js';
 import { buildReadable } from './readable.js';
 
@@ -122,6 +123,7 @@ export class World {
     this.noDash = new Set(['books']);
     this.runnerTags = new Set(['rug', 'landing', 'door', 'underbed']);
     this.build();
+    this.props = addProps(this);
     root.traverse((o) => { if (o.isMesh && !o.userData.noShadow) { o.receiveShadow = true; o.castShadow = !!o.userData.cast; } });
     this.merged = mergeStatic(root, { keep: (o) => o === this.startLine || this.padMeshes.has(o) });
     this.moon.shadow.needsUpdate = true;
