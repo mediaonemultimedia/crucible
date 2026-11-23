@@ -131,6 +131,29 @@ The rails, kerbs, signs and arrows add ~9 draws per view (merged by material); t
 add one small plane per near kart and cost nothing measurable (inside run-to-run noise), so
 they stay. SwiftShader render times are a CPU rasteriser's and swing a few ms between runs.
 
+## Status — stage 4, the music pass (`docs/stage-4-music.md`)
+
+Kevin: "more beeps than an actual song". Every track is now a song: a tune you can hum,
+lower and warmer, over moving chords, a counter-melody and a walking bass. Still all
+synthesised from data (`src/audio/music.js`); no audio files.
+
+| # | Item | State |
+|---|---|---|
+| 1 | Melody first: 4-bar question / answer phrases, mostly steps with a few leaps, held notes and rests, a hook that comes back; no run of one pitch | done — `test/music.test.mjs` asserts it (no 3 in a row, ≥ 60 % steps, ≥ 8 held notes) |
+| 2 | Lower and warmer: the tune in octave 4 (62–73 % of notes under c5; peaks e5–a5), a 50 % / 25 % pulse through a pitch-tracking low-pass with a soft attack, delayed vibrato on long notes; the 12.5 % arp is gone (a quiet filtered shimmer in the intro / lift only) | done — `audio/synth.js` (`wave`, `lp` per channel) |
+| 3 | Harmony and groove: vi, ii, borrowed iv, secondary dominants, a key-change lift for B; `lead2` a counter-melody under the tune; a syncopated walking bass (`bassLine`, chart-driven, approach notes into each chord); drums sit back (≤ 3 hats a bar), tom fills into every section | done |
+| 4 | Structure: intro (2) · A (8) · A' (8) · B lift (8) · A (8) · turnaround (2) → back to the first A (`loopFrom`); loops of 60 / 78 / 69 s | done |
+| 5 | Final lap: the same song ×1.06 with the hype layer (off-beat hats, the shimmer under the tune), switched on the next bar line (`Sequencer.queueIntense`) | done — tested: lands on a bar line within one bar |
+| 6 | Mix: music bus 0.9 → 0.5 (≈ −5 dB) under the engines / items / voices, a soft music compressor and a −4 dB high shelf at 4.5 kHz, the lead panned a touch left with a dotted-8th echo on the right, the counter-melody right | done — `audio/engine.js` |
+| 7 | The Landing (F, lifts to G, 136 bpm), Laundry Day (E dorian funk, lifts to F♯ dorian, 104 bpm, swung 16ths), Sprinkler Park (B♭, lifts to D♭, 118 bpm), and the title / select theme (G, 100 bpm) | done |
+
+`node tools/music.mjs` renders each track offline in headless Chromium (the real engine
+and graph on an OfflineAudioContext) to `shots/music/*.mp3`: from the top, the lift, and
+the final-lap switch; `shots/music/before/` has the old loops. Measured on 40 s from the
+top (old → new): RMS −18.6 → −21.2 dBFS (Landing), −19.5 → −21.8 (Laundry), −20.1 →
+−21.0 (Park); energy above 6 kHz about −45 → −58 to −60 dB; the "brightness" (first-difference / RMS)
+0.10–0.12 → 0.05–0.06.
+
 ## Stage 2 hooks
 - `input/controls.js` has `extra`: a function returning another input to
   merge (the phone pads plug in there); `Race` takes `humans: [...]`, the

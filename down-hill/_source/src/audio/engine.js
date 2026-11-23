@@ -15,6 +15,7 @@ const LOOKAHEAD = 0.25;          // s of music scheduled ahead
 const MAX_VOICES = 14;           // SFX playing at once
 const MAX_SAME = 4;              // …of one sound
 export const PRACTICE_MUSIC = 0.35;   // practice: the music low
+export const MUSIC_GAIN = 0.5;        // the music under the engines, items and voices (was 0.9: about -5 dB)
 
 const db = (x) => 10 ** (x / 20);
 /* the clips' levels, from their measured loudness (tools/audio-prep.mjs:
@@ -46,6 +47,11 @@ export function saveSettings(ls, s) {
 /* a slider (0–100) → gain: a squared curve, so the low end is usable */
 export const level = (v) => (v / 100) ** 2;
 
+/* each instrument's place in the stereo field, and how much of it goes to the echo */
+const PAN = { lead: -0.12, lead2: 0.26, arp: -0.3, bass: 0, drums: 0.04 };
+const SEND = { lead: 0.3, arp: 0.22 };
+const ECHO = { beats: 0.75, feedback: 0.3, lp: 1900, pan: 0.42 };
+
 /* ── the sequencer: one track on one context ───────────────────────────── */
 export class Sequencer {
   constructor(ctx, dest, name, { loop = null, onEnd = null } = {}) {
@@ -56,24 +62,57 @@ export class Sequencer {
     this.onEnd = onEnd;
     this.out = ctx.createGain();
     this.out.connect(dest);
+    this.buses = {};
+    this.echo = null;
     this.tempo = 1;
     this.intense = false;
+    this.pending = null;         // a final-lap switch waiting for its bar line
     this.idx = 0;
-    this.base = 0;               // the beat the current pass of the loop starts on
+    this.base = 0;               // the beat offset of the current pass of the loop
     this.on = false;
     this.done = false;
+  }
+
+  /* an instrument's bus: panned, and (the lead, the shimmer) a send to the echo */
+  bus(inst) {
+    let b = this.buses[inst];
+    if (b) return b;
+    const ctx = this.ctx;
+    b = this.buses[inst] = ctx.createGain();
+    const pan = PAN[inst] ?? 0;
+    if (pan && ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = pan; b.connect(p); p.connect(this.out); } else b.connect(this.out);
+    if (SEND[inst]) { const s = ctx.createGain(); s.gain.value = SEND[inst]; b.connect(s); s.connect(this._echo()); }
+    return b;
+  }
+
+  /* a dotted-eighth echo, darker on each repeat, on the other side */
+  _echo() {
+    if (this.echo) return this.echo.in;
+    const ctx = this.ctx, d = ctx.createDelay(2), fb = ctx.createGain(), lp = ctx.createBiquadFilter(), wet = ctx.createGain();
+    d.delayTime.value = ECHO.beats * this.spb();
+    fb.gain.value = ECHO.feedback;
+    lp.type = 'lowpass'; lp.frequency.value = ECHO.lp; lp.Q.value = 0.5;
+    wet.gain.value = 1;
+    d.connect(lp); lp.connect(fb); fb.connect(d); lp.connect(wet);
+    if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = ECHO.pan; wet.connect(p); p.connect(this.out); } else wet.connect(this.out);
+    this.echo = { in: d, d };
+    return d;
   }
 
   spb() { return 60 / (this.c.bpm * this.tempo); }
   timeOf(beat) { return this.t0 + (beat - this.b0) * this.spb(); }
   beatAt(time) { return this.b0 + (time - this.t0) / this.spb(); }
 
+  /* the beats one pass of the loop adds (after the first: from loopBeat to the end) */
+  get passBeats() { return this.c.beats - (this.loop ? this.c.loopBeat : 0); }
+
   start(at = this.ctx.currentTime + 0.05, fromBeat = 0) {
     this.t0 = at; this.b0 = fromBeat;
-    this.base = Math.floor(fromBeat / this.c.beats) * this.c.beats;
+    const B = this.c.beats, L0 = this.loop ? this.c.loopBeat : 0, L = B - L0;
+    this.base = fromBeat < B ? 0 : Math.floor((fromBeat - L0) / L) * L;
     const inLoop = fromBeat - this.base;
     this.idx = this.c.events.findIndex((e) => e.beat >= inLoop - 1e-6);
-    if (this.idx < 0) { this.idx = 0; this.base += this.c.beats; }
+    if (this.idx < 0) { this.idx = this.loop ? this.c.loopIdx : 0; this.base += L; }
     this.on = true;
     this.endAt = this.loop ? Infinity : this.timeOf(this.c.beats) + 1.2;
     return this;
@@ -86,25 +125,45 @@ export class Sequencer {
     for (let n = 0; n < 4000; n++) {
       if (this.idx >= E.length) {
         if (!this.loop) { this.on = false; return; }
-        this.idx = 0; this.base += this.c.beats;
+        this.idx = this.c.loopIdx; this.base += this.passBeats;
       }
-      const e = E[this.idx], beat = this.base + e.beat, t = this.timeOf(beat);
+      const e = E[this.idx], beat = this.base + e.beat;
+      if (this.pending && beat >= this.pending.beat - 1e-6 && this.timeOf(this.pending.beat) < until) this._switch();
+      const t = this.timeOf(beat);
       if (t >= until) return;
       this.idx++;
       if (e.hype && !this.intense) continue;
       if (t < this.ctx.currentTime - 0.02) continue;            // (late: skip, never pile up)
       const dur = e.dur * this.spb();
-      if (e.inst === 'drums') playDrum(this.ctx, this.out, e.drum, t, e.gain);
+      if (e.inst === 'drums') playDrum(this.ctx, this.bus('drums'), e.drum, t, e.gain);
       else if (e.inst === 'fx') playFx(this.ctx, this.out, e.fx, t, e.gain);
-      else playNote(this.ctx, this.out, e.inst, e.note, t, dur, e.gain);
+      else playNote(this.ctx, this.bus(e.inst), e.inst, e.note, t, dur, e.gain, e);
     }
+  }
+
+  /* the final lap (or back): the hype layer and the new tempo from the next
+     bar line, so the switch lands on the downbeat */
+  queueIntense(on, tempo = 1) {
+    if (!this.on) { this.intense = on; this.tempo = tempo; return; }
+    const E = this.c.events;
+    const next = this.idx < E.length ? this.base + E[this.idx].beat : this.base + this.passBeats + (this.loop ? this.c.loopBeat : 0);
+    this.pending = { beat: Math.ceil(next / 4 - 1e-6) * 4, on, tempo };
+  }
+  _switch() {
+    const p = this.pending;
+    this.pending = null;
+    const t = this.timeOf(p.beat);
+    this.t0 = t; this.b0 = p.beat;
+    this.tempo = p.tempo;
+    this.intense = p.on;
+    if (this.echo) this.echo.d.delayTime.setValueAtTime(ECHO.beats * this.spb(), Math.max(t, this.ctx.currentTime));
   }
 
   /* a new tempo from the next note on (the beats so far keep their times) */
   setTempo(f) {
     if (f === this.tempo || !this.on) { this.tempo = f; return; }
     const E = this.c.events, e = E[Math.min(this.idx, E.length - 1)];
-    const beat = this.base + (this.idx < E.length ? e.beat : this.c.beats);
+    const beat = this.base + (this.idx < E.length ? e.beat : this.c.beats);  // (a stray tempo: from the next note)
     const t = Math.max(this.ctx.currentTime, this.timeOf(beat));
     this.t0 = t; this.b0 = beat;
     this.tempo = f;
@@ -178,7 +237,13 @@ export class AudioEngine {
     this.musicBus = ctx.createGain();
     this.duckNode = ctx.createGain();
     this.sfxBus = ctx.createGain();
-    this.duckNode.connect(this.musicBus); this.musicBus.connect(this.master); this.sfxBus.connect(this.master);
+    // the music's own glue: a soft compressor and the top end rolled off a
+    // little (no harsh highs), under the engines, items and voices
+    const mComp = ctx.createDynamicsCompressor();
+    mComp.threshold.value = -22; mComp.knee.value = 12; mComp.ratio.value = 2.5; mComp.attack.value = 0.012; mComp.release.value = 0.25;
+    const mTone = ctx.createBiquadFilter();
+    mTone.type = 'highshelf'; mTone.frequency.value = 4500; mTone.gain.value = -4;
+    this.duckNode.connect(this.musicBus); this.musicBus.connect(mComp); mComp.connect(mTone); mTone.connect(this.master); this.sfxBus.connect(this.master);
     this._levels(true);
   }
 
@@ -201,7 +266,7 @@ export class AudioEngine {
     const S = this.settings, t = this.ctx.currentTime;
     const set = (p, v) => { if (now) p.value = v; else { p.cancelScheduledValues(t); p.setValueAtTime(p.value, t); p.setTargetAtTime(v, t, 0.03); } };
     set(this.master.gain, S.muted ? 0 : 1);
-    set(this.musicBus.gain, level(S.music) * 0.9 * (this.practice ? PRACTICE_MUSIC : 1) * (this.paused ? 0 : 1));
+    set(this.musicBus.gain, level(S.music) * MUSIC_GAIN * (this.practice ? PRACTICE_MUSIC : 1) * (this.paused ? 0 : 1));
     set(this.sfxBus.gain, level(S.sfx));
   }
 
@@ -278,7 +343,7 @@ export class AudioEngine {
     if (!this.want) return;
     this.loopSeq = new Sequencer(this.ctx, this.duckNode, this.want);
     this.loopSeq.intense = this.intense;
-    this.loopSeq.setTempo(this.intense ? 1.07 : 1);
+    this.loopSeq.tempo = this.intense ? this.loopSeq.c.hypeTempo : 1;
     this.loopSeq.start(this.ctx.currentTime + 0.08);
     this.loopSeq.pump(this.ctx.currentTime + LOOKAHEAD);
   }
@@ -303,12 +368,13 @@ export class AudioEngine {
     g.setTargetAtTime(1, t + hold, 0.35);
   }
 
-  /* tense: the fight loop speeds up a little and the extra layer comes in */
+  /* tense (the final lap): the same song a touch faster with the extra
+     layer in, from the next bar line */
   setIntense(on) {
     on = !!on;
     if (on === this.intense) return;
     this.intense = on;
-    if (this.loopSeq) { this.loopSeq.intense = on; if (this.loopSeq.name === 'fight') this.loopSeq.setTempo(on ? 1.07 : 1); }
+    if (this.loopSeq) this.loopSeq.queueIntense(on, on ? this.loopSeq.c.hypeTempo : 1);
   }
 
   setPractice(on) { if (this.practice !== !!on) { this.practice = !!on; this._levels(); } }
@@ -327,7 +393,7 @@ export class AudioEngine {
     } else if (this.resumeAt && this.resumeAt.name === this.want) {
       this.loopSeq = new Sequencer(this.ctx, this.duckNode, this.want);
       this.loopSeq.intense = this.intense;
-      this.loopSeq.tempo = this.intense && this.want === 'fight' ? 1.07 : 1;
+      this.loopSeq.tempo = this.intense ? this.loopSeq.c.hypeTempo : 1;
       this.loopSeq.start(now + 0.06, this.resumeAt.beat);
       this.resumeAt = null;
     } else { this.resumeAt = null; this._applyWant(); }
@@ -372,7 +438,7 @@ export async function renderOffline({ seconds, music = null, musicFrom = 0, inte
     const s = new Sequencer(ctx, E.duckNode, music).start(0.02, musicFrom);
     if (intenseAt !== null) {
       s.pump(intenseAt);
-      s.intense = true; s.setTempo(music === 'fight' ? 1.07 : 1);
+      s.queueIntense(true, s.c.hypeTempo);
     }
     s.pump(seconds);
   }

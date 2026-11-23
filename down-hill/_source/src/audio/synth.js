@@ -48,19 +48,31 @@ function noiseSrc(ctx, t, rate = 1) {
 
 /* ── the music's instruments ───────────────────────────────────────────── */
 
-const LEVEL = { lead: 0.13, lead2: 0.085, arp: 0.05, bass: 0.26, tbone: 0.16 };
+const LEVEL = { lead: 0.13, lead2: 0.085, arp: 0.05, bass: 0.21, tbone: 0.16 };
+/* the warm voices (a channel with a low-pass): levels for a filtered pulse */
+const WARM = { lead: 0.092, lead2: 0.05, arp: 0.024 };
 
-/* one note: inst, MIDI note, time, duration (s), gain (0–1 from the track) */
-export function playNote(ctx, dest, inst, note, t, dur, gain = 1) {
+/* one note: inst, MIDI note, time, duration (s), gain (0–1 from the track),
+   v: the channel's voicing ({ wave: 'p50' | 'p25' | 'p12', lp: Hz }) */
+export function playNote(ctx, dest, inst, note, t, dur, gain = 1, v = {}) {
   const K = kit(ctx), f = hz(note), g = ctx.createGain();
   g.connect(dest);
   if (inst === 'bass') {
+    // a triangle (the NES bass) with a soft, filtered half-pulse an octave
+    // up for body on small speakers; bouncy: it lets go before the next note
     const o = ctx.createOscillator();
     o.type = 'triangle';
     o.frequency.setValueAtTime(f, t);
     o.connect(g);
-    const stop = env(g, t, LEVEL.bass * gain, { a: 0.003, d: 0.12, s: 0.75, end: t + dur * 0.92, r: 0.04 });
-    o.start(t); o.stop(stop);
+    const o2 = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g2 = ctx.createGain();
+    o2.setPeriodicWave(K.p50);
+    o2.frequency.setValueAtTime(f, t);
+    lp.type = 'lowpass'; lp.Q.value = 0.6;
+    lp.frequency.setValueAtTime(900, t); lp.frequency.setTargetAtTime(420, t, 0.05);
+    g2.gain.value = 0.16;
+    o2.connect(lp); lp.connect(g2); g2.connect(g);
+    const stop = env(g, t, LEVEL.bass * gain, { a: 0.003, d: 0.14, s: 0.62, end: t + Math.max(0.06, dur * 0.86), r: 0.05 });
+    o.start(t); o.stop(stop); o2.start(t); o2.stop(stop);
     return;
   }
   if (inst === 'tbone') {
@@ -85,20 +97,36 @@ export function playNote(ctx, dest, inst, note, t, dur, gain = 1) {
     return;
   }
   // the pulses
+  const warm = !!v.lp;
   const o = ctx.createOscillator();
-  o.setPeriodicWave(inst === 'lead' ? K.p25 : K.p12);
+  o.setPeriodicWave(K[v.wave] || (inst === 'lead' ? K.p25 : K.p12));
   o.frequency.setValueAtTime(f, t);
-  // a little vibrato on long lead notes (it sings)
-  if (dur > 0.45 && inst !== 'arp') {
-    const lfo = ctx.createOscillator(), lg = ctx.createGain();
-    lfo.frequency.value = 5.5;
-    lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(f * 0.012, t + 0.3);
-    lfo.connect(lg); lg.connect(o.frequency);
-    lfo.start(t); lfo.stop(t + dur + 0.1);
+  let src = o;
+  if (warm) {
+    // a gentle low-pass that tracks the pitch, opening a little on the attack
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.Q.value = 0.5;
+    const fc = Math.min(v.lp, Math.max(800, f * 7));
+    lp.frequency.setValueAtTime(fc * 1.6, t);
+    lp.frequency.setTargetAtTime(fc, t + 0.01, 0.07);
+    o.connect(lp); src = lp;
   }
-  o.connect(g);
+  // vibrato on long notes (it sings); the warm voices start straight and ease in
+  if (dur > (warm ? 0.32 : 0.45) && inst !== 'arp') {
+    const lfo = ctx.createOscillator(), lg = ctx.createGain();
+    lfo.frequency.value = warm ? 5.2 : 5.5;
+    const delay = warm ? 0.2 : 0, depth = f * (warm ? 0.0075 : 0.012);
+    lg.gain.setValueAtTime(0, t); lg.gain.setValueAtTime(0, t + delay); lg.gain.linearRampToValueAtTime(depth, t + delay + 0.3);
+    lfo.connect(lg); lg.connect(o.frequency);
+    lfo.start(t); lfo.stop(t + dur + 0.15);
+  }
+  src.connect(g);
   const short = inst === 'arp';
-  const stop = env(g, t, (LEVEL[inst] ?? 0.1) * gain, short ? { a: 0.002, d: 0.06, s: 0.35, end: t + Math.min(dur, 0.12), r: 0.03 } : { a: 0.004, d: 0.12, s: 0.62, end: t + dur * 0.9, r: 0.05 });
+  const peak = ((warm ? WARM[inst] : LEVEL[inst]) ?? 0.1) * gain;
+  const shape = short ? { a: 0.003, d: 0.08, s: 0.35, end: t + Math.min(dur, 0.14), r: 0.05 }
+    : warm ? { a: 0.008, d: 0.16, s: 0.72, end: t + dur * 0.93, r: 0.09 }
+      : { a: 0.004, d: 0.12, s: 0.62, end: t + dur * 0.9, r: 0.05 };
+  const stop = env(g, t, peak, shape);
   o.start(t); o.stop(stop);
 }
 
@@ -117,6 +145,18 @@ export function playDrum(ctx, dest, d, t, gain = 1) {
     o.connect(g); o.start(t); o.stop(t + 0.22);
     return;
   }
+  if (d === 't' || d === 'l') {
+    // a toy tom (high / low): a triangle thud dropping in pitch, a breath of noise
+    const o = ctx.createOscillator(), hi = d === 't';
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(hi ? 240 : 165, t);
+    o.frequency.exponentialRampToValueAtTime(hi ? 150 : 100, t + 0.14);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.42 * gain, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    o.connect(g); o.start(t); o.stop(t + 0.24);
+    return;
+  }
   const n = noiseSrc(ctx, t), f = ctx.createBiquadFilter();
   n.connect(f); f.connect(g);
   let len = 0.04, lvl = 0.07;
@@ -127,8 +167,8 @@ export function playDrum(ctx, dest, d, t, gain = 1) {
     o.type = 'triangle'; o.frequency.setValueAtTime(190, t); o.frequency.exponentialRampToValueAtTime(120, t + 0.06);
     og.gain.setValueAtTime(0.2 * gain, t); og.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
     o.connect(og); og.connect(dest); o.start(t); o.stop(t + 0.1);
-  } else if (d === 'h') { f.type = 'highpass'; f.frequency.value = 7000; len = 0.035; lvl = 0.07; }
-  else if (d === 'o') { f.type = 'highpass'; f.frequency.value = 6500; len = 0.16; lvl = 0.06; }
+  } else if (d === 'h') { f.type = 'bandpass'; f.frequency.value = 7200; f.Q.value = 0.9; len = 0.032; lvl = 0.055; }
+  else if (d === 'o') { f.type = 'bandpass'; f.frequency.value = 6800; f.Q.value = 0.8; len = 0.14; lvl = 0.05; }
   else if (d === 'c') { f.type = 'highpass'; f.frequency.value = 3800; len = 0.9; lvl = 0.09; }
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(lvl * gain, t + 0.002);
