@@ -17,6 +17,7 @@ import { rbox, pillowGeo, mat, glowMat, mesh, canvasTex, srand, mergeStatic } fr
 import { addProps } from './props.js';
 import { along, groundAt, lateral, locate, rightX, rightZ } from '../race/track.js';
 import { buildReadable } from './readable.js';
+import { dressLanding } from './landing-lookdev.js';
 
 const TAU = Math.PI * 2;
 const landingLookdev = typeof LOOKDEV_RACE !== 'undefined' && LOOKDEV_RACE;
@@ -56,9 +57,9 @@ function carpetTex(c1, c2) {
 }
 function wallpaperTex() {
   return canvasTex(256, 256, (g, w, h) => {
-    const base = landingLookdev ? '#365374' : '#3a3566';
+    const base = landingLookdev ? '#55768b' : '#3a3566';
     g.fillStyle = base; g.fillRect(0, 0, w, h);
-    g.fillStyle = landingLookdev ? '#3d5d7e' : '#433d74';
+    g.fillStyle = landingLookdev ? '#608399' : '#433d74';
     for (let x = 0; x < w; x += 32) g.fillRect(x, 0, 14, h);
     // little stars and moons
     g.fillStyle = landingLookdev ? '#bfd4e3' : '#f3d98b';
@@ -76,9 +77,9 @@ function hallPaperTex() {
 }
 function quiltTex() {
   return canvasTex(512, 512, (g, w, h) => {
-    const cols = landingLookdev ? ['#397f9f', '#55a3b5', '#2d6587', '#438da5']
+    const cols = landingLookdev ? ['#2f8090', '#efc584', '#c96d55', '#376785']
       : ['#2f4a8a', '#3a5aa0', '#27407a', '#33509a'];
-    const n = 8, s = w / n;
+    const n = landingLookdev ? 6 : 8, s = w / n;
     for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
       g.fillStyle = cols[(i + j * 3) % 4]; g.fillRect(i * s, j * s, s, s);
       if (landingLookdev) {
@@ -91,6 +92,19 @@ function quiltTex() {
         g.strokeStyle = 'rgba(24,50,68,0.38)';
         g.lineWidth = 2;
         g.strokeRect(x + 1, y + 1, s - 2, s - 2);
+        g.fillStyle = 'rgba(255,245,222,0.19)';
+        g.beginPath();
+        if ((i + j) % 2) {
+          g.moveTo(x, y);
+          g.lineTo(x + s, y);
+          g.lineTo(x, y + s);
+        } else {
+          g.moveTo(x + s, y + s);
+          g.lineTo(x + s, y);
+          g.lineTo(x, y + s);
+        }
+        g.fill();
+        continue;
       }
       // a stitched star or moon in each square
       g.fillStyle = (i + j) % 3 ? '#f2d98a' : '#e9eef9';
@@ -101,15 +115,23 @@ function quiltTex() {
       g.setLineDash([6, 6]); g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 2;
       g.strokeRect(i * s + 4, j * s + 4, s - 8, s - 8); g.setLineDash([]);
     }
-  }, { repeat: [3, 4] });
+  }, { repeat: landingLookdev ? [1, 1] : [3, 4] });
 }
 function rugTex() {
   return canvasTex(512, 512, (g, w, h) => {
     const cx = w / 2, cy = h / 2;
-    const rings = landingLookdev ? ['#286264', '#eed19a', '#3e9290', '#337568', '#bf6554', '#f0d6aa', '#36889b', '#4dad97', '#225c67']
+    const rings = landingLookdev ? ['#294b61', '#ead0a0', '#317c7e', '#317c7e', '#317c7e', '#317c7e', '#317c7e', '#317c7e', '#317c7e']
       : ['#e86f7d', '#f4c06a', '#6fd3b8', '#7e72d8', '#f4efe6', '#e86f7d', '#f4c06a', '#6fd3b8', '#7e72d8'];
     for (let i = 0; i < rings.length; i++) { g.fillStyle = rings[i]; g.beginPath(); g.arc(cx, cy, w / 2 - i * 26, 0, TAU); g.fill(); }
     if (landingLookdev) {
+      g.save();
+      g.beginPath(); g.arc(cx, cy, 203, 0, TAU); g.clip();
+      g.fillStyle = 'rgba(255,234,195,0.18)';
+      for (let x = -h; x < w; x += 37) {
+        g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 7, 0);
+        g.lineTo(x + h + 7, h); g.lineTo(x + h, h); g.fill();
+      }
+      g.restore();
       // Herringbone stitches follow the rug's binding, painted into the existing texture.
       for (const radius of [244, 224, 190, 112]) {
         const count = Math.round(radius * 0.85);
@@ -209,6 +231,7 @@ export class World {
     this._landing();
     this._trackParts();
     this._guides();
+    if (landingLookdev) dressLanding(this);
     this.readable = buildReadable(this, { railCols: landingLookdev ? ['#b4523e', '#f9e7be'] : undefined, arrowTags: new Set(['door', 'drawer', 'pillows', 'underbed', 'landing', 'books']) });
   }
 
@@ -461,7 +484,7 @@ export class World {
     pn.rotation.z = -0.08;
     // fairy lights along the north wall
     const fl = [];
-    for (let i = 0; i < 26; i++) {
+    for (let i = 0; i < 26; i += landingLookdev ? 2 : 1) {
       const x = -140 + i * 10.4, y = 100 - Math.sin((i % 13) / 12 * Math.PI) * 10;
       const c = cols[i % 4];
       mesh(new THREE.SphereGeometry(0.9, 8, 6), glowMat(c, 2.5), x, y, -110.5, root).userData.noShadow = true;
