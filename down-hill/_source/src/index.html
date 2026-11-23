@@ -167,6 +167,12 @@ body[data-screen=select] #pads .qr{width:clamp(160px,17vh,240px);height:clamp(16
 body[data-screen=select] #pads .code{font-size:32px}
 body[data-screen=select] #pads .seats{flex-direction:row;flex-wrap:wrap;gap:3px 12px;max-width:380px}
 body[data-screen=select] #players{top:114px}
+/* stage 5: the bigger QR card owns the top-right on select — the heading centres in the space left of it, the CPU / track menus start below it */
+body[data-screen=select] #select .head{right:calc(clamp(160px,17vh,240px) + 250px);left:max(24px,18vw)}
+body[data-screen=title] #pads{top:auto;bottom:22px;right:22px}
+body[data-screen=title] .keys{left:24px;transform:none}
+body[data-screen=select] #select #diff{top:calc(clamp(160px,17vh,240px) + 44px)}
+body[data-screen=select] #select #tracks{top:calc(clamp(160px,17vh,240px) + 266px)!important}
 
 /* split screen: one panel per player (main.js _views) */
 #hud .view{position:absolute;overflow:hidden;box-shadow:inset 0 0 0 2px #120d1f}
@@ -290,7 +296,7 @@ body.photo #photo{display:block;animation:jig .3s steps(2) infinite}
       <div class="stats" id="s-stats"></div>
     </div>
     <div class="diff" id="diff"><span class="eyebrow">CPU · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd></span></div>
-    <div class="diff" id="tracks" style="top:calc(max(16%,120px) + 170px)"><span class="eyebrow">Track · <kbd>Tab</kbd></span></div>
+    <div class="diff" id="tracks" style="top:calc(max(16%,120px) + 222px)"><span class="eyebrow">Track · <kbd>Tab</kbd></span></div>
     <div class="cards" id="cards"></div>
   </section>
 

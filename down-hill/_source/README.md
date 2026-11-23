@@ -174,6 +174,31 @@ taunt tricks, and loves the toy scale.
 | 8 | See your item on your kart: the held item rides above the rear bumper (one shared low-poly mesh per item type, instanced: ≤ 1 draw per type), flickers through the roulette, pops in with a bounce; a missile or slick held behind on LOOK BACK dangles off the back (and now blocks one missile or paper plane from behind); every kart shows its item, hidden past 72 units; the HUD slot is bottom-centre with the icon + name, in every split view | done — `fx._heldUpdate` |
 | 9 | Kevalanche is number 88 (`KEV 88`, back plate `88`); Sumaura's bus sign unchanged | done — `render/karts.js` |
 
+
+### Stage 5 numbers
+**Difficulty curve** (`node tools/avgdriver.mjs normal <strength> 40`: the average driver vs 7 normal CPUs, 40 seeded races per track; it starts at the back of the grid):
+
+| normal, strength | Landing top 3 | Laundry top 3 | Park top 3 | all three | mean place |
+|---|---|---|---|---|---|
+| race 1 / single race (gentle, 0) | 25/40 | 15/40 | 25/40 | **65/120 (54 %)** | 3.52 |
+| cup race 2 (0.5) | 20/40 | 19/40 | 16/40 | 55/120 (46 %) | 3.94 |
+| cup race 3 = stage 4's normal (1) | 17/40 | 16/40 | 16/40 | 49/120 (41 %) | 4.38 |
+
+Boxes for the average driver: a row every 7.9–9.2 s on average (the longest gap 17.8–21.8 s, when it was spun out or launched near a row), 5 rows missed out of 2,281 driven through, about 16–19 items a race.
+
+**Frame cost** (`node tools/framecost.mjs main.html final.html`, The Landing, 8 karts, SwiftShader 1280×720):
+
+| build | views | JS / frame (mean, p95) | render call p50 | draws | triangles |
+|---|---|---|---|---|---|
+| main (stage 4) | 1 | 0.63, 1.5 ms | 10.4 ms | 415 | 1.71 M |
+| stage 5 | 1 | 1.17, 4.4 ms | 9.9 ms | 382 | 1.65 M |
+| main (stage 4) | 4 | 1.09, 3.0 ms | 38.3 ms | 1,494 | 3.59 M |
+| stage 5 | 4 | 1.48, 5.3 ms | 35.8 ms | 1,408 | 3.66 M |
+
+The instanced boxes take ~33 draws off a view; the held items add ≤ 1 draw per item type in view, the props 1. The Hot Wash is a scale on each kart's existing group (no new draws), so it stays. JS per frame is up ~0.4–0.5 ms (the extra items in play, the held-item and box matrices) and still well inside a 16.7 ms frame. `tools/check.mjs` on the release build: ALL CHECKS PASS (8/8 finish on all three tracks, mean laps 53.1 / 54.4 / 54.8 s, race JS p95 ≤ 1.0 ms, 0 safety-net catches; split-4 253 draws per view, JS p95 4.0 ms); `tools/items-test.mjs`: all 10 items fire, hit and resolve in 1P and 4-way split, zero errors; `npm test` 46/46 (stage 3's fall-through regression included: 0 below the road, 0 layer jumps, 0 edge falls on all three tracks).
+
+Also fixed: the alarm clock's flight path was drawn 42–118 units behind where the sim had it (the lap counter counts from the start line); a handcuff chain between two karts far apart (one fished out) used to yank the other across the room — it snaps now.
+
 ## Stage 2 hooks
 - `input/controls.js` has `extra`: a function returning another input to
   merge (the phone pads plug in there); `Race` takes `humans: [...]`, the

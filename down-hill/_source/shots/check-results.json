@@ -1,0 +1,350 @@
+{
+ "menus": {
+  "trail": [
+   "title",
+   "select",
+   "race"
+  ],
+  "pick": {
+   "sel": 8,
+   "level": "hard",
+   "turn": [
+    "sumaura",
+    true
+   ]
+  },
+  "me": [
+   "sumaura",
+   true
+  ],
+  "cpu": [
+   "hard",
+   "hard",
+   "hard",
+   "hard",
+   "hard",
+   "hard",
+   "hard"
+  ],
+  "n": 8,
+  "moved": "11.6",
+  "turned": "1.92"
+ },
+ "race-landing": {
+  "screen": "results",
+  "secs": 168.8,
+  "order": [
+   "sumaura*",
+   "sebas",
+   "kevalanche",
+   "zach*",
+   "kevalanche*",
+   "rubberta*",
+   "k8e*",
+   "johnny"
+  ],
+  "times": [
+   150.5,
+   159.5,
+   161.6,
+   164.3,
+   164.6,
+   165.1,
+   165.1,
+   165.1
+  ],
+  "ev": {
+   "count": 3,
+   "go": 1,
+   "boost": 160,
+   "launch": 49,
+   "trick": 47,
+   "trickBoost": 46,
+   "land": 79,
+   "drift": 228,
+   "bump": 122,
+   "tier": 174,
+   "box": 111,
+   "scrape": 98,
+   "wall": 92,
+   "balls": 16,
+   "gotItem": 102,
+   "use": 99,
+   "use:alarm": 8,
+   "pad": 79,
+   "alarm": 8,
+   "hit": 41,
+   "wobble": 4,
+   "use:missile": 17,
+   "bounce": 52,
+   "pop": 34,
+   "use:case": 6,
+   "case": 5,
+   "use:plane": 8,
+   "use:slick": 10,
+   "use:wash": 7,
+   "wash": 7,
+   "use:cuffs": 11,
+   "cuffs": 8,
+   "flat": 6,
+   "use:spring": 13,
+   "eject": 12,
+   "use:espresso": 10,
+   "ejectLand": 12,
+   "use:sugar": 9,
+   "sugar": 9,
+   "unCuff": 5,
+   "post": 5,
+   "lap": 16,
+   "fizzle": 6,
+   "finish": 5
+  },
+  "lap": {
+   "min": 43,
+   "max": 67.9,
+   "mean": 53.1
+  },
+  "jsMs": {
+   "mean": 0.39,
+   "p50": 0.3,
+   "p95": 1,
+   "p99": 1.8
+  },
+  "finished": 8,
+  "net": 0
+ },
+ "race-laundry": {
+  "screen": "results",
+  "secs": 171.4,
+  "order": [
+   "johnny",
+   "sumaura*",
+   "rubberta*",
+   "sebas",
+   "kevalanche",
+   "k8e*",
+   "kevalanche*",
+   "zach*"
+  ],
+  "times": [
+   151.6,
+   161.2,
+   162.9,
+   163.4,
+   164.3,
+   167.2,
+   167.6,
+   167.8
+  ],
+  "ev": {
+   "count": 3,
+   "go": 1,
+   "boost": 57,
+   "box": 155,
+   "pad": 55,
+   "gotItem": 144,
+   "use": 143,
+   "use:slick": 19,
+   "hit": 72,
+   "pop": 42,
+   "use:espresso": 25,
+   "bump": 127,
+   "use:case": 15,
+   "case": 11,
+   "use:cuffs": 15,
+   "use:spring": 17,
+   "eject": 16,
+   "use:wash": 9,
+   "cuffs": 14,
+   "use:plane": 10,
+   "wash": 9,
+   "ejectLand": 16,
+   "launch": 24,
+   "trick": 23,
+   "trickBoost": 23,
+   "land": 31,
+   "use:alarm": 4,
+   "use:sugar": 11,
+   "sugar": 11,
+   "alarm": 4,
+   "fizzle": 13,
+   "drift": 56,
+   "wall": 27,
+   "scrape": 31,
+   "use:missile": 18,
+   "tier": 25,
+   "drum": 17,
+   "drumOut": 17,
+   "flat": 7,
+   "pile": 37,
+   "lap": 16,
+   "taunt": 1,
+   "unCuff": 8,
+   "bounce": 41,
+   "balls": 4,
+   "finish": 7
+  },
+  "lap": {
+   "min": 44.4,
+   "max": 63.5,
+   "mean": 54.4
+  },
+  "jsMs": {
+   "mean": 0.36,
+   "p50": 0.3,
+   "p95": 0.9,
+   "p99": 1.7
+  },
+  "finished": 8,
+  "net": 0
+ },
+ "race-park": {
+  "screen": "results",
+  "secs": 155.7,
+  "order": [
+   "kevalanche",
+   "k8e*",
+   "kevalanche*",
+   "zach*",
+   "johnny",
+   "sebas",
+   "rubberta*",
+   "sumaura*"
+  ],
+  "times": [
+   148.5,
+   152,
+   152,
+   152,
+   152,
+   152,
+   152,
+   152
+  ],
+  "ev": {
+   "count": 3,
+   "go": 1,
+   "boost": 47,
+   "spray": 231,
+   "box": 143,
+   "gotItem": 125,
+   "use": 121,
+   "use:slick": 16,
+   "hit": 39,
+   "pop": 38,
+   "bump": 104,
+   "soak": 61,
+   "use:cuffs": 13,
+   "use:espresso": 24,
+   "use:spring": 8,
+   "eject": 8,
+   "cuffs": 13,
+   "use:plane": 11,
+   "unCuff": 12,
+   "use:wash": 7,
+   "wash": 7,
+   "ejectLand": 8,
+   "use:alarm": 7,
+   "alarm": 7,
+   "wobble": 4,
+   "land": 59,
+   "launch": 48,
+   "trick": 45,
+   "trickBoost": 45,
+   "taunt": 1,
+   "pad": 43,
+   "use:missile": 21,
+   "use:sugar": 7,
+   "sugar": 7,
+   "flat": 2,
+   "wall": 16,
+   "scrape": 15,
+   "splash": 25,
+   "use:case": 7,
+   "case": 5,
+   "bounce": 31,
+   "fizzle": 10,
+   "drift": 18,
+   "tier": 15,
+   "lap": 16,
+   "post": 2,
+   "balls": 1,
+   "finish": 1
+  },
+  "lap": {
+   "min": 48.1,
+   "max": 61.8,
+   "mean": 54.8
+  },
+  "jsMs": {
+   "mean": 0.29,
+   "p50": 0.2,
+   "p95": 0.7,
+   "p99": 1.3
+  },
+  "finished": 8,
+  "net": 0
+ },
+ "split-2": {
+  "views": 2,
+  "humans": 2,
+  "jsMs": {
+   "mean": 1.44,
+   "p95": 5.3
+  },
+  "renderCallMsSwiftShader": {
+   "p50": 16.3
+  },
+  "drawCallsPerFrame": 658,
+  "drawCallsPerView": 329,
+  "trianglesPerFrame": 2216560,
+  "lodNear": 19,
+  "lod": "11111100"
+ },
+ "split-4": {
+  "views": 4,
+  "humans": 4,
+  "jsMs": {
+   "mean": 1.6,
+   "p95": 4
+  },
+  "renderCallMsSwiftShader": {
+   "p50": 29.4
+  },
+  "drawCallsPerFrame": 1013,
+  "drawCallsPerView": 253,
+  "trianglesPerFrame": 3754748,
+  "lodNear": 14,
+  "lod": "01110010"
+ },
+ "cup": {
+  "trail": [
+   "race:landing",
+   "results",
+   "race:laundry",
+   "results",
+   "race:park",
+   "results",
+   "cup"
+  ],
+  "total": 117,
+  "title": "Zach Sparrow wins the Pillow Cup"
+ },
+ "ghostPhoto": {
+  "ghostFrames": 1826,
+  "bestLapTicks": 3688,
+  "stored": true,
+  "slow": true,
+  "sepia": true,
+  "cleared": true
+ },
+ "render": {
+  "renderCallMsSwiftShader": {
+   "p50": 8.5
+  },
+  "drawCallsPerFrame": 371,
+  "trianglesPerFrame": 1444115,
+  "awakeMax": 7,
+  "lod": "11111000"
+ }
+}
