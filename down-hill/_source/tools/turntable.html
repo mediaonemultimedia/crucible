@@ -13,12 +13,15 @@
   button { font: inherit; font-size: 12px; font-weight: 750; letter-spacing: .08em; border: 1px solid #a49f96; background: transparent; color: inherit; padding: 9px 18px; cursor: pointer; }
   button[aria-pressed="true"] { background: #282722; color: #fff; border-color: #282722; }
   .controls { display: flex; flex-wrap: wrap; gap: 6px; }
-  .comparison { overflow-x: auto; }
-  .sheet { min-width: 780px; }
-  canvas { display: block; width: 100%; aspect-ratio: 3 / 1; }
-  .cards { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid #a49f96; }
-  article { padding: 18px; }
-  article + article { border-left: 1px solid #c7c2b9; }
+  .sheet { position: relative; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 1050px) { .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 780px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 525px) { .cards { grid-template-columns: 1fr; } }
+  article { min-width: 0; }
+  .view { aspect-ratio: 1; background: #e6e3dd; }
+  .caption { padding: 14px 0 10px; }
   h2 { margin: 0; font: 26px Georgia, serif; }
   .driver { margin: 4px 0 16px; color: #514e47; font-size: 14px; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
@@ -48,7 +51,7 @@
   </header>
   <div class="comparison">
     <div class="sheet">
-      <canvas aria-label="Three Down Hill karts with their plush drivers"></canvas>
+      <canvas aria-label="Seven Down Hill karts with their plush drivers"></canvas>
       <div class="cards"></div>
     </div>
   </div>
@@ -70,7 +73,11 @@ const seating = { scale: 0.88, y: 0.09, z: -0.44 };
 const specs = [
   { id: 'kevalanche', paint: '#eeeee3', stripe: '#c92632', hub: '#254ba2', number: '88', badge: 'KEV 88', sponsor: 'DOWN FEATHER RACING' },
   { id: 'sumaura', paint: '#c82d30', stripe: '#ffe0a1', hub: '#ead29c', number: '19', badge: '19 LANDING', sponsor: 'FLUFF CO.' },
-  { id: 'sebas', paint: '#19845d', stripe: '#fff5d8', hub: '#e7af53', number: '07', badge: 'EL BAJITO', sponsor: 'DOWN FEATHER RACING' }
+  { id: 'sebas', paint: '#19845d', stripe: '#fff5d8', hub: '#e7af53', number: '07', badge: 'EL BAJITO', sponsor: 'DOWN FEATHER RACING' },
+  { id: 'k8e', paint: '#e5aa47', stripe: '#fff3d4', hub: '#9a5532', number: '08', badge: 'LONG NECK GT', sponsor: 'FLUFF CO.', seatY: -0.60 },
+  { id: 'rubberta', paint: '#809aa4', stripe: '#fcdfce', hub: '#cc6855', number: '88', badge: 'TIN TUB', sponsor: 'FLUFF CO.', seatY: 0.41 },
+  { id: 'johnny', paint: '#427d58', stripe: '#e2ee75', hub: '#d7ed55', number: '15', badge: 'DEUCE', sponsor: 'DOWN FEATHER RACING' },
+  { id: 'zach', paint: '#a9afb2', stripe: '#bb3338', hub: '#d6a04c', number: '00', badge: 'ZACH', sponsor: 'FLUFF CO.', seatY: 0.16 }
 ];
 const rubber = mat('#25272a', { roughness: 0.92 });
 const frame = mat('#47494e', { metalness: 0.32, roughness: 0.36 });
@@ -150,16 +157,17 @@ function decal(root, material, rect, size, at, rx = 0, ry = 0) {
 
 function chassis(root, spec, ink, length) {
   const hub = mat(spec.hub, { metalness: 0.32, roughness: 0.3 });
-  box(root, frame, [1.64, 0.15, 2.18], [0, 0.29, 0]);
+  const wheelbase = Math.min(1, length / 3.1);
+  box(root, frame, [1.64, 0.15, 2.18 * wheelbase], [0, 0.29, 0]);
   box(root, rubber, [1.02, 0.16, 0.76], [0, 0.43, -0.42]);
   box(root, rubber, [1.02, 0.48, 0.16], [0, 0.63, -0.82]);
   for (const side of [-1, 1]) {
-    tube(root, frame, [side * 0.92, 0.38, -1.16], [side * 0.92, 0.38, 1.16], 0.074);
+    tube(root, frame, [side * 0.92, 0.38, -1.16 * wheelbase], [side * 0.92, 0.38, 1.16 * wheelbase], 0.074);
     for (const front of [true, false]) {
       const radius = front ? 0.34 : 0.49;
       const width = front ? 0.33 : 0.53;
       const x = side * 1.06;
-      const z = front ? 1.04 : -0.97;
+      const z = (front ? 1.04 : -0.97) * wheelbase;
       tube(root, frame, [0, radius, z], [x, radius, z], 0.06);
       mesh(new THREE.CylinderGeometry(radius, radius, width, 24), rubber, x, radius, z, root).rotation.z = Math.PI / 2;
       const outside = x + side * width / 2;
@@ -215,7 +223,7 @@ function shell(root, spec, kind, ink, length) {
     box(root, trim, [1.58, 0.08, 0.65], [0, 1.18, nose - 0.46]);
     box(root, mat(spec.hub), [1.88, 0.26, 0.44], [0, 0.48, -nose + 0.11], 0.10);
     tube(root, chrome, [-0.85, 0.19, -nose - 0.04], [0.85, 0.19, -nose - 0.04], 0.12);
-  } else {
+  } else if (kind === 'lowrider') {
     face(0.39, 0.69);
     box(root, paint, [1.86, 0.29, 0.48], [0, 0.59, -nose + 0.17], 0.12);
     box(root, chrome, [1.10, 0.14, 0.06], [0, 0.64, nose + 0.005]);
@@ -224,6 +232,68 @@ function shell(root, spec, kind, ink, length) {
       fin.rotation.x = -0.25;
       mesh(new THREE.SphereGeometry(0.089, 10, 6), redLens, side * 0.76, 0.74, -nose - 0.095, root);
     }
+  } else if (kind === 'roadster') {
+    const bonnet = rbox(1.80, 0.39, nose - 0.58, 0.14, 2);
+    const points = bonnet.attributes.position;
+    for (let i = 0; i < points.count; i++) {
+      points.setX(i, points.getX(i) * (0.88 - 0.32 * points.getZ(i)));
+    }
+    bonnet.computeVertexNormals();
+    mesh(bonnet, paint, 0, 0.69, (nose + 0.58) / 2, root);
+    mesh(new THREE.TorusGeometry(0.52, 0.047, 6, 16, Math.PI), chrome, 0, 0.57, -1, root);
+    box(root, trim, [1.7, 0.10, 0.31], [0, 0.94, -nose + 0.12]);
+    for (const side of [-1, 1]) tube(root, frame, [side * 0.55, 0.59, -1.07], [side * 0.55, 0.91, -nose + 0.12], 0.037);
+  } else if (kind === 'washtub') {
+    const tin = mat(spec.paint, { side: THREE.DoubleSide, metalness: 0.48, roughness: 0.33 });
+    mesh(new THREE.CylinderGeometry(0.99, 0.85, 0.40, 24, 1, true), tin, 0, 0.58, 0.02, root);
+    for (const [radius, thickness, height] of [[1, 0.054, 0.79], [0.91, 0.032, 0.53]]) {
+      mesh(new THREE.TorusGeometry(radius, thickness, 6, 20), chrome, 0, height, 0.02, root).rotation.x = -Math.PI / 2;
+    }
+    for (const side of [-1, 1]) {
+      mesh(new THREE.TorusGeometry(0.22, 0.037, 6, 12, Math.PI), chrome, side * 1.01, 0.74, 0.02, root)
+        .rotation.set(0, Math.PI / 2, Math.PI);
+      for (let i = 0; i < 3; i++) {
+        mesh(new THREE.SphereGeometry(0.09 + i * 0.02, 8, 6), ivory, side * (0.83 - i * 0.09), 0.79, 0.46 + i * 0.09, root);
+      }
+    }
+    box(root, paint, [1.54, 0.30, 0.25], [0, 0.67, nose - 0.12]);
+  } else if (kind === 'ballmachine') {
+    face(0.39, 0.69);
+    const hopper = mesh(new THREE.CylinderGeometry(0.69, 0.47, 0.49, 18), paint, 0, 0.84, -1.14, root);
+    hopper.scale.z = 0.56;
+    const rim = mesh(new THREE.TorusGeometry(0.69, 0.036, 6, 20), chrome, 0, 1.08, -1.14, root);
+    rim.rotation.x = Math.PI / 2;
+    rim.scale.y = 0.56;
+    const felt = mat('#cddb57', { roughness: 0.92 });
+    for (let i = 0; i < 7; i++) {
+      const a = i * Math.PI / 3;
+      mesh(new THREE.SphereGeometry(0.143, 10, 8), felt, Math.cos(a) * 0.42 * (i < 6), 1.10 + 0.12 * (i === 6),
+        -1.14 + Math.sin(a) * 0.22 * (i < 6), root);
+    }
+    tube(root, frame, [0, 0.69, -1.15], [0, 0.84, -nose - 0.04], 0.19);
+    tube(root, chrome, [0, 0.81, -nose + 0.06], [0, 0.84, -nose - 0.05], 0.196);
+  } else if (kind === 'cart') {
+    const front = nose - 0.05;
+    const rear = 0.57;
+    box(root, paint, [1.73, 0.20, front - rear], [0, 0.59, (front + rear) / 2]);
+    for (const y of [0.68, 0.98]) {
+      tube(root, chrome, [-0.88, y, front], [0.88, y, front], 0.033);
+      for (const side of [-1, 1]) tube(root, chrome, [side * 0.88, y, front], [side * 0.88, y, rear], 0.033);
+    }
+    for (let i = -4; i <= 4; i++) {
+      const x = i * 0.21;
+      tube(root, chrome, [x, 0.67, front], [x, 0.99, front], 0.015);
+      if (i === 0) continue;
+      const z = rear + Math.abs(i) * (front - rear) / 4;
+      const side = Math.sign(i);
+      tube(root, chrome, [side * 0.88, 0.67, z], [side * 0.88, 0.99, z], 0.016);
+    }
+    for (const side of [-1, 1]) {
+      tube(root, chrome, [side * 0.74, 0.51, -1.04], [side * 0.79, 1.03, -1.35], 0.04);
+      mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.05, 12), ivory, side * 0.48, 0.74, front - 0.20, root);
+    }
+    tube(root, trim, [-0.80, 1.03, -1.35], [0.80, 1.03, -1.35], 0.068);
+    mesh(new THREE.IcosahedronGeometry(0.21, 1), chrome, 0, 0.85, front - 0.20, root);
   }
 
   for (const side of [-1, 1]) {
@@ -236,7 +306,7 @@ function shell(root, spec, kind, ink, length) {
   decal(root, ink, [262, 6, 244, 54], [bus ? 1.33 : 0.94, bus ? 0.23 : 0.19],
     [0, bus ? 1.47 : ice ? 0.94 : 0.81, nose + 0.025]);
   if (bus) box(root, ivory, [1.79, 0.065, 0.79], [0, 1.46, nose - 0.38]);
-  decal(root, ink, [264, 74, 47, 92], [0.42, bus ? 0.49 : ice ? 0.46 : 0.57],
+  if (kind !== 'washtub' && kind !== 'cart') decal(root, ink, [264, 74, 47, 92], [0.42, bus ? 0.49 : ice ? 0.46 : 0.57],
     [0, bus ? 1.496 : ice ? 1.223 : 0.888, ice ? nose - 0.46 : nose - 0.39], -Math.PI / 2);
 }
 
@@ -254,22 +324,46 @@ function driverStances(driver, body) {
   const steeringUp = new THREE.Vector3(0, Math.cos(steering.tilt), Math.sin(steering.tilt));
   const gripAngle = Math.PI / 9;
 
+  const octopus = plush.rig.name === 'octopus';
+  const giraffe = plush.rig.name === 'giraffe';
+  const tentacles = octopus ? plush.puppet.armsToward([0, 0, 1]) : [];
+  const gripChains = new Set(tentacles.map((arm) => arm.k));
   for (const chain of plush.rig.arms) {
-    if (chain.kind !== 'arm' && chain.kind !== 'leg') continue;
+    if (!octopus && chain.kind !== 'arm' && chain.kind !== 'leg') continue;
     const indices = chain.idx;
     const socket = indices[0] * 3;
     start.fromArray(standing, socket);
     const side = Math.sign(start.x);
-    if (chain.kind === 'arm') {
+    const grips = chain.kind === 'arm' || gripChains.has(chain.k)
+      || (giraffe && chain.name.includes('fore leg'));
+    if (grips) {
       end.copy(steering.center).addScaledVector(steeringUp, Math.sin(gripAngle) * steering.radius);
       end.x += side * Math.cos(gripAngle) * steering.radius;
       end.applyMatrix4(toPlush);
       middle.copy(start).lerp(end, 0.46);
       middle.x += side * 0.32;
       middle.y -= 0.32;
+    } else if (octopus) {
+      end.set(0.79 * Math.sin(chain.angle), 0.66, -0.39 + 0.63 * Math.cos(chain.angle)).applyMatrix4(toPlush);
+      middle.copy(start).lerp(end, 0.45);
+      middle.y -= 0.26;
     } else {
-      end.set(side * 0.40, 0.49, 0.61).applyMatrix4(toPlush);
-      middle.set(side * 0.60, 0.91, 0.36).applyMatrix4(toPlush);
+      end.set(side * 0.40, 0.49, giraffe ? -0.86 : 0.61).applyMatrix4(toPlush);
+      middle.set(side * 0.60, 0.91, giraffe ? -1.06 : 0.36).applyMatrix4(toPlush);
+    }
+    if (giraffe) {
+      // The separately skinned felt hooves follow their leg tips.
+      const tip = indices[indices.length - 1] * 3;
+      const rest = plush.rig.rest;
+      const delta = point.copy(end).sub(new THREE.Vector3().fromArray(standing, tip));
+      for (const particle of plush.rig.clouds[0].ix) {
+        const p = particle * 3;
+        if (rest[p + 1] > 0.42 || Math.sign(rest[p]) !== side
+            || Math.sign(rest[p + 2]) !== Math.sign(rest[tip + 2])) continue;
+        x[p] = standing[p] + delta.x;
+        x[p + 1] = standing[p + 1] + delta.y;
+        x[p + 2] = standing[p + 2] + delta.z;
+      }
     }
     for (let i = 1; i < indices.length; i++) {
       const t = i / (indices.length - 1);
@@ -286,6 +380,8 @@ function driverStances(driver, body) {
     plush.body.update(0);
     plush.cloth?.update(0);
     plush.gloves?.update(0);
+    plush.wingFx?.update();
+    if (plush.racquet) plush.racquet.visible = !isNew;
   };
 }
 
@@ -302,7 +398,7 @@ function lights(scene) {
 
 async function start() {
   const canvas = document.querySelector('canvas');
-  const renderer = new THREE.WebGPURenderer({ canvas, antialias: true, forceWebGL: true });
+  const renderer = new THREE.WebGPURenderer({ canvas, alpha: true, antialias: true, forceWebGL: true });
   await renderer.init();
   renderer.setClearColor('#e6e3dd');
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -332,25 +428,27 @@ async function start() {
     old.driver.light(camera.quaternion);
     const driver = old.driver.root;
     newBody.add(driver);
-    driver.scale.setScalar(seating.scale);
-    driver.position.set(0, seating.y, seating.z);
+    const newPose = { ...seating, y: spec.seatY ?? seating.y };
+    driver.scale.setScalar(newPose.scale);
+    driver.position.set(0, newPose.y, newPose.z);
     const poseDriver = driverStances(old.driver, newBody);
 
     const article = document.createElement('article');
     article.innerHTML = `
-      <h2>${racer.kartName}</h2><p class="driver">${racer.name}</p>
+      <div class="view" aria-hidden="true"></div>
+      <div class="caption"><h2>${racer.kartName}</h2><p class="driver">${racer.name}</p>
       <table aria-label="${racer.kartName} render cost">
         <thead><tr><th scope="col">Per kart + driver</th><th scope="col" class="old">OLD</th><th scope="col" class="new">NEW</th></tr></thead>
         <tbody><tr><th scope="row">Draw calls</th><td class="old"></td><td class="new"></td></tr>
         <tr><th scope="row">Triangles</th><td class="old"></td><td class="new"></td></tr></tbody>
-      </table>`;
+      </table></div>`;
     cards.append(article);
     function setLook(mode) {
       const isNew = mode === 'new';
       old.group.visible = !isNew;
       newBody.visible = isNew;
       (isNew ? newBody : old.kart.seat).add(old.driver.root);
-      const pose = isNew ? seating : old.kart.plush;
+      const pose = isNew ? newPose : old.kart.plush;
       old.driver.root.scale.setScalar(pose.scale);
       old.driver.root.position.set(0, pose.y, pose.z);
       poseDriver(isNew);
@@ -369,7 +467,7 @@ async function start() {
     }
     // The studio base is outside the measured render.
     mesh(new THREE.CylinderGeometry(2.87, 2.91, 0.12, 64), mat('#c9c5bd'), 0, -0.07, 0, scene);
-    return { scene, root, setLook };
+    return { scene, root, setLook, view: article.querySelector('.view') };
   });
   renderer.setRenderTarget(null);
   target.dispose();
@@ -380,9 +478,11 @@ async function start() {
   let spinning = !matchMedia('(prefers-reduced-motion: reduce)').matches;
   let angle = -1.02;
   let previous;
+  let needsRender = true;
   for (const button of modes) {
     button.disabled = false;
     button.addEventListener('click', () => {
+      needsRender = true;
       main.dataset.look = button.dataset.mode;
       for (const stage of stages) stage.setLook(button.dataset.mode);
       for (const mode of modes) mode.setAttribute('aria-pressed', String(mode === button));
@@ -396,23 +496,34 @@ async function start() {
   });
 
   const resize = () => {
+    needsRender = true;
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
   };
   new ResizeObserver(resize).observe(canvas);
+  window.addEventListener('scroll', () => { needsRender = true; }, { passive: true });
   resize();
   document.querySelector('#status').textContent = 'Counts come from one isolated render per kart, including the plush driver.';
   renderer.setAnimationLoop((now) => {
     if (spinning && previous !== undefined) angle += Math.min((now - previous) / 1000, 0.05) * 0.26;
     previous = now;
-    const viewWidth = canvas.clientWidth / stages.length;
+    if (!spinning && !needsRender) return;
+    needsRender = false;
+    const bounds = canvas.getBoundingClientRect();
+    renderer.setScissorTest(false);
+    renderer.setClearAlpha(0);
+    renderer.clear();
+    renderer.setClearAlpha(1);
     renderer.setScissorTest(true);
-    stages.forEach(({ scene, root }, i) => {
+    stages.forEach(({ scene, root, view }) => {
       root.rotation.y = angle;
-      const left = Math.round(i * viewWidth);
-      const width = Math.round((i + 1) * viewWidth) - left;
-      renderer.setViewport(left, 0, width, canvas.clientHeight);
-      renderer.setScissor(left, 0, width, canvas.clientHeight);
+      const rect = view.getBoundingClientRect();
+      if (rect.bottom <= 0 || rect.top >= innerHeight) return;
+      const left = Math.round(rect.left - bounds.left);
+      const top = Math.round(rect.top - bounds.top);
+      const size = Math.round(rect.width);
+      renderer.setViewport(left, top, size, size);
+      renderer.setScissor(left, top, size, size);
       renderer.clear();
       renderer.render(scene, camera);
     });
