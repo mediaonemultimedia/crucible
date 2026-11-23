@@ -18,16 +18,19 @@ page.on('pageerror', (e) => errs.push('pageerror: ' + e.message));
 page.on('request', (r) => { if (!/^(file|data|blob):/.test(r.url())) errs.push('NETWORK ' + r.url()); });
 await page.goto(`file://${html}?hold&webgl&noportraits&p1=zach&p1cpu=hard&seed=5&track=${track}`);
 await page.waitForFunction(() => window.__dh && document.body.classList.contains('is-live'), null, { timeout: 180000 });
+const ALL = process.argv.includes('--all');   // a shot at every waypoint (stage 3's before / after pass)
 const SECTIONS = { landing: ['books', 'underbed', 'banister', 'drawer'], laundry: ['ramp', 'belt', 'suds', 'bulge', 'pods', 'socks', 'cut'], park: ['hose', 'patio', 'pool', 'ramp', 'deck', 'lawn'] }[track] || [];
 const done = new Set();
 await page.evaluate(() => { const A = __dh; if (A.T.cut) { A.cpus[A.me].cutPlan = true; } });
-for (let s = 0; s < 75 * 4 && done.size < SECTIONS.length; s++) {
-  const tag = await page.evaluate(() => { const A = __dh; A.step(0.25, false); const K = A.race.karts[A.me]; if (A.T.cut && A.cpus[A.me]) A.cpus[A.me].cutPlan = true; return K.cut && K.drum > 0.3 ? 'cut' : A.T.def.points[A.T.sec[K.k]].tag; });
-  if (SECTIONS.includes(tag) && !done.has(tag)) {
-    done.add(tag);
+const nPts = await page.evaluate(() => __dh.T.def.points.length);
+for (let s = 0; s < (ALL ? 1200 : 300) && (ALL ? done.size < nPts : done.size < SECTIONS.length); s++) {
+  const [tag, sec] = await page.evaluate((all) => { const A = __dh; A.step(all ? 0.1 : 0.25, false); const K = A.race.karts[A.me]; if (A.T.cut && A.cpus[A.me]) A.cpus[A.me].cutPlan = true; return [K.cut && K.drum > 0.3 ? 'cut' : A.T.def.points[A.T.sec[K.k]].tag, K.fish ? -1 : A.T.sec[K.k]]; }, ALL);
+  if (ALL ? sec >= 0 && !done.has(sec) : SECTIONS.includes(tag) && !done.has(tag)) {
+    done.add(ALL ? sec : tag);
     await page.evaluate(() => __dh.step(0.3));
-    await page.screenshot({ path: path.join(out, `${track}-${tag}.png`) });
-    console.log('shot', tag);
+    const name = ALL ? `${track}-${String(sec).padStart(2, '0')}-${tag}.png` : `${track}-${tag}.png`;
+    await page.screenshot({ path: path.join(out, name) });
+    console.log('shot', name);
   }
 }
 console.log(errs.length ? errs.join('\n') : 'no console errors');
