@@ -437,7 +437,10 @@ export class World {
       for (const s of [-1, 1]) mesh(new THREE.SphereGeometry(1.4, 10, 8), mat('#e9c349', { metalness: 0.8, roughness: 0.3 }), (drw[0] + drw[1]) / 2 + s * 22, 14 + i * 17, -84.3, root);
     }
     // the drawer itself: a floor at 3.1, low sides, a front panel you drive over
-    const dfx0 = drw[0] - 24, dfx1 = drw[1] + 24, half = 11.5;
+    const dfx0 = drw[0] - 24, dfx1 = drw[1] + 24;
+    // its sides sit just outside the road's own edge (stage 5: one road width everywhere)
+    let half = 11.5;
+    for (let k = 0; k < T.N; k++) if (T.def.points[T.sec[k]].tag === 'drawer') half = Math.max(half, T.w[k] + T.m[k] + 0.6);
     mesh(new THREE.BoxGeometry(dfx1 - dfx0, 3.1, half * 2), mat('#c99a6c', { roughness: 0.6 }), (dfx0 + dfx1) / 2, 1.55, dz, root);
     for (const s of [-1, 1]) mesh(rbox(dfx1 - dfx0, 5, 1.6, 0.5), oak, (dfx0 + dfx1) / 2, 4.5, dz + s * half, root);
     // the drawer's lining: a striped paper

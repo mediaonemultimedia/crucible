@@ -25,7 +25,7 @@ export const LEVEL_NAMES = ['easy', 'normal', 'hard', 'champion'];
    late-braking mistakes into the tight corners, slower and sloppier item
    use, a milder catch-up band. 1 is the level at full strength (the cup's
    third race). Champion never eases off. */
-export const GENTLE = { top: 0.955, drift: 0.6, item: 0.45, noise: 1.5, band: 0.5, err: 0.4 };
+export const GENTLE = { top: 0.977, drift: 0.8, item: 0.6, noise: 1.25, band: 0.75, err: 0.2 };
 export function levelAt(level, strength = 1) {
   const F = LEVELS[level] || LEVELS.normal;
   const s = level === 'champion' ? 1 : Math.max(0, Math.min(1, strength));
@@ -47,7 +47,7 @@ export const cupStrength = (n) => [0, 0.5, 1][Math.max(0, Math.min(2, n))];
 /* the "average driver": a stand-in for a casual human in the tuning runs
    (tools / tests): full kart speed like any human, but no drift, wandering
    lines, slow hands on the stick, late into the corners, items whenever */
-export const AVERAGE = { top: 1, look: 0.75, drift: 0, tier: 0, item: 0.01, noise: 0.6, band: [0, 0], err: 0, clip: 0.5, lift: [0.018, 18], human: 1 };
+export const AVERAGE = { top: 1, look: 0.75, drift: 0, tier: 0, item: 0.01, noise: 0.6, band: [0, 0], err: 0, clip: 0.5, lift: [0.017, 18], human: 1 };
 
 export class CPU {
   constructor(race, i, level = 'normal', seed = 1, strength = 1) {
