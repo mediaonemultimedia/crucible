@@ -5,6 +5,7 @@ import * as esbuild from 'esbuild';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const src = path.join(root, 'src');
+const lookdev = process.argv.includes('--lookdev');
 const out = path.join(root, 'build');
 
 const result = await esbuild.build({
@@ -13,6 +14,7 @@ const result = await esbuild.build({
   format: 'iife',
   target: ['es2020'],
   minify: true,
+  define: { LOOKDEV_RACE: String(lookdev) },
   legalComments: 'none',
   // the SFX clips (src/audio/clips.js): inlined as base64 strings, decoded in the page
   loader: { '.mp3': 'base64' },
@@ -44,7 +46,7 @@ html = html.replace('/*FONTFACE*/', () => face);
 
 const final = html.replace('<!--BUNDLE-->', () => `<script>\n${js}\n</script>`);
 const oi = process.argv.indexOf('--out');
-const dest = oi > 0 ? path.resolve(process.argv[oi + 1]) : path.join(root, 'final.html');
+const dest = oi > 0 ? path.resolve(process.argv[oi + 1]) : lookdev ? path.join(out, 'lookdev-race.html') : path.join(root, 'final.html');
 fs.writeFileSync(dest, final);
 
 /* ── self-containment gate ────────────────────────────────────────────────

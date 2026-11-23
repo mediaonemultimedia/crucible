@@ -18,6 +18,9 @@
 import * as THREE from 'three/webgpu';
 import { Plush } from './plush.js';
 import { buildKart } from './karts.js';
+import { buildLookdevKart, driverStances } from './lookdev-karts.js';
+
+const previewKarts = typeof LOOKDEV_RACE !== 'undefined' && LOOKDEV_RACE;
 import { KEY, FILL } from '../../shared/grommet/fur.js';
 import { RACERS } from '../race/roster.js';
 import { stepSpring } from '../../shared/grommet/spring.js';
@@ -85,7 +88,13 @@ export class RacerView {
   constructor(scene, id, alt) {
     const R = RACERS[id];
     this.id = id; this.alt = alt;
-    this.kart = buildKart(R.kart, alt);
+    const original = buildKart(R.kart, alt);
+    this.kart = previewKarts ? buildLookdevKart(R.kart, alt, original) : original;
+    if (previewKarts) {
+      const geometries = new Set();
+      original.group.traverse((object) => { if (object.isMesh) geometries.add(object.geometry); });
+      geometries.forEach((geometry) => geometry.dispose());
+    }
     this.group = this.kart.group;
     this.driver = new Driver(scene, id, alt);
     const P = this.kart.plush;
@@ -93,6 +102,7 @@ export class RacerView {
     d.scale.setScalar(P.scale);
     d.position.set(0, P.y, P.z);
     this.kart.seat.add(d);
+    if (previewKarts) driverStances(this.driver, this.kart.body)(true);
     scene.add(this.group);
     this.t = Math.random() * 10;
     this.lean = 0; this.pitch = 0; this.roll = 0; this.bob = 0; this.squash = 0; this.squashV = 0;
@@ -165,10 +175,11 @@ export class RacerView {
 
     // the plush in its seat: breathing, leaning into the steer, looking about
     const d = this.driver.root, P = this.kart.plush;
-    d.position.y = P.y + Math.sin(this.t * 2.2) * 0.03;
+    d.position.y = P.y + (previewKarts ? 0 : Math.sin(this.t * 2.2) * 0.03);
     d.rotation.z = -(K.steer || 0) * 0.16 * Math.min(1, Math.abs(K.fwd) / 12) + (K.caseT > 0 || K.wobT > 0 ? Math.sin(this.t * 14) * 0.18 : 0);
     d.rotation.x = Math.max(-0.15, Math.min(0.2, (K.boostT > 0 ? -0.12 : 0) + this.pitch * 0.4));
     d.rotation.y = (K.steer || 0) * 0.25 + (K.spinT > 0 ? Math.sin(this.t * 20) * 0.3 : 0);
+    if (previewKarts) d.rotation.set(0, 0, 0);
     if (this.showT > 0) {
       this.showT -= dt;
       const u = 1 - Math.max(0, this.showT) / this.showLen, up = Math.sin(Math.min(1, u * 1.3) * Math.PI);
@@ -201,7 +212,7 @@ export class RacerView {
     this.dist = dist;
     this.setLod(dist > RacerView.lodNear ? 1 : 0);
     this.driver.light(camQ);
-    this.driver.update(dt, dist < 45 && this.mayWake !== false, !!this.racing);
+    if (!previewKarts) this.driver.update(dt, dist < 45 && this.mayWake !== false, !!this.racing);
     g.visible = dist < RacerView.farCull;
   }
 

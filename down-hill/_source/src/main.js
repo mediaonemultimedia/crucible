@@ -110,7 +110,8 @@ class App {
     this.addPlayer({ kb: 'all', gp: 'auto' });
     // the phone pads: off in the test harness (?hold) unless asked for (?pads=1); ?pads=off turns them off
     this.pads = new PadHost(this, Q);
-    this.padsOn = Q.get('pads') === 'off' ? false : this.hold ? Q.has('pads') : true;
+    const localLookdev = typeof LOOKDEV_RACE !== 'undefined' && LOOKDEV_RACE;
+    this.padsOn = localLookdev ? false : Q.get('pads') === 'off' ? false : this.hold ? Q.has('pads') : true;
     this.pads.onSeat = (k, on) => this.padSeat(k, on);
     this.padN = 0;
     addEventListener('resize', () => this.resize());

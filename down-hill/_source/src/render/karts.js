@@ -13,7 +13,7 @@ import { rbox, mat, glowMat, mesh, canvasTex, mergeStatic } from './geo.js';
 const TAU = Math.PI * 2;
 
 /* skins: OG and ALT colours for each kart */
-const SKIN = {
+export const SKIN = {
   zamboni: [
     { body: '#f3f1ec', trim: '#c8202a', accent: '#1d4fa3', hub: '#c8202a', seat: '#1d4fa3', text: 'KEV 88' },
     { body: '#14254a', trim: '#ef6a1e', accent: '#ef6a1e', hub: '#ef6a1e', seat: '#0b1530', text: 'GOON 44' },
