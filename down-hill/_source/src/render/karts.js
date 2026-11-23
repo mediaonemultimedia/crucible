@@ -111,7 +111,11 @@ function zamboni(alt) {
     mesh(rbox(0.14, 0.4, 0.7, 0.05), mat('#111'), 1.45, 1.15, 1.75, B);
     K.detail.push(st);
   } else {
-    // a maple leaf flag on a whip
+    // his stick rides along (stage 3), and a maple leaf flag on a whip
+    const st = mesh(rbox(0.12, 0.12, 3.6, 0.05), mat('#d9b27c'), 1.45, 1.35, -0.2, B);
+    st.rotation.x = 0.08;
+    mesh(rbox(0.14, 0.4, 0.7, 0.05), mat('#1d4fa3'), 1.45, 1.15, 1.75, B);
+    K.detail.push(st);
     const pole = mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.2), mat('#ddd'), -1.05, 2.4, -1.9, B);
     const fl = mesh(new THREE.PlaneGeometry(0.8, 0.5), new THREE.MeshStandardMaterial({ map: flagTex('ca'), side: THREE.DoubleSide }), -1.45, 3.25, -1.9, B);
     K.detail.push(pole, fl); K.parts.flag = fl;
@@ -354,6 +358,22 @@ export function flagTex(code) {
       P.forEach(([x, y], i) => (i ? g.lineTo(cx + x * s, cy + y * s) : g.moveTo(cx + x * s, cy + y * s)));
       g.fill();
     }
+    else if (code === 'gb') {
+      g.fillStyle = '#1f3a8a'; g.fillRect(0, 0, w, h);
+      g.strokeStyle = '#fff'; g.lineWidth = h * 0.2; g.beginPath(); g.moveTo(0, 0); g.lineTo(w, h); g.moveTo(w, 0); g.lineTo(0, h); g.stroke();
+      g.strokeStyle = '#c8102e'; g.lineWidth = h * 0.07; g.stroke();
+      g.fillStyle = '#fff'; g.fillRect(w * 0.42, 0, w * 0.16, h); g.fillRect(0, h * 0.37, w, h * 0.26);
+      g.fillStyle = '#c8102e'; g.fillRect(w * 0.455, 0, w * 0.09, h); g.fillRect(0, h * 0.43, w, h * 0.14);
+    } else if (code === 'mx') {
+      for (const [i, c] of ['#006847', '#fff', '#ce1126'].entries()) { g.fillStyle = c; g.fillRect((i * w) / 3, 0, w / 3 + 1, h); }
+      g.fillStyle = '#8c5a2b'; g.beginPath(); g.arc(w / 2, h / 2, h * 0.14, 0, TAU); g.fill();
+    } else if (code === 'br') {
+      g.fillStyle = '#009c3b'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#ffdf00'; g.beginPath(); g.moveTo(w / 2, h * 0.1); g.lineTo(w * 0.92, h / 2); g.lineTo(w / 2, h * 0.9); g.lineTo(w * 0.08, h / 2); g.fill();
+      g.fillStyle = '#002776'; g.beginPath(); g.arc(w / 2, h / 2, h * 0.22, 0, TAU); g.fill();
+    } else if (code === 'nl') {
+      for (const [i, c] of ['#ae1c28', '#fff', '#21468b'].entries()) { g.fillStyle = c; g.fillRect(0, (i * h) / 3, w, h / 3 + 1); }
+    }
   });
 }
 function pinTex(c) {
@@ -391,9 +411,37 @@ function sailTex() {
   });
 }
 
+/* stage 3's light refinement: a number plate on the back of every kart with
+   its driver's flag (one small plane, a far-LOD detail), where the body ends */
+const PLATE = {
+  zamboni: { flag: 'ca', n: '19', at: [0, 0.98, -2.17] }, bus: { flag: 'gb', n: '07', at: [0, 0.9, -2.31] },
+  roadster: { flag: 'ca', n: '08', at: [0, 0.78, -2.32] }, lowrider: { flag: 'mx', n: '13', at: [0, 0.74, -2.47] },
+  washtub: { flag: 'br', n: '88', at: [0, 1.02, -1.47], w: 0.95 }, ballmachine: { flag: 'nl', n: '15', at: [0, 0.82, -2.07] },
+  cart: { flag: 'ca', n: '00', at: [0, 1.25, -2.05] },
+};
+function plateTex(flag, n, alt) {
+  const f = flagTex(flag).image;
+  return canvasTex(128, 64, (g, w, h) => {
+    g.fillStyle = alt ? '#17131f' : '#f6f1e6'; g.fillRect(0, 0, w, h);
+    g.drawImage(f, 6, 8, 66, 44);
+    g.strokeStyle = alt ? '#3ff0c8' : '#17131f'; g.lineWidth = 4; g.strokeRect(2, 2, w - 4, h - 4);
+    g.fillStyle = alt ? '#3ff0c8' : '#17131f'; g.font = '900 34px "Bolster Display","Arial Black",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(n, 100, h / 2 + 2);
+  });
+}
+function addPlate(K, kind, alt) {
+  const P = PLATE[kind];
+  if (!P) return;
+  const w = P.w || 1.25;
+  const pl = mesh(new THREE.PlaneGeometry(w, w / 2), new THREE.MeshStandardMaterial({ map: plateTex(P.flag, P.n, alt), roughness: 0.45 }), P.at[0], P.at[1], P.at[2], K.body);
+  pl.rotation.y = Math.PI;
+  K.detail.push(pl);
+}
+
 const BUILD = { zamboni, bus, roadster, lowrider, washtub, ballmachine, cart };
 export function buildKart(kind, alt = false) {
   const K = BUILD[kind](alt);
+  addPlate(K, kind, alt);
   // the body's fixed parts merge by material (the wheels, the seat, the
   // moving bits and the far-LOD details stay their own)
   const moving = new Set([K.seat, ...K.detail, ...Object.values(K.parts).filter((p) => p && p.isObject3D), ...(K.parts.paddles || []).map((p) => p.g)]);
