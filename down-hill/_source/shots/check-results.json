@@ -105,10 +105,10 @@
    "mean": 53.1
   },
   "jsMs": {
-   "mean": 0.39,
+   "mean": 0.42,
    "p50": 0.3,
    "p95": 1,
-   "p99": 1.8
+   "p99": 1.7
   },
   "finished": 8,
   "net": 0
@@ -190,10 +190,10 @@
    "mean": 54.4
   },
   "jsMs": {
-   "mean": 0.36,
+   "mean": 0.41,
    "p50": 0.3,
    "p95": 0.9,
-   "p99": 1.7
+   "p99": 1.6
   },
   "finished": 8,
   "net": 0
@@ -277,10 +277,10 @@
    "mean": 54.8
   },
   "jsMs": {
-   "mean": 0.29,
+   "mean": 0.27,
    "p50": 0.2,
-   "p95": 0.7,
-   "p99": 1.3
+   "p95": 0.6,
+   "p99": 1.1
   },
   "finished": 8,
   "net": 0
@@ -289,15 +289,15 @@
   "views": 2,
   "humans": 2,
   "jsMs": {
-   "mean": 1.44,
-   "p95": 5.3
+   "mean": 1.38,
+   "p95": 3.8
   },
   "renderCallMsSwiftShader": {
-   "p50": 16.3
+   "p50": 19
   },
   "drawCallsPerFrame": 658,
   "drawCallsPerView": 329,
-  "trianglesPerFrame": 2216560,
+  "trianglesPerFrame": 2216563,
   "lodNear": 19,
   "lod": "11111100"
  },
@@ -305,15 +305,15 @@
   "views": 4,
   "humans": 4,
   "jsMs": {
-   "mean": 1.6,
-   "p95": 4
+   "mean": 1.65,
+   "p95": 5
   },
   "renderCallMsSwiftShader": {
-   "p50": 29.4
+   "p50": 25.4
   },
   "drawCallsPerFrame": 1013,
   "drawCallsPerView": 253,
-  "trianglesPerFrame": 3754748,
+  "trianglesPerFrame": 3752618,
   "lodNear": 14,
   "lod": "01110010"
  },
@@ -340,10 +340,10 @@
  },
  "render": {
   "renderCallMsSwiftShader": {
-   "p50": 8.5
+   "p50": 10.7
   },
   "drawCallsPerFrame": 371,
-  "trianglesPerFrame": 1444115,
+  "trianglesPerFrame": 1443279,
   "awakeMax": 7,
   "lod": "11111000"
  }
