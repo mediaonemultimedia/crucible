@@ -67,3 +67,26 @@ Use instanced or merged geometry, and add no frame cost.
 - Auto-merge your own PR only if the full quality bar passes, plus stage 3's fall-through tests and a new item test (every item fires, hits, and resolves with no errors, in 1P and 4-way split). Then confirm the Pages deploy.
 - The PR opens with a GIF or shot of each new item mid-effect, plus the difficulty-curve finishing places.
 - Never push to `main`, never force-push, no self-scheduled follow-ups and no polling.
+
+## 6. Bigger phone-pad QR (Kevin, Sun Nov 22, all games)
+Kevin: QR codes must scan from a good distance across the room — "decent size, not massive". PF2 + Battle Royale already got this (PR #57); match it exactly in `src/index.html`:
+- `#pads .qr` 112px → `width/height: clamp(200px,24vh,320px)`, border-radius 6px; `.h` 14px, `.code` 44px, `.how` 13px, `.seats` 14px (gap 3px, margin-top 6px).
+- `body[data-screen=select] #pads .qr` 84px → `clamp(160px,17vh,240px)`; select `.code` 32px. Widen the select `.seats` max-width if the row wraps badly.
+- Screenshot title + select at 1920×1080 and 1280×720: nothing overlapped, the QR still decodes (jsQR in the pad test).
+
+## 7. One road width, everywhere (Kevin, 2nd playtest, Sun Nov 22)
+Kevin played the pre-stage-3 build, but the note stands: "the track should always be the same width, roughly. It could be bigger, but never super skinny." On The Landing the planks leaving the landing and the pillow/ramp section up against the bed felt like squeezes.
+- Make every section on ALL 3 tracks one consistent road: half-width `w` 10–11 everywhere (pick one value per track, e.g. 10.5), with only gentle tapers between sections. No deliberate squeezes, not even signposted ones. Margins (`m`) may vary with the scenery, but the drivable road must read as the same width.
+- Check the new ruler ramp, planks, banister, doorways, under-bed, drawer, books, conveyor, dryer, treehouse deck, garden-hose jump. Where scenery (rails, bed edge, pillows, door frames) is drawn tight to the old road, move or scale it to the new edge so nothing pokes into the road.
+- Rerun stage 3's fall-through/collision regression and the race-camera tour after the change; nothing narrower than the chosen width in the shots.
+
+## 8. See your item on your kart (Kevin, 2nd playtest)
+Kevin: "When you get an item it should be placed on the back of your cart so you know what you have... I was getting items but I didn't know what I actually had. You're always looking at your cart."
+- Show the held item as a small 3D model mounted on the back of YOUR kart (just above the rear bumper, facing the chase camera): feather, pillow missile, espresso cup, handcuffs, pillowcase, alarm clock, lollipop, paper plane, steam puff/detergent, spring cushion. Cheap: one shared low-poly mesh per item type, reused across karts.
+- During the roulette, the slot on the kart flickers through items, then pops in the chosen one with a little bounce and the name toast (section 3).
+- Items that can be held behind you (missile/feather trailing on LOOK BACK) visibly dangle behind the kart while held.
+- Show it on every kart (so you can see what rivals carry), LOD'd away for far karts.
+- Also make the HUD item slot bigger and put it near the bottom-centre, just under where your eyes sit on your kart, with the icon + name, in each split-screen view.
+
+## 9. Kevin's jersey number is 88
+In `render/karts.js`: Kevalanche's livery text `'KEV 19'` → `'KEV 88'`, and his back plate `PLATE.zamboni.n` `'19'` → `'88'`. Leave Sumaura's bus destination sign ("19 LANDING") as is; Kevin likes the bus. Check both in a close kart shot.
