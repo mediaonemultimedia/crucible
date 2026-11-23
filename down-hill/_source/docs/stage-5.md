@@ -67,3 +67,9 @@ Use instanced or merged geometry, and add no frame cost.
 - Auto-merge your own PR only if the full quality bar passes, plus stage 3's fall-through tests and a new item test (every item fires, hits, and resolves with no errors, in 1P and 4-way split). Then confirm the Pages deploy.
 - The PR opens with a GIF or shot of each new item mid-effect, plus the difficulty-curve finishing places.
 - Never push to `main`, never force-push, no self-scheduled follow-ups and no polling.
+
+## 6. Bigger phone-pad QR (Kevin, Sun Nov 22, all games)
+Kevin: QR codes must scan from a good distance across the room — "decent size, not massive". PF2 + Battle Royale already got this (PR #57); match it exactly in `src/index.html`:
+- `#pads .qr` 112px → `width/height: clamp(200px,24vh,320px)`, border-radius 6px; `.h` 14px, `.code` 44px, `.how` 13px, `.seats` 14px (gap 3px, margin-top 6px).
+- `body[data-screen=select] #pads .qr` 84px → `clamp(160px,17vh,240px)`; select `.code` 32px. Widen the select `.seats` max-width if the row wraps badly.
+- Screenshot title + select at 1920×1080 and 1280×720: nothing overlapped, the QR still decodes (jsQR in the pad test).
