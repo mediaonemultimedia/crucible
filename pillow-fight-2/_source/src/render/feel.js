@@ -40,6 +40,7 @@ import { BipedPuppet } from './puppets.js';
 import { clamp, spring, TAU } from '../../shared/grommet/athletes/game.js';
 
 import { TOSS } from '../fighters/index.js';
+import { stepSpring } from '../../shared/grommet/spring.js';
 
 export const FEEL = { old: false };
 
@@ -49,10 +50,7 @@ const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a || 1e-6), 0, 1); r
 const easeIn = (a, b, x) => { const t = clamp((x - a) / (b - a || 1e-6), 0, 1); return t * t; };
 const easeOut = (a, b, x) => { const t = clamp((x - a) / (b - a || 1e-6), 0, 1); return 1 - (1 - t) * (1 - t); };
 /* a damped spring: zeta 1 critical, < 1 overshoots and settles */
-function drive(s, target, k, z, dt) {
-  s.v += (k * (target - s.x) - 2 * z * Math.sqrt(k) * s.v) * dt;
-  s.x += s.v * dt;
-}
+function drive(s, target, k, z, dt) { stepSpring(s, target, k, z, dt); }   // (dt-safe: spring.js)
 const vspring = (v) => v.map((x) => ({ x, v: 0 }));
 
 /* a pose of the whole bear, in the fight frame. Arms: [out, up, fwd] (out:
@@ -494,7 +492,7 @@ export class BoxerFeel extends BipedPuppet {
     drive(this.pitch, T.pitch, clamp(T.kh, 160, 360), 1, h);
     drive(this.roll, T.roll, 200, 0.7, h);
     drive(this.sink, T.sink, T.ks, Math.min(1, T.z + 0.1), h);
-    for (const g of this.gloveFx) drive(g.squash, 0, 900, 0.3, dt);
+    for (const g of this.gloveFx) stepSpring(g.squash, 0, 900, 0.3, dt, -3, 3);
     this.reachR.set(clamp(this.aR.s.x, 1, 2.6));
     this.reachL.set(clamp(this.aL.s.x, 1, 2.6));
     // keep the base springs in step (other code reads them: the trail, gloves)

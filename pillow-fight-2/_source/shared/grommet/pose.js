@@ -25,12 +25,12 @@ export function rodrigues(ax, ay, az, out) {
   return out;
 }
 
+import { stepSpring } from './spring.js';
+
 /* a critically damped spring for one pose angle */
 export const spring = () => ({ x: 0, v: 0 });
 export function ease(s, target, k, dt) {
-  const c = 2 * Math.sqrt(k);
-  s.v += (k * (target - s.x) - c * s.v) * dt;
-  s.x += s.v * dt;
+  stepSpring(s, target, k, 1, dt);   // (dt-safe: substeps of ≤ 1/120 s; spring.js)
 }
 
 /* ── the pose ─────────────────────────────────────────────────────────────
