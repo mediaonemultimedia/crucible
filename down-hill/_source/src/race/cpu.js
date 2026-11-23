@@ -59,7 +59,7 @@ export class CPU {
     const la = Math.round(5 + sp * 0.42 * L.look);
     const t = (K.k + la) % N;
     this.sway += this.swayF;
-    const careful = T.drop[t] || T.drop[K.k];
+    const careful = T.drop[t] || T.drop[K.k] || T.rail[t];
     let want = careful ? T.line[t] * 0.4 + this.bias * 0.3 : T.line[t] + this.bias + Math.sin(this.sway) * T.w[t] * 0.28;
     // dodge slicks and posts near the line ahead
     for (const H of R.hazards) {
@@ -104,8 +104,15 @@ export class CPU {
     let bend = 0;
     for (let q = 4; q < 30; q += 2) bend += T.curv[(K.k + q) % N];
     bend /= 13;
+    // a tight corner coming at speed, or already out at the wall on its outside: lift (the rails scrape)
+    const outside = K.d * Math.sign(-bend || 1) > T.w[K.k] - 0.5;
+    if (!onCut && !K.drift && K.fwd > 21 && (Math.abs(bend) > 0.034 || (outside && Math.abs(bend) > 0.014))) I.gas = false;
     const wantDrift = Math.abs(bend) > 0.016 && K.fwd > 16 && !K.air && !careful && !onCut;
-    if (onCut) { I.drift = false; } else if (K.drift) {
+    if (onCut) { I.drift = false; } else if (K.wallT > 0.1) {
+      // against a rail or a wall: let go of any slide and ease off it
+      I.drift = false;
+      if (!K.cut && Math.abs(K.d) > T.w[K.k]) I.steer = Math.max(-1, Math.min(1, I.steer + (K.d > 0 ? -0.5 : 0.5)));
+    } else if (K.drift) {
       // hold it while the bend lasts, to this CPU's tier; let go on the straight
       I.drift = Math.abs(bend) > 0.012 && K.tier < L.tier + (L.tier === 3 ? 0 : 0) || (K.tier < 1 && Math.abs(bend) > 0.008);
       if (K.tier >= L.tier && Math.abs(bend) < 0.02) I.drift = false;

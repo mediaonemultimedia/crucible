@@ -5,8 +5,12 @@
      w      half-width of the driving surface (the guide lines sit here)
      m      the margin of off-track fluff beyond it, before the edge
      edge   what the edge is: 'wall' (an invisible barrier, only where the
-            room has none of its own), 'drop' (fall off: the sock fishes you
-            back), 'solid' (a real wall the renderer draws)
+            room has none of its own), 'rail' (a drawn rail or bumper: SOLID,
+            it scrapes you and slows you, the renderer draws it), 'drop'
+            (visibly no barrier: fall off and the sock fishes you back),
+            'solid' (a real wall the renderer draws).
+            Stage 3 rule: every drawn barrier is solid; a drop is only where
+            nothing is drawn. No track has a 'drop' section now.
      tag    the section's name (the HUD, the shots, the CPU's caution)
      launch upward kick (units/s) given as a grounded kart crosses it
      pad    a feather-burst boost pad here
@@ -43,30 +47,30 @@ export const LANDING = {
     W(-64, 0, 30, { tag: 'rug', w: 10, m: 5 }),
     W(-64, 0, 2, { tag: 'rug', w: 10, m: 5, pad: 1 }),
     W(-54, 0, -20, { tag: 'rug', w: 9, m: 4 }),
-    W(-36, 0, -27, { tag: 'underbed', w: 8, m: 2, ceil: 8.6 }),
-    W(-12, 0, -24, { tag: 'underbed', w: 8, m: 2, ceil: 8.6 }),
-    W(10, 0, -28, { tag: 'underbed', w: 8, m: 2, ceil: 8.6 }),
+    W(-36, 0, -27, { tag: 'underbed', w: 9, m: 2.5, ceil: 8.6 }),
+    W(-12, 0, -24, { tag: 'underbed', w: 9, m: 2.5, ceil: 8.6 }),
+    W(10, 0, -28, { tag: 'underbed', w: 9, m: 2.5, ceil: 8.6 }),
     W(30, 0, -20, { tag: 'rug', w: 9, m: 4 }),
     W(44, 0, -2, { tag: 'rug', w: 9, m: 4 }),
-    W(60, 0, 12, { tag: 'door', w: 8, m: 1 }),
+    W(60, 0, 12, { tag: 'door', w: 9, m: 2.5 }),
     W(82, 0, 20, { tag: 'landing', w: 10, m: 5 }),
-    W(96, 3, 34, { tag: 'plank', w: 8, m: 0.8, edge: 'drop' }),
-    W(110, 12, 46, { tag: 'banister', w: 6.5, m: 0.8, edge: 'drop' }),
-    W(140, 12, 54, { tag: 'banister', w: 6.5, m: 0.8, edge: 'drop', pad: 1 }),
-    W(172, 12, 52, { tag: 'banister', w: 6.5, m: 0.8, edge: 'drop' }),
-    W(194, 12, 36, { tag: 'banister', w: 6.5, m: 0.8, edge: 'drop' }),
-    W(200, 12, 12, { tag: 'banister', w: 6.5, m: 0.8, edge: 'drop' }),
-    W(196, 5.5, -10, { tag: 'plank', w: 8, m: 0.8, edge: 'drop' }),
+    W(96, 3, 34, { tag: 'plank', w: 9, m: 1.5, edge: 'rail' }),
+    W(110, 12, 46, { tag: 'banister', w: 8.5, m: 1.5, edge: 'rail' }),
+    W(140, 12, 54, { tag: 'banister', w: 8.5, m: 1.5, edge: 'rail', pad: 1 }),
+    W(172, 12, 52, { tag: 'banister', w: 8.5, m: 1.5, edge: 'rail' }),
+    W(194, 12, 36, { tag: 'banister', w: 8.5, m: 1.5, edge: 'rail' }),
+    W(200, 12, 12, { tag: 'banister', w: 8.5, m: 1.5, edge: 'rail' }),
+    W(196, 5.5, -10, { tag: 'plank', w: 9, m: 1.5, edge: 'rail' }),
     W(180, 0, -26, { tag: 'landing', w: 10, m: 5 }),
     W(156, 0, -38, { tag: 'landing', w: 9, m: 3 }),
     W(140, 2.5, -40, { tag: 'drawer', w: 9, m: 1.5 }),
     W(124, 2.5, -40, { tag: 'drawer', w: 9, m: 1.5 }),
     W(108, 2.5, -40, { tag: 'drawer', w: 9, m: 1.5 }),
     W(92, 0, -44, { tag: 'landing', w: 9, m: 4 }),
-    W(68, 0, -46, { tag: 'door', w: 8, m: 1 }),
-    W(52, 0, -46, { tag: 'pillows', w: 9, m: 2, pad: 1 }),
-    W(38, 8, -46, { tag: 'pillows', w: 9, m: 1.5 }),
-    W(25, 16, -46, { tag: 'pillows', w: 9, m: 1.5, launch: 19 }),
+    W(68, 0, -46, { tag: 'door', w: 9, m: 2.5 }),
+    W(52, 0, -46, { tag: 'pillows', w: 9, m: 2.5, pad: 1 }),
+    W(38, 8, -46, { tag: 'pillows', w: 9, m: 1.5, edge: 'rail' }),
+    W(25, 16, -46, { tag: 'pillows', w: 9, m: 1.5, edge: 'rail', launch: 12 }),
     W(8, 16, -50, { tag: 'duvet', w: 10, m: 6 }),
     W(-8, 16, -46, { tag: 'duvet', w: 10, m: 6 }),
   ],
@@ -108,11 +112,11 @@ export const LAUNDRY = {
     W(-112, 0, 70, { tag: 'floor', w: 10, m: 5 }),
     W(-80, 0, 72, { tag: 'floor', w: 10, m: 5 }),
     W(-56, 0, 72, { tag: 'floor', w: 9, m: 4, pad: 1 }),
-    W(-38, 5, 72, { tag: 'ramp', w: 8, m: 1, edge: 'drop' }),
-    W(-20, 10, 72, { tag: 'belt', w: 7, m: 0.8, edge: 'drop', belt: 9 }),
-    W(16, 10, 72, { tag: 'belt', w: 7, m: 0.8, edge: 'drop', belt: 9 }),
-    W(52, 10, 72, { tag: 'belt', w: 7, m: 0.8, edge: 'drop', belt: 9 }),
-    W(74, 10, 72, { tag: 'belt', w: 7, m: 0.8, edge: 'drop', belt: 9, launch: 8 }),
+    W(-38, 5, 72, { tag: 'ramp', w: 9, m: 1.5, edge: 'rail' }),
+    W(-20, 10, 72, { tag: 'belt', w: 8.5, m: 1.2, edge: 'rail', belt: 9 }),
+    W(16, 10, 72, { tag: 'belt', w: 8.5, m: 1.2, edge: 'rail', belt: 9 }),
+    W(52, 10, 72, { tag: 'belt', w: 8.5, m: 1.2, edge: 'rail', belt: 9 }),
+    W(74, 10, 72, { tag: 'belt', w: 8.5, m: 1.2, edge: 'rail', belt: 9, launch: 8 }),
     W(100, 0, 66, { tag: 'floor', w: 11, m: 5 }),
     W(124, 0, 44, { tag: 'floor', w: 10, m: 5 }),
     W(134, 0, 8, { tag: 'suds', w: 10, m: 5 }),
@@ -183,10 +187,10 @@ export const PARK = {
     W(64, 0, -28, { tag: 'pool', w: 11, m: 3 }),
     W(46, 0, -46, { tag: 'lawn', w: 10, m: 4 }),
     W(22, 0, -56, { tag: 'lawn', w: 9, m: 3 }),
-    W(4, 3.5, -60, { tag: 'ramp', w: 7.5, m: 0.8, edge: 'drop' }),
-    W(-14, 9, -60, { tag: 'ramp', w: 7.5, m: 0.8, edge: 'drop' }),
-    W(-32, 12, -55, { tag: 'deck', w: 8, m: 0.8, edge: 'drop' }),
-    W(-46, 12, -44, { tag: 'deck', w: 8, m: 0.8, edge: 'drop', launch: 11 }),
+    W(4, 3.5, -60, { tag: 'ramp', w: 8.5, m: 1.2, edge: 'rail' }),
+    W(-14, 9, -60, { tag: 'ramp', w: 8.5, m: 1.2, edge: 'rail' }),
+    W(-32, 12, -55, { tag: 'deck', w: 8.5, m: 1.2, edge: 'rail' }),
+    W(-46, 12, -44, { tag: 'deck', w: 8.5, m: 1.2, edge: 'rail', launch: 11 }),
     W(-62, 0, -26, { tag: 'lawn', w: 10, m: 5 }),
     W(-84, 0, -8, { tag: 'lawn', w: 10, m: 5 }),
     W(-102, 0, 14, { tag: 'lawn', w: 10, m: 5, pad: 1 }),
@@ -281,7 +285,7 @@ export function buildTrack(def) {
     curv: new Float32Array(N),                           // signed turn per unit (+ = left)
     line: new Float32Array(N),                           // the racing line's lateral offset
     sec: new Uint8Array(N),                              // index into def.points (the section)
-    drop: new Uint8Array(N), ceil: new Float32Array(N), pad: new Uint8Array(N), launch: new Float32Array(N),
+    drop: new Uint8Array(N), rail: new Uint8Array(N), ceil: new Float32Array(N), pad: new Uint8Array(N), launch: new Float32Array(N),
     belt: new Float32Array(N),                           // a conveyor's speed along the track
   };
   let j = 0;
@@ -296,6 +300,7 @@ export function buildTrack(def) {
     T.sec[k] = sec;
     const S = P[sec], Sa = P[a.from];
     T.drop[k] = S.edge === 'drop' || Sa.edge === 'drop' ? 1 : 0;
+    T.rail[k] = !T.drop[k] && (S.edge === 'rail' || Sa.edge === 'rail' || S.edge === 'solid' || Sa.edge === 'solid') ? 1 : 0;
     T.ceil[k] = Sa.ceil && (P[(a.from + 1) % n].ceil || a.t < 0.5) ? Sa.ceil : 0;
     T.belt[k] = Sa.belt && P[(a.from + 1) % n].belt ? Sa.belt : 0;
   }
@@ -361,8 +366,12 @@ export const sprinklerOn = (S, tick) => ((tick + S.phase) % S.period) < S.dur;
 export const rightX = (T, k) => -T.tz[k];
 export const rightZ = (T, k) => T.tx[k];
 
-/* nearest sample to (x, z) searched around a hint (a kart's own index), and
-   the lateral offset d (+ = right of the centreline) and along-sample frac */
+/* nearest sample to (x, z) searched around a hint (a kart's own index).
+   With a height y it is layer-aware: samples near the hint (the same piece
+   of road, however steep) are found by xz alone, but a sample further away
+   whose road is well above the kart (it can't be under its own road) or far
+   below it (the under-bed, beneath the duvet) is pushed away, so a kart in
+   the air never snaps to another layer of the track. */
 export function locate(T, x, z, hint, span = 24, y = null) {
   const N = T.N;
   let best = hint, bd = 1e18;
@@ -370,7 +379,10 @@ export function locate(T, x, z, hint, span = 24, y = null) {
     const k = (hint + q + N) % N;
     const dx = x - T.x[k], dz = z - T.z[k];
     let d = dx * dx + dz * dz;
-    if (y !== null) { const dy = y - T.y[k]; d += dy * dy * 4; }
+    if (y !== null && (q > 8 || q < -8)) {
+      const dy = y - T.y[k], e = dy < -2.5 ? -dy - 2.5 : dy > 11 ? dy - 11 : 0;
+      d += e * e * 30;
+    }
     if (d < bd) { bd = d; best = k; }
   }
   return best;

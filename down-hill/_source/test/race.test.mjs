@@ -4,7 +4,7 @@ import fs from 'fs';
 import { Race, noInput, ITEMS } from '../src/race/sim.js';
 import { CPU } from '../src/race/cpu.js';
 import { ORDER } from '../src/race/roster.js';
-import { buildTrack, TRACKS, groundAt } from '../src/race/track.js';
+import { buildTrack, TRACKS, groundAt, rightX, rightZ } from '../src/race/track.js';
 
 const field = (lvl = 'hard') => [...ORDER, 'kevalanche'].map((id, i) => ({ id, alt: i === 7, cpu: lvl }));
 function run(seed, lvl = 'hard', max = 60 * 300) {
@@ -24,16 +24,17 @@ test('no clock or Math.random in the race sim', () => {
   }
 });
 
-test('the track: a lap of ~1300 units, launches, pads, drops, the under-bed ceiling, every section', () => {
+test('the track: a lap of ~1300 units, launches, pads, rails, the under-bed ceiling, every section', () => {
   const T = buildTrack(TRACKS.landing);
   assert.ok(T.length > 1100 && T.length < 1600, `length ${T.length}`);
   assert.ok(T.launch.filter(Boolean).length >= 2);
   assert.ok(T.pad.filter(Boolean).length >= 6);
-  assert.ok(T.drop.some(Boolean) && T.ceil.some(Boolean));
+  assert.ok(T.rail.some(Boolean) && T.ceil.some(Boolean));
   const tags = new Set(T.def.points.map((p) => p.tag));
   for (const t of ['duvet', 'books', 'rug', 'underbed', 'banister', 'drawer', 'pillows']) assert.ok(tags.has(t), t);
-  const k = T.drop.findIndex(Boolean);
-  assert.equal(groundAt(T, k, 99), -Infinity);
+  // the banister has rails: there is ground (and a wall) at its edge, no drop
+  const k = T.rail.findIndex(Boolean);
+  assert.notEqual(groundAt(T, k, 99), -Infinity);
 });
 
 test('a whole 3-lap race of 8 hard CPUs: everyone finishes, laps 45–62 s, drifts, items, tricks', () => {
@@ -117,11 +118,18 @@ test('every item is used and does its thing', () => {
   }
 });
 
-test('falling off the banister: the sock fishes you back onto the track', () => {
-  const R = solo('rubberta');
+test('falling off a drop edge (where nothing is drawn): the sock fishes you back onto the track', () => {
+  // no shipped track has a drop now (stage 3: every drawn barrier is solid), so try a copy of
+  // The Landing whose banister has no rails
+  const def = TRACKS.landing;
+  TRACKS.testdrop = { ...def, id: 'testdrop', points: def.points.map((p) => (p.tag === 'banister' ? { ...p, edge: 'drop' } : p)) };
+  const R = new Race({ racers: [{ id: 'rubberta' }], seed: 1, humans: [0], track: 'testdrop' });
+  delete TRACKS.testdrop;
+  for (let i = 0; i < 230; i++) R.step([noInput()]);
+  R.events.length = 0;
   const K = R.karts[0], T = R.T;
-  const k = T.drop.findIndex(Boolean) + 40;
-  K.x = T.x[k] + 20; K.z = T.z[k]; K.y = T.y[k]; K.k = k; K.lastGood = k;
+  const k = T.drop.findIndex(Boolean) + 40, off = T.w[k] + T.m[k] + 3;
+  K.x = T.x[k] + rightX(T, k) * off; K.z = T.z[k] + rightZ(T, k) * off; K.y = T.y[k]; K.k = k; K.lastGood = k;
   const seen = [];
   for (let i = 0; i < 60 * 5; i++) { R.step([noInput()]); for (const e of R.events) seen.push(e.k); R.events.length = 0; }
   assert.ok(seen.includes('fall') && seen.includes('fished'), seen.join(' '));

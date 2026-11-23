@@ -258,11 +258,13 @@ export class Race {
     if (!K.air && T.belt[K.k]) { K.x += T.tx[K.k] * T.belt[K.k] * DT; K.z += T.tz[K.k] * T.belt[K.k] * DT; }
     const kPrev = K.k;
     const inCut = this._cut(K);
-    if (!inCut) K.k = locate(T, K.x, K.z, K.k, 20);
+    if (!inCut) K.k = locate(T, K.x, K.z, K.k, 20, K.y);
     let d = lateral(T, K.k, K.x, K.z);
     const a = along(T, K.k, K.x, K.z);
 
-    // the edge: a wall (pushed back along the track, nose nudged round), or a drop
+    // the edge: a wall or a rail (solid: it scrapes you and slows you, it never
+    // bounces you off; the nose is nudged back along the track so nobody
+    // sticks), or a drop (only where nothing is drawn: you fall)
     const lim = T.w[K.k] + T.m[K.k];
     if (inCut) { d = 0; }
     else if (Math.abs(d) > lim && !T.drop[K.k]) {
@@ -270,15 +272,23 @@ export class Race {
       const Rx = rightX(T, K.k), Rz = rightZ(T, K.k);
       K.x -= Rx * over * s; K.z -= Rz * over * s;
       const vOut = (K.vx * Rx + K.vz * Rz) * s;
-      if (vOut > 0) { K.vx -= Rx * s * vOut * 1.35; K.vz -= Rz * s * vOut * 1.35; }
+      // the outward part of the velocity is gone (no rebound) …
+      if (vOut > 0) { K.vx -= Rx * s * vOut; K.vz -= Rz * s * vOut; }
+      // … the impact costs speed, and grinding along it keeps costing a little
       const sp2 = Math.hypot(K.vx, K.vz);
-      if (sp2 > 0.1) { K.vx *= 0.985; K.vz *= 0.985; }
-      // turn the nose back along the track: nobody sticks to a wall
+      if (sp2 > 0.1) { const f = 0.993 * (1 - Math.min(0.2, Math.max(0, vOut) * 0.008)); K.vx *= f; K.vz *= f; }
+      // turn the nose back along the track (the rest of the speed carries on
+      // along the rail): nobody sticks to a wall
       const th = Math.atan2(T.tx[K.k], T.tz[K.k]);
       const df = Math.atan2(Math.sin(th - K.yaw), Math.cos(th - K.yaw));
-      if (Math.abs(df) < 1.6) K.yaw += df * 0.08;
+      if (Math.abs(df) < 1.6) K.yaw += df * 0.16;
       K.wallT = 0.2;
-      if (vOut > 6) this.emit({ k: 'wall', i: K.i, p: Math.min(1, vOut / 20) });
+      if (vOut > 6) this.emit({ k: 'wall', i: K.i, p: Math.min(1, vOut / 20), rail: T.rail[K.k] });
+      // the scrape: sparks and a grind while you're against it at speed
+      if (sp2 > 7 && (K.scrapeT = (K.scrapeT || 0) - 1) <= 0) {
+        K.scrapeT = 5;
+        this.emit({ k: 'scrape', i: K.i, x: K.x + Rx * s * KART_R, y: K.y + 0.6, z: K.z + Rz * s * KART_R, p: Math.min(1, sp2 / 40), rail: T.rail[K.k] });
+      }
       d = s * lim;
     } else if (K.wallT > 0) K.wallT -= DT;
 
@@ -321,7 +331,8 @@ export class Race {
       K.airT += DT;
       K.vy -= GRAV * DT;
       K.y += K.vy * DT;
-      if (T.ceil[K.k] && K.y > T.ceil[K.k] - 3.4) { K.y = T.ceil[K.k] - 3.4; K.vy = Math.min(0, K.vy); }
+      // the under-bed slats: only for a kart that is actually under them
+      if (T.ceil[K.k] && K.y > T.ceil[K.k] - 3.4 && K.y < T.ceil[K.k] + 1) { K.y = T.ceil[K.k] - 3.4; K.vy = Math.min(0, K.vy); }
       // TAUNT in the air: the trick
       if (pressed('taunt') && !K.trick && K.spinT <= 0) { K.trick = 1; K.trickT = 0.75; this.emit({ k: 'trick', i: K.i }); }
       if (g !== -Infinity && K.y <= g) {
@@ -334,7 +345,17 @@ export class Race {
         // over the edge: the sock comes down for you
         K.fish = { t: 0, dur: 2.2, k: K.lastGood, x: K.x, y: K.y, z: K.z };
         K.air = 0; K.drift = 0; K.charge = 0; K.tier = 0; K.boostT = 0;
-        this.emit({ k: 'fall', i: K.i });
+        this.emit({ k: 'fall', i: K.i, why: 'edge' });
+      }
+    }
+    // the safety net: a kart is never below the road it is on. (The layer-
+    // aware locate should make this unreachable; if anything ever puts a
+    // kart under its road, it is put back on top, not fished out by the sock.)
+    if (!K.fish) {
+      const gS = groundAt(T, K.k, K.d, a);
+      if (gS !== -Infinity && K.y < gS - 0.5) {
+        K.y = gS; K.vy = Math.max(0, K.vy); K.air = 0; K.slopeVy = 0;
+        this.netCount = (this.netCount || 0) + 1;
       }
     }
 
@@ -355,7 +376,7 @@ export class Race {
         } else this.emit({ k: 'lap', i: K.i, lap: lap + 1 });
       }
       // stuck (CPU or not): a long crawl into something gets fished back
-      if (this.phase === 'race' && Math.abs(fwd) < 2.5 && I.gas && K.spinT <= 0) { K.stuckT += DT; if (K.stuckT > 4) { K.stuckT = 0; K.fish = { t: 0, dur: 1.6, k: K.lastGood, x: K.x, y: K.y, z: K.z }; this.emit({ k: 'fall', i: K.i }); } }
+      if (this.phase === 'race' && Math.abs(fwd) < 2.5 && I.gas && K.spinT <= 0) { K.stuckT += DT; if (K.stuckT > 4) { K.stuckT = 0; K.fish = { t: 0, dur: 1.6, k: K.lastGood, x: K.x, y: K.y, z: K.z }; this.emit({ k: 'fall', i: K.i, why: 'stuck' }); } }
       else K.stuckT = 0;
     }
 
@@ -536,7 +557,7 @@ export class Race {
           S.vx += (dx / l * sp - S.vx) * 0.07; S.vz += (dz / l * sp - S.vz) * 0.07;
         }
         S.x += S.vx * DT; S.z += S.vz * DT;
-        S.k = locate(T, S.x, S.z, S.k, 20);
+        S.k = locate(T, S.x, S.z, S.k, 20, S.y);
         const d = lateral(T, S.k, S.x, S.z), lim = T.w[S.k] + T.m[S.k];
         const gy = T.y[S.k] + 1.2;
         S.y += (gy - S.y) * 0.25;
