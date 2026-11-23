@@ -12,16 +12,16 @@ const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const chip = (b, k = '') => `<span class="chip${k}">${b}</span>`;
 
 export const ITEM_HOW = {
-  slick: 'drop it behind you · whoever drives through spins out',
-  missile: 'throw it ahead (hold LOOK BACK: behind, or keep it there as a shield)',
-  espresso: 'a big speed boost · jittery steering',
-  cuffs: 'chains the two racers just ahead together',
-  case: 'over a rival’s head · wobbly steering, a fabric view',
-  alarm: 'flies to whoever’s in 1st and wakes them up · BRRRING!',
-  sugar: 'a giant lollipop · 6 s of candy speed, nothing can touch you, bump to spin them',
-  plane: 'homes in on the racer just ahead · block it with a missile held behind',
-  wash: 'hot steam · everyone else shrinks for 5 s · squash the little ones flat',
-  spring: 'locks onto the racer ahead · press again: their seat springs them out',
+  slick: 'drop it behind you: they spin out',
+  missile: 'throw it ahead (LOOK BACK: behind, or a shield)',
+  espresso: 'a big boost, jittery steering',
+  cuffs: 'chains the two racers ahead together',
+  case: 'over a rival’s head: wobbly and blind',
+  alarm: 'flies to whoever’s 1st · BRRRING!',
+  sugar: '6 s of candy speed, nothing touches you',
+  plane: 'homes in on the racer just ahead',
+  wash: 'everyone else shrinks: squash them flat',
+  spring: 'lock on, press again: they fly out',
 };
 
 export function sheetHTML(o = {}) {
