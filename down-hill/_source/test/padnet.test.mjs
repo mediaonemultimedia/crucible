@@ -64,12 +64,13 @@ const SCRIPT = [
   { t0: 14000, t1: 16500, bit: TAUNT },                 // 5: held through the reconnect
   { t0: 17000, t1: 17040, bit: ITEM },                  // 2
   { t0: 18000, t1: 19500, bit: DRIFT },
+  { t0: 17500, t1: 19900, bit: TAUNT },                 // 6: held through a 1 s outage (inside the seq window)
 ];
-const NET = { outages: [[3000, 6000 - 500], [9000, 11500]], reconnects: [15000] };
+const NET = { outages: [[3000, 6000 - 500], [9000, 11500], [18200, 19200]], reconnects: [15000] };
 
 test('a clean link: one press per physical press', () => {
   const e = simulate({ script: SCRIPT });
-  assert.deepEqual(e, { gas: 1, item: 2, taunt: 5, drift: 1 });
+  assert.deepEqual(e, { gas: 1, item: 2, taunt: 6, drift: 1 });
 });
 
 for (const [name, net] of [
@@ -78,9 +79,9 @@ for (const [name, net] of [
   ['duplicates', { dup: 0.3 }],
   ['15 % loss + 300 ms jitter + duplicates', { loss: 0.15, jitter: 300, dup: 0.2 }],
 ]) for (const seed of [1, 2, 3, 4, 5]) {
-  test(`${name} + two outages (3 s, 2.5 s) + a reconnect, seed ${seed}: a held TAUNT never re-fires`, () => {
+  test(`${name} + three outages (3 s, 2.5 s, 1 s) + a reconnect, seed ${seed}: a held TAUNT never re-fires`, () => {
     const e = simulate({ script: SCRIPT, ...NET, ...net, seed });
-    assert.equal(e.taunt, 5, `taunt presses ${e.taunt}`);
+    assert.equal(e.taunt, 6, `taunt presses ${e.taunt}`);
     assert.equal(e.item, 2, `item presses ${e.item}`);
     assert.ok(e.drift <= 2 && e.drift >= 1, `drift ${e.drift}`);
   });
