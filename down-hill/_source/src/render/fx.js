@@ -257,7 +257,6 @@ export class Fx {
       g.font = '900 140px sans-serif';
       g.strokeStyle = '#101729'; g.lineWidth = 13; g.strokeText('?', 129, 132);
       g.fillStyle = '#fff9d6'; g.fillText('?', 129, 132);
-      g.font = '800 16px sans-serif'; g.fillText('FEATHER CACHE', 128, 204);
     });
     const shell = new THREE.InstancedMesh(new THREE.BoxGeometry(3.25, 2.95, 3.25),
       new THREE.MeshStandardMaterial({ map: label, roughness: 0.44, emissive: '#46888b',

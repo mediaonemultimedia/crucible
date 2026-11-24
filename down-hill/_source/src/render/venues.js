@@ -1,11 +1,12 @@
 import * as THREE from 'three/webgpu';
+import { buildCentreCourtStadium, clayMaterial } from './centre-court.js';
 import { World, keepCameraAboveRoad } from './world.js';
 import { canvasTex, mesh, srand } from './geo.js';
 import { buildReadable } from './readable.js';
 import { lateral, rightX, rightZ, sceneryClearsRoad } from '../race/track.js';
 
 const VENUES = {
-  laundry: { sky: '#65aeed', ground: '#28774b', lane: '#c64d29', deck: '#8a2c1c', rail: '#164e3b', light: '#ffedbd', title: 'CENTRE COURT', sub: 'JOHNNY DEUCE INVITATIONAL' },
+  laundry: { sky: '#7badc5', ground: '#38745a', lane: '#c64d29', deck: '#55382e', rail: '#214b44', light: '#ffd1a1', title: 'CENTRE COURT', sub: 'JOHNNY DEUCE INVITATIONAL' },
   hockey: { sky: '#14285b', ground: '#152f69', lane: '#8ccbea', deck: '#254a87', rail: '#df233e', light: '#ddf2ff', title: 'RINK 88', sub: 'OVERTIME' },
   dojo: { sky: '#2c205c', ground: '#452f68', lane: '#b67143', deck: '#693243', rail: '#bc2042', light: '#ffe0aa', title: 'MIDNIGHT DOJO', sub: 'SUMAURA’S MOON GATE' },
   park: { sky: '#62cdef', ground: '#078d9d', lane: '#e5a434', deck: '#744557', rail: '#ff6830', light: '#fff3c1', title: 'RUBBERTA’S RAPIDS', sub: 'CIRCUITO DAS ÁGUAS' },
@@ -249,16 +250,23 @@ export class VenueWorld extends World {
     this.scene.background = new THREE.Color(V.sky);
     this.lightsG = new THREE.Group();
     this.scene.add(this.lightsG);
-    this.lightsG.add(new THREE.HemisphereLight('#eef8ff', '#a5adb2', 1.63));
-    this.moon = new THREE.DirectionalLight(V.light, 2);
-    this.moon.position.set(-130, 260, 100);
+    const court = id === 'laundry';
+    this.lightsG.add(court ? new THREE.HemisphereLight('#c2dff6', '#675546', 0.93)
+      : new THREE.HemisphereLight('#eef8ff', '#a5adb2', 1.63));
+    this.moon = new THREE.DirectionalLight(V.light, court ? 2.65 : 2);
+    this.moon.position.set(...(court ? [-148, 96, -90] : [-130, 260, 100]));
     this.lightsG.add(this.moon);
+    if (court) {
+      const fill = new THREE.DirectionalLight('#b1d2ff', 0.36);
+      fill.position.set(102, 58, 70);
+      this.lightsG.add(fill);
+    }
 
     const ground = mesh(new THREE.PlaneGeometry(640, 490),
       new THREE.MeshStandardMaterial({ map: groundPaint(id, V, T), roughness: 0.9 }), 0, id === 'park' ? -2.7 : -0.8, 10, root);
     ground.rotation.x = -Math.PI / 2;
 
-    const dry = new THREE.MeshStandardMaterial({ map: lanePaint(id, V, false), roughness: 0.78, side: THREE.DoubleSide });
+    const dry = court ? clayMaterial() : new THREE.MeshStandardMaterial({ map: lanePaint(id, V, false), roughness: 0.78, side: THREE.DoubleSide });
     const wet = new THREE.MeshStandardMaterial({ map: lanePaint(id, V, true), roughness: 0.28, side: THREE.DoubleSide });
     const edge = new THREE.MeshStandardMaterial({ color: V.deck, side: THREE.DoubleSide });
     const flume = (k) => tagAt(T, k) === 'flume';
@@ -282,8 +290,17 @@ export class VenueWorld extends World {
     this.dashLift = () => 0.22;
     this._guides();
     this.readable = buildReadable(this, { railCols: [V.rail, '#fff4dc'], arrowTags: new Set() });
-    this._perimeter(id, V);
+    if (court) {
+      buildCentreCourtStadium(this);
+      sign(root, 0, 32, -162, 80, V.title, V.sub, '#ffcf74');
+      sign(root, 132, 19, -151, 46, 'LOVE ALL', 'MATCH POINT', '#f1ce87');
+    } else this._perimeter(id, V);
     this._landmarks(id);
+  }
+
+  update(dt, t) {
+    super.update(dt, t);
+    this.animateStadium?.(t);
   }
 
   _landmarks(id) {
