@@ -15,7 +15,7 @@ const result = await esbuild.build({
   format: 'iife',
   target: ['es2020'],
   minify: true,
-  define: { LOOKDEV_RACE: String(lookdev) },
+  define: { LOOKDEV_RACE: String(lookdev), RACE_REMESH: String(lookdev && process.argv.includes('--race-remesh')) },
   legalComments: 'none',
   // the SFX clips (src/audio/clips.js): inlined as base64 strings, decoded in the page
   loader: { '.mp3': 'base64' },

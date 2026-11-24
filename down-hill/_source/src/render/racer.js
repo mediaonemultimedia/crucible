@@ -16,6 +16,7 @@
    tentacles, the resurfacer's roller, the disco ball).                  */
 
 import * as THREE from 'three/webgpu';
+import { createRaceRemesh } from './race-remesh.js';
 import { Plush } from './plush.js';
 import { buildKart } from './karts.js';
 import { buildLookdevKart, driverStances } from './lookdev-karts.js';
@@ -107,6 +108,16 @@ export class RacerView {
     this.t = Math.random() * 10;
     this.lean = 0; this.pitch = 0; this.roll = 0; this.bob = 0; this.squash = 0; this.squashV = 0;
     this.spin = 0; this.hyd = 0; this.lod = 0; this.wheelA = 0;
+  }
+
+  setRaceMesh(style) {
+    const p = this.driver.p;
+    if (!style) {
+      if (this.raceMesh) Object.assign(p.shells, { geometry: p.body.geometry, material: p.fur.material });
+      return;
+    }
+    this.raceMesh ??= createRaceRemesh(p, style);
+    Object.assign(p.shells, this.raceMesh);
   }
 
   setLod(l) {
@@ -218,7 +229,12 @@ export class RacerView {
     g.visible = dist < RacerView.farCull;
   }
 
-  dispose(scene) { this.driver.dispose(scene); this.group.removeFromParent(); }
+  dispose(scene) {
+    this.raceMesh?.geometry.dispose();
+    this.raceMesh?.material.dispose();
+    this.driver.dispose(scene);
+    this.group.removeFromParent();
+  }
 }
 
 /* the LOD distances; split screen lowers them (main.js) */

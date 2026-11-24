@@ -36,6 +36,7 @@ import { skinId } from './pad/skins.js';
 import { START, LEFT, RIGHT, UP, DOWN, GAS, ITEM, SUPER, BRAKE } from './pad/wire.js';
 
 const Q = new URLSearchParams(location.search);
+const raceMeshStyle = typeof RACE_REMESH !== 'undefined' && RACE_REMESH ? 'smooth' : null;
 const $ = (id) => document.getElementById(id);
 const ORD = (n) => n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : n % 10] || 'th');
 const fmt = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(2).padStart(5, '0')}`;
@@ -164,6 +165,9 @@ class App {
 
   setScreen(s) {
     this.screen = s;
+    if (raceMeshStyle) for (const v of this.views.values()) {
+      v.setRaceMesh(s === 'race' && this.rviews.includes(v) ? raceMeshStyle : null);
+    }
     document.body.dataset.screen = s;
     for (const el of document.querySelectorAll('.screen')) el.classList.toggle('on', el.id === s || (s === 'race' && el.id === 'hud'));
     document.body.classList.toggle('racing', s === 'race');
