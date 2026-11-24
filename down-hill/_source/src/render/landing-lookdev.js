@@ -8,34 +8,37 @@ const blue = '#1572ed';
 const gold = '#ffba12';
 
 const panels = [
-  { title: 'FLUFFED AND FURIOUS', note: 'THE PILLOW FORT GRAND PRIX', base: navy, ink: cream },
-  { title: 'PIT TUNNEL', note: 'KEEP TO THE TAPE', base: cream, ink: navy },
-  { title: 'BANISTER', note: 'HOLD YOUR LINE', base: red, ink: cream },
-  { title: 'SOCK DRAWER', note: 'THREAD THE GAPS', base: gold, ink: navy },
+  { title: 'Pillow Fort GP', note: 'START / FINISH', base: navy, ink: cream },
+  { title: 'Pit Tunnel', note: 'KEEP TO THE TAPE', base: cream, ink: navy },
+  { title: 'Banister Drop', note: 'HOLD YOUR LINE', base: red, ink: cream },
+  { title: 'Sock Drawer', note: 'THREAD THE GAPS', base: gold, ink: navy },
 ];
 
 function panelAtlas() {
-  return canvasTex(512, 512, (g, w) => {
+  return canvasTex(1024, 1024, (g, w) => {
+    g.scale(2, 2);
+    w /= 2;
     for (const [i, panel] of panels.entries()) {
       const y = i * 128;
       g.fillStyle = panel.base;
       g.fillRect(0, y, w, 128);
       g.fillStyle = panel.ink;
-      for (const x of [12, w - 24]) {
-        for (let r = 0; r < 4; r++) for (let c = 0; c < 2; c++) {
-          if ((r + c) % 2) g.fillRect(x + c * 6, y + 31 + r * 16, 6, 16);
-        }
-      }
+      g.fillRect(0, y, w, 5);
+      g.fillRect(0, y + 123, w, 5);
       g.strokeStyle = panel.ink;
       g.lineWidth = 2;
-      g.setLineDash([6, 5]);
-      g.strokeRect(32, y + 10, w - 64, 108);
+      g.setLineDash([5, 4]);
+      g.strokeRect(15, y + 12, w - 30, 104);
       g.setLineDash([]);
+      for (const [x, side] of [[42,1],[w-42,-1]]) {
+        g.beginPath(); g.moveTo(x-7*side,y+43);g.lineTo(x+11*side,y+57);g.lineTo(x-7*side,y+71);
+        g.stroke();
+      }
       g.textAlign = 'center';
-      g.font = '900 49px "Bolster Display", sans-serif';
-      g.fillText(panel.title, w / 2, y + 65, w - 96);
-      g.font = '700 18px sans-serif';
-      g.fillText(panel.note, w / 2, y + 96);
+      g.font = '58px "Bolster Hand", cursive';
+      g.fillText(panel.title, w / 2, y + 72, w - 120);
+      g.font = '700 19px "Bolster Condensed", sans-serif';
+      g.fillText(panel.note, w / 2, y + 102);
     }
   });
 }

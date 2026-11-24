@@ -256,11 +256,11 @@ export class World {
   _lights() {
     const S = (this.lightsG = new THREE.Group());
     this.scene.add(S);
-    this.hemi = landingLookdev ? new THREE.HemisphereLight('#c3d9f0', '#9c7e63', 1.32)
+    this.hemi = landingLookdev ? new THREE.HemisphereLight('#d9eaff', '#c28c69', 1.48)
       : new THREE.HemisphereLight('#5d63b8', '#2a1c22', 1.25);
     S.add(this.hemi);
     // the moon through the west window: low and cool, casting the furniture's shadows (once)
-    const moon = (this.moon = new THREE.DirectionalLight(landingLookdev ? '#dceaff' : '#a9bcff', landingLookdev ? 2.35 : 2.1));
+    const moon = (this.moon = new THREE.DirectionalLight(landingLookdev ? '#dceaff' : '#a9bcff', landingLookdev ? 2.48 : 2.1));
     moon.position.set(-420, 300, 60);
     moon.target.position.set(80, 0, 0);
     moon.castShadow = true;

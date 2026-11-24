@@ -2,14 +2,15 @@ import * as THREE from 'three/webgpu';
 import { buildCentreCourtStadium, buildTournamentSigns, clayMaterial } from './centre-court.js';
 import { World, keepCameraAboveRoad } from './world.js';
 import { canvasTex, mesh, srand } from './geo.js';
+import { buildTrackBranding } from './track-branding.js';
 import { buildReadable } from './readable.js';
 import { lateral, rightX, rightZ, sceneryClearsRoad } from '../race/track.js';
 
 const VENUES = {
   laundry: { sky: '#52a8e2', ground: '#338f64', lane: '#c64d29', deck: '#55382e', rail: '#007c65', light: '#ffe0b9', title: 'CENTRE COURT', sub: 'JOHNNY DEUCE INVITATIONAL' },
-  hockey: { sky: '#14285b', ground: '#152f69', lane: '#8ccbea', deck: '#254a87', rail: '#df233e', light: '#ddf2ff', title: 'RINK 88', sub: 'OVERTIME' },
-  dojo: { sky: '#2c205c', ground: '#452f68', lane: '#b67143', deck: '#693243', rail: '#bc2042', light: '#ffe0aa', title: 'MIDNIGHT DOJO', sub: 'SUMAURA’S MOON GATE' },
-  park: { sky: '#62cdef', ground: '#078d9d', lane: '#e5a434', deck: '#744557', rail: '#ff6830', light: '#fff3c1', title: 'RUBBERTA’S RAPIDS', sub: 'CIRCUITO DAS ÁGUAS' },
+  hockey: { sky: '#285eaa', ground: '#2559a8', lane: '#8edbff', deck: '#1b52a3', rail: '#e92d55', light: '#d6f7ff' },
+  dojo: { sky: '#5644a5', ground: '#624680', lane: '#e29b5c', deck: '#963849', rail: '#dc3154', light: '#ffdda5' },
+  park: { sky: '#55d8ff', ground: '#0cabb2', lane: '#ffd04c', deck: '#9d4c57', rail: '#ff674b', light: '#fff0b6' },
 };
 const standard = (color, roughness = 0.82) => new THREE.MeshStandardMaterial({ color, roughness });
 const box = (root, material, x, y, z, w, h, d) => mesh(new THREE.BoxGeometry(w, h, d), material, x, y, z, root);
@@ -42,7 +43,12 @@ function ribbon(T, root, material, section, profile) {
 function lanePaint(id, V, slick) {
   return canvasTex(256, 256, (g, w, h) => {
     const rnd = srand(58235);
-    g.fillStyle = slick ? '#007fc9' : V.lane;
+    const base = g.createLinearGradient(0,0,w,0);
+    const edges = {hockey:'#53a0e6',park:'#e28b31',dojo:'#ad573e'};
+    const border = slick ? '#0866ce' : edges[id] || V.lane;
+    base.addColorStop(0,border); base.addColorStop(.16,slick?'#0e99f0':V.lane);
+    base.addColorStop(.84,slick?'#0e99f0':V.lane); base.addColorStop(1,border);
+    g.fillStyle = base;
     g.fillRect(0, 0, w, h);
     g.fillStyle = slick ? '#46cde8' : '#fff3d0';
     g.fillRect(5, 0, 5, h);
@@ -76,68 +82,68 @@ function lanePaint(id, V, slick) {
   }, { repeat: [1, 1] });
 }
 
-function balconyArt(id, V) {
-  // One strip of opaque painted scenery for the entire perimeter.
-  return canvasTex(1024, 256, (g, w, h) => {
-    const rnd = srand(2307);
-    const sky = g.createLinearGradient(0, 0, 0, h);
-    sky.addColorStop(0, V.sky);
-    sky.addColorStop(1, id === 'hockey' ? '#4865a2' : '#d3f5ff');
-    g.fillStyle = sky; g.fillRect(0, 0, w, h);
-    if (id === 'laundry' || id === 'park') {
-      for (let i = 0; i < 17; i++) {
-        const x = rnd() * w, y = 22 + rnd() * 83, r = 16 + rnd() * 32;
-        g.fillStyle = i % 3 ? '#fcf6e7ac' : '#d9e7efa0';
-        for (const [dx, dy, rx, ry] of [[0,0,1,0.24],[-0.36,0.03,0.62,0.14],[0.31,-0.12,0.59,0.3]]) {
-          g.beginPath(); g.ellipse(x+dx*r,y+dy*r,r*rx,r*ry,0,0,Math.PI*2); g.fill();
-        }
-      }
+function rinkStands() {
+  return canvasTex(1024,256,(g,w,h)=>{
+    const rnd=srand(2307);
+    const fabric=g.createLinearGradient(0,0,0,h);
+    fabric.addColorStop(0,'#18365f');fabric.addColorStop(0.48,'#31588c');fabric.addColorStop(1,'#193958');
+    g.fillStyle=fabric;g.fillRect(0,0,w,h);
+    g.fillStyle='#74c9ed';g.fillRect(0,35,w,4);
+    g.fillStyle='#f9cfd6';g.fillRect(0,40,w,2);
+    for(let x=0;x<w;x+=128){
+      g.strokeStyle='#7db6e3';g.lineWidth=3;
+      g.beginPath();g.moveTo(x,35);g.lineTo(x+64,4);g.lineTo(x+128,35);g.stroke();
+      g.fillStyle='#ecfaff';g.fillRect(x+45,38,38,4);
     }
-    if (id === 'dojo') {
-      for (const [step, base, color] of [[66, 168, '#513f79'], [44, 213, '#30204d']]) {
-        g.fillStyle = color;
-        g.beginPath(); g.moveTo(0, h);
-        for (let x = 0; x <= w; x += step / 2) g.lineTo(x, base - rnd() * step);
-        g.lineTo(w, h); g.fill();
-      }
-    } else if (id === 'park') {
-      for (const [color, y, a] of [['#439c87', 132, 32], ['#14775a', 168, 42], ['#0c594c', 211, 22]]) {
-        g.fillStyle = color;
-        g.beginPath(); g.moveTo(0, h);
-        for (let x = 0; x <= w; x += 8) g.lineTo(x, y + Math.sin(x * Math.PI / 128) * a + Math.sin(x * Math.PI / 64) * 15);
-        g.lineTo(w, h); g.fill();
-      }
-    } else {
-      g.strokeStyle = id === 'hockey' ? '#7798d1' : '#e6f4db';
-      g.lineWidth = 2;
-      for (let x = 0; x < w; x += 128) {
-        g.beginPath(); g.moveTo(x, 65); g.lineTo(x + 64, 13); g.lineTo(x + 128, 65); g.stroke();
-      }
-      g.fillStyle = id === 'hockey' ? '#23397c' : '#32634b';
-      for (let row = 0; row < 6; row++) {
-        const y = 63 + row * 32;
-        g.fillRect(0, y, w, 28);
-        for (let x = 5; x < w; x += 12) {
-          g.fillStyle = ['#ffe89c', '#fa4f60', '#f3fbff', '#44bacb', '#7d61c4'][Math.floor(rnd() * 5)];
-          g.fillRect(x, y + 4 + rnd() * 8, 6, 9);
-        }
-        g.fillStyle = id === 'hockey' ? '#162651' : '#23452d';
+    const clothes=['#ed678b','#ffd881','#d0f8ff','#42a7d8','#e1cbee'];
+    for(let row=0;row<6;row++){
+      const y=63+row*32;
+      g.fillStyle=row%2?'#213b61':'#28486c';g.fillRect(0,y,w,30);
+      g.fillStyle='#84b1d1';g.fillRect(0,y+29,w,1.5);
+      for(let x=8;x<w;x+=15){
+        if(x%128<9 || rnd()<.14)continue;
+        const py=y+13+rnd()*4;
+        g.fillStyle=clothes[Math.floor(rnd()*clothes.length)];
+        g.beginPath();g.ellipse(x,py+3,5.1,6.1,0,0,Math.PI*2);g.fill();
+        g.fillStyle=rnd()>.42?'#deb594':'#9e725e';g.beginPath();g.arc(x,py-4,3.4,0,Math.PI*2);g.fill();
       }
     }
   });
 }
 
-function sign(root, x, y, z, width, title, sub, accent, rotation = 0) {
-  const map = canvasTex(512, 160, (g, w, h) => {
-    g.fillStyle = '#101932'; g.fillRect(0, 0, w, h);
-    g.fillStyle = accent; g.fillRect(0, 0, w, 12); g.fillRect(0, h - 12, w, 12);
-    g.textAlign = 'center'; g.fillStyle = '#fff9e4';
-    g.font = 'bold 46px sans-serif'; g.fillText(title, w / 2, 77, 475);
-    g.font = 'bold 23px sans-serif'; g.fillStyle = accent; g.fillText(sub, w / 2, 122, 470);
+function outdoorSky(id) {
+  const dojo=id==='dojo';
+  return canvasTex(2048,512,(g,w,h)=>{
+    const rng=srand(86313);
+    const fade=g.createLinearGradient(0,0,0,h);
+    const colors=dojo?['#251d67','#7855bf','#ef91a1','#512863']:['#1367ce','#4fc5fb','#bff5e4','#91cead'];
+    [0,.37,.53,1].forEach((y,i)=>fade.addColorStop(y,colors[i]));
+    g.fillStyle=fade;g.fillRect(0,0,w,h);
+    if(dojo){
+      for(let i=0;i<127;i++){
+        const x=rng()*w,y=48+rng()*181;
+        g.fillStyle=i%5?'#fce3b2a0':'#fffaeb';
+        g.beginPath();g.arc(x,y,.48+rng()*1.07,0,Math.PI*2);g.fill();
+      }
+    } else {
+      for(let i=0;i<19;i++){
+        const x=rng()*w,y=130+rng()*100,r=35+rng()*105;
+        for(const d of [-w,0,w]){
+          g.fillStyle='#fffcdbbe';g.beginPath();g.ellipse(x+d,y,r,r*.085,0,0,Math.PI*2);g.fill();
+          g.fillStyle='#edffffb3';g.beginPath();g.ellipse(x+d+r*.52,y-2,r*.7,r*.073,0,0,Math.PI*2);g.fill();
+        }
+      }
+    }
+    const ridges=dojo?['#6d61a6','#4e3a83','#392767']:['#7cc5a4','#34a87e','#10766e'];
+    for(const [i,color] of ridges.entries()){
+      g.fillStyle=color;g.beginPath();g.moveTo(0,h);
+      for(let x=0;x<=w;x+=16){
+        const a=x/w*Math.PI*2;
+        g.lineTo(x,249+i*8+Math.sin(a*(7+i)+i)*7+Math.cos(a*(11+i))*5);
+      }
+      g.lineTo(w,h);g.fill();
+    }
   });
-  const panel = mesh(new THREE.PlaneGeometry(width, width * 160 / 512),
-    new THREE.MeshBasicMaterial({ map, side: THREE.DoubleSide }), x, y, z, root);
-  panel.rotation.y = rotation;
 }
 
 function groundPaint(id, V, T) {
@@ -251,10 +257,12 @@ export class VenueWorld extends World {
     this.lightsG = new THREE.Group();
     this.scene.add(this.lightsG);
     const court = id === 'laundry';
-    this.lightsG.add(court ? new THREE.HemisphereLight('#c5edff', '#926047', 1.19)
-      : new THREE.HemisphereLight('#eef8ff', '#a5adb2', 1.63));
+    const fills = { hockey:['#bce7ff','#6d77b5',1.36], park:['#efffff','#6ea385',1.48],
+      dojo:['#b5abff','#ad5265',1.30] };
+    this.lightsG.add(new THREE.HemisphereLight(...(court ? ['#c5edff','#926047',1.19] : fills[id])));
     this.moon = new THREE.DirectionalLight(V.light, court ? 2.65 : 2);
-    this.moon.position.set(...(court ? [-148, 96, -90] : [-130, 260, 100]));
+    const key = { hockey:[-110,145,110], park:[-180,125,-66], dojo:[-62,82,-110] };
+    this.moon.position.set(...(court ? [-148,96,-90] : key[id]));
     this.lightsG.add(this.moon);
     if (court) {
       const fill = new THREE.DirectionalLight('#b1d2ff', 0.36);
@@ -293,7 +301,10 @@ export class VenueWorld extends World {
     if (court) {
       buildCentreCourtStadium(this);
       buildTournamentSigns(root);
-    } else this._perimeter(id, V);
+    } else {
+      this._perimeter(id, V);
+      buildTrackBranding(this);
+    }
     this._landmarks(id);
   }
 
@@ -359,7 +370,7 @@ export class VenueWorld extends World {
 
   _dojo() {
     const root = this.root;
-    const timber = standard('#792a43'), plaster = standard('#f9ca9a'), roof = standard('#372754');
+    const timber = standard('#a6334d'), plaster = standard('#ffce95'), roof = standard('#50317c');
     const gold = new THREE.MeshBasicMaterial({ color: '#ffc34b' });
     const tile = new THREE.CylinderGeometry(1, 1, 1, 4);
     for (const [x, z, width] of [[-148, -175, 56], [-60, -173, 55], [4, 5, 47], [-75, 72, 42], [98, -187, 63], [232, -170, 55]]) {
@@ -381,7 +392,6 @@ export class VenueWorld extends World {
       box(root, gold, x - 4.5, 12.7, z, 2.8, 4.4, 2.8);
       box(root, timber, x - 4.5, 15.1, z, 3.6, 0.7, 3.6);
     }
-    sign(root, 5, 36, -180, 87, 'MIDNIGHT DOJO', 'SUMAURA’S MOON GATE', '#ffc34b');
   }
 
   _rapidsMascot() {
@@ -417,18 +427,23 @@ export class VenueWorld extends World {
 
   _perimeter(id, V) {
     const root = this.root;
-    const mural = new THREE.MeshBasicMaterial({ map: balconyArt(id, V), side: THREE.DoubleSide });
-    for (const [x, z, w, angle] of [[0, -236, 640, 0], [-320, 8, 490, Math.PI / 2], [320, 8, 490, -Math.PI / 2]]) {
-      const panel = mesh(new THREE.PlaneGeometry(w, 112), mural, x, 54, z, root);
-      panel.rotation.y = angle;
-      panel.userData.noShadow = true;
+    if(id==='hockey'){
+      const mural = new THREE.MeshBasicMaterial({ map: rinkStands(), side: THREE.DoubleSide });
+      for(const [x,z,w,angle] of [[0,-236,640,0],[-320,8,490,Math.PI/2],[320,8,490,-Math.PI/2]]){
+        const panel=mesh(new THREE.PlaneGeometry(w,112),mural,x,54,z,root);
+        panel.rotation.y=angle;panel.userData.noShadow=true;
+      }
+    } else {
+      const sky = new THREE.MeshBasicMaterial({map:outdoorSky(id),side:THREE.BackSide,depthWrite:false});
+      const dome=mesh(new THREE.SphereGeometry(810,48,24),sky,0,0,0,root);
+      dome.renderOrder=-20;dome.userData.noShadow=true;
     }
     const vivid = [V.rail, '#ffc724', '#1faea2', '#6143b7', '#f9f5e3'].map((color) => standard(color));
     const dark = standard(V.deck);
     const rnd = srand(47322);
     if (id === 'dojo') {
-      const moon = new THREE.MeshBasicMaterial({ color: '#ffdda5', side: THREE.DoubleSide });
-      mesh(new THREE.CircleGeometry(15, 28), moon, 30, 77, -235.5, root).scale.x = 1.35;
+      const moon = new THREE.MeshBasicMaterial({ color: '#ffe5ae', side: THREE.DoubleSide });
+      mesh(new THREE.CircleGeometry(15, 28), moon, 30, 98, -299, root).scale.x = 1.35;
       return;
     }
     if (id === 'park') {
@@ -443,7 +458,6 @@ export class VenueWorld extends World {
           o.scale.set(14, 5.5, 8);
         }
       }
-      sign(root, 0, 36, -186, 105, V.title, V.sub, '#ffdc42');
     } else {
       for (let i = 0; i < 27; i++) {
         const x = -296 + i * 23;
@@ -452,8 +466,6 @@ export class VenueWorld extends World {
         box(root, vivid[i % vivid.length], x, h + 1, -155, 21, 2, 5);
         box(root, vivid[(i + 2) % vivid.length], x, h + 5, -176, 21, 8, 4);
       }
-      sign(root, 0, 43, -163, 114, V.title, V.sub, id === 'hockey' ? '#4cd7ff' : '#fce373');
-      sign(root, 132, 22, -148, 51, id === 'hockey' ? 'HOME 88' : 'LOVE ALL', id === 'hockey' ? 'VISITORS 08' : 'MATCH POINT', '#ffcf49');
     }
     for (let i = 0; i < 12; i++) {
       const x = i < 6 ? -287 : 278, z = -107 + (i % 6) * 59;

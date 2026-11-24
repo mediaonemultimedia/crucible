@@ -1489,6 +1489,9 @@ async function start() {
   const [{ renderer, canvas }] = await Promise.all([
     makeRenderer($('stage')),
     document.fonts.load('700 51px "Bolster Condensed"'),
+    document.fonts.load('58px "Bolster Hand"'),
+    document.fonts.load('105px Bungee'),
+    document.fonts.load('102px "Bolster Display"'),
   ]);
   const app = new App(renderer, canvas);
   window.__dh = app;
