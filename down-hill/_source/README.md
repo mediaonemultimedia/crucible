@@ -60,6 +60,16 @@ the podium. The single-surface remesh applies only during races.
 Run `node tools/build-roster.mjs` to build the offline roster turntable with
 all seven smooth racers and both liveries.
 
+## Split-screen frame pacing
+
+Run `node tools/framecost.mjs build/lookdev-race.html --track=landing --views=4`
+with Chrome installed. The benchmark drives eight karts, renders 120 warm-up
+frames, then samples 600 frames from the game’s normal animation loop. It
+reports frame gaps, gaps over 25 ms, CPU update and render submission, and
+draw counts. WebGPU timestamp queries run in a separate pass so readback
+cannot affect the frame-pacing sample. Use `--headed` to also test a
+windowed browser, or `--webgl` to test the fallback renderer.
+
 ## Status — stage 1 of 2
 
 | # | Stage 1 item | State |

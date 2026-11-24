@@ -598,6 +598,9 @@ class App {
     this.ghostStart();
     this.slowmo = null; this.photoDone = false; document.body.classList.remove('photo');
     this.setScreen('race');
+    if (this.hv.length === 4 && this.renderer.backend.isWebGPUBackend && (!this.hold || Q.has('warm-effects'))) {
+      this.fx.warmPipelines(this.renderer, this.hv[0].camera);
+    }
     this.audio.music(null);
     this.audio.setIntense(false);
     for (const p of this.players) p.ctl.clear();
@@ -1467,9 +1470,10 @@ class App {
   }
 
   loop() {
-    let last = performance.now();
+    let last;
     const f = (now) => {
-      const dt = (now - last) / 1000; last = now;
+      const dt = last === undefined ? 0 : (now - last) / 1000;
+      last = now;
       this.frame(dt);
       requestAnimationFrame(f);
     };

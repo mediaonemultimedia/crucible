@@ -158,6 +158,40 @@ export class Fx {
     this.pops = new Float32Array(16);
   }
 
+  // These effects created their first WebGPU pipelines in the middle of
+  // a split-screen race. Compile the same mesh and material layouts during
+  // countdown, then share the compiled resources with the spawned effects.
+  warmPipelines(renderer, camera) {
+    const models = new THREE.Group();
+    const slick = this._slick(), plane = this._shotMesh('plane'), reticle = this._reticle();
+    models.add(slick, plane, reticle);
+    this.warmedModels = { slick, plane, reticle };
+    models.traverse(o => { o.frustumCulled = false; });
+    const compiling = renderer.compileAsync(models, camera, this.scene);
+    models.traverse(o => { o.frustumCulled = true; });
+    this.pipelineWarmup = compiling.catch(error => {
+      console.warn('Race effect precompile did not finish', error);
+    });
+    return this.pipelineWarmup;
+  }
+
+  dispose() {
+    const templates = this.warmedModels;
+    if (!templates) return;
+    this.pipelineWarmup.finally(() => {
+      const geometries = new Set(), materials = new Set(), textures = new Set();
+      for (const root of Object.values(templates)) root.traverse(o => {
+        if (!o.isMesh) return;
+        geometries.add(o.geometry);
+        materials.add(o.material);
+        if (o.material.map && o.material.map !== this.feathers.mesh.material.map) textures.add(o.material.map);
+      });
+      geometries.forEach(geometry => { if (geometry !== this.itemGeo.plane) geometry.dispose(); });
+      materials.forEach(material => material.dispose());
+      textures.forEach(texture => texture.dispose());
+    });
+  }
+
   /* ── what each kart holds, on its back: one instanced mesh per item type ── */
   _held() {
     const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, emissive: '#ffffff', emissiveIntensity: 0.12, side: THREE.DoubleSide });
@@ -226,7 +260,10 @@ export class Fx {
   /* the spring cushion's reticle over its target (every view sees it: a warning) */
   _reticle() {
     const g = new THREE.Group();
-    const m = new THREE.MeshBasicMaterial({ color: '#ff3b3b', transparent: true, opacity: 0.95, depthTest: false, depthWrite: false, side: THREE.DoubleSide });
+    // All reticle pieces are flat. A single two-sided pass has the same
+    // coverage and avoids compiling separate front/back pipelines on use.
+    const m = new THREE.MeshBasicMaterial({ color: '#ff3b3b', transparent: true, opacity: 0.95,
+      depthTest: false, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true });
     mesh(new THREE.RingGeometry(1.7, 2.05, 28), m, 0, 0, 0, g);
     for (let i = 0; i < 4; i++) { const t = mesh(new THREE.PlaneGeometry(0.28, 1.1), m, 0, 0, 0, g); const a = i * Math.PI / 2; t.position.set(Math.cos(a) * 2.5, Math.sin(a) * 2.5, 0); t.rotation.z = a + Math.PI / 2; }
     mesh(new THREE.CircleGeometry(0.3, 12), m, 0, 0, 0, g);
@@ -411,7 +448,7 @@ export class Fx {
     for (const S of R.shots) {
       seen.add(S.id);
       let m = this.shotMeshes.get(S.id);
-      if (!m) { m = this._shotMesh(S.kind); this.shotMeshes.set(S.id, m); this.root.add(m); }
+      if (!m) { m = this.warmedModels?.[S.kind]?.clone() || this._shotMesh(S.kind); this.shotMeshes.set(S.id, m); this.root.add(m); }
       m.position.set(S.x, S.y, S.z);
       if (S.kind === 'missile') {
         m.rotation.y = Math.atan2(S.vx, S.vz); m.rotation.x = t * 14;
@@ -440,8 +477,8 @@ export class Fx {
     for (const H of R.hazards) {
       hs.add(H.id);
       let m = this.hazMeshes.get(H.id);
-      if (!m) { m = this._slick(); this.hazMeshes.set(H.id, m); this.root.add(m); m.position.set(H.x, H.y + 0.15, H.z); }
-      m.rotation.y = t * 0.3;
+      if (!m) { m = this.warmedModels?.slick.clone() || this._slick(); this.hazMeshes.set(H.id, m); this.root.add(m); m.position.set(H.x, H.y + 0.15, H.z); }
+      m.rotation.y = t * 0.3 + H.id * 0.618;
       m.children[1].rotation.y = -t * 0.8;
     }
     for (const [id, m] of this.hazMeshes) if (!hs.has(id)) { m.removeFromParent(); this.hazMeshes.delete(id); }
@@ -504,7 +541,7 @@ export class Fx {
     for (const K of karts) if (K.lock >= 0) {
       locks.add(K.i);
       let m = this.reticles.get(K.i);
-      if (!m) { m = this._reticle(); this.reticles.set(K.i, m); this.root.add(m); }
+      if (!m) { m = this.warmedModels?.reticle.clone() || this._reticle(); this.reticles.set(K.i, m); this.root.add(m); }
       const v = views[K.lock].group.position;
       m.position.set(v.x, v.y + 5.4 + Math.sin(t * 6) * 0.2, v.z);
       m.quaternion.copy(camQ);
