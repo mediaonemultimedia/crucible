@@ -8,7 +8,7 @@ import { World } from './world.js';
 import { VenueWorld } from './venues.js';
 
 const venue = (scene, T) => new VenueWorld(scene, T);
-const BUILDERS = { landing: (scene, T) => new World(scene, T), laundry: venue, park: venue, hockey: venue };
+const BUILDERS = { landing: (scene, T) => new World(scene, T), laundry: venue, park: venue, hockey: venue, dojo: venue };
 export const registerWorld = (id, make) => { BUILDERS[id] = make; };
 
 export function makeWorld(scene, T) {

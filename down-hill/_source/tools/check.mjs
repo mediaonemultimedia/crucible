@@ -63,8 +63,8 @@ const key = (p, code, ms = 40) => p.evaluate(async ([c, t]) => {
 }
 
 // 2 + 3. a whole race with 8 CPUs on each track, its frame cost, the results
-const TRACK_EVENTS = { landing: [], laundry: ['launch'], hockey: ['launch'], park: ['launch', 'splash'] };
-for (const track of (process.argv.includes('--quick') ? ['landing'] : ['landing', 'laundry', 'hockey', 'park'])) {
+const TRACK_EVENTS = { landing: [], laundry: ['launch'], hockey: ['launch'], park: ['launch', 'splash'], dojo: ['launch'] };
+for (const track of (process.argv.includes('--quick') ? ['landing'] : ['landing', 'laundry', 'hockey', 'park', 'dojo'])) {
   const p = await page(`?hold&webgl&p1=kevalanche&p1cpu=hard&cpu=hard&seed=11&track=${track}`);
   const r = await p.evaluate(() => {
     const A = __dh, R = A.race, ev = {}, laps = {};
@@ -137,7 +137,7 @@ for (const n of [2, 4]) {
   await p.close();
 }
 
-// 5. the Pillow Cup: four races (each cut short), points, the overall podium
+// 5. the Pillow Cup: five races (each cut short), points, the overall podium
 {
   const p = await page('?hold&webgl&noportraits&seed=7');
   const r = await p.evaluate(() => {
@@ -146,7 +146,7 @@ for (const n of [2, 4]) {
     A.lock(A.players[0]);
     while (document.querySelector('#course-name').textContent !== 'The Pillow Cup') A.cycleTrack(1);
     A.go();
-    for (let race = 0; race < 4; race++) {
+    for (let race = 0; race < 5; race++) {
       trail.push(A.screen + ':' + A.trackId);
       A.step(6, false);
       const R = A.race; R._end(); A.resultsAt = A.t; A.toResults();
@@ -158,8 +158,8 @@ for (const n of [2, 4]) {
     return { trail, total: pts.reduce((a, b) => a + b, 0), title: document.getElementById('c-title').textContent };
   });
   results.cup = r;
-  if (r.trail.join() !== 'race:landing,results,race:laundry,results,race:hockey,results,race:park,results,cup') problems.push(`cup: ${r.trail}`);
-  if (r.total !== 4 * 39) problems.push(`cup: ${r.total} points handed out (want ${4 * 39})`);
+  if (r.trail.join() !== 'race:landing,results,race:laundry,results,race:hockey,results,race:park,results,race:dojo,results,cup') problems.push(`cup: ${r.trail}`);
+  if (r.total !== 5 * 39) problems.push(`cup: ${r.total} points handed out (want ${5 * 39})`);
   await p.evaluate(() => __dh.step(1));
   await p.screenshot({ path: path.join(root, 'shots/check-cup-podium.png'), timeout: 240000 });
   await p.close();

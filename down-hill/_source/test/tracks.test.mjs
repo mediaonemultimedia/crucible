@@ -20,12 +20,12 @@ function run(track, seed, lvl = 'hard') {
   return { R, ev, lapT, mean: lapT.reduce((a, b) => a + b, 0) / lapT.length };
 }
 
-test('the cup starts at The Landing and includes four distinct venues', () => {
-  assert.deepEqual(CUP, ['landing', 'laundry', 'hockey', 'park']);
+test('the cup starts at The Landing and includes five distinct venues', () => {
+  assert.deepEqual(CUP, ['landing', 'laundry', 'hockey', 'park', 'dojo']);
   for (const id of CUP) assert.ok(TRACKS[id], id);
 });
 
-for (const track of ['laundry', 'hockey', 'park']) {
+for (const track of ['laundry', 'hockey', 'park', 'dojo']) {
   test(`${track}: a whole 3-lap race of 8 hard CPUs, everyone home, with airborne launches`, () => {
     const { R, ev, mean } = run(track, 11);
     assert.equal(R.phase, 'done');
@@ -36,7 +36,7 @@ for (const track of ['laundry', 'hockey', 'park']) {
   });
 }
 
-for (const id of ['laundry', 'hockey', 'park']) {
+for (const id of ['laundry', 'hockey', 'park', 'dojo']) {
   test(`${id}: overpass preserves both road layers and kart clearance`, () => {
     const T = buildTrack(TRACKS[id]);
     const crossings = [];

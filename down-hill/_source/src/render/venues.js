@@ -5,8 +5,9 @@ import { buildReadable } from './readable.js';
 import { lateral, rightX, rightZ, sceneryClearsRoad } from '../race/track.js';
 
 const VENUES = {
-  laundry: { sky: '#65aeed', ground: '#28774b', lane: '#c64d29', deck: '#8a2c1c', rail: '#164e3b', light: '#ffedbd', title: 'CENTRE COURT', sub: 'SUMAURA INVITATIONAL' },
+  laundry: { sky: '#65aeed', ground: '#28774b', lane: '#c64d29', deck: '#8a2c1c', rail: '#164e3b', light: '#ffedbd', title: 'CENTRE COURT', sub: 'JOHNNY DEUCE INVITATIONAL' },
   hockey: { sky: '#14285b', ground: '#152f69', lane: '#8ccbea', deck: '#254a87', rail: '#df233e', light: '#ddf2ff', title: 'RINK 88', sub: 'OVERTIME' },
+  dojo: { sky: '#2c205c', ground: '#452f68', lane: '#b67143', deck: '#693243', rail: '#bc2042', light: '#ffe0aa', title: 'MIDNIGHT DOJO', sub: 'SUMAURA’S MOON GATE' },
   park: { sky: '#62cdef', ground: '#078d9d', lane: '#e5a434', deck: '#744557', rail: '#ff6830', light: '#fff3c1', title: 'RUBBERTA’S RAPIDS', sub: 'CIRCUITO DAS ÁGUAS' },
 };
 const standard = (color, roughness = 0.82) => new THREE.MeshStandardMaterial({ color, roughness });
@@ -64,7 +65,14 @@ function balconyArt(id, V) {
     sky.addColorStop(0, V.sky);
     sky.addColorStop(1, id === 'hockey' ? '#4865a2' : '#d3f5ff');
     g.fillStyle = sky; g.fillRect(0, 0, w, h);
-    if (id === 'park') {
+    if (id === 'dojo') {
+      for (const [step, base, color] of [[66, 168, '#513f79'], [44, 213, '#30204d']]) {
+        g.fillStyle = color;
+        g.beginPath(); g.moveTo(0, h);
+        for (let x = 0; x <= w; x += step / 2) g.lineTo(x, base - rnd() * step);
+        g.lineTo(w, h); g.fill();
+      }
+    } else if (id === 'park') {
       for (const [color, y, a] of [['#439c87', 132, 32], ['#14775a', 168, 42], ['#0c594c', 211, 22]]) {
         g.fillStyle = color;
         g.beginPath(); g.moveTo(0, h);
@@ -107,7 +115,12 @@ function sign(root, x, y, z, width, title, sub, accent, rotation = 0) {
 function groundPaint(id, V) {
   return canvasTex(1024, 1024, (g, w, h) => {
     g.fillStyle = V.ground; g.fillRect(0, 0, w, h);
-    if (id === 'park') {
+    if (id === 'dojo') {
+      for (let y = 0; y < h; y += 32) for (let x = -32; x < w; x += 45) {
+        g.strokeStyle = '#ddc1e830';
+        g.strokeRect(x + (y % 64 ? 22 : 0), y, 43, 30);
+      }
+    } else if (id === 'park') {
       const rnd = srand(4552);
       for (let i = 0; i < 550; i++) {
         g.strokeStyle = i % 2 ? '#6de1cc45' : '#03778365';
@@ -221,6 +234,10 @@ export class VenueWorld extends World {
   _landmarks(id) {
     const root = this.root;
     const clear = (x, z, r) => sceneryClearsRoad(this.T, x, z, r, r);
+    if (id === 'dojo') {
+      this._dojo();
+      return;
+    }
     if (id === 'park') {
       const sand = standard('#ffbf46'), grass = standard('#28aa58'), palm = standard('#a8522c');
       const island = new THREE.CylinderGeometry(1, 1.22, 1, 10);
@@ -270,6 +287,33 @@ export class VenueWorld extends World {
     }
   }
 
+  _dojo() {
+    const root = this.root;
+    const timber = standard('#792a43'), plaster = standard('#f9ca9a'), roof = standard('#372754');
+    const gold = new THREE.MeshBasicMaterial({ color: '#ffc34b' });
+    const tile = new THREE.CylinderGeometry(1, 1, 1, 4);
+    for (const [x, z, width] of [[-148, -175, 56], [-60, -173, 55], [4, 5, 47], [-75, 72, 42], [98, -187, 63], [232, -170, 55]]) {
+      if (!sceneryClearsRoad(this.T, x, z, width / 2 + 5, 19)) continue;
+      box(root, timber, x, 10, z, width, 20, 28);
+      for (let i = -2; i <= 2; i++) {
+        box(root, plaster, x + i * width / 6, 10, z + 14.2, width / 8, 13, 0.5);
+        box(root, timber, x + i * width / 6, 10, z + 14.5, 0.65, 13, 0.5);
+      }
+      const upper = mesh(tile, roof, x, 24, z, root);
+      upper.rotation.set(0, Math.PI / 4, Math.PI / 2);
+      upper.scale.set(9, width + 10, 24);
+      box(root, timber, x, 21, z + 18, width + 11, 2, 3);
+    }
+    for (const [x, z] of [[-276, 42], [-265, 148], [269, 130], [267, -76], [-82, 189], [35, 188], [166, 181], [-15, -171]]) {
+      if (!sceneryClearsRoad(this.T, x, z, 7, 4)) continue;
+      box(root, timber, x, 8, z, 1.5, 16, 1.5);
+      box(root, timber, x - 2.5, 15, z, 6, 1.3, 1.3);
+      box(root, gold, x - 4.5, 12.7, z, 2.8, 4.4, 2.8);
+      box(root, timber, x - 4.5, 15.1, z, 3.6, 0.7, 3.6);
+    }
+    sign(root, 5, 36, -180, 87, 'MIDNIGHT DOJO', 'SUMAURA’S MOON GATE', '#ffc34b');
+  }
+
   _rapidsMascot() {
     const root = this.root, x = 248, z = 70;
     if (!sceneryClearsRoad(this.T, x, z, 27, 27)) return;
@@ -312,6 +356,11 @@ export class VenueWorld extends World {
     const vivid = [V.rail, '#ffc724', '#1faea2', '#6143b7', '#f9f5e3'].map((color) => standard(color));
     const dark = standard(V.deck);
     const rnd = srand(47322);
+    if (id === 'dojo') {
+      const moon = new THREE.MeshBasicMaterial({ color: '#ffdda5', side: THREE.DoubleSide });
+      mesh(new THREE.CircleGeometry(15, 28), moon, 30, 77, -235.5, root).scale.x = 1.35;
+      return;
+    }
     if (id === 'park') {
       const trunk = standard('#825030'), leaves = ['#0c7652', '#12a461', '#55bc48'].map((color) => standard(color));
       const crown = new THREE.IcosahedronGeometry(1, 0);

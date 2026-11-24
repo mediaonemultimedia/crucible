@@ -50,7 +50,7 @@ const face = `/* ${bungeeLicense} */
 @font-face{font-family:"Bolster Condensed";src:url(data:font/woff2;base64,${cond}) format("woff2");font-weight:700;font-display:block}`;
 html = html.replace('/*FONTFACE*/', () => face);
 
-const courses = Object.fromEntries(['landing', 'laundry', 'park', 'hockey'].map((id) => [
+const courses = Object.fromEntries(['landing', 'laundry', 'park', 'hockey', 'dojo'].map((id) => [
   id, 'data:image/webp;base64,' + fs.readFileSync(path.join(src, 'assets/courses', id + '.webp')).toString('base64')
 ]));
 const mi = process.argv.indexOf('--music-dir');

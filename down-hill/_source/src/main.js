@@ -63,7 +63,8 @@ const COURSE_NOTES = {
   laundry: 'Clay-court flyover · switchbacks · championship jump',
   hockey: 'Rink crossover · icy bends · penalty-box jump',
   park: 'Canopy climb · slick downhill flume · splash jump',
-  cup: 'Race all four courses, starting on The Landing',
+  dojo: 'Lantern courtyard · rooftop crossover · moon gate jump',
+  cup: 'Race all five courses, starting on The Landing',
 };
 const lookKey = (id, alt) => `${id}:${alt ? 1 : 0}`;
 /* the ghost's samples ↔ a localStorage string */

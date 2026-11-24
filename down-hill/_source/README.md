@@ -1,10 +1,10 @@
 # Fluffed and Furious — source
 
 *Fluffed and Furious: a Pillow Fight kart race.* The Pillow Fight 2 plush cast race
-karts through four courses, starting on **The Landing**, a giant bedroom and
-upstairs landing at night. Sumaura’s Centre Court has clay-court flyovers,
+karts through five courses, starting on **The Landing**, a giant bedroom and
+upstairs landing at night. Johnny Deuce’s Centre Court has clay-court flyovers,
 Overtime at Rink 88 has icy crossover ramps, and Rubberta’s Rapids features a
-slick downhill flume. The Pillow Cup runs all four courses. This tree lives on the `kart-source` branch only; what ships to
+slick downhill flume. Sumaura’s Midnight Dojo adds a rooftop crossover. The Pillow Cup runs all five courses. This tree lives on the `kart-source` branch only; what ships to
 `main` is the single built file `down-hill/index.html`
 (https://mediaonemultimedia.github.io/crucible/down-hill/).
 

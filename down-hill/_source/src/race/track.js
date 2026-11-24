@@ -105,7 +105,7 @@ const flume = (...p) => route('flume', ...p);
 
 export const CENTRE_COURT = {
   id: 'laundry',
-  name: 'Sumaura’s Centre Court',
+  name: 'Johnny Deuce’s Centre Court',
   laps: 3,
   start: [-150, 0, 108],
   points: [
@@ -175,6 +175,32 @@ export const HOCKEY = {
   music: 'laundry',
 };
 
+const dojo = (...p) => route('dojo', ...p);
+export const DOJO = {
+  id: 'dojo',
+  name: 'Sumaura’s Midnight Dojo',
+  laps: 3,
+  start: [-130, 0, 145],
+  points: [
+    dojo(-180, 0, 145), dojo(-96, 0, 145, { pad: 1 }),
+    dojo(-40, 0, 122), dojo(-3, 4, 75), dojo(31, 18, 38),
+    dojo(78, 30, 26), dojo(139, 35, 33), dojo(189, 27, 6),
+    dojo(197, 18, -42, { launch: 15 }), dojo(167, 0, -93),
+    dojo(119, 0, -116), dojo(73, 0, -81), dojo(67, 0, -21),
+    dojo(84, 0, 41), dojo(61, 0, 91), dojo(112, 6, 121),
+    dojo(172, 10, 133), dojo(224, 16, 103), dojo(244, 26, 52),
+    dojo(243, 33, -12), dojo(207, 37, -77), dojo(153, 42, -130),
+    dojo(69, 42, -145), dojo(-16, 31, -125), dojo(-77, 13, -93),
+    dojo(-124, 0, -98), dojo(-174, 0, -124), dojo(-223, 0, -86),
+    dojo(-217, 0, -35), dojo(-164, 0, -9), dojo(-136, 0, 32),
+    dojo(-175, 0, 67), dojo(-224, 0, 83), dojo(-232, 0, 123),
+  ],
+  patches: [], posts: [],
+  boxes: [0.05, 0.19, 0.34, 0.5, 0.65, 0.82, 0.92],
+  mapHigh: [5, 42],
+  music: 'race',
+};
+
 /* the room was laid out in a compact sketch; the race runs it 1.9× wider
    and 1.25× taller (a lap of ~55 s at racing speed) */
 function scaled(def, sxz, sy) {
@@ -192,9 +218,9 @@ function scaled(def, sxz, sy) {
     sprinklers: (def.sprinklers || []).map(P),
   };
 }
-export const TRACKS = { landing: scaled(LANDING, 1.9, 1.25), laundry: scaled(CENTRE_COURT, 1, 1), hockey: scaled(HOCKEY, 1, 1), park: scaled(RUBBERTA_RAPIDS, 1, 1) };
-/* the Pillow Cup: four races, points for every place */
-export const CUP = ['landing', 'laundry', 'hockey', 'park'];
+export const TRACKS = { landing: scaled(LANDING, 1.9, 1.25), laundry: scaled(CENTRE_COURT, 1, 1), hockey: scaled(HOCKEY, 1, 1), park: scaled(RUBBERTA_RAPIDS, 1, 1), dojo: scaled(DOJO, 1, 1) };
+/* the Pillow Cup: five races, points for every place */
+export const CUP = ['landing', 'laundry', 'hockey', 'park', 'dojo'];
 
 /* ── sampling ─────────────────────────────────────────────────────────── */
 function cr(p0, p1, p2, p3, t) {
