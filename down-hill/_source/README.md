@@ -57,6 +57,8 @@ The folder should contain the MP3s named `Artist - Title.mp3` as listed in
 To build the local smooth-mesh race preview, add `--race-remesh` to the
 look-dev build command. It uses the original plushes in the lobby and on
 the podium. The single-surface remesh applies only during races.
+Run `node tools/build-roster.mjs` to build the offline roster turntable with
+all seven smooth racers and both liveries.
 
 ## Status — stage 1 of 2
 

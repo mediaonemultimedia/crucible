@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fluffed and Furious · Smooth roster</title>
+<style>
+*{box-sizing:border-box} body{margin:0;background:#201b23;color:#f4ede4;font:16px system-ui,sans-serif}
+main{max-width:1560px;margin:auto;padding:32px clamp(16px,4vw,54px)}
+header{display:flex;justify-content:space-between;gap:18px;align-items:end;margin-bottom:22px;flex-wrap:wrap}
+h1,h2,p{margin:0}h1{font-size:clamp(28px,5vw,53px);letter-spacing:-.055em}header p{color:#d6c5bd;margin-top:7px}
+.controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+a{color:#f4dfc0}button{font:inherit;color:#201b23;background:#f4dfc0;border:0;border-radius:5px;padding:8px 13px;cursor:pointer}
+input{accent-color:#eab976}#cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+article{background:#352b33;border-radius:8px;overflow:hidden}canvas{display:block;width:100%;height:clamp(295px,30vw,448px);touch-action:none;cursor:grab}
+article div{padding:14px 17px 18px}h2{font-size:22px}article p{font-size:14px;color:#decfc8;margin-top:5px}
+@media(max-width:750px){#cards{grid-template-columns:1fr}canvas{height:380px}}
+</style>
+</head>
+<body><main><header><div><h1>Fluffed and Furious · Smooth roster</h1><p>Drag any kart to rotate all three. <a href="?alt=0">Original liveries</a> · <a href="?alt=1">Alternate liveries</a></p></div>
+<div class="controls"><button id="spin">Pause spin</button><label for="angle">Angle</label><input id="angle" type="range" min="-180" max="180" value="-33"></div></header>
+<p id="status" role="status"></p><section id="cards" aria-label="Three plush prototypes"></section></main>
+<script>/* BUNDLE */</script></body></html>

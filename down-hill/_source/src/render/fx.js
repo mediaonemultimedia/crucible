@@ -4,7 +4,7 @@
    - feathers (the hits' bursts, the tier-1 drift sparks, the slicks);
      glows (tier-2 gold and tier-3 mint drift sparks, boost flames, the
      resurfacer's snow, the pads' sparkle, pops); Johnny's tennis balls;
-   - the item boxes: gift-wrapped little pillows, bobbing and turning;
+   - the item boxes: latched Feather Caches, bobbing and turning;
    - the items in flight: the pillow missile, the pillowcase, the fuzzy
      handcuffs (and the fuzzy chain between two cuffed karts), the alarm
      clock (and its jump-scare over the leader); feather slicks on the
@@ -236,32 +236,62 @@ export class Fx {
 
   r() { return Math.random(); }
 
-  /* ── the item boxes: big gift-wrapped pillows with a glow, bobbing and
-     turning; instanced (the pillow, the ribbons and bow, the glow: three
-     draws for every box on the track). Stage 5: bigger (3.6 across), a
-     "?" on every face, an additive halo so a row reads from far off ── */
+  // A latched toy case, a wraparound badge, and a small location glow.
+  // All active pickups share these three instanced meshes.
   _boxes() {
     const n = this.race.boxes.length;
-    const q = canvasTex(128, 128, (g, w, h) => {
-      g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
-      g.fillStyle = 'rgba(255,255,255,0.0)';
-      g.font = '900 92px "Bolster Display","Arial Black",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.lineWidth = 10; g.strokeStyle = '#3a1c4a'; g.strokeText('?', w / 2, h / 2 + 6);
-      g.fillStyle = '#fff7d8'; g.fillText('?', w / 2, h / 2 + 6);
+    const label = canvasTex(256, 256, (g, w, h) => {
+      const grad = g.createLinearGradient(0, 0, w, h);
+      grad.addColorStop(0, '#297c83'); grad.addColorStop(0.45, '#143852'); grad.addColorStop(1, '#111a33');
+      g.fillStyle = grad; g.fillRect(0, 0, w, h);
+      g.strokeStyle = '#f3d392'; g.lineWidth = 7;
+      g.strokeRect(18, 18, 220, 220);
+      g.strokeStyle = '#71d5d6'; g.lineWidth = 2; g.strokeRect(30, 30, 196, 196);
+      // The club's feather sits behind the question mark on every face.
+      g.fillStyle = '#367682'; g.beginPath(); g.moveTo(63, 205);
+      g.bezierCurveTo(47, 101, 105, 52, 189, 51);
+      g.bezierCurveTo(193, 142, 123, 164, 63, 205); g.fill();
+      g.strokeStyle = '#6cb7af'; g.lineWidth = 4;
+      g.beginPath(); g.moveTo(65, 210); g.quadraticCurveTo(104, 136, 162, 74); g.stroke();
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.font = '900 140px sans-serif';
+      g.strokeStyle = '#101729'; g.lineWidth = 13; g.strokeText('?', 129, 132);
+      g.fillStyle = '#fff9d6'; g.fillText('?', 129, 132);
+      g.font = '800 16px sans-serif'; g.fillText('FEATHER CACHE', 128, 204);
     });
-    const body = new THREE.InstancedMesh(pillowGeo(3.6, 2.2, 3.6, [8, 3, 8]), new THREE.MeshStandardMaterial({ map: q, roughness: 0.45, emissive: '#ffffff', emissiveMap: q, emissiveIntensity: 0.06 }), n);
-    const ribbonG = colorMerge([[rbox(3.78, 2.28, 0.48, 0.12), '#ffffff'], [rbox(0.48, 2.28, 3.78, 0.12), '#ffffff'], [new THREE.TorusGeometry(0.5, 0.17, 6, 12), '#ffffff', -0.5, 1.3, 0, 0.5, Math.PI / 2], [new THREE.TorusGeometry(0.5, 0.17, 6, 12), '#ffffff', 0.5, 1.3, 0, -0.5, Math.PI / 2]]);
-    const ribbon = new THREE.InstancedMesh(ribbonG, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, emissive: '#ffffff', emissiveIntensity: 0.25 }), n);
-    const halo = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: dotTex(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), n);
-    const wraps = [['#ff3b6b', '#ffd84a'], ['#3ff0c8', '#ff3b6b'], ['#9b5cff', '#3ff0c8'], ['#ffd84a', '#9b5cff'], ['#3ab7ff', '#ffd84a']];
-    const C = new THREE.Color();
-    this.race.boxes.forEach((B, i) => {
-      const [a, b] = wraps[i % wraps.length];
-      body.setColorAt(i, C.set(a)); ribbon.setColorAt(i, C.set(b)); halo.setColorAt(i, C.set(a).multiplyScalar(0.55));
+    const shell = new THREE.InstancedMesh(new THREE.BoxGeometry(3.25, 2.95, 3.25),
+      new THREE.MeshStandardMaterial({ map: label, roughness: 0.44, emissive: '#46888b',
+        emissiveMap: label, emissiveIntensity: 0.45 }), n);
+    const trim = [];
+    const metal = '#e8c073', corner = '#eef1db';
+    for (const x of [-1.62, 1.62]) for (const z of [-1.62, 1.62]) {
+      trim.push([rbox(0.30, 3.08, 0.30, 0.09, 1), metal, x, 0, z]);
+    }
+    for (const y of [-1.45, 1.45]) {
+      for (const x of [-1.62, 1.62]) trim.push([rbox(0.25, 0.23, 3.22, 0.07, 1), metal, x, y]);
+      for (const z of [-1.62, 1.62]) trim.push([rbox(3.22, 0.23, 0.25, 0.07, 1), metal, 0, y, z]);
+    }
+    trim.push([rbox(0.46, 0.32, 0.16, 0.06, 1), corner, 0, 1.24, 1.65],
+      [rbox(0.46, 0.32, 0.16, 0.06, 1), corner, 0, 1.24, -1.65]);
+    const frame = new THREE.InstancedMesh(colorMerge(trim),
+      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.33 }), n);
+    const halo = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: dotTex(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), n);
+    const tint = ['#69d0e2', '#9fedb3', '#ffcc78', '#eaa2ee', '#a6d2ff'];
+    const color = new THREE.Color();
+    this.race.boxes.forEach((_, i) => {
+      shell.setColorAt(i, color.set(tint[i % tint.length]));
+      halo.setColorAt(i, color.multiplyScalar(0.24));
     });
-    for (const m of [body, ribbon, halo]) { m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; this.root.add(m); }
-    this.boxI = { body, ribbon, halo };
+    for (const m of [shell, frame, halo]) {
+      m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      m.frustumCulled = false;
+      this.root.add(m);
+    }
+    this.boxI = { body: shell, ribbon: frame, halo };
+    const T = this.race.T;
     this.boxPh = this.race.boxes.map((B, i) => i * 0.7 + B.k * 0.013);
+    this.boxYaw = this.race.boxes.map(B => Math.atan2(T.tx[B.k], T.tz[B.k]));
   }
   _boxesUpdate(t, camQ) {
     const R = this.race, { body, ribbon, halo } = this.boxI;
@@ -270,11 +300,11 @@ export class Fx {
       const ph = this.boxPh[i];
       // a grabbed box pops and grows straight back
       const s = B.dead ? Math.max(0.05, 1 - B.dead / 24) ** 0.7 : 1;
-      P.set(B.x, B.y + 0.4 + Math.sin(t * 2.2 + ph) * 0.45, B.z);
-      Q.setFromEuler(E.set(0, t * 1.3 + ph, Math.sin(t * 1.7 + ph) * 0.15));
-      M.compose(P, Q, S.set(s, s, s));
+      P.set(B.x, B.y + 0.60 + Math.sin(t * 2.2 + ph) * 0.27, B.z);
+      Q.setFromEuler(E.set(0, this.boxYaw[i] + Math.sin(t * 1.25 + ph) * 0.18, Math.sin(t * 1.7 + ph) * 0.05));
+      M.compose(P, Q, S.set(s * 0.92, s, s * 0.92));
       body.setMatrixAt(i, M); ribbon.setMatrixAt(i, M);
-      const hs = s * (6.4 + Math.sin(t * 3 + ph) * 0.5);
+      const hs = s * (5.1 + Math.sin(t * 3 + ph) * 0.35);
       M.compose(P, camQ, S.set(hs, hs, hs));
       halo.setMatrixAt(i, M);
     });

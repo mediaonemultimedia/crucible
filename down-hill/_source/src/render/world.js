@@ -17,6 +17,7 @@ import { rbox, pillowGeo, mat, glowMat, mesh, canvasTex, srand, mergeStatic } fr
 import { addProps } from './props.js';
 import { along, groundAt, lateral, locate, rightX, rightZ } from '../race/track.js';
 import { buildReadable } from './readable.js';
+import { dressCourse } from './course-details.js';
 import { dressLanding } from './landing-lookdev.js';
 
 const TAU = Math.PI * 2;
@@ -190,6 +191,7 @@ export class World {
     this.runnerTags = new Set(['rug', 'landing', 'door', 'underbed']);
     this.build();
     if (roomProps) this.props = addProps(this);
+    if (landingLookdev) dressCourse(this);
     root.traverse((o) => { if (o.isMesh && !o.userData.noShadow) { o.receiveShadow = true; o.castShadow = !!o.userData.cast; } });
     this.merged = mergeStatic(root, { keep: (o) => o === this.startLine || this.padMeshes.has(o) });
     this.moon.shadow.needsUpdate = true;

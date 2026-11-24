@@ -38,7 +38,7 @@ function ribbon(T, root, material, section, profile) {
   return strip;
 }
 
-function lanePaint(V, slick) {
+function lanePaint(id, V, slick) {
   return canvasTex(256, 256, (g, w, h) => {
     const rnd = srand(58235);
     g.fillStyle = slick ? '#007fc9' : V.lane;
@@ -50,9 +50,27 @@ function lanePaint(V, slick) {
       g.fillStyle = i % 2 ? '#ffffff24' : '#001b5430';
       g.fillRect(rnd() * w, rnd() * h, slick ? 1 + rnd() * 3 : 2, slick ? 10 + rnd() * 65 : 2);
     }
+    if (id === 'dojo' || (id === 'park' && !slick)) {
+      for (let y = 0; y < h; y += 26) {
+        g.fillStyle = '#40242d35'; g.fillRect(12, y, w - 24, 2);
+        g.fillStyle = '#ffe0a233'; g.fillRect(12, y + 2, w - 24, 1);
+        for (const x of [22, w - 24]) g.fillRect(x, y + 5, 3, 3);
+      }
+    } else if (id === 'hockey') {
+      for (let i = 0; i < 60; i++) {
+        g.strokeStyle = i % 2 ? '#f4fbff45' : '#28559419';
+        const x = 14 + rnd() * (w - 28), y = rnd() * h;
+        g.beginPath(); g.moveTo(x,y); g.lineTo(x+(rnd()-0.5)*38,y+22); g.stroke();
+      }
+    }
     if (slick) {
       g.fillStyle = '#85eeff54';
       for (const x of [34, 89, 166, 223]) g.fillRect(x, 0, 4, h);
+      for (let i = 0; i < 70; i++) {
+        g.strokeStyle = i % 2 ? '#baf5f969' : '#295bbe68';
+        const x = 17 + rnd() * (w - 34), y = rnd() * h;
+        g.beginPath(); g.moveTo(x,y); g.quadraticCurveTo(x+5,y+8,x-3,y+27); g.stroke();
+      }
     }
   }, { repeat: [1, 1] });
 }
@@ -65,6 +83,15 @@ function balconyArt(id, V) {
     sky.addColorStop(0, V.sky);
     sky.addColorStop(1, id === 'hockey' ? '#4865a2' : '#d3f5ff');
     g.fillStyle = sky; g.fillRect(0, 0, w, h);
+    if (id === 'laundry' || id === 'park') {
+      for (let i = 0; i < 17; i++) {
+        const x = rnd() * w, y = 22 + rnd() * 83, r = 16 + rnd() * 32;
+        g.fillStyle = i % 3 ? '#fcf6e7ac' : '#d9e7efa0';
+        for (const [dx, dy, rx, ry] of [[0,0,1,0.24],[-0.36,0.03,0.62,0.14],[0.31,-0.12,0.59,0.3]]) {
+          g.beginPath(); g.ellipse(x+dx*r,y+dy*r,r*rx,r*ry,0,0,Math.PI*2); g.fill();
+        }
+      }
+    }
     if (id === 'dojo') {
       for (const [step, base, color] of [[66, 168, '#513f79'], [44, 213, '#30204d']]) {
         g.fillStyle = color;
@@ -112,7 +139,7 @@ function sign(root, x, y, z, width, title, sub, accent, rotation = 0) {
   panel.rotation.y = rotation;
 }
 
-function groundPaint(id, V) {
+function groundPaint(id, V, T) {
   return canvasTex(1024, 1024, (g, w, h) => {
     g.fillStyle = V.ground; g.fillRect(0, 0, w, h);
     if (id === 'dojo') {
@@ -148,6 +175,34 @@ function groundPaint(id, V) {
         }
       }
     }
+    // Paint the deck's cast shadow into the ground map once. On the lower
+    // routes this adds depth without asking four race cameras to draw shadows.
+    g.save();
+    g.filter = 'blur(6px)';
+    g.strokeStyle = id === 'park' ? '#062e58' : '#132039';
+    g.globalAlpha = 0.23;
+    g.lineWidth = 45;
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    let raised = false;
+    g.beginPath();
+    for (let k = 0; k <= T.N; k += 2) {
+      const sample = k % T.N;
+      if (T.y[sample] < 6) { raised = false; continue; }
+      const x = (T.x[sample] + 320 + 0.3 * T.y[sample]) / 640 * w;
+      const y = (T.z[sample] + 235 + 0.2 * T.y[sample]) / 490 * h;
+      if (raised) g.lineTo(x, y);
+      else g.moveTo(x, y);
+      raised = true;
+    }
+    g.stroke();
+    g.restore();
+    const light = g.createRadialGradient(w*0.48,h*0.47,30,w*0.48,h*0.47,w*0.68);
+    light.addColorStop(0, '#ffe4ba26');
+    light.addColorStop(0.46, '#f7d8b509');
+    light.addColorStop(1, '#12112f4a');
+    g.fillStyle = light;
+    g.fillRect(0, 0, w, h);
   });
 }
 
@@ -200,11 +255,11 @@ export class VenueWorld extends World {
     this.lightsG.add(this.moon);
 
     const ground = mesh(new THREE.PlaneGeometry(640, 490),
-      new THREE.MeshStandardMaterial({ map: groundPaint(id, V), roughness: 0.9 }), 0, id === 'park' ? -2.7 : -0.8, 10, root);
+      new THREE.MeshStandardMaterial({ map: groundPaint(id, V, T), roughness: 0.9 }), 0, id === 'park' ? -2.7 : -0.8, 10, root);
     ground.rotation.x = -Math.PI / 2;
 
-    const dry = new THREE.MeshStandardMaterial({ map: lanePaint(V, false), roughness: 0.78, side: THREE.DoubleSide });
-    const wet = new THREE.MeshStandardMaterial({ map: lanePaint(V, true), roughness: 0.28, side: THREE.DoubleSide });
+    const dry = new THREE.MeshStandardMaterial({ map: lanePaint(id, V, false), roughness: 0.78, side: THREE.DoubleSide });
+    const wet = new THREE.MeshStandardMaterial({ map: lanePaint(id, V, true), roughness: 0.28, side: THREE.DoubleSide });
     const edge = new THREE.MeshStandardMaterial({ color: V.deck, side: THREE.DoubleSide });
     const flume = (k) => tagAt(T, k) === 'flume';
     const all = () => true;
