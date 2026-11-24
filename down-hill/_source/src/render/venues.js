@@ -1,12 +1,12 @@
 import * as THREE from 'three/webgpu';
-import { buildCentreCourtStadium, clayMaterial } from './centre-court.js';
+import { buildCentreCourtStadium, buildTournamentSigns, clayMaterial } from './centre-court.js';
 import { World, keepCameraAboveRoad } from './world.js';
 import { canvasTex, mesh, srand } from './geo.js';
 import { buildReadable } from './readable.js';
 import { lateral, rightX, rightZ, sceneryClearsRoad } from '../race/track.js';
 
 const VENUES = {
-  laundry: { sky: '#7badc5', ground: '#38745a', lane: '#c64d29', deck: '#55382e', rail: '#214b44', light: '#ffd1a1', title: 'CENTRE COURT', sub: 'JOHNNY DEUCE INVITATIONAL' },
+  laundry: { sky: '#52a8e2', ground: '#338f64', lane: '#c64d29', deck: '#55382e', rail: '#007c65', light: '#ffe0b9', title: 'CENTRE COURT', sub: 'JOHNNY DEUCE INVITATIONAL' },
   hockey: { sky: '#14285b', ground: '#152f69', lane: '#8ccbea', deck: '#254a87', rail: '#df233e', light: '#ddf2ff', title: 'RINK 88', sub: 'OVERTIME' },
   dojo: { sky: '#2c205c', ground: '#452f68', lane: '#b67143', deck: '#693243', rail: '#bc2042', light: '#ffe0aa', title: 'MIDNIGHT DOJO', sub: 'SUMAURA’S MOON GATE' },
   park: { sky: '#62cdef', ground: '#078d9d', lane: '#e5a434', deck: '#744557', rail: '#ff6830', light: '#fff3c1', title: 'RUBBERTA’S RAPIDS', sub: 'CIRCUITO DAS ÁGUAS' },
@@ -160,7 +160,7 @@ function groundPaint(id, V, T) {
       g.strokeStyle = '#f9f5e8c0';
       if (id === 'laundry') {
         for (const x of [155, 570]) {
-          g.fillStyle = '#668925';
+          g.fillStyle = '#80ad3f';
           g.fillRect(x - 25, 260, 350, 470);
           g.strokeRect(x, 272, 300, 443);
           g.strokeRect(x + 27, 272, 246, 443);
@@ -251,7 +251,7 @@ export class VenueWorld extends World {
     this.lightsG = new THREE.Group();
     this.scene.add(this.lightsG);
     const court = id === 'laundry';
-    this.lightsG.add(court ? new THREE.HemisphereLight('#c2dff6', '#675546', 0.93)
+    this.lightsG.add(court ? new THREE.HemisphereLight('#c5edff', '#926047', 1.19)
       : new THREE.HemisphereLight('#eef8ff', '#a5adb2', 1.63));
     this.moon = new THREE.DirectionalLight(V.light, court ? 2.65 : 2);
     this.moon.position.set(...(court ? [-148, 96, -90] : [-130, 260, 100]));
@@ -292,8 +292,7 @@ export class VenueWorld extends World {
     this.readable = buildReadable(this, { railCols: [V.rail, '#fff4dc'], arrowTags: new Set() });
     if (court) {
       buildCentreCourtStadium(this);
-      sign(root, 0, 32, -162, 80, V.title, V.sub, '#ffcf74');
-      sign(root, 132, 19, -151, 46, 'LOVE ALL', 'MATCH POINT', '#f1ce87');
+      buildTournamentSigns(root);
     } else this._perimeter(id, V);
     this._landmarks(id);
   }
@@ -344,7 +343,6 @@ export class VenueWorld extends World {
         box(root, tape, x, 8, z, 42, 0.75, 1.4);
       }
       this._concourse('#17685a', '#f8ecdb', '#ff6848');
-      sign(root, -145, 25, -144, 67, 'SEB’S LUCHA CLUB', 'INVITATIONAL SPONSOR', '#fa6438');
       return;
     }
     this._concourse('#334b8a', '#eff8ff', '#ed305d');

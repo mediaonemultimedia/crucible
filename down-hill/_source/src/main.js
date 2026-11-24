@@ -1486,7 +1486,10 @@ class App {
 async function start() {
   // the phone pad: the same page, ?pad=CODE (no renderer, no game)
   if (Q.has('pad')) { runPad(Q); return; }
-  const { renderer, canvas } = await makeRenderer($('stage'));
+  const [{ renderer, canvas }] = await Promise.all([
+    makeRenderer($('stage')),
+    document.fonts.load('700 51px "Bolster Condensed"'),
+  ]);
   const app = new App(renderer, canvas);
   window.__dh = app;
   // the deep links

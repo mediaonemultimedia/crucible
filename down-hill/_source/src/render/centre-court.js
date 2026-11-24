@@ -5,12 +5,12 @@ export function clayMaterial() {
   const color = canvasTex(512, 512, (g, w, h) => {
     const random = srand(72037);
     const shade = g.createLinearGradient(0, 0, w, 0);
-    for (const [u, ink] of [[0,'#743b2b'],[0.08,'#a55232'],[0.30,'#be683d'],[0.60,'#c16b42'],[0.90,'#ae5d39'],[1,'#743b2b']]) {
+    for (const [u, ink] of [[0,'#a74724'],[0.08,'#e8713d'],[0.30,'#f18a4d'],[0.60,'#f49250'],[0.90,'#e7793f'],[1,'#a74724']]) {
       shade.addColorStop(u, ink);
     }
     g.fillStyle = shade; g.fillRect(0,0,w,h);
     for (let i=0;i<10000;i++) {
-      g.fillStyle = i % 2 ? '#f4ad6764' : '#59291449';
+      g.fillStyle = i % 2 ? '#ffd18a50' : '#79332131';
       const x=random()*w,y=random()*h;
       g.fillRect(x,y,0.8+random()*2.4,0.8+random()*2.4);
     }
@@ -33,7 +33,7 @@ export function clayMaterial() {
 function crowdMap() {
   return canvasTex(1024, 288, (g,w,h) => {
     const rnd = srand(14018);
-    const coats = ['#b0354a','#c65f32','#475d7e','#e6c973','#477253','#355565','#dbc9a7','#648e90','#786487'];
+    const coats = ['#eb4f5d','#f17a4a','#5379b2','#ffe47c','#65b662','#278388','#fff4d5','#5fc6b3','#a681c6'];
     const faces = ['#f1c391','#c68962','#7a503f','#e8af84','#e5d3b0'];
     g.fillStyle='#1c3440';g.fillRect(0,0,w,h);
     for(let row=0;row<6;row++){
@@ -60,8 +60,8 @@ function skyMap() {
   return canvasTex(1024, 256, (g,w,h) => {
     const random=srand(774);
     const horizon=g.createLinearGradient(0,0,0,h);
-    horizon.addColorStop(0,'#376b93');horizon.addColorStop(0.35,'#548bab');
-    horizon.addColorStop(0.48,'#9dc0c8');horizon.addColorStop(0.57,'#f6d4a6');horizon.addColorStop(1,'#b6a189');
+    horizon.addColorStop(0,'#275dbe');horizon.addColorStop(0.35,'#4e9edf');
+    horizon.addColorStop(0.48,'#90d9f0');horizon.addColorStop(0.57,'#ffe2b2');horizon.addColorStop(1,'#b6a189');
     g.fillStyle=horizon;g.fillRect(0,0,w,h);
     for(let i=0;i<21;i++){
       const x=random()*w,y=63+random()*54,r=13+random()*40;
@@ -71,7 +71,7 @@ function skyMap() {
         g.beginPath();g.ellipse(x+dx-r*.37,y+2,r*.64,r*.13,0,0,Math.PI*2);g.fill();
       }
     }
-    for (const [ink, height, amplitude] of [['#719383',128,4.6],['#547d6b',132,3.8]]) {
+    for (const [ink, height, amplitude] of [['#6ba58a',128,4.6],['#358d7a',132,3.8]]) {
       g.fillStyle=ink;g.beginPath();g.moveTo(0,h);
       for(let x=0;x<=w;x+=8) {
         const u=x/w*Math.PI*2;
@@ -89,8 +89,8 @@ export function buildCentreCourtStadium(world) {
   const dome=mesh(new THREE.SphereGeometry(810,48,24),sky,0,0,0,root);
   dome.renderOrder=-20;
   dome.userData.noShadow=true;
-  const steel=new THREE.MeshStandardMaterial({color:'#274851',roughness:0.64});
-  const stone=new THREE.MeshStandardMaterial({color:'#b6a58c',roughness:0.91});
+  const steel=new THREE.MeshStandardMaterial({color:'#24675c',roughness:0.64});
+  const stone=new THREE.MeshStandardMaterial({color:'#dfc9a4',roughness:0.91});
   const trim=new THREE.MeshStandardMaterial({color:'#e2c493',roughness:0.68});
   const lamps=new THREE.MeshBasicMaterial({color:'#fff0bf'});
   const box=(parent,mat,x,y,z,w,h,d)=>mesh(new THREE.BoxGeometry(w,h,d),mat,x,y,z,parent);
@@ -126,7 +126,7 @@ export function buildCentreCourtStadium(world) {
         box(stand,lamps,cx+(i-1.5)*3.2,48.65+j*2.65,-14.91,2.65,2.0,0.30);
     }
   }
-  const colors=['#f4cc73','#ff734f','#d8eee6','#5ea592'];
+  const colors=['#e1f15f','#ff644c','#fff1cf','#49c4af'];
   const flagGeometry=new THREE.PlaneGeometry(6.4,3.2,3,1);
   const flagPos=flagGeometry.attributes.position;
   for (let i=0;i<flagPos.count;i++) {
@@ -152,4 +152,76 @@ export function buildCentreCourtStadium(world) {
     pennants.instanceMatrix.needsUpdate=true;
   };
   world.animateStadium(0);
+}
+
+export function buildTournamentSigns(root) {
+  const evergreen = '#083b38', aubergine = '#342149';
+  const ivory = '#fff6dc', lime = '#dcf164', coral = '#ff664f';
+  const atlas = canvasTex(1024, 1024, (g) => {
+    const text = (copy, x, y, font, color, width = 900) => {
+      g.font = font; g.fillStyle = color; g.fillText(copy, x, y, width);
+    };
+    const sans = '"Bolster Condensed", sans-serif';
+    const ball = (x, y, radius) => {
+      g.fillStyle = lime; g.beginPath(); g.arc(x, y, radius, 0, Math.PI * 2); g.fill();
+      g.save(); g.translate(x, y); g.rotate(-0.64);
+      g.strokeStyle = evergreen; g.lineWidth = radius * 0.1;
+      for (const side of [-1, 1]) {
+        g.beginPath(); g.moveTo(side * radius * 0.55, -radius * 0.81);
+        g.quadraticCurveTo(-side * radius * 0.06, 0, side * radius * 0.55, radius * 0.81);
+        g.stroke();
+      }
+      g.restore();
+    };
+    const frame = (y, bg, stripe) => {
+      g.fillStyle = bg; g.fillRect(0, y, 1024, 320);
+      g.strokeStyle = stripe; g.lineWidth = 4; g.strokeRect(19, y + 17, 986, 286);
+      g.fillStyle = stripe; g.fillRect(0, y, 1024, 8);
+    };
+    g.textBaseline = 'alphabetic';
+    frame(0, evergreen, lime);
+    text('JOHNNY DEUCE INVITATIONAL', 58, 82, `700 39px ${sans}`, lime, 680);
+    text('Centre Court', 52, 207, 'italic bold 125px Georgia, serif', ivory, 746);
+    g.fillStyle = lime; g.fillRect(57, 240, 647, 3);
+    text('EXHIBITION  •  CLAY COURT', 57, 281, `700 26px ${sans}`, ivory);
+    ball(882, 160, 64);
+    g.strokeStyle = ivory; g.lineWidth = 2.5;
+    g.strokeRect(800, 69, 166, 182);
+    g.beginPath(); g.moveTo(800, 159); g.lineTo(966, 159); g.stroke();
+
+    frame(336, evergreen, lime);
+    g.fillStyle = lime; g.fillRect(19, 357, 986, 58);
+    text('EXHIBITION SCORE', 54, 399, `700 36px ${sans}`, evergreen);
+    g.fillStyle = '#18564d'; g.fillRect(41, 454, 942, 79); g.fillRect(41, 545, 942, 70);
+    text('JOHNNY DEUCE', 65, 512, `700 51px ${sans}`, ivory);
+    text('SEBAS PERRA', 65, 598, `700 51px ${sans}`, ivory);
+    g.fillStyle = '#eaefc566'; g.fillRect(750, 454, 2, 161);
+    text('40', 799, 512, 'bold 62px monospace', lime);
+    text('30', 799, 598, 'bold 62px monospace', ivory);
+
+    frame(672, aubergine, coral);
+    g.fillStyle = coral;
+    g.beginPath(); g.moveTo(708, 680); g.lineTo(1018, 680); g.lineTo(1018, 984); g.lineTo(872, 984); g.fill();
+    text('OFFICIAL TOURNAMENT PARTNER', 56, 749, `700 34px ${sans}`, '#ff9b81');
+    text('Seb’s Lucha Club', 51, 879, 'italic bold 96px Georgia, serif', ivory, 770);
+    g.fillStyle = '#ff9783'; g.fillRect(55, 926, 641, 3);
+    ball(908, 880, 35);
+  });
+  atlas.anisotropy = 4;
+  const print = new THREE.MeshBasicMaterial({ map: atlas, side: THREE.DoubleSide });
+  const rim = new THREE.MeshStandardMaterial({ color: '#ebd5a2', roughness: 0.67 });
+  const post = new THREE.MeshStandardMaterial({ color: '#145951', roughness: 0.76 });
+  for (const [cell, x, y, z, width] of [[0, 60, 34, -161, 83], [1, 173, 19, -149, 48], [2, -145, 24, -145, 57]]) {
+    const height = width * 320 / 1024;
+    mesh(new THREE.BoxGeometry(width + 1.4, height + 1.4, 1.4), rim, x, y, z, root);
+    const sign = new THREE.PlaneGeometry(width, height);
+    const uv = sign.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - (cell * 336 + 319 - uv.getY(i) * 318) / 1024);
+    const flat = mesh(sign, print, x, y, z + 0.73, root);
+    flat.userData.noShadow = true;
+    for (const side of [-1, 1]) {
+      const supportHeight = y - height / 2;
+      mesh(new THREE.BoxGeometry(1.25, supportHeight, 1.3), post, x + width * 0.37 * side, supportHeight / 2, z, root);
+    }
+  }
 }
