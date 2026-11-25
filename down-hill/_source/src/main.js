@@ -41,6 +41,10 @@ const $ = (id) => document.getElementById(id);
 const ORD = (n) => n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : n % 10] || 'th');
 const fmt = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(2).padStart(5, '0')}`;
 const lerp = (a, b, t) => a + (b - a) * t;
+const smooth01 = (x) => {
+  const t = Math.max(0, Math.min(1, x));
+  return t * t * (3 - 2 * t);
+};
 const angLerp = (a, b, t) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -139,6 +143,10 @@ class App {
     this.world?.dispose();
     this.T = buildTrack(TRACKS[this.trackId]);
     this.world = makeWorld(this.scene, this.T);
+    // The launch after the banister is on the descending plank.
+    this.banisterLip = this.trackId === 'landing'
+      ? this.T.launch.findIndex((launch, k) => launch > 0 && this.T.def.points[this.T.sec[k]].tag === 'plank')
+      : -1;
     this.world.setStart(new Race({ track: this.trackId, racers: [{ id: 'k8e' }], seed: 1, humans: [] }).startK);
     this.minimap = this._minimapBase();
     if (this.ghost) this.ghost.mesh.visible = false;
@@ -875,8 +883,17 @@ class App {
     const punch = Math.sin(Math.min(1, C.punch) * Math.PI * 0.5);
     // shrunk in the wash: the camera comes in closer to the little kart
     C.size = lerp(C.size ?? 1, K.shrinkT > 0 && !tv ? 0.72 : 1, Math.min(1, dt * 4));
-    const dist = ((8.6 + sp * 0.06) * (1 + intro * 2.5) + tv * 7 + punch * 2.6) * C.size;
-    const h = (4.3 + intro * 9 + (K.air ? 1.2 : 0) + tv * 6) * C.size;
+    let reveal = 0;
+    if (this.banisterLip >= 0 && !H.tv && !H.lookBack && !K.fish && R.phase === 'race' && K.fwd > 0) {
+      const T = R.T;
+      const along = (K.k - this.banisterLip) * T.step
+        + (pose.x - T.x[K.k]) * T.tx[K.k] + (pose.z - T.z[K.k]) * T.tz[K.k];
+      reveal = smooth01((along + 45) / 29) * smooth01((44 - along) / 23) * smooth01(K.fwd / 10);
+    }
+    C.reveal = lerp(C.reveal || 0, reveal, Math.min(1, dt * 8));
+    const lift = H.lookBack || H.lb || K.fish ? 0 : C.reveal;
+    const dist = ((8.6 + sp * 0.06) * (1 + intro * 2.5) + tv * 7 + punch * 2.6 + lift * 3.1) * C.size;
+    const h = (4.3 + intro * 9 + (K.air ? 1.2 : 0) + tv * 6 + lift * 4.6) * C.size;
     const fx = Math.sin(yaw), fz = Math.cos(yaw);
     const want = new THREE.Vector3(pose.x - fx * dist * back, pose.y + h, pose.z - fz * dist * back);
     const [bx0, bx1, bz0, bz1] = this.world.info.bounds;
@@ -887,7 +904,7 @@ class App {
     H.lb = H.lookBack;
     C.pos.lerp(want, k);
     this.world.camFix(C.pos, pose, K.k);
-    const look = new THREE.Vector3(pose.x + fx * 5 * back, pose.y + 1.8, pose.z + fz * 5 * back);
+    const look = new THREE.Vector3(pose.x + fx * (5 + lift * 1.4) * back, pose.y + 1.8 - lift * 3.8, pose.z + fz * (5 + lift * 1.4) * back);
     C.look.lerp(look, Math.min(1, dt * 12));
     const fov = (64 + Math.min(1.45, sp / top) * 9 + (K.boostT > 0 ? 8 : 0) + punch * 9) * (this.hv.length === 2 && !tv ? 0.82 : 1);
     C.fov = lerp(C.fov, fov, Math.min(1, dt * 4));
