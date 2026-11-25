@@ -2,8 +2,7 @@
    taped to the cabinet (marker hand, tape corners, a coffee ring — the CSS
    is in pad.js), here listing the buttons, the ten items (names and icons
    from the game's own tables, so it can never disagree with the HUD), and
-   the phone's own settings: STICK or TILT steering, tilt sensitivity
-   (3 steps), re-centre, and auto-gas.                                   */
+   the phone's own settings: drift calibration and auto-gas.                                   */
 
 import { ITEM_NAMES } from '../race/sim.js';
 import { ICONS } from '../ui/icons.js';
@@ -13,7 +12,7 @@ const chip = (b, k = '') => `<span class="chip${k}">${b}</span>`;
 
 export const ITEM_HOW = {
   slick: 'drop it behind you: they spin out',
-  missile: 'throw it ahead (LOOK BACK: behind, or a shield)',
+  missile: 'throw it ahead at rivals',
   espresso: 'a big boost, jittery steering',
   cuffs: 'chains the two racers ahead together',
   case: 'over a rival’s head: wobbly and blind',
@@ -26,17 +25,14 @@ export const ITEM_HOW = {
 
 export function sheetHTML(o = {}) {
   const rows = [
-    ['Drive', 'hold GAS · BRAKE backs up', `${chip('GAS')} ${chip('BRAKE', ' g')}`],
-    ['Drift', 'hold while turning · let go to boost', `${chip('DRIFT', ' w')} <span class="sp"><i class="t1"></i><i class="t2"></i><i class="t3"></i></span>`],
-    ['Trick', 'TAUNT in the air · landing boost', chip('TAUNT', ' s')],
-    ['Items', 'ITEM or the big pill', `${chip('ITEM')} ${chip('USE ITEM', ' s')}`],
+    ['Drive', 'Steer with the stick · hold the pedals', `${chip('ACCELERATE')} ${chip('BRAKE / REVERSE', ' g')}`],
+    ['Drift', 'Tilt your phone’s top edge toward you while turning. Return to centre to boost.', chip('TILT', ' w')],
+    ['Items', 'Press SUPER to use your item', chip('SUPER', ' s')],
   ].map(([n, s, i]) => `<div class="row"><div class="mv">${esc(n)}<small>${esc(s)}</small></div><div class="in">${i}</div></div>`).join('');
   const items = Object.keys(ITEM_HOW).map((k) => `<div class="it"><span class="ic">${ICONS[k] || ''}</span><b>${esc(ITEM_NAMES[k])}</b><small>${esc(ITEM_HOW[k])}</small></div>`).join('');
-  const tilt = o.mode === 'tilt';
   const seg = (on, attr, label) => `<b class="${on ? 'on' : ''}" ${attr}>${label}</b>`;
   const set = `<div class="set">
-    <div class="opt"><span>Steer</span><span class="tg">${seg(!tilt, 'data-mode="stick"', 'Stick')}${seg(tilt, 'data-mode="tilt"', 'Tilt')}</span></div>
-    <div class="opt${tilt ? '' : ' off'}"><span>Tilt</span><span class="tg">${[0, 1, 2].map((s) => seg((o.sens ?? 1) === s, `data-sens="${s}"`, ['Calm', 'Normal', 'Twitchy'][s])).join('')}</span><b class="btn" data-recentre="1">Re-centre</b></div>
+    <div class="opt"><span>Drift</span><b class="btn" data-recentre="1">Re-centre</b></div>
     <div class="opt"><span>Auto-gas</span><span class="tg">${seg(!o.auto, 'data-auto="0"', 'Off')}${seg(!!o.auto, 'data-auto="1"', 'On')}</span></div>
   </div>`;
   // a marker-drawn wobble on the icons (an SVG filter, no images)

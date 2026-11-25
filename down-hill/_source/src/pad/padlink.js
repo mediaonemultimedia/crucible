@@ -57,6 +57,7 @@ function unreliablePi() {
    cb.error(kind) */
 export function hostPads(params, code, cb) {
   if (params.get('net') === 'local') return hostLocal(params, code, cb);
+  if (params.get('net') === 'lan') return hostLan(params, code, cb);
   const peer = new Peer(PAD_PREFIX + code, peerOpts(params));
   const by = new Map();
   let dead = false;
@@ -82,7 +83,14 @@ export function hostPads(params, code, cb) {
 }
 
 function hostLocal(params, code, cb) {
-  const bc = new BroadcastChannel(PAD_PREFIX + code), shape = shaper(params);
+  const channel = new BroadcastChannel(PAD_PREFIX + code);
+  const handle = hostRoom(params, cb, channel);
+  setTimeout(() => cb.ready(code), 30);
+  return handle;
+}
+
+function hostRoom(params, cb, bc) {
+  const shape = shaper(params);
   const by = new Map();
   bc.onmessage = ({ data: d }) => {
     if (!d || d.to) return;
@@ -101,7 +109,6 @@ function hostLocal(params, code, cb) {
     if (d.bye) { c.closed = true; by.delete(d.from); c.onclose(); return; }
     if (d.ch) c.on(d.ch, d.msg);
   };
-  setTimeout(() => cb.ready(code), 30);
   return { close: () => { for (const c of by.values()) c.close(); bc.close(); } };
 }
 
@@ -109,7 +116,8 @@ function hostLocal(params, code, cb) {
    cb.open(link) — link: { send(ch, msg), on(ch, msg), onclose, close() } —
    cb.error(kind) */
 export function joinPad(params, code, uid, cb) {
-  if (params.get('net') === 'local') return joinLocal(params, code, uid, cb);
+  if (params.get('net') === 'local') return joinRoom(params, uid, cb, new BroadcastChannel(PAD_PREFIX + code));
+  if (params.get('net') === 'lan') return joinRoom(params, uid, cb, lanChannel(code, uid));
   unreliablePi();
   const peer = new Peer(peerOpts(params));
   const link = { ch: {}, closed: false, on: () => {}, onclose: () => {} };
@@ -133,13 +141,13 @@ export function joinPad(params, code, uid, cb) {
   return link;
 }
 
-function joinLocal(params, code, uid, cb) {
-  const bc = new BroadcastChannel(PAD_PREFIX + code), shape = shaper(params);
+function joinRoom(params, uid, cb, bc) {
+  const shape = shaper(params);
   const link = { closed: false, on: () => {}, onclose: () => {} };
   let open = false;
   link.send = (ch, msg) => { if (!link.closed) shape(ch, () => { try { bc.postMessage({ from: uid, ch, msg }); } catch { /* closed */ } }); };
   link.close = () => { if (link.closed) return; link.closed = true; clearInterval(hello); try { bc.postMessage({ from: uid, bye: 1 }); } catch { /* */ } bc.close(); };
-  const hello = setInterval(() => { if (!open) bc.postMessage({ from: uid, hello: 1 }); }, 400);
+  const hello = setInterval(() => { if (!open && !link.closed) bc.postMessage({ from: uid, hello: 1 }); }, 400);
   const timer = setTimeout(() => { if (!open) { clearInterval(hello); link.closed = true; bc.close(); cb.error('notfound'); } }, 8000);
   bc.onmessage = ({ data: d }) => {
     if (!d || d.to !== uid || link.closed) return;
@@ -147,6 +155,49 @@ function joinLocal(params, code, uid, cb) {
     if (d.bye) { link.closed = true; bc.close(); link.onclose(); return; }
     if (d.ch) link.on(d.ch, d.msg);
   };
+  bc.onclose = () => {
+    if (link.closed) return;
+    link.closed = true;
+    clearTimeout(timer); clearInterval(hello);
+    if (open) link.onclose(); else cb.error('network');
+  };
   bc.postMessage({ from: uid, hello: 1 });
   return link;
+}
+
+
+// Explicit LAN playtest transport. The local server routes the same envelopes
+// as the BroadcastChannel test path. Binary input bytes travel as JSON arrays.
+function lanChannel(code, uid) {
+  const url = new URL('/pad-relay', location.href);
+  url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  url.search = new URLSearchParams({ code, ...(uid ? { uid } : {}) });
+  const socket = new WebSocket(url);
+  const channel = {
+    postMessage(data) {
+      if (socket.readyState !== WebSocket.OPEN || (data.ch === 'pi' && socket.bufferedAmount > 4096)) return;
+      socket.send(JSON.stringify(data.ch === 'pi' ? { ...data, msg: Array.from(data.msg) } : data));
+    },
+    close: () => socket.close(),
+  };
+  socket.addEventListener('message', ({ data }) => channel.onmessage?.({ data: JSON.parse(data) }));
+  socket.addEventListener('close', ({ code }) => channel.onclose?.(code));
+  return channel;
+}
+
+function hostLan(params, code, cb) {
+  const channel = lanChannel(code);
+  const handle = hostRoom(params, cb, channel);
+  const receive = channel.onmessage;
+  channel.onmessage = (event) => {
+    if (event.data.ready) cb.ready(code);
+    else receive(event);
+  };
+  channel.onclose = (reason) => cb.error(reason === 4009 ? 'taken' : 'network');
+  return {
+    close() {
+      channel.onclose = null;
+      handle.close();
+    },
+  };
 }

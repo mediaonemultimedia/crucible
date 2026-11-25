@@ -43,6 +43,25 @@ items and race physics. Each wheel rolls at its own radius, and the front
 pair steers. Phone pairing is disabled for offline play.
 The regular build still uses the original kart models.
 
+### Playtest with a phone on Wi-Fi
+
+Build with `npm run build -- --lookdev --race-remesh`. Use an HTTPS
+certificate trusted by Chrome and the phone, with your Mac's Wi-Fi IP in the
+certificate. Run the relay from this source directory:
+
+```sh
+node tools/phone-playtest.mjs build/lookdev-race.html \
+  ../../pillow-fight-2/_source/docs/friday-nov20/backgrounds \
+  /path/to/server.pem /path/to/server-key.pem MAC_WIFI_IP
+```
+
+Open `https://MAC_WIFI_IP:8443/` on the Mac and scan the game's QR with your
+phone on the same Wi-Fi. Hold the phone sideways in your normal driving pose
+and tap **Enable tilt drift** if prompted. Steer with the joystick. Tilt the
+top edge toward you while turning, then return to centre to release the drift.
+**How To → Re-centre** resets the neutral grip. **SUPER** uses your item.
+
+
 To jump into four-way split screen, append
 `?p1=zach&p2=sumaura&p3=k8e&p4=kevalanche` to the preview URL.
 Use the two keyboard layouts and two gamepads, or join from the select screen.

@@ -1,11 +1,7 @@
-/* The phone pads, in node: the wire (the stick-X byte round trip, taps
-   that survive loss, stale packets), and TILT's geometry (the wheel angle
-   from DeviceOrientationEvent's beta / gamma, in every screen rotation;
-   the dead zone, sensitivity and lock).                                 */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { encodeInput, decode, PadState, GAS, ITEM, SUPER, BRAKE, TAPS, STALE_MS } from '../src/pad/wire.js';
-import { tiltRoll, tiltSteer, TILT_RANGE, TILT_DEAD } from '../src/pad/tilt.js';
+import { driftPitch, motionDrift } from '../src/pad/tilt.js';
 
 test('wire: the packet carries the buttons, the tap counters and the steering byte', () => {
   for (const s of [-1, -0.5, 0, 0.25, 1]) {
@@ -36,45 +32,20 @@ test('wire: a tap whose packets were all lost still lands (the counter); a stale
   assert.equal(P.sample().item, true);
 });
 
-test('tilt: the wheel angle, landscape (angle 90): held upright and turned clockwise is +', () => {
-  // upright in landscape, top to the left: device +x is up → beta 0, gamma −90
-  for (const th of [-60, -20, 0, 15, 45, 80]) {
-    const r = tiltRoll(th, -90, 90);
-    assert.ok(Math.abs(r - th) < 1e-6, `θ ${th} → ${r}`);
-  }
+test('tilt drift: pitch drops when the phone tips toward the player', () => {
+  assert.ok(Math.abs(driftPitch(90, 0)) < 1e-8);
+  assert.ok(Math.abs(driftPitch(112, 0) + 22) < 1e-8);
+  // Either landscape rotation leans downward by the same amount.
+  assert.equal(driftPitch(110, 60), driftPitch(110, -60));
+  assert.equal(driftPitch(null, 0), null);
 });
 
-test('tilt: every screen rotation reads the same wheel', () => {
-  // build "up" in the screen plane for a wheel angle θ, then the beta/gamma that give it
-  const solve = (th, angle) => {
-    let best = null, bd = 1e9;
-    for (let b = -180; b <= 180; b += 0.5) for (let g = -90; g <= 90; g += 0.5) {
-      const r = tiltRoll(b, g, angle);
-      if (r === null) continue;
-      // keep the phone upright-ish (screen facing the player): |cos β cos γ| small
-      const tilt = Math.abs(Math.cos(b * Math.PI / 180) * Math.cos(g * Math.PI / 180));
-      const d = Math.abs(r - th) + tilt * 0.01;
-      if (d < bd) { bd = d; best = { b, g, r }; }
-    }
-    return best;
-  };
-  for (const angle of [0, 90, 180, 270]) for (const th of [-40, 0, 30]) { const s = solve(th, angle); assert.ok(Math.abs(s.r - th) < 1, `angle ${angle} θ ${th}: ${JSON.stringify(s)}`); }
-  // laid on its back: no wheel to read
-  assert.equal(tiltRoll(0, 0, 90), null);
-  // tipped back 50° (a lazy grip) still reads the turn
-  const tipped = tiltRoll(20, -40, 90);
-  assert.ok(tipped > 10, `tipped back, turned right: ${tipped}`);
-});
-
-test('tilt: dead zone, three sensitivities, full lock, wrap', () => {
-  assert.equal(tiltSteer(TILT_DEAD - 0.5, 0, 1), 0);
-  for (const s of [0, 1, 2]) {
-    assert.equal(tiltSteer(TILT_RANGE[s] + 5, 0, s), 1);
-    assert.equal(tiltSteer(-TILT_RANGE[s] - 5, 0, s), -1);
-  }
-  assert.ok(tiltSteer(15, 0, 2) > tiltSteer(15, 0, 1) && tiltSteer(15, 0, 1) > tiltSteer(15, 0, 0), 'twitchy > normal > calm');
-  assert.ok(Math.abs(tiltSteer(25, 10, 1) - tiltSteer(15, 0, 1)) < 1e-9, 'relative to the calibrated centre');
-  assert.ok(tiltSteer(-175, 175, 1) > 0, 'wraps round ±180');
+test('tilt drift: separate engage and release thresholds prevent chatter', () => {
+  assert.equal(motionDrift(13, false), false);
+  assert.equal(motionDrift(14, false), true);
+  assert.equal(motionDrift(10, true), true);
+  assert.equal(motionDrift(7, true), false);
+  assert.equal(motionDrift(-20, false), false);
 });
 
 test('wire: a button held through a quiet spell is not pressed twice', () => {

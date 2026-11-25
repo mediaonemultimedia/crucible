@@ -10,14 +10,9 @@
       then P1 picks the track and starts a 4-player split-screen race
    3. loopback latency: a phone's GAS tap → the sim's input, in frames
       (must be ≤ 2), and the stick's X → the kart's steer
-   4. TILT: one phone switches to tilt on its strip, simulated
-      DeviceOrientationEvents (level, turned right, turned left, re-centre)
-      → the stick-X byte → the kart's steer; the stick is hidden, the
-      wheel shown
-   5. four phones in sync: all four drive at once (GAS held, steering
-      round the track by stick or tilt) for a stretch of the race with lag
-      + jitter + loss injected on every phone; every phone's taps land,
-      and every kart makes progress
+   4. Motion drift: simulated pitch holds and releases drift, with the
+      stick still steering the kart
+   5. Four phones drive simultaneously and SUPER taps survive packet loss
    6. haptics: an item hit buzzes that player's phone (and only theirs)
    7. the "how to race" sheet: the ten items; auto-gas
    8. reconnect: a phone's page closes mid-race; it comes back on the same
@@ -37,7 +32,7 @@ const html = path.resolve(arg('html', path.join(root, 'final.html')));
 const out = path.join(root, 'shots', 'pad');
 fs.mkdirSync(out, { recursive: true });
 // Kevin's painted backgrounds (they ship in down-hill/controller/backgrounds/)
-const ART = 'file://' + path.resolve(root, '../../pillow-fight-2/_source/docs/friday-nov20/backgrounds') + '/';
+const ART = 'file://' + path.resolve(arg('art', path.join(root, '../../pillow-fight-2/_source/docs/friday-nov20/backgrounds'))) + '/';
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', '--allow-file-access-from-files'] });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
@@ -81,6 +76,9 @@ async function phone(name, extra = '') {
   const p = await ctx.newPage();
   await p.setViewportSize({ width: 844, height: 390 });
   watch(p, name);
+  await p.addInitScript(() => {
+    if (typeof DeviceOrientationEvent?.requestPermission === 'function') DeviceOrientationEvent.requestPermission = async () => 'granted';
+  });
   await p.goto(`file://${html}?pad=${qr.code}&net=local&art=${encodeURIComponent(ART)}&nofs&uid=${name}${extra}`);
   const cdp = await ctx.newCDPSession(p);
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
@@ -91,8 +89,7 @@ async function phone(name, extra = '') {
 }
 // svg (2400×1100) → CSS px on a phone
 const at = (p, x, y) => p.evaluate(([x, y]) => { const s = document.getElementById('s'), m = s.getScreenCTM(), q = s.createSVGPoint(); q.x = x; q.y = y; const r = q.matrixTransform(m); return [r.x, r.y]; }, [x, y]);
-const L = { stick: [604, 517], btn: [[1550, 425], [1762, 361], [1979, 348], [1550, 692], [1764, 637], [1979, 626]], super: [1097, 550], start: [1132, 215], moves: [2062, 1050] };
-const B = { GAS: 0, DRIFT: 1, ITEM: 2, BRAKE: 3, BACK: 4, TAUNT: 5 };
+const L = { stick: [604, 517], accelerate: [1970, 482], brake: [1645, 574], super: [1097, 550], start: [1132, 215], moves: [2062, 1050] };
 async function touch(p, type, id, x, y) {
   const T = p.T;
   if (type === 'end') T.delete(id); else T.set(id, [x, y]);
@@ -165,7 +162,7 @@ const lat = [];
 for (let n = 0; n < 4; n++) {
   for (let r = 0; r < 3; r++) {
     await G.evaluate((j) => { const H = __dh.hv[j]; __dh._probe = { j, i: H.i, f: 0, got: -1 }; const P = __dh.humanP[j].ctl; const s0 = P.sample.bind(P); P.sample = () => { const I = s0(); __dh._probe.f++; if (I.gas && __dh._probe.got < 0) __dh._probe.got = __dh._probe.f; return I; }; P._s0 = s0; }, n);
-    await down(phones[n], 3, ...L.btn[B.GAS]);
+    await down(phones[n], 3, ...L.accelerate);
     let got = -1;
     for (let f = 0; f < 12 && got < 0; f++) { await tick(1); got = await G.evaluate(() => __dh._probe.got); }
     await up(phones[n], 3); await tick(2);
@@ -184,89 +181,61 @@ await up(phones[1], 2); await tick(3);
 results.stick = { steerR, steerL };
 ok(steerR > 0.9 && steerL < -0.3 && steerL > -0.8, `stick → steer (full right ${steerR.toFixed(2)}, half left ${steerL.toFixed(2)})`);
 
-// 4. TILT on phone 3 (P3): the sheet's switch, simulated orientation events
+// 4. Tilt drift on phone 3 (P3)
 await tap(phones[2], ...L.moves); await sleep(500);
 const sheet = await phones[2].evaluate(() => ({ items: document.querySelectorAll('#sh .it').length, names: [...document.querySelectorAll('#sh .it b')].map((b) => b.textContent), open: __pad.sheetOpen }));
 results.sheet = sheet;
 ok(sheet.open && sheet.items === 10, `the how-to sheet lists ${sheet.items} items`);
 await phones[2].screenshot({ path: path.join(out, 'phone-how-to-sheet.png') });
-await stripTap(phones[2], '#sh [data-mode="tilt"]'); await sleep(100);
-// iPhone-style permission (Chromium has it too): close the sheet, "Tap to enable tilt"
-const askBtn = await phones[2].evaluate(() => getComputedStyle(document.getElementById('tilt')).display !== 'none' || typeof DeviceOrientationEvent.requestPermission !== 'function');
-ok(askBtn, 'the "Tap to enable tilt" button shows where permission is needed');
 await stripTap(phones[2], '#sh .x'); await sleep(500);
-if (await phones[2].evaluate(() => getComputedStyle(document.getElementById('tilt')).display !== 'none')) { await stripTap(phones[2], '#tilt'); await sleep(200); }
-await tap(phones[2], ...L.moves); await sleep(500);
-const angle = await phones[2].evaluate(() => (screen.orientation ? screen.orientation.angle : 0));
-// find beta / gamma for a wheel angle θ at this screen rotation (the phone's own maths, upright)
-const orient = (th) => phones[2].evaluate(([th, a]) => {
-  let best = [0, 0], bd = 1e9;
-  for (let b = -180; b <= 180; b += 1) for (let g = -90; g <= 90; g += 1) { const r = __pad.tiltRoll(b, g, a); if (r === null) continue; const tl = Math.abs(Math.cos(b * Math.PI / 180) * Math.cos(g * Math.PI / 180)); const d = Math.abs(r - th) + tl * 0.02; if (d < bd) { bd = d; best = [b, g]; } }
-  return best;
-}, [th, angle]);
-const fire = async (p, bg, n = 6) => { for (let i = 0; i < n; i++) { await p.evaluate(([b, g]) => dispatchEvent(new DeviceOrientationEvent('deviceorientation', { alpha: 0, beta: b, gamma: g })), bg); await tick(1); } };
-await fire(phones[2], await orient(4), 4);       // calibrates here: "level" is 4°
-await stripTap(phones[2], '#sh [data-recentre="1"]'); await tick(2);
-await fire(phones[2], await orient(4), 6);
-const tLevel = await G.evaluate(() => __dh.pads.state[2].steer);
-await fire(phones[2], await orient(34), 10);
-const tRight = await G.evaluate(() => __dh.pads.state[2].steer);
-await fire(phones[2], await orient(-14), 10);
-const tLeft = await G.evaluate(() => __dh.pads.state[2].steer);
-const tiltUI = await phones[2].evaluate(() => ({ mode: __pad.SET.mode, ok: __pad.T.ok, wheel: getComputedStyle(document.getElementById('wheel')).display, stick: getComputedStyle(document.getElementById('stickG')).display, rot: document.getElementById('wrot').getAttribute('transform') }));
-results.tilt = { angle, level: tLevel, right: tRight, left: tLeft, ui: tiltUI };
-ok(tiltUI.mode === 'tilt' && tiltUI.ok, `tilt on ${JSON.stringify(tiltUI)}`);
-ok(Math.abs(tLevel) < 0.05, `tilt level → steer ${tLevel.toFixed(3)}`);
-ok(tRight > 0.9, `tilt turned right 30° → steer ${tRight.toFixed(2)}`);
-ok(tLeft < -0.4 && tLeft > -0.95, `tilt turned left 18° → steer ${tLeft.toFixed(2)}`);
-ok(tiltUI.wheel !== 'none' && tiltUI.stick === 'none', 'TILT: the wheel replaces the stick');
-// close the sheet, wheel level again
-await stripTap(phones[2], '#sh .x'); await sleep(500);
-await fire(phones[2], await orient(4), 8);
-await phones[2].screenshot({ path: path.join(out, 'phone-tilt-wheel.png') });
+const fire = async (p, beta) => {
+  await p.evaluate((b) => {
+    for (let i = 0; i < 10; i++) dispatchEvent(new DeviceOrientationEvent('deviceorientation', { beta: b, gamma: 0 }));
+  }, beta);
+  await tick(2);
+};
+const p3 = phones[2];
+await p3.bringToFront();
+if (await p3.locator('#tilt').isVisible()) await stripTap(p3, '#tilt');
+await fire(p3, 90);
+await down(p3, 2, ...L.stick);
+await move(p3, 2, L.stick[0] + 65, L.stick[1]);
+await fire(p3, 112);
+const held = await G.evaluate(() => ({ drift: !!(__dh.pads.state[2].held & 32), steer: __dh.pads.state[2].steer }));
+await fire(p3, 90);
+const released = await G.evaluate(() => !(__dh.pads.state[2].held & 32));
+await up(p3, 2);
+results.tilt = { ...held, released };
+ok(held.drift && held.steer > 0.4 && released, `pitch toggles drift with stick steering: ${JSON.stringify(results.tilt)}`);
 
-// 5. four phones in sync: everyone drives at once — GAS held, steering round the
-//    track (stick on 1, 2, 4; tilt on 3) — with lag, jitter and loss on the input channel
-const inject = (on) => Promise.all(phones.map((p) => p.evaluate((on) => { const q = new URLSearchParams(location.search); if (on) { q.set('lag', '40'); q.set('jitter', '30'); q.set('loss', '0.2'); } return on; }, on)));
-void inject;
 await G.evaluate(() => __dh.step(4.2, false));    // past the countdown
 ok((await Promise.all(phones.map((p) => p.evaluate(() => __pad.sheetOpen)))).every((o) => !o), 'every sheet closed before the race');
-for (const p of phones) await down(p, 3, ...L.btn[B.GAS]);
+for (const p of phones) await down(p, 3, ...L.accelerate);
 const kc0 = await G.evaluate(() => __dh.hv.map((h) => __dh.race.karts[h.i].kc));
 await tick(3);
-results.gasHeld = { phone: await Promise.all(phones.map((p) => p.evaluate(() => [__pad.mask(), __pad.sheetOpen, __pad.SET.mode, !!__pad.S.link, __pad.S.seat]))), game: await G.evaluate(() => [0, 1, 2, 3].map((k) => [__dh.pads.state[k].held, __dh.pads.connected(k), __dh.playerOfPhone(k) && __dh.num(__dh.playerOfPhone(k))])) };
-const tapsSent = [0, 0, 0, 0];
-let sync = [];
-// beta / gamma for wheel angles −30…40°, once (the phone's own maths)
-const TILT = await phones[2].evaluate((a) => { const out = {}; for (let th = -30; th <= 40; th++) { let best = [0, 0], bd = 1e9; for (let b = -180; b <= 180; b += 1) for (let g = -90; g <= 90; g += 1) { const r = __pad.tiltRoll(b, g, a); if (r === null) continue; const tl = Math.abs(Math.cos(b * Math.PI / 180) * Math.cos(g * Math.PI / 180)); const d = Math.abs(r - th) + tl * 0.02; if (d < bd) { bd = d; best = [b, g]; } } out[th] = best; } return out; }, angle);
+results.gasHeld = { phone: await Promise.all(phones.map((p) => p.evaluate(() => [__pad.mask(), __pad.sheetOpen, !!__pad.S.link, __pad.S.seat]))), game: await G.evaluate(() => [0, 1, 2, 3].map((k) => [__dh.pads.state[k].held, __dh.pads.connected(k), __dh.playerOfPhone(k) && __dh.num(__dh.playerOfPhone(k))])) };
+const sync = [];
 let want = [0, 0, 0, 0];
 for (let f = 0; f < 600; f++) {
-  if (f % 2 === 0) await phones[2].evaluate(([b, g]) => dispatchEvent(new DeviceOrientationEvent('deviceorientation', { alpha: 0, beta: b, gamma: g })), TILT[Math.round(Math.max(-30, Math.min(40, 4 + want[2] * 24)))]);
   // each phone steers toward the racing line ahead of its kart
   if (f % 6 === 0) {
     want = await G.evaluate(() => __dh.hv.map((h, j) => { const R = __dh.race, T = R.T, K = R.karts[h.i], k = (K.k + 14) % T.N; const tx = T.x[k] + (-T.tz[k]) * T.line[k], tz = T.z[k] + T.tx[k] * T.line[k]; const a = Math.atan2(tx - K.x, tz - K.z), d = Math.atan2(Math.sin(a - K.yaw), Math.cos(a - K.yaw)); return Math.max(-1, Math.min(1, -d * (j === 2 ? 1.4 : 2.2))); }));
     for (let n = 0; n < 4; n++) {
-      if (n === 2) continue;
-      else { if (!phones[n].T.has(2)) await down(phones[n], 2, ...L.stick); await move(phones[n], 2, L.stick[0] + want[n] * 64, L.stick[1]); }
+      if (!phones[n].T.has(2)) await down(phones[n], 2, ...L.stick);
+      await move(phones[n], 2, L.stick[0] + want[n] * 64, L.stick[1]);
     }
   }
-  // a TAUNT tap now and then from every phone (counted at both ends)
-  // (not on the tilt phone: CDP's touch emulation mixes up two touches when no third one is down)
-  if (f % 90 === 45) for (const n of [0, 1, 3]) { await tap(phones[n], ...L.btn[B.TAUNT], 20, 5); tapsSent[n]++; }
   await tick(1);
-  if (f % 30 === 0) (results.p3 = results.p3 || []).push([f, +want[2].toFixed(2), await phones[2].evaluate(() => [+__pad.T.steer.toFixed(2), +__pad.T.centre.toFixed(1), __pad.T.roll && +__pad.T.roll.toFixed(1), __pad.SET.mode, __pad.mask()]), await G.evaluate(() => { const K = __dh.race.karts[__dh.hv[2].i]; return [+__dh.pads.state[2].steer.toFixed(2), +K.fwd.toFixed(1), +K.steer.toFixed(2), K.kc, K.spinT > 0, K.fish ? 1 : 0, K.surf]; })]);
   if (f % 60 === 0) sync.push(await G.evaluate(() => __dh.hv.map((h) => __dh.pads.state[__dh.humanP[h.j].phone]?.seq ?? -1)));
 }
 for (const p of phones) { if (p.T.has(3)) await up(p, 3); if (p.T.has(2)) await up(p, 2); }
 const kc1 = await G.evaluate(() => __dh.hv.map((h) => __dh.race.karts[h.i].kc));
 const prog = kc1.map((v, n) => v - kc0[n]);
-const tauntsSeen = await G.evaluate(() => __dh._tauntsSeen || null);
 results.sync = { progress: prog, seqSamples: sync.length };
 ok(prog.every((d) => d > 150), `all four phone karts drove (${prog})`);
 await step(0, true);
 await G.screenshot({ path: path.join(out, '3-race-four-phones.png') });
 await phones[0].screenshot({ path: path.join(out, 'phone-racing-stick.png') });
-void tauntsSeen;
 
 // 5b. loss + lag on every phone: taps still land (the press counters)
 const lossy = [];
@@ -281,8 +250,8 @@ ok(results.reconnect.join() === '0,1,2,3', `every phone came back to its own pla
 for (let n = 0; n < 4; n++) {
   let landed = 0;
   for (let r = 0; r < 6; r++) {
-    await G.evaluate((j) => { const P = __dh.humanP[j].ctl; if (!P._s0) P._s0 = P.sample.bind(P); __dh._it = 0; P.sample = () => { const I = P._s0(); if (I.taunt) __dh._it++; return I; }; }, n);
-    await tap(phones[n], ...L.btn[B.TAUNT], 12, 4);
+    await G.evaluate((j) => { const P = __dh.humanP[j].ctl; if (!P._s0) P._s0 = P.sample.bind(P); __dh._it = 0; P.sample = () => { const I = P._s0(); if (I.item) __dh._it++; return I; }; }, n);
+    await tap(phones[n], ...L.super, 12, 4);
     await tick(14);
     landed += (await G.evaluate(() => __dh._it)) > 0 ? 1 : 0;
     await G.evaluate((j) => { const P = __dh.humanP[j].ctl; P.sample = P._s0; }, n);
