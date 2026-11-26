@@ -97,3 +97,66 @@ test('Rapids: the splashdown has a dry lane and a splashy run-off', () => {
   assert.deepEqual(R.karts.map(K => K.surf), ['track', 'pool']);
   assert.ok(R.events.some(e => e.k === 'splash' && e.i === 1));
 });
+
+test('Rapids: a fast, lined-up kart can take the shortcut without falling or skipping a lap', () => {
+  const R = new Race({ track: 'park', racers: [{ id: 'k8e' }], humans: [0] });
+  const { T } = R, C = T.cut, K = R.karts[0];
+  const put = (fwd, yaw) => {
+    const k = C.kA;
+    Object.assign(K, { x: C.ax, z: C.az, y: T.y[k], k, kc: k - R.startK,
+      lastGood: k, yaw, vx: Math.sin(yaw) * fwd, vz: Math.cos(yaw) * fwd, fwd });
+  };
+  const heading = Math.atan2(C.ux, C.uz);
+  R.phase = 'race';
+  put(22, heading + Math.PI / 2);
+  R.step([{ ...noInput(), gas: true }]);
+  assert.ok(!K.cut, 'requires lining up with the bridge');
+  put(4, heading);
+  R.step([{ ...noInput(), gas: true }]);
+  assert.ok(!K.cut, 'requires some entry speed');
+  put(22, heading);
+  R.step([{ ...noInput(), gas: true }]);
+  assert.ok(K.cut);
+  assert.ok(R.events.some(e => e.k === 'shortcut'));
+  for (let i = 0; i < 240 && K.cut; i++) R.step([{ ...noInput(), gas: true }]);
+  assert.ok(!K.cut && !K.fish && Math.abs(K.k - C.kB) < 12);
+  assert.ok(C.kB - C.kA - C.len > 50);
+  assert.ok(K.kc < T.N, 'the shortcut credits only the section it bypasses');
+});
+
+test('Rapids: a torpedo hit can send a kart over the open flume edge', () => {
+  const R = new Race({ track: 'park', racers: [{ id: 'k8e' }, { id: 'zach' }], humans: [0, 1] });
+  R.phase = 'race';
+  const { T } = R, [A, B] = R.karts;
+  const k = T.drop.findIndex(v => v) + 28;
+  const rx = rightX(T, k), rz = rightZ(T, k), edge = T.w[k] + T.m[k];
+  for (const [K,d] of [[A,edge - 3], [B,edge - 0.1]]) {
+    Object.assign(K, { x: T.x[k]+rx*d, z: T.z[k]+rz*d, y: T.y[k], k,
+      yaw: Math.atan2(rx,rz), surf:'flume', lastGood:k, d });
+  }
+  const speed = A.S.top * 1.18;
+  Object.assign(A, {fwd:speed,vx:rx*speed,vz:rz*speed});
+  R._bumps();
+  assert.ok(R.events.some(e => e.k === 'torpedo' && e.by === A.i && e.i === B.i));
+  for (let i=0;i<120 && !B.fish;i++) R.step([noInput(),noInput()]);
+  assert.ok(B.fish, 'outward momentum carried the slower kart off the unguarded edge');
+});
+
+test('Rapids: the shortcut can be reached by steering in from the main road', () => {
+  const R = new Race({ track: 'park', racers: [{ id: 'k8e' }], humans: [0] });
+  R.phase = 'race';
+  const { T } = R, C = T.cut, K = R.karts[0];
+  const k = C.kA - 30, d = -3, speed = 12;
+  const approach = Math.atan2(T.tx[k], T.tz[k]);
+  const bridge = Math.atan2(C.ux, C.uz);
+  Object.assign(K, { x: T.x[k] + rightX(T,k)*d, y: T.y[k], z: T.z[k] + rightZ(T,k)*d, k, d,
+    yaw: approach, vx: Math.sin(approach)*speed, vz: Math.cos(approach)*speed, fwd: speed, lastGood: k });
+  let turning = false;
+  for (let tick = 0; tick < 180 && !K.cut; tick++) {
+    if (K.x >= C.ax - 9) turning = true;
+    const delta = (turning ? bridge : approach) - K.yaw;
+    const steer = -Math.max(-1, Math.min(1, Math.atan2(Math.sin(delta), Math.cos(delta)) * 2.4));
+    R.step([{ ...noInput(), steer, gas: K.fwd < 12, brake: K.fwd > 13 }]);
+  }
+  assert.ok(K.cut && !K.fish, 'a controlled turn enters from the dry lane');
+});

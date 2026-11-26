@@ -207,7 +207,7 @@ export class Race {
     if (surf === 'fluff' || surf === 'mulch') top *= 0.58;
     else if (surf === 'cereal') top *= 0.64;
     else if (surf === 'pool') top *= 0.66;
-    else if (surf === 'flume') top *= 1.10;
+    else if (surf === 'flume') top *= 1.19;
     if (K.cuff >= 0) top *= 0.86;
     if (K.caseT > 0) top *= 0.9;
     if (K.shrinkT > 0) top *= 0.84;                  // shrunk in the wash: little wheels
@@ -230,6 +230,11 @@ export class Race {
       if (fwd > top && !gas) fwd = Math.max(top, fwd - 30 * DT);
       if (K.spinT > 0) fwd *= 0.95;
       if (K.ejectT > 0) fwd *= 0.965;              // nobody at the wheel: it rolls to a stop
+    }
+
+    if (surf === 'flume' && !K.air && !brake && fwd > 0 && fwd < top + 3) {
+      const next = (K.k + 2) % N;
+      fwd = Math.min(top + 3, fwd + Math.max(0, T.y[K.k] - T.y[next]) * 9 * DT);
     }
 
     // Feather the throttle or brake before a corner to regain bite.
@@ -452,8 +457,10 @@ export class Race {
       if (Math.abs(lateral(T, k, K.x, K.z)) > T.w[k] + T.m[k] + 0.5) return false;
       // only heading through it
       const head = Math.sin(K.yaw) * C.ux + Math.cos(K.yaw) * C.uz;
-      if (s > C.len / 2 || head < 0.3) return false;
+      if (s > C.len / 2 || head < (C.tight ? 0.82 : 0.3)) return false;
+      if (C.tight && (Math.abs(k - C.kA) > 20 || Math.abs(l) > C.w || K.fwd < 8 || K.y > 3)) return false;
       K.cut = 1;
+      if (C.tight) this.emit({ k: 'shortcut', i: K.i });
     }
     if (s > C.len + 3 || s < -3 || (Math.abs(l) > half && (s < C.m0 || s > C.m1))) {
       K.cut = 0; K.drum = 0;
@@ -760,9 +767,22 @@ export class Race {
       const vrel = (B.vx - A.vx) * nx + (B.vz - A.vz) * nz;
       if (vrel < 0) {
         const j = -(1.35) * vrel / (1 / ma + 1 / mb);
-        const shove = 2.2;
+        // On the open flume, a fast kart can carry real momentum into a side hit.
+        // Require a closing speed as well as high forward speed.
+        const aTorpedo = A.surf === 'flume' && A.fwd > A.S.top * 1.07 && A.vx * nx + A.vz * nz > 10;
+        const bTorpedo = B.surf === 'flume' && B.fwd > B.S.top * 1.07 && -B.vx * nx - B.vz * nz > 10;
+        const torpedo = -vrel > 9 && aTorpedo !== bTorpedo;
+        const shove = torpedo ? 10 : 2.2;
         A.vx -= (j / ma + shove * wa) * nx; A.vz -= (j / ma + shove * wa) * nz;
         B.vx += (j / mb + shove * wb) * nx; B.vz += (j / mb + shove * wb) * nz;
+        if (torpedo) {
+          const target = aTorpedo ? B : A, sign = aTorpedo ? 1 : -1;
+          target.vx += nx * sign * 10; target.vz += nz * sign * 10;
+          if (this.tick - (target.torpedoTick ?? -99) > 24) {
+            target.torpedoTick = this.tick;
+            this.emit({ k: 'torpedo', i: target.i, by: aTorpedo ? A.i : B.i });
+          }
+        }
         if (-vrel > 3 && (this.tick - (A.bumpTick || 0) > 12)) { A.bumpTick = B.bumpTick = this.tick; this.emit({ k: 'bump', i: a, j: b, p: Math.min(1, -vrel / 18), x: (A.x + B.x) / 2, y: (A.y + B.y) / 2, z: (A.z + B.z) / 2 }); }
       }
     }

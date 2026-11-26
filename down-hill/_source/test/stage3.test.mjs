@@ -16,7 +16,7 @@ function torture(track, seed, { speed = 1, lvl = 'hard' } = {}) {
   const R = new Race({ racers: field(lvl), seed, humans: [], track });
   const cpus = R.karts.map((K) => new CPU(R, K.i, lvl, seed));
   const T = R.T, N = T.N;
-  const out = { below: 0, maxBelow: 0, falls: 0, stuck: 0, laps: 0, layerJumps: 0, scrapes: 0, items: 0, where: [] };
+  const out = { below: 0, maxBelow: 0, falls: 0, stuck: 0, laps: 0, layerJumps: 0, scrapes: 0, items: 0, where: [], unmarkedFalls: 0 };
   const prevY = R.karts.map((K) => T.y[K.k]);
   let n = 0;
   while (R.phase !== 'done' && n++ < 60 * 300) {
@@ -24,7 +24,7 @@ function torture(track, seed, { speed = 1, lvl = 'hard' } = {}) {
     if (speed !== 1) for (const K of R.karts) K.topMul = (K.topMul || 1) * speed;
     R.step(inp);
     for (const e of R.events) {
-      if (e.k === 'fall') { if (e.why === 'stuck') out.stuck++; else { out.falls++; out.where.push(T.def.points[T.sec[R.karts[e.i].k]].tag); } }
+      if (e.k === 'fall') { if (e.why === 'stuck') out.stuck++; else { out.falls++; if (!T.drop[R.karts[e.i].k]) out.unmarkedFalls++; out.where.push(T.def.points[T.sec[R.karts[e.i].k]].tag); } }
       if (e.k === 'lap' || e.k === 'finish') out.laps++;
       if (e.k === 'scrape') out.scrapes++;
       if (e.k === 'use') out.items++;
@@ -47,12 +47,12 @@ function torture(track, seed, { speed = 1, lvl = 'hard' } = {}) {
 }
 
 for (const track of ['landing', 'laundry', 'hockey', 'park', 'dojo']) {
-  test(`${track}: 24+ laps at racing and at high speed, items on: never below the road, no layer jumps, no falls`, () => {
-    const tot = { net: 0, below: 0, falls: 0, stuck: 0, laps: 0, layerJumps: 0, scrapes: 0, items: 0, maxBelow: 0, where: [] };
+  test(`${track}: 24+ laps at racing and at high speed, items on: never below the road, no layer jumps or unmarked falls`, () => {
+    const tot = { net: 0, below: 0, falls: 0, stuck: 0, laps: 0, layerJumps: 0, scrapes: 0, items: 0, maxBelow: 0, where: [], unmarkedFalls: 0 };
     for (const [seed, speed] of [[1, 1], [2, 1.25], [3, 1.4]]) {
       const r = torture(track, seed, { speed });
       assert.ok(r.done, `${track} seed ${seed} finished`);
-      for (const k of ['net', 'below', 'falls', 'stuck', 'laps', 'layerJumps', 'scrapes', 'items']) tot[k] += r[k];
+      for (const k of ['net', 'below', 'falls', 'unmarkedFalls', 'stuck', 'laps', 'layerJumps', 'scrapes', 'items']) tot[k] += r[k];
       tot.maxBelow = Math.max(tot.maxBelow, r.maxBelow); tot.where.push(...r.where);
     }
     console.log(`# ${track}: ${tot.laps} laps, ${tot.items} items used, below-road ${tot.below}, safety-net catches ${tot.net}, layer jumps ${tot.layerJumps}, edge falls ${tot.falls}, stuck fish-outs ${tot.stuck}, scrapes ${tot.scrapes}`);
@@ -60,15 +60,19 @@ for (const track of ['landing', 'laundry', 'hockey', 'park', 'dojo']) {
     assert.equal(tot.net, 0, 'the safety net never had to catch anyone');
     assert.equal(tot.below, 0, `below the road: ${tot.where.join(' ')}`);
     assert.equal(tot.layerJumps, 0, `layer jumps: ${tot.where.join(' ')}`);
-    assert.equal(tot.falls, 0, `falls off an edge (no track has a drop now): ${tot.where.join(' ')}`);
+    assert.equal(tot.unmarkedFalls, 0, `falls on guarded road: ${tot.where.join(' ')}`);
     assert.ok(tot.stuck <= 2, `stuck fish-outs ${tot.stuck}`);
   });
 }
 
-test('every drawn barrier is solid: no drop sections on any track; rails on the raised runs', () => {
+test('only the open Rapids flume has unguarded edges; raised runs still have rails', () => {
   for (const id of ['landing', 'laundry', 'hockey', 'park', 'dojo']) {
     const T = buildTrack(TRACKS[id]);
-    assert.equal(T.drop.filter(Boolean).length, 0, id);
+    const open = T.drop.reduce((ks, drop, k) => { if (drop) ks.push(k); return ks; }, []);
+    if (id === 'park') {
+      assert.ok(open.length > 0);
+      assert.ok(open.every(k => T.def.points[T.sec[k]].tag === 'flume' && !T.rail[k]));
+    } else assert.equal(open.length, 0, id);
     assert.ok(T.rail.filter(Boolean).length > 50, id);
   }
   const L = buildTrack(TRACKS.landing);

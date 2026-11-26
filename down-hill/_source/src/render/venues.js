@@ -286,7 +286,11 @@ export class VenueWorld extends World {
     }
     for (const s of [-1, 1]) {
       ribbon(T, root, edge, all, (w) => [[s * w, 0.02], [s * w, -2.5]]);
-      if (id === 'park') ribbon(T, root, wet, flume, (w) => [[s * (w - 0.1), 0], [s * (w + 0.2), 2.5]]);
+      if (id === 'park') {
+        ribbon(T, root, wet, (k) => flume(k) && !T.drop[k], (w) => [[s * (w - 0.1), 0], [s * (w + 0.2), 2.5]]);
+        const warn = new THREE.MeshBasicMaterial({ color: '#ffeb52', side: THREE.DoubleSide });
+        ribbon(T, root, warn, (k) => Boolean(T.drop[k]), (w) => [[s * (w - 0.9), 0.08], [s * w, 0.08]]);
+      }
     }
     ribbon(T, root, edge, (k) => T.y[k] > 1.5, (w) => [[-w, -2.5], [w, -2.5]]);
     const pilaster = standard(id === 'park' ? '#ea6a25' : '#e7ebea');
@@ -300,7 +304,16 @@ export class VenueWorld extends World {
     this.runnerTags.clear();
     this.dashLift = () => 0.22;
     this._guides();
-    this.readable = buildReadable(this, { railCols: [V.rail, '#fff4dc'], arrowTags: new Set() });
+    const C = T.cut;
+    this.readable = buildReadable(this, { railCols: [V.rail, '#fff4dc'], arrowTags: new Set(),
+      railGap: C && ((k, side) => {
+        const w = (T.w[k] + T.m[k]) * side;
+        const x = T.x[k] + rightX(T, k) * w - C.ax;
+        const z = T.z[k] + rightZ(T, k) * w - C.az;
+        const along = x * C.ux + z * C.uz;
+        return along > 3 && along < C.len - 3 && Math.abs(-x * C.uz + z * C.ux) < C.w + 2.2;
+      }),
+    });
     if (court) {
       buildCentreCourtStadium(this);
       buildTournamentSigns(root);
@@ -316,6 +329,37 @@ export class VenueWorld extends World {
     this.animateStadium?.(t);
   }
 
+  _rapidsDetours() {
+    const { root, T } = this;
+    const C = T.cut;
+    const raft = canvasTex(128, 512, (g, w, h) => {
+      g.fillStyle = '#13bfa9'; g.fillRect(0, 0, w, h);
+      for (let y = 0; y < h; y += 24) {
+        g.fillStyle = '#006f89'; g.fillRect(0, y, w, 2);
+        g.fillStyle = '#e4ffb3'; g.fillRect(6, y + 8, 9, 7); g.fillRect(w - 15, y + 8, 9, 7);
+      }
+    });
+    const deck = new THREE.MeshStandardMaterial({ map: raft, roughness: .76 });
+    const yaw = Math.atan2(C.ux, C.uz);
+    const middle = (C.m0 + C.m1) * 0.5;
+    const plank = box(root, deck, C.ax + C.ux * middle, -0.37, C.az + C.uz * middle, C.w * 2, 0.86, C.m1 - C.m0 + 5);
+    plank.rotation.y = yaw;
+    const float = standard('#ff694c', .48);
+    const rim = standard('#ffdf49', .42);
+    const floatGeo = new THREE.CylinderGeometry(1, 1, 1, 14);
+    for (const { x, z, r, kind } of T.def.posts) {
+      if (kind !== 'buoy') continue;
+      mesh(floatGeo, float, x, 1.7, z, root).scale.set(r, 3.4, r);
+      mesh(floatGeo, rim, x, 2.6, z, root).scale.set(r * 1.06, .55, r * 1.06);
+    }
+    // Two low float rails match the shortcut's collision corridor.
+    for (const side of [-1, 1]) {
+      const rail = box(root, rim, plank.position.x + C.uz * C.w * side, 0.35,
+        plank.position.z - C.ux * C.w * side, .36, .65, C.m1 - C.m0);
+      rail.rotation.y = yaw;
+    }
+  }
+
   _landmarks(id) {
     const root = this.root;
     const clear = (x, z, r) => sceneryClearsRoad(this.T, x, z, r, r);
@@ -326,7 +370,7 @@ export class VenueWorld extends World {
     if (id === 'park') {
       const sand = standard('#ffbf46'), grass = standard('#28aa58'), palm = standard('#a8522c');
       const island = new THREE.CylinderGeometry(1, 1.22, 1, 10);
-      for (const [x, z, r] of [[-105, -100, 39], [132, 108, 14], [248, 70, 33], [-150, 50, 34], [85, 9, 13]]) {
+      for (const [x, z, r] of [[-105, -100, 39], [248, 70, 33], [-150, 50, 34], [85, 9, 13]]) {
         if (!clear(x, z, r)) continue;
         mesh(island, sand, x, -0.35, z, root).scale.set(r, 4, r);
         mesh(island, grass, x, 1.85, z, root).scale.set(r * 0.87, 1, r * 0.87);
@@ -338,6 +382,7 @@ export class VenueWorld extends World {
           o.rotation.y = -angle; o.scale.set(12, 2.2, 3.7);
         }
       }
+      this._rapidsDetours();
       this._rapidsMascot();
       return;
     }

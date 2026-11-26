@@ -67,7 +67,7 @@ const COURSE_NOTES = {
   landing: 'Quilt grid · book drop · banister jump',
   laundry: 'Clay-court flyover · switchbacks · championship jump',
   hockey: 'Rink crossover · icy bends · penalty-box jump',
-  park: 'Canopy climb · slick downhill flume · splash jump',
+  park: 'Canopy climb · open flume · buoy slalom',
   dojo: 'Lantern courtyard · rooftop crossover · moon gate jump',
   cup: 'Race all five courses, starting on The Landing',
 };
@@ -790,6 +790,16 @@ class App {
         V.taunt(false);
         if (near) { A.play('dh-honk', { gain: g(0.8), rate: RACERS[K.id].voice }); A.play('dh-grunt', { rate: RACERS[K.id].voice * 1.2, gain: g(0.6) }); }
         if (mine || this._dist(K) < 40) this.bubble(e.i, tauntLine(K.id, K.alt, this.raceN * 5 + R.tick), 2.0);
+        break;
+      }
+      case 'shortcut':
+        if (mine) this.toast(H, 'SECRET CHUTE!', '#ffe56a');
+        if (near) A.play('dh-whoosh', { gain: g(0.7) });
+        break;
+      case 'torpedo': {
+        if (mine) { this.toast(H, 'TORPEDOED!', '#ff8dc7'); H.cam.shake = 0.32; }
+        const attacker = this.hvOf(e.by);
+        if (attacker) this.toast(attacker, 'TORPEDO HIT!', '#7af9e0');
         break;
       }
       case 'fall': if (near) A.play('crowd-ooh', { gain: g(0.7) }); if (mine) this.toast(H, 'OOPS!', '#9b5cff'); break;

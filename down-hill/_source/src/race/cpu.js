@@ -121,7 +121,7 @@ export class CPU {
     // the shortcut: decided once a lap on the way in (the bold ones take it more)
     const C = T.cut;
     let onCut = false;
-    if (C) {
+    if (C && !C.tight) {
       const toA = (C.kA - K.k + N) % N;
       if (toA > 80 && toA < 200) this.cutPlan = null;
       if (this.cutPlan === null || this.cutPlan === undefined) if (toA < 70) this.cutPlan = this.rng.int(1000) < { easy: 250, normal: 500, hard: 750 }[this.level];

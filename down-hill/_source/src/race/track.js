@@ -10,7 +10,7 @@
             (visibly no barrier: fall off and the sock fishes you back),
             'solid' (a real wall the renderer draws).
             Stage 3 rule: every drawn barrier is solid; a drop is only where
-            nothing is drawn. No track has a 'drop' section now.
+            the Rapids course deliberately leaves its yellow-edged flume open.
      tag    the section's name (the HUD, the shots, the CPU's caution)
      launch upward kick (units/s) given as a grounded kart crosses it
      pad    a feather-burst boost pad here
@@ -140,15 +140,21 @@ export const RUBBERTA_RAPIDS = {
     flume(139, 79, -137), flume(193, 70, -100),
     flume(197, 57, -42), flume(148, 43, -5),
     flume(97, 30, -24), flume(57, 19, -53), flume(5, 13, -54),
-    flume(-37, 8, -26), flume(-34, 5, 24),
+    flume(-37, 8, -26, { edge: 'drop' }), flume(-34, 5, 24),
     flume(13, 5, 61), flume(75, 7, 62, { launch: 15 }),
-    route('runoff', 129, 0, 59), boardwalk(180, 0, 80), boardwalk(173, 0, 124),
+    route('runoff', 129, 0, 59), boardwalk(180, 0, 80), boardwalk(173, 1.4, 124, { launch: 9 }),
     boardwalk(116, 0, 148), boardwalk(57, 0, 130),
     boardwalk(3, 0, 132), boardwalk(-42, 0, 175),
     boardwalk(-110, 0, 191), boardwalk(-183, 0, 187),
     boardwalk(-226, 0, 177),
   ],
-  patches: [], posts: [],
+  cut: { from: [143, 61], to: [116, 148], w: 3.4, drum: [0, 0], tight: true },
+  patches: [],
+  posts: [
+    { x: 178, z: 88, r: 2.2, kind: 'buoy' },
+    { x: 182, z: 111, r: 2.2, kind: 'buoy' },
+    { x: 160, z: 135, r: 2.2, kind: 'buoy' },
+  ],
   boxes: [0.06, 0.19, 0.32, 0.46, 0.62, 0.75, 0.91],
   mapHigh: [6, 78],
   music: 'park',
@@ -341,7 +347,7 @@ function buildCut(T, c) {
     const off = Math.abs(lateral(T, k, x, z)) > T.w[k] + T.m[k] - 1;
     if (off) { m0 = Math.min(m0, s); m1 = Math.max(m1, s); }
   }
-  return { ax, az, bx, bz, len, ux, uz, w: c.w, m0, m1, d0: len * c.drum[0], d1: len * c.drum[1], kA: locateGlobal(T, ax, az), kB: locateGlobal(T, bx, bz) };
+  return { ax, az, bx, bz, len, ux, uz, w: c.w, tight: c.tight, m0, m1, d0: len * c.drum[0], d1: len * c.drum[1], kA: locateGlobal(T, ax, az), kB: locateGlobal(T, bx, bz) };
 }
 /* a detergent pod's place at a tick (pure: the sim and the renderer agree) */
 export function podPos(T, P, tick) {

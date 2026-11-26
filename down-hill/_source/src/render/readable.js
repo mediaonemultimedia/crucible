@@ -62,17 +62,17 @@ export function buildReadable(W, opts = {}) {
   // ── rails ──
   const railMat = new THREE.MeshStandardMaterial({ map: stripeTex(cA, cB), roughness: 0.5 });
   const postMat = new THREE.MeshStandardMaterial({ color: cB, roughness: 0.55 });
-  const runs = [];
-  let cur = null;
-  for (let k = 0; k < N; k++) {
-    const on = T.rail[k] && !own.has(tag(k));
-    if (on) { if (!cur) runs.push((cur = [])); cur.push(k); } else cur = null;
-  }
-  if (runs.length > 1 && runs[0][0] === 0 && runs[runs.length - 1][runs[runs.length - 1].length - 1] === N - 1) runs[0] = [...runs.pop(), ...runs[0]];
   const H0 = 0.55, H1 = 1.85, TH = 0.7;   // the bar: its bottom and top over the road, its thickness
-  for (const run of runs) {
-    const ks = [(run[0] - 1 + N) % N, ...run, (run[run.length - 1] + 1) % N];
-    for (const s of [-1, 1]) {
+  for (const s of [-1, 1]) {
+    const runs = [];
+    let cur = null;
+    for (let k = 0; k < N; k++) {
+      const on = T.rail[k] && !own.has(tag(k)) && !opts.railGap?.(k, s);
+      if (on) { if (!cur) runs.push((cur = [])); cur.push(k); } else cur = null;
+    }
+    if (runs.length > 1 && runs[0][0] === 0 && runs[runs.length - 1].at(-1) === N - 1) runs[0] = [...runs.pop(), ...runs[0]];
+    for (const run of runs) {
+      const ks = [(run[0] - 1 + N) % N, ...run, (run.at(-1) + 1) % N];
       const pos = [], uv = [], idx = [];
       let v = 0;
       ks.forEach((k, i) => {
