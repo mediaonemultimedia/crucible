@@ -92,7 +92,7 @@ const VIEW_HTML = `<div class="vdark"></div><div class="fabric"></div>
 <div class="place">8<sup>th</sup></div>
 <div class="drift"><span>Drift</span><i></i><i></i><i></i></div>
 <div class="final">FINAL LAP!</div><div class="start-lights" aria-hidden="true"><i></i><i></i><i></i></div><div class="count"></div><div class="toast"></div>
-<div class="wallop-hud"></div><div class="lookback">Look back</div><div class="ptag"></div><div class="scare"></div><div class="wait"></div>`;
+<div class="wallop-hud"></div><div class="wrong-way" hidden>WRONG WAY!</div><div class="lookback">Look back</div><div class="ptag"></div><div class="scare"></div><div class="wait"></div>`;
 
 class App {
   constructor(renderer, canvas) {
@@ -521,7 +521,7 @@ class App {
         j, i, rect: rects[j], el, q,
         place: q('.place'), lap: q('.lap .n'), time: q('.lap .tm'), item: q('.item'), itemName: q('.item-name'), drift: q('.drift'), final: q('.final'),
         tip: q('.tip'), tprompt: q('.tprompt'), tauntIc: q('.taunt-ic'), warn: q('.warn'), caption: q('.caption'), speed: q('.speed'), islot: q('.islot'),
-        lights: q('.start-lights'), count: q('.count'), toastEl: q('.toast'), wallop: q('.wallop-hud'), fabric: q('.fabric'), scare: q('.scare'), dark: q('.vdark'), mm: q('.minimap'), wait: q('.wait'),
+        lights: q('.start-lights'), count: q('.count'), toastEl: q('.toast'), wallop: q('.wallop-hud'), wrongWay: q('.wrong-way'), fabric: q('.fabric'), scare: q('.scare'), dark: q('.vdark'), mm: q('.minimap'), wait: q('.wait'),
         camera: new THREE.PerspectiveCamera(64, 1, 0.3, 1400),
         cam: { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 64, shake: 0 },
         lastItem: null, lookBack: false, lb: false, darkV: 0, tipUntil: 0, capUntil: 0, hud: {},
@@ -715,6 +715,13 @@ class App {
         V.wallop(e.windup);
         if (near) A.play('dh-whoosh', { gain: g(0.6), rate: e.pose === 'sweep' ? 1.2 : 0.98 });
         break;
+      case 'wallop-prop': {
+        const P = R.wallopProp;
+        this.fx.burst(P.x, P.y + 1.5, P.z, ['#fff9ce', '#edff3c', '#42edff'], 12, 7);
+        if (near) A.play('dh-bonk', { gain: g(0.9), rate: P.type === 'ball' ? 1.12 : 0.85 });
+        if (mine) this.toast(H, P.type === 'ball' ? 'BALL IN PLAY!' : 'PUCK IN PLAY!', '#efff65');
+        break;
+      }
       case 'wallop-hit': {
         V.hit();
         this.fx.burst(K.x, K.y + 2, K.z, ['#fff8d8', '#ffcd50', '#ff70ad'], 9, 6.5);
@@ -1007,6 +1014,8 @@ class App {
     if (!H.hud.keys) { H.hud.keys = 1; for (const el of H.el.querySelectorAll('.tk')) el.textContent = this.keyFor(H, 'taunt'); }
     set('tip', this.t < H.tipUntil, (v) => H.tip.classList.toggle('on', v));
     set('cap', this.t < H.capUntil, (v) => H.caption.classList.toggle('on', v));
+    set('wrongWay', R.phase === 'race' && !K.fin && K.wrongWayT >= 0.45, (v) => { H.wrongWay.hidden = !v; });
+    set('windup', K.wallopAt > R.tick, (v) => H.wallop.classList.toggle('windup', v));
     const ready = K.wallopReady <= R.tick;
     set('wallopReady', ready, (v) => {
       H.wallop.classList.toggle('cooldown', !v);

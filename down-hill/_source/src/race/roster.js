@@ -61,13 +61,13 @@ export const RACERS = {
 
 // Range is measured from kart centre. Recovery includes the wind-up.
 export const WALLOPS = {
-  kevalanche: { name: 'Snowball Punch', pose: 'punch', range: 4.8, arc: 0.55, windup: 0.22, recovery: 1.65, stagger: 0.72, shove: 11 },
-  sumaura:    { name: 'Bamboo Bash', pose: 'headbutt', range: 5.4, arc: 0.65, windup: 0.20, recovery: 1.4, stagger: 0.60, shove: 9 },
-  k8e:        { name: 'Neck Check', pose: 'headbutt', range: 9.3, arc: 0.80, windup: 0.16, recovery: 0.88, stagger: 0.32, shove: 4 },
-  sebas:      { name: 'Lowrider Headbutt', pose: 'headbutt', range: 5.8, arc: 0.62, windup: 0.18, recovery: 1.18, stagger: 0.53, shove: 8 },
-  rubberta:   { name: 'Tentacle Sweep', pose: 'sweep', range: 6.6, arc: 0.1, windup: 0.24, recovery: 1.35, stagger: 0.40, shove: 6 },
-  johnny:     { name: 'Court Punch', pose: 'punch', range: 6.2, arc: 0.62, windup: 0.15, recovery: 1.06, stagger: 0.44, shove: 7 },
-  zach:       { name: 'Wing Clip', pose: 'sweep', range: 5.5, arc: 0.38, windup: 0.12, recovery: 0.96, stagger: 0.37, shove: 5 },
+  kevalanche: { name: 'Snowball Punch', pose: 'punch', range: 4.8, arc: 0.55, windup: 0.32, recovery: 1.65, stagger: 0.72, shove: 11 },
+  sumaura:    { name: 'Bamboo Bash', pose: 'headbutt', range: 5.4, arc: 0.65, windup: 0.29, recovery: 1.4, stagger: 0.60, shove: 9 },
+  k8e:        { name: 'Neck Check', pose: 'headbutt', range: 9.3, arc: 0.80, windup: 0.25, recovery: 0.88, stagger: 0.32, shove: 4 },
+  sebas:      { name: 'Lowrider Headbutt', pose: 'headbutt', range: 5.8, arc: 0.62, windup: 0.27, recovery: 1.18, stagger: 0.53, shove: 8 },
+  rubberta:   { name: 'Tentacle Sweep', pose: 'sweep', range: 6.6, arc: 0.1, windup: 0.34, recovery: 1.35, stagger: 0.40, shove: 6 },
+  johnny:     { name: 'Court Punch', pose: 'punch', range: 6.2, arc: 0.62, windup: 0.26, recovery: 1.06, stagger: 0.44, shove: 7 },
+  zach:       { name: 'Wing Clip', pose: 'sweep', range: 5.5, arc: 0.38, windup: 0.24, recovery: 0.96, stagger: 0.37, shove: 5 },
 };
 
 export const ORDER = ['kevalanche', 'sumaura', 'k8e', 'sebas', 'rubberta', 'johnny', 'zach'];

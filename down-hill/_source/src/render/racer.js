@@ -269,17 +269,35 @@ export class RacerView {
       this.swipeT += dt;
       const w = this.swipeWindup, recovers = this.swipeT - w;
       const pose = WALLOPS[this.id].pose;
-      const power = recovers < 0 ? -0.46 * Math.sin(this.swipeT / w * Math.PI) : Math.max(0, 1 - recovers / 0.24) ** 2;
-      d.position.z = P.z + power * (pose === 'headbutt' ? 0.6 : 0.32);
+      const wind = Math.min(1, this.swipeT / (w * 0.65));
+      const load = recovers < 0 ? Math.sin(wind * Math.PI / 2) : 0;
+      const power = recovers < 0 ? 0 : Math.max(0, 1 - recovers / 0.24) ** 2;
+      if (load) {
+        const [lift, back, pitch, yaw, lean] = WALLOP_WINDUP[this.id];
+        d.position.y += lift * P.scale * load;
+        d.rotation.x += pitch * load;
+        d.rotation.y += yaw * load;
+        d.rotation.z += lean * load;
+        d.position.z = P.z - back * P.scale * load;
+      }
+      if (!load) d.position.z = P.z + power * (pose === 'headbutt' ? 0.6 : 0.32);
       d.rotation.x += power * (pose === 'headbutt' ? 0.42 : 0.19);
       d.rotation.y += power * (pose === 'sweep' ? 0.85 : pose === 'punch' ? -0.62 : 0);
       d.rotation.z += power * (pose === 'sweep' ? -0.29 : 0.05);
       if (this.strike) {
-        this.strike.visible = power > 0.18 && !K.fish;
+        this.strike.visible = (load > 0.28 || power > 0.18) && !K.fish;
         this.strike.position.set(P.scale * (pose === 'sweep' ? 0.15 : 0.68), P.y + P.scale * 1.06,
           P.z + P.scale * (0.56 + power * (pose === 'sweep' ? .44 : 1)));
         this.strike.rotation.y = pose === 'sweep' ? 0.58 - power * 1.4 : -0.16;
-        this.strike.scale.setScalar(P.scale * (0.66 + Math.max(0, power) * .54));
+        if (load) {
+          const [, , , yaw, lean] = WALLOP_WINDUP[this.id];
+          this.strike.position.x += P.scale * lean * load;
+          this.strike.position.y += P.scale * 0.48 * load;
+          this.strike.position.z -= P.scale * (pose === 'punch' ? 0.72 : 0.38) * load;
+          this.strike.rotation.y += yaw * load;
+          this.strike.rotation.z = -lean * load;
+        } else this.strike.rotation.z = 0;
+        this.strike.scale.setScalar(P.scale * (0.8 + power * .54));
       }
       if (recovers > 0.24 || K.fish) this.swipeWindup = 0;
     } else d.position.z = P.z;
@@ -330,6 +348,18 @@ export class RacerView {
     this.group.removeFromParent();
   }
 }
+
+// Lift, pullback, pitch, yaw and roll. Keep the silhouettes distinct
+// even at the smaller chase-camera scale in four-player split.
+const WALLOP_WINDUP = {
+  kevalanche: [0.08, 0.55, -0.32, -0.68, -0.23], // shoulder and fist pull back
+  sumaura: [-0.36, 0.45, 0.42, 0.05, 0],        // crouch and tuck chin
+  k8e: [0.56, 0.32, -0.45, 0.07, 0.1],         // neck rears straight up
+  sebas: [0.16, 0.35, -0.16, 0.48, -0.5],      // side cock
+  rubberta: [0.18, 0.1, -0.1, 0.7, 0.48],       // winds tentacle out and high
+  johnny: [0.42, 0.15, 0.12, 0.56, 0.25],       // high backswing
+  zach: [0.38, 0.24, -0.14, -0.45, -0.52],     // wing flares out
+};
 
 /* the LOD distances; split screen lowers them (main.js) */
 RacerView.lodNear = 26;

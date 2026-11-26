@@ -83,7 +83,50 @@ export class Race {
     this.pods = T.pods.map((P) => ({ ...P, ...podPos(T, P, 0) }));
     this.piles = (T.def.piles || []).map((P) => ({ ...P, kicked: 0 }));
     this.sprinklers = (T.def.sprinklers || []).map((S) => ({ ...S, on: false }));
+    const propType = { laundry: 'ball', hockey: 'puck' }[T.def.id];
+    if (propType) {
+      const home = (this.startK + 26) % T.N;
+      this.wallopProp = { type: propType, home, k: home, radius: propType === 'ball' ? 2.35 : 1.8 };
+      this._resetWallopProp();
+    }
     this._place();
+  }
+
+  _resetWallopProp() {
+    const P = this.wallopProp, T = this.T, k = P.home, d = T.w[k] * 0.54;
+    Object.assign(P, { k, x: T.x[k] + rightX(T, k) * d, y: T.y[k], z: T.z[k] + rightZ(T, k) * d,
+      vx: 0, vz: 0, life: 0, reset: 0, owner: -1, roll: 0 });
+  }
+
+  _moveWallopProp() {
+    const P = this.wallopProp;
+    if (!P) return;
+    const T = this.T;
+    if (P.reset && --P.reset === 0) this._resetWallopProp();
+    if (!P.life) return;
+    P.x += P.vx * DT;
+    P.z += P.vz * DT;
+    const k = P.k = locate(T, P.x, P.z, P.k, 6, P.y);
+    P.y = T.y[k];
+    P.roll += Math.hypot(P.vx, P.vz) * DT / P.radius;
+    const d = lateral(T, k, P.x, P.z);
+    if (Math.abs(d) > T.w[k] - P.radius) {
+      const nX = rightX(T, k), nZ = rightZ(T, k), over = d - Math.sign(d) * (T.w[k] - P.radius);
+      P.x -= nX * over; P.z -= nZ * over;
+      const out = (P.vx * nX + P.vz * nZ) * Math.sign(d);
+      if (out > 0) { P.vx -= nX * out * Math.sign(d) * 1.45; P.vz -= nZ * out * Math.sign(d) * 1.45; }
+    }
+    const drag = P.type === 'puck' ? 0.991 : 0.98;
+    P.vx *= drag; P.vz *= drag;
+    for (const K of this.karts) {
+      if (K.i === P.owner || K.air || Math.abs(K.y - P.y) > 2 || Math.hypot(K.x - P.x, K.z - P.z) > P.radius + KART_R) continue;
+      if (this.hit(K, 'wallop-prop', P.owner)) {
+        K.spinT = 0.48;
+        P.life = 1;
+        break;
+      }
+    }
+    if (--P.life === 0) { P.vx = P.vz = 0; P.reset = 95; }
   }
 
   _nearest([x, y, z]) {
@@ -110,7 +153,7 @@ export class Race {
       boostT: 0, padT: 0, spinT: 0, spinDir: 1, invT: 0,
       jitterT: 0, caseT: 0, wobT: 0, cuff: -1, cuffT: 0,
       sugarT: 0, shrinkT: 0, flatT: 0, flatCd: 0, ejectT: 0, lock: -1, held: 0, ramp: 0,
-      item: null, roulette: 0, tauntT: 0, bounceT: 0, wallopAt: 0, wallopReady: 0,
+      item: null, roulette: 0, tauntT: 0, bounceT: 0, wallopAt: 0, wallopReady: 0, wrongWayT: 0,
       fish: null, lastGood: k, stuckT: 0, wallT: 0, offT: 0, surf: 'track',
       steer: 0, inp: noInput(), prevInp: noInput(),
     };
@@ -136,6 +179,7 @@ export class Race {
     this._world();
     for (const K of this.karts) this._kartTick(K, inputs[K.i] || noInput());
     this._wallops();
+    this._moveWallopProp();
     this._bumps();
     this._cuffs();
     this._settleContacts();
@@ -164,7 +208,7 @@ export class Race {
 
     // fished back up by the sock on a string
     if (K.fish) {
-      K.wallopAt = 0;
+      K.wallopAt = K.wrongWayT = 0;
       const F = K.fish;
       F.t += DT;
       if (F.t >= F.dur) {
@@ -425,6 +469,12 @@ export class Race {
       else K.stuckT = 0;
     }
 
+    // Measure actual travel along the road, so backing up and driving
+    // nose-first the wrong way both count, while standing still does not.
+    const roadSpeed = K.vx * T.tx[K.k] + K.vz * T.tz[K.k];
+    if (this.phase !== 'race' || K.fin || K.fish || K.spinT > 0 || K.cut || roadSpeed > 3) K.wrongWayT = 0;
+    else K.wrongWayT = Math.max(0, Math.min(0.5, K.wrongWayT + (roadSpeed < -2.5 ? DT : -DT)));
+
     // ── items: the boxes, and using what you hold ──
     if (this.phase === 'race') {
       // (stage 5: a grabbed box pops and grows back, but a box is never "used
@@ -637,6 +687,19 @@ export class Race {
         const dx = O.x - K.x, dz = O.z - K.z, d2 = dx * dx + dz * dz;
         if (d2 >= best || dx * fx + dz * fz < Math.sqrt(d2) * move.arc) continue;
         target = O; best = d2;
+      }
+      const P = this.wallopProp;
+      if (P && !P.reset && Math.abs(P.y - K.y) <= 2.2) {
+        const dx = P.x - K.x, dz = P.z - K.z, dist = Math.hypot(dx, dz);
+        const reach = Math.max(0, dist - P.radius);
+        if (reach ** 2 < best && dx * fx + dz * fz >= dist * move.arc) {
+          const speed = 17 + move.shove * 1.25;
+          P.vx = fx * speed; P.vz = fz * speed; P.owner = K.i;
+          P.life = P.type === 'puck' ? 124 : 96;
+          P.reset = 0;
+          this.emit({ k: 'wallop-prop', i: K.i });
+          continue;
+        }
       }
       if (!target) continue;
       const dx = target.x - K.x, dz = target.z - K.z, d = Math.sqrt(best);

@@ -192,3 +192,24 @@ test('holding and re-tapping Wallop during recovery cannot start another swing',
   }
   assert.equal(swings,1);
 });
+
+test('track Wallops launch the ball and puck, hit a rival, then reset in their lane', () => {
+  for (const [track, type] of [['laundry', 'ball'], ['hockey', 'puck']]) {
+    const R = new Race({ track, racers: [{ id: 'kevalanche' }, { id: 'k8e' }] });
+    const P = R.wallopProp, [A, B] = R.karts;
+    const { x, y, z, k } = P, { tx, tz } = R.T;
+    assert.equal(P.type, type);
+    Object.assign(A, { x: x - tx[k] * 5, y, z: z - tz[k] * 5, yaw: Math.atan2(tx[k], tz[k]), wallopAt: 1 });
+    Object.assign(B, { x: x + tx[k] * 8, y, z: z + tz[k] * 8 });
+    R.tick = 1;
+    R._wallops();
+    assert.equal(P.owner, A.i);
+    assert.ok(P.life > 0);
+    for (let i = 0; i < 65 && !B.spinT; i++) R._moveWallopProp();
+    assert.equal(B.spinT, 0.48);
+    assert.equal(A.spinT, 0);
+    for (let i = 0; i < 95; i++) R._moveWallopProp();
+    assert.deepEqual([P.x, P.y, P.z, P.owner, P.reset], [x, y, z, -1, 0]);
+  }
+  assert.equal(new Race({ track: 'landing', racers: [] }).wallopProp, undefined);
+});

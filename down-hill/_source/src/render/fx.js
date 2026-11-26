@@ -146,6 +146,7 @@ export class Fx {
     this.itemGeo = itemGeos();
     this.tmp = { M: new THREE.Matrix4(), L: new THREE.Matrix4(), P: new THREE.Vector3(), Q: new THREE.Quaternion(), S: new THREE.Vector3(), E: new THREE.Euler(), C: new THREE.Color(), C2: new THREE.Color() };
     this._boxes();
+    if (race.wallopProp) this._makeWallopProp(race.wallopProp);
     this.shotMeshes = new Map();
     this.hazMeshes = new Map();
     this.cuffChains = new Map();
@@ -175,7 +176,39 @@ export class Fx {
     return this.pipelineWarmup;
   }
 
+  _makeWallopProp(P) {
+    const ball = P.type === 'ball';
+    const geometry = ball ? new THREE.SphereGeometry(P.radius, 24, 16)
+      : new THREE.CylinderGeometry(P.radius, P.radius, 0.76, 24);
+    const map = canvasTex(256, 128, (ctx, w, h) => {
+      ctx.fillStyle = ball ? '#daf32e' : '#27243f';
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = ball ? '#fffce6' : '#52eafa';
+      ctx.lineWidth = ball ? 5 : 9;
+      ctx.beginPath();
+      for (let x = 0; x <= w; x++) {
+        const wave = Math.cos(x / w * TAU) * (ball ? 26 : 0);
+        const y = h / 2 + wave;
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      if (!ball) {
+        ctx.fillStyle = '#fff9dc';
+        ctx.font = 'bold 70px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('88', w / 2, h / 2);
+      }
+    });
+    this.wallopProp = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ map, roughness: 0.79 }));
+    this.wallopAxis = new THREE.Vector3(1, 0, 0);
+    this.root.add(this.wallopProp);
+  }
+
   dispose() {
+    this.wallopProp?.geometry.dispose();
+    this.wallopProp?.material.map.dispose();
+    this.wallopProp?.material.dispose();
     const templates = this.warmedModels;
     if (!templates) return;
     this.pipelineWarmup.finally(() => {
@@ -431,6 +464,18 @@ export class Fx {
   update(dt, camQ, karts, views) {
     this.t += dt;
     const R = this.race, t = this.t;
+    const P = R.wallopProp;
+    if (P) {
+      const model = this.wallopProp, ball = P.type === 'ball';
+      const scale = P.reset ? Math.max(0, 1 - (95 - P.reset) / 15) : 1;
+      model.visible = scale > 0;
+      model.scale.setScalar(scale);
+      model.position.set(P.x, P.y + (ball ? P.radius : 0.39) * scale, P.z);
+      if (ball) {
+        if (P.life) this.wallopAxis.set(P.vz, 0, -P.vx).normalize();
+        model.quaternion.setFromAxisAngle(this.wallopAxis, P.roll);
+      } else model.rotation.y = P.roll * 0.4;
+    }
     // boxes
     this._boxesUpdate(t, camQ);
     // shots in flight
