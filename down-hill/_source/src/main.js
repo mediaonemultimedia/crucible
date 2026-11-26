@@ -21,7 +21,7 @@ import { Fx, TIER_COLORS } from './render/fx.js';
 import { Race, DT, ITEMS, ITEM_NAMES, ITEM_TIPS, COUNT_TICKS } from './race/sim.js';
 import { CPU, LEVEL_NAMES, cupStrength } from './race/cpu.js';
 import { buildTrack, TRACKS, CUP, rightX, rightZ } from './race/track.js';
-import { RACERS, ORDER, racerId, WEIGHTS } from './race/roster.js';
+import { RACERS, ORDER, racerId, WEIGHTS, WALLOPS } from './race/roster.js';
 import { Controls, MENU_KEYS, gamepads } from './input/controls.js';
 import { AudioEngine } from './audio/engine.js';
 import { CLIPS } from './audio/clips.js';
@@ -92,7 +92,7 @@ const VIEW_HTML = `<div class="vdark"></div><div class="fabric"></div>
 <div class="place">8<sup>th</sup></div>
 <div class="drift"><span>Drift</span><i></i><i></i><i></i></div>
 <div class="final">FINAL LAP!</div><div class="start-lights" aria-hidden="true"><i></i><i></i><i></i></div><div class="count"></div><div class="toast"></div>
-<div class="lookback">Look back</div><div class="ptag"></div><div class="scare"></div><div class="wait"></div>`;
+<div class="wallop-hud"></div><div class="lookback">Look back</div><div class="ptag"></div><div class="scare"></div><div class="wait"></div>`;
 
 class App {
   constructor(renderer, canvas) {
@@ -404,7 +404,7 @@ class App {
         const vis = v.group.visible, inRace = this.screen === 'race';
         if (inRace) break;
         const old = v.group.position.clone(), oldR = v.group.rotation.y;
-        const still = { fwd: 0, drift: 0, steer: 0, air: 0, spinT: 0, boostT: 0, caseT: 0, wobT: 0 };
+        const still = { lobby: true, fwd: 0, drift: 0, steer: 0, air: 0, spinT: 0, boostT: 0, caseT: 0, wobT: 0 };
         v.update(1 / 60, still, { x: spot[0], y: spot[1], z: spot[2], yaw: 0.55 }, cam.position, cam.quaternion);
         v.group.visible = true;
         const hidden = [];
@@ -443,6 +443,8 @@ class App {
     $('s-animal').textContent = `${R.animal} · ${S.alt ? R.altName.split('— ')[1] : 'the original'} · ${R.weight}`;
     $('s-kart').textContent = S.alt ? R.altKart : R.kartName;
     $('s-blurb').textContent = R.blurb;
+    const attack = WALLOPS[S.id];
+    $('s-wallop').textContent = `Wallop · ${attack.name} · ${attack.range} reach · ${attack.recovery.toFixed(2)}s recovery`;
     const bar = (v) => `<div class="bar"><i style="width:${Math.round(v * 100)}%"></i></div>`;
     $('s-stats').innerHTML = `<span>Speed</span>${bar((W.top - 26.5) / 2.6)}<span>Accel</span>${bar((W.accel - 13) / 4.5)}<span>Handling</span>${bar((W.grip - 0.85) / 0.25)}<span>Weight</span>${bar((W.mass - 0.6) / 0.85)}`;
     if (!quiet) this.audio.ui('tick');
@@ -519,7 +521,7 @@ class App {
         j, i, rect: rects[j], el, q,
         place: q('.place'), lap: q('.lap .n'), time: q('.lap .tm'), item: q('.item'), itemName: q('.item-name'), drift: q('.drift'), final: q('.final'),
         tip: q('.tip'), tprompt: q('.tprompt'), tauntIc: q('.taunt-ic'), warn: q('.warn'), caption: q('.caption'), speed: q('.speed'), islot: q('.islot'),
-        lights: q('.start-lights'), count: q('.count'), toastEl: q('.toast'), fabric: q('.fabric'), scare: q('.scare'), dark: q('.vdark'), mm: q('.minimap'), wait: q('.wait'),
+        lights: q('.start-lights'), count: q('.count'), toastEl: q('.toast'), wallop: q('.wallop-hud'), fabric: q('.fabric'), scare: q('.scare'), dark: q('.vdark'), mm: q('.minimap'), wait: q('.wait'),
         camera: new THREE.PerspectiveCamera(64, 1, 0.3, 1400),
         cam: { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 64, shake: 0 },
         lastItem: null, lookBack: false, lb: false, darkV: 0, tipUntil: 0, capUntil: 0, hud: {},
@@ -636,6 +638,11 @@ class App {
   /* the key (or button) for an action, as this view's player would press it */
   keyFor(H, act) {
     const p = this.humanP?.[H.j];
+    if (act === 'wallop') {
+      if (p?.phone >= 0) return 'Wallop';
+      if (p?.ctl.map === 'none' && p.ctl.gamepad?.()) return 'L3';
+      return p?.ctl.map === 'right' ? 'O' : 'X';
+    }
     if (p && p.phone >= 0 && p.ctl.map === 'none') return act === 'item' ? 'SUPER' : 'TAUNT';
     if (p && p.ctl.map === 'none' && p.ctl.gamepad?.()) return act === 'item' ? 'LB' : 'Y';
     const m = p ? p.ctl.map : 'all';
@@ -702,6 +709,19 @@ class App {
             }
           }
         }, 900);
+        break;
+      }
+      case 'wallop':
+        V.wallop(e.windup);
+        if (near) A.play('dh-whoosh', { gain: g(0.6), rate: e.pose === 'sweep' ? 1.2 : 0.98 });
+        break;
+      case 'wallop-hit': {
+        V.hit();
+        this.fx.burst(K.x, K.y + 2, K.z, ['#fff8d8', '#ffcd50', '#ff70ad'], 9, 6.5);
+        if (near) A.play('dh-bonk', { gain: g(0.9) });
+        if (mine) { H.cam.shake = 0.22; this.toast(H, 'WALLOPED!', '#ff84b2'); this.buzz(e.i, 'bump'); }
+        const hitter = this.hvOf(e.by);
+        if (hitter) this.toast(hitter, 'WALLOP!', '#ffcc52');
         break;
       }
       case 'hit': {
@@ -987,6 +1007,11 @@ class App {
     if (!H.hud.keys) { H.hud.keys = 1; for (const el of H.el.querySelectorAll('.tk')) el.textContent = this.keyFor(H, 'taunt'); }
     set('tip', this.t < H.tipUntil, (v) => H.tip.classList.toggle('on', v));
     set('cap', this.t < H.capUntil, (v) => H.caption.classList.toggle('on', v));
+    const ready = K.wallopReady <= R.tick;
+    set('wallopReady', ready, (v) => {
+      H.wallop.classList.toggle('cooldown', !v);
+      H.wallop.textContent = v ? `Wallop · ${this.keyFor(H, 'wallop')}` : 'Wallop · recovering';
+    });
     // the TAUNT prompt: airborne off a ramp, no trick yet
     const tp = !!(K.air && K.ramp && !K.trick && K.airT > 0.06 && K.spinT <= 0 && !K.fin);
     set('tp', tp, (v) => H.tprompt.classList.toggle('on', v));
@@ -1281,10 +1306,10 @@ class App {
     const I = this.world.info;
     if (this.screen === 'select' && this.turn) {
       const v = this.turn, [x, y, z] = I.turn;
-      v.update(dt, { fwd: 0, drift: 0, steer: 0, air: 0, spinT: 0, boostT: 0, caseT: 0, wobT: 0, x, y, z }, { x, y, z, yaw: -Math.PI / 6 }, this.camera.position, this.camera.quaternion);
+      v.update(dt, { lobby: true, fwd: 0, drift: 0, steer: 0, air: 0, spinT: 0, boostT: 0, caseT: 0, wobT: 0, x, y, z }, { x, y, z, yaw: -Math.PI / 6 }, this.camera.position, this.camera.quaternion);
       this.camera.fov = 40; this.camera.updateProjectionMatrix();
-      this.camera.position.set(x + 1.2, y + 4.2, z + 11.5);
-      this.camera.lookAt(x - 0.4, y, z);
+      this.camera.position.set(x + 1.2, y + 4.2, z + 12.25);
+      this.camera.lookAt(x - 0.4, y + 0.23, z);
       return;
     }
     // title: the whole world as a diorama, swaying slowly

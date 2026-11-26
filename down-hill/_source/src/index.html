@@ -168,7 +168,7 @@ body[data-screen=select] #pads{top:12px;bottom:auto;right:16px;padding:6px 10px 
 body[data-screen=select] #pads .qr{width:clamp(160px,17vh,240px);height:clamp(160px,17vh,240px)}
 body[data-screen=select] #pads .code{font-size:32px}
 body[data-screen=select] #pads .seats{flex-direction:row;flex-wrap:wrap;gap:3px 12px;max-width:380px}
-body[data-screen=select] #players{top:114px}
+body[data-screen=select] #players{top:84px}
 /* stage 5: the bigger QR card owns the top-right on select — the heading centres in the space left of it, the CPU / track menus start below it */
 body[data-screen=select] #select .head{right:calc(clamp(160px,17vh,240px) + 250px);left:max(24px,18vw)}
 body[data-screen=title] #pads{top:auto;bottom:22px;right:22px}
@@ -329,6 +329,12 @@ body.photo #photo{display:block;animation:jig .3s steps(2) infinite}
 .count.go::after{background-image:linear-gradient(#dcffd9 17%,#84f4ba 47%,#39c695 100%)}
 #setup #setup-start{background:linear-gradient(#ffed86,#ffbf36 65%,#f89722);border:2px solid #ffe698;box-shadow:0 3px 0 #a64c1a;color:#2b1730;font-family:var(--lettering);font-weight:400}
 #setup #setup-start:focus-visible{outline:3px solid #fff;outline-offset:4px}
+#players .pp{padding:3px 10px;min-width:110px;font-size:12px;line-height:1.15}
+#players .pp b{font-size:15px}
+#players .pp small{font-size:9px}
+#s-wallop{margin-top:7px;font:700 clamp(11px,1.05vw,15px)/1.15 var(--label);color:#ffe6a0}
+.wallop-hud{position:absolute;top:83px;right:28px;padding:4px 9px;border-radius:6px;background:#251837;color:#ffe6a0;border:1px solid #9e7244;font:700 16px/1 var(--label);text-transform:uppercase;letter-spacing:.04em;pointer-events:none}
+.wallop-hud.cooldown{color:#ead9fa;border-color:#69527b}
 </style>
 </head>
 <body data-screen="title">
@@ -355,6 +361,7 @@ body.photo #photo{display:block;animation:jig .3s steps(2) infinite}
       <div><kbd>Space</kbd> / <kbd>J</kbd><b>Item</b></div>
       <div><kbd>T</kbd> / <kbd>L</kbd><b>Taunt · trick</b></div>
       <div><kbd>Q</kbd> / <kbd>C</kbd><b>Look back</b></div>
+      <div><kbd>X</kbd> / <kbd>O</kbd><b>Wallop · L3</b></div>
       <div><kbd>Esc</kbd> <kbd>M</kbd><b>Pause · mute</b></div>
       <h4 style="margin-top:6px">Up to 4 players · split screen</h4>
       <div style="grid-column:1/-1;white-space:normal;max-width:640px;color:var(--dim)">Two on one keyboard (<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> and <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> — press <kbd>/</kbd> on the select screen), gamepads, and phones: scan the QR to race with your phone (stick to steer, button or tilt to drift).</div>
@@ -370,6 +377,7 @@ body.photo #photo{display:block;animation:jig .3s steps(2) infinite}
       <div class="an" id="s-animal"></div>
       <div class="kart" id="s-kart"></div>
       <div class="blurb" id="s-blurb"></div>
+      <div id="s-wallop"></div>
       <div class="stats" id="s-stats"></div>
     </div>
     <div class="diff" id="diff"><span class="eyebrow">CPU · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd></span></div>

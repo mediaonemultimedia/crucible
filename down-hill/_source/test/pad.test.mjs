@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { encodeInput, decode, PadState, GAS, ITEM, SUPER, BRAKE, TAPS, STALE_MS } from '../src/pad/wire.js';
+import { encodeInput, decode, PadState, GAS, ITEM, SUPER, BRAKE, WALLOP, TAPS, STALE_MS } from '../src/pad/wire.js';
 import { driftPitch, motionDrift } from '../src/pad/tilt.js';
 
 test('wire: the packet carries the buttons, the tap counters and the steering byte', () => {
@@ -72,4 +72,14 @@ test('wire: a phone that (re)joins holding a button does not press it', () => {
   P.take(decode(encodeInput(2, 0, c, 0)), 10);
   c[TAPS.indexOf(ITEM)]++;                        // (the phone counts every press)
   assert.ok(P.take(decode(encodeInput(3, ITEM, c, 0)), 20) & ITEM, 'pressed after letting go');
+});
+
+test('wire: Wallop has an independent tap counter and accepts older pads', () => {
+  const state = new PadState();
+  const taps = new Array(TAPS.length).fill(0);
+  state.take(decode(encodeInput(1, 0, taps.slice(0, 10))), 0);
+  taps[TAPS.indexOf(WALLOP)] = 1;
+  state.take(decode(encodeInput(3, GAS, taps)), 20);
+  assert.ok(state.sample().wallop, 'the tap survives a lost button-down packet');
+  assert.ok(!state.sample().wallop, 'the tap is delivered once');
 });

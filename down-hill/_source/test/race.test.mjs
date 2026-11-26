@@ -150,3 +150,45 @@ test('the amber cue gives enough time to charge a clean launch', () => {
     assert.equal(burst, expected);
   }
 });
+
+test('Wallop trades reach and recovery for power and never hits a different deck', () => {
+  function swing(id, gap, rise = 0, behind = false) {
+    const R = new Race({ track:'landing', racers:[{id},{id:'johnny'}], humans:[0,1] });
+    R.phase = 'race';
+    const {T} = R, [A,B] = R.karts;
+    const k = R.startK + 10;
+    for (const [K,q] of [[A,k],[B,k+(behind ? -gap : gap)]]) {
+      Object.assign(K,{k:q,x:T.x[q],y:T.y[q],z:T.z[q],yaw:Math.atan2(T.tx[q],T.tz[q]),vx:0,vz:0});
+    }
+    // Check the attack resolver directly for layer separation; the physics
+    // would otherwise put the staged grounded kart back on its own road.
+    if (rise) B.y += rise;
+    const events = [];
+    R._kartTick(A,{...noInput(),wallop:true});
+    for (let tick = R.tick + 1; tick <= A.wallopAt; tick++) {
+      R.tick = tick;
+      R._wallops();
+      events.push(...R.events);
+      R.events.length = 0;
+      if (A.wallopAt === 0) break;
+    }
+    return { hit:events.some(e=>e.k==='wallop-hit'), stagger:B.spinT, speed:Math.hypot(B.vx,B.vz), recovery:A.wallopReady };
+  }
+  const punch = swing('kevalanche',4), check = swing('k8e',4);
+  assert.ok(punch.hit && check.hit && punch.stagger > check.stagger && punch.speed > check.speed);
+  assert.ok(punch.recovery > check.recovery);
+  assert.ok(swing('k8e',8).hit && !swing('kevalanche',8).hit);
+  assert.ok(!swing('k8e',4,4).hit && !swing('k8e',4,0,true).hit);
+});
+
+test('holding and re-tapping Wallop during recovery cannot start another swing', () => {
+  const R = new Race({ racers: [{id:'kevalanche'}], humans:[0] });
+  R.phase = 'race';
+  let swings = 0;
+  for (let i = 0; i < 150; i++) {
+    R.step([{ ...noInput(), wallop:i !== 20 }]);
+    swings += R.events.filter(e => e.k === 'wallop').length;
+    R.events.length=0;
+  }
+  assert.equal(swings,1);
+});

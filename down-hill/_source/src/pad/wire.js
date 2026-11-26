@@ -4,13 +4,13 @@
    heartbeat, so a lost packet is replaced 16 ms later; a stale one (older
    seq) is dropped.
 
-   input  [1, seq, mask lo, mask hi, c0|c1, c2|c3, c4|c5, c6|c7, c8|c9, stickX]  10 bytes
+   input  [1, seq, mask lo, mask hi, c0|c1, c2|c3, c4|c5, c6|c7, c8|c9, stickX, c10?]
+          c10 is present when the controller supports Wallop (11-byte packet).
           mask: the stick's 4 directions (menus) + the kart's buttons;
           c: a 4-bit press counter per tap-able bit, so a tap shorter than
           a packet gap (or one whose packets were all lost) still lands;
           stickX: the steering, a signed byte (−127 … 127) — from the stick
-          or, in TILT mode, from the gyro. The game reads only this byte for
-          steering, so STICK and TILT look the same to it.
+          the joystick.
    ping   [2, id, rtt/2 ms]     game → phone (the last round trip, for its LED)
    pong   [3, id]               phone → game
 
@@ -18,8 +18,8 @@
    sheet's open/closed) is JSON on the reliable 'pc' channel.            */
 
 export const LEFT = 1, RIGHT = 2, UP = 4, DOWN = 8;
-export const GAS = 16, DRIFT = 32, ITEM = 64, BRAKE = 128, BACK = 256, TAUNT = 512, START = 1024, SUPER = 2048;
-export const TAPS = [ITEM, TAUNT, START, SUPER, LEFT, RIGHT, UP, DOWN, DRIFT, BRAKE];
+export const GAS = 16, DRIFT = 32, ITEM = 64, BRAKE = 128, BACK = 256, TAUNT = 512, START = 1024, SUPER = 2048, WALLOP = 4096;
+export const TAPS = [ITEM, TAUNT, START, SUPER, LEFT, RIGHT, UP, DOWN, DRIFT, BRAKE, WALLOP];
 export const T_INPUT = 1, T_PING = 2, T_PONG = 3;
 export const HEARTBEAT_MS = 16;
 export const STALE_MS = 400;          // nothing heard this long: the pad's held bits (and steering) drop to 0
@@ -27,10 +27,11 @@ export const STALE_MS = 400;          // nothing heard this long: the pad's held
 const s8 = (v) => Math.max(-127, Math.min(127, Math.round(v * 127)));
 
 export function encodeInput(seq, mask, counts, steer = 0) {
-  const b = new Uint8Array(10);
+  const b = new Uint8Array(counts.length > 10 ? 11 : 10);
   b[0] = T_INPUT; b[1] = seq & 255; b[2] = mask & 255; b[3] = (mask >> 8) & 255;
   for (let i = 0; i < 5; i++) b[4 + i] = ((counts[i * 2] & 15) << 4) | (counts[i * 2 + 1] & 15);
   b[9] = s8(steer) & 255;
+  if (b.length > 10) b[10] = counts[10] & 15;
   return b;
 }
 
@@ -40,6 +41,7 @@ export function decode(data) {
   if (b[0] === T_INPUT && b.length >= 9) {
     const counts = [];
     for (let i = 0; i < 5; i++) counts.push(b[4 + i] >> 4, b[4 + i] & 15);
+    if (b.length > 10) counts.push(b[10] & 15);
     const sx = b.length >= 10 ? (b[9] > 127 ? b[9] - 256 : b[9]) / 127 : 0;
     return { t: T_INPUT, seq: b[1], mask: b[2] | (b[3] << 8), counts, steer: sx };
   }
@@ -64,7 +66,7 @@ export const REORDER = 48;
    again, so the race never sees it come back as a second press (a held
    TAUNT re-firing the bounce on every dropout). GAS, BRAKE, DRIFT, LOOK and
    the stick come straight back. */
-export const LATCH = ITEM | TAUNT | START | SUPER;
+export const LATCH = ITEM | TAUNT | START | SUPER | WALLOP;
 const TAP_BITS = TAPS.reduce((m, b) => m | b, 0);
 
 /* one seat's state on the game side: packets in, the race's input out */
@@ -85,7 +87,7 @@ export class PadState {
     // let go: the latch is off; the counter moved: a real new press
     this.wasHeld &= p.mask;
     let pressed = 0;
-    if (!resync) TAPS.forEach((bit, i) => { if (((p.counts[i] - this.counts[i]) & 15) !== 0) pressed |= bit; });
+    if (!resync) TAPS.forEach((bit, i) => { if ((((p.counts[i] ?? 0) - (this.counts[i] ?? 0)) & 15) !== 0) pressed |= bit; });
     this.wasHeld &= ~pressed;
     // held edges: the uncounted bits always; every bit on a resync (its
     // counters can't be compared), but never one held through the gap
@@ -103,7 +105,7 @@ export class PadState {
     this.tapped = 0;
     return {
       steer: this.steer, gas: !!(m & GAS), brake: !!(m & BRAKE), drift: !!(m & DRIFT),
-      item: !!(m & (ITEM | SUPER)), taunt: !!(m & TAUNT), back: !!(m & BACK),
+      item: !!(m & (ITEM | SUPER)), taunt: !!(m & TAUNT), back: !!(m & BACK), wallop: !!(m & WALLOP),
     };
   }
   clear() { this.tapped = 0; }

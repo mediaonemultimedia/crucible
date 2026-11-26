@@ -550,7 +550,7 @@ const K8E = {
    points, its edges frayed and notched, one tear; unit = the head's radius */
 function makeTricorn() {
   const g = new THREE.Group();
-  const felt = uniform(new THREE.Color('#2a2326'));
+  const felt = uniform(new THREE.Color('#463358'));
   const rnd = (() => { let s = 7; return () => ((s = (s * 16807) % 2147483647) / 2147483647); })();
   // the crown: a low rounded dome
   const prof = [[0, 0.5], [0.22, 0.49], [0.4, 0.43], [0.52, 0.3], [0.56, 0.12], [0.57, 0.0]].map(([x, y]) => new THREE.Vector2(x, y));
@@ -559,7 +559,7 @@ function makeTricorn() {
   // against the crown except at the three points; a ragged edge
   const NA = 120, NR = 7, pos = [], idx = [], uvs = [];
   const notches = [];
-  for (let k = 0; k < 9; k++) notches.push({ a: rnd() * Math.PI * 2, w: 0.04 + rnd() * 0.07, d: 0.25 + rnd() * 0.45 });
+  for (let k = 0; k < 9; k++) notches.push({ a: rnd() * Math.PI * 2, w: 0.04 + rnd() * 0.07, d: 0.07 + rnd() * 0.13 });
   const tear = 1.05;
   for (let i = 0; i <= NA; i++) {
     const a = (i / NA) * Math.PI * 2;
@@ -582,7 +582,7 @@ function makeTricorn() {
   for (let i = 0; i < NA; i++) for (let j = 0; j < NR; j++) {
     const a = i * (NR + 1) + j, b = (i + 1) * (NR + 1) + j;
     // the tear: a slit through the brim on one side
-    if (Math.abs(((i + 0.5) / NA) * Math.PI * 2 - tear) < 0.03 && j > 2) continue;
+    if (Math.abs(((i + 0.5) / NA) * Math.PI * 2 - tear) < 0.025 && j > 5) continue;
     idx.push(a, b, a + 1, b, b + 1, a + 1);
   }
   const geo = new THREE.BufferGeometry();
@@ -595,13 +595,15 @@ function makeTricorn() {
     const N = normalize(normalWorld), V = normalize(cameraPosition.sub(positionWorld));
     const t = uv().y;
     const f = mx_noise_float(vec3(positionLocal.mul(60))).mul(0.1).add(0.96);
-    const base = vec3(felt).mul(f).mul(mix(float(1), float(0.6), smoothstep(0.93, 1.0, t)));
+    const base = mix(vec3(felt).mul(f), vec3(0.92, 0.54, 0.16), smoothstep(0.88, 0.97, t));
     const Nf = dot(N, V).lessThan(0).select(N.negate(), N);
     const rim = pow(float(1).sub(abs(dot(N, V))), float(2.2));
     return vec4(shade(base, Nf, { spec: 0.04, power: 8, wrap: 0.5 }).add(base.mul(rim.mul(0.3))), 1);
   })();
   const brim = new THREE.Mesh(geo, bm);
-  g.add(crown, brim);
+  const underside = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.055, 28), crown.material);
+  underside.position.y = -0.01;
+  g.add(crown, brim, underside);
   g.matrixAutoUpdate = false;
   return g;
 }
@@ -621,13 +623,13 @@ const ZACH = {
     const H = new HeadFrame(plush), hat = makeTricorn();
     plush.group.add(hat);
     const head = gridOf(plush.rig, 'head'), hr = Math.max(head.r[0], head.r[2]);
-    const at = [0, head.r[1] * 0.6, -0.04], T = new THREE.Vector3(), S = new THREE.Matrix4(), Q = new THREE.Matrix4();
+    const at = [0, head.r[1] * 0.82, -0.02], T = new THREE.Vector3(), S = new THREE.Matrix4(), Q = new THREE.Matrix4();
     return {
       update() {
         H.update();
         H.point(at, T);
         // cocked forward and a little to one side, as a pirate wears it
-        Q.makeRotationX(0.16).multiply(S.makeRotationZ(-0.08));
+        Q.makeRotationX(0.10).multiply(S.makeRotationZ(-0.08));
         hat.matrix.copy(H.m).setPosition(T).multiply(Q).multiply(S.makeScale(hr * 1.32, hr * 1.32, hr * 1.32));
         hat.matrixWorldNeedsUpdate = true;
       },

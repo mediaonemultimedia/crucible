@@ -27,6 +27,7 @@ export function sheetHTML(o = {}) {
   const rows = [
     ['Drive', 'Steer with the stick · hold the pedals', `${chip('ACCELERATE')} ${chip('BRAKE / REVERSE', ' g')}`],
     ['Drift', 'Hold while turning, release to boost. Slide from gas to drift to keep accelerating. Tilt also works.', chip('DRIFT', ' w')],
+    ['Wallop', 'Line up a nearby rival. Leave time to recover before swinging again.', chip('WALLOP', ' w')],
     ['Items', 'Press SUPER to use your item', chip('SUPER', ' s')],
   ].map(([n, s, i]) => `<div class="row"><div class="mv">${esc(n)}<small>${esc(s)}</small></div><div class="in">${i}</div></div>`).join('');
   const items = Object.keys(ITEM_HOW).map((k) => `<div class="it"><span class="ic">${ICONS[k] || ''}</span><b>${esc(ITEM_NAMES[k])}</b><small>${esc(ITEM_HOW[k])}</small></div>`).join('');

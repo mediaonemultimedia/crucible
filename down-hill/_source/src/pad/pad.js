@@ -1,16 +1,17 @@
 /* Phone pad with the original fourteen skins, stick steering and motion drift. */
 import { L, SK, skinId } from './skins.js';
 import { joinPad } from './padlink.js';
-import { encodeInput, decode, pong, TAPS, T_PING, HEARTBEAT_MS, LEFT, RIGHT, UP, DOWN, GAS, DRIFT, BRAKE, START, SUPER } from './wire.js';
+import { encodeInput, decode, pong, TAPS, T_PING, HEARTBEAT_MS, LEFT, RIGHT, UP, DOWN, GAS, DRIFT, BRAKE, START, SUPER, WALLOP } from './wire.js';
 import { sheetHTML } from './sheet.js';
 import { driftPitch, motionDrift } from './tilt.js';
 import { ledOf } from './host.js';
 
-const ACCELERATE = 0, DRIFT_BUTTON = 1;
+const ACCELERATE = 0, DRIFT_BUTTON = 1, WALLOP_BUTTON = 2;
 const BUTTONS = [
   { k: ACCELERATE, x: 1600, y: 510, radius: 112, bit: GAS, label: 'ACCELERATE' },
   { k: 3, x: 1975, y: 394, radius: 111, bit: BRAKE, label: 'BRAKE / REVERSE' },
-  { k: DRIFT_BUTTON, x: 1827, y: 703, radius: 109, bit: DRIFT, label: 'DRIFT' },
+  { k: DRIFT_BUTTON, x: 1777, y: 703, radius: 105, bit: DRIFT, label: 'DRIFT' },
+  { k: WALLOP_BUTTON, x: 2011, y: 666, radius: 104, bit: WALLOP, label: 'WALLOP' },
 ];
 const STICK_MAX = 60, DEAD = 20, FOLLOW = 110, STEER_DEAD = 8;
 
@@ -77,7 +78,7 @@ export function panelSVG(skin, art) {
     const cols = C.caps;
     let o = '';
     o += `<g id="stickG">${stick(...L.stick, C.ring, C.ball)}</g>`;
-    BUTTONS.forEach(({ k, x, y, radius, label }) => { o += btn(x, y, cols[k === DRIFT_BUTTON ? 2 : k], label, C.lab, k, radius); });
+    BUTTONS.forEach(({ k, x, y, radius, label }) => { o += btn(x, y, k === WALLOP_BUTTON ? '#ec9a35' : cols[k === DRIFT_BUTTON ? 2 : k], label, C.lab, k, radius); });
     o += pill(L.super[0], L.super[1], L.super[2], L.super[3], C.sup, 'SUPER', C.st);
     o += nesStart(L.start[0], L.start[1], L.start[2], L.start[3], C.slab || C.lab);
     const m = L.moves, tw = 230, th = 78, tx = m[0] - tw / 2, ty = 1100 - th;

@@ -12,7 +12,7 @@
    into a boost.                                                          */
 
 import { buildTrack, locate, lateral, along, groundAt, rightX, rightZ, TRACKS, podPos, sprinklerOn, WET_RUNOFF_EDGE } from './track.js';
-import { RACERS, stats } from './roster.js';
+import { RACERS, stats, WALLOPS } from './roster.js';
 import { makeRng } from '../sim/rng.js';
 
 export const DT = 1 / 60;
@@ -52,7 +52,7 @@ const ODDS = [
 export const KART_R = 1.55;           // kart radius for bumps
 
 /* the inputs a kart reads each tick (keyboard, pad or CPU) */
-export const noInput = () => ({ steer: 0, gas: false, brake: false, drift: false, item: false, taunt: false, back: false });
+export const noInput = () => ({ steer: 0, gas: false, brake: false, drift: false, item: false, taunt: false, back: false, wallop: false });
 
 export class Race {
   constructor({ track = 'landing', racers, seed = 1, laps = null, humans = [0] } = {}) {
@@ -110,7 +110,7 @@ export class Race {
       boostT: 0, padT: 0, spinT: 0, spinDir: 1, invT: 0,
       jitterT: 0, caseT: 0, wobT: 0, cuff: -1, cuffT: 0,
       sugarT: 0, shrinkT: 0, flatT: 0, flatCd: 0, ejectT: 0, lock: -1, held: 0, ramp: 0,
-      item: null, roulette: 0, tauntT: 0, bounceT: 0,
+      item: null, roulette: 0, tauntT: 0, bounceT: 0, wallopAt: 0, wallopReady: 0,
       fish: null, lastGood: k, stuckT: 0, wallT: 0, offT: 0, surf: 'track',
       steer: 0, inp: noInput(), prevInp: noInput(),
     };
@@ -135,6 +135,7 @@ export class Race {
     for (const B of this.boxes) if (B.dead > 0) B.dead--;
     this._world();
     for (const K of this.karts) this._kartTick(K, inputs[K.i] || noInput());
+    this._wallops();
     this._bumps();
     this._cuffs();
     this._settleContacts();
@@ -163,6 +164,7 @@ export class Race {
 
     // fished back up by the sock on a string
     if (K.fish) {
+      K.wallopAt = 0;
       const F = K.fish;
       F.t += DT;
       if (F.t >= F.dur) {
@@ -176,6 +178,14 @@ export class Race {
     }
 
     if (K.item && K.roulette > 0) { K.roulette--; if (!K.roulette) this.emit({ k: 'gotItem', i: K.i, item: K.item }); }
+
+    if (this.phase === 'race' && pressed('wallop') && this.tick >= K.wallopReady &&
+        !K.air && !K.fin && K.spinT <= 0 && K.ejectT <= 0) {
+      const move = WALLOPS[K.id];
+      K.wallopAt = this.tick + Math.round(move.windup / DT);
+      K.wallopReady = this.tick + Math.round(move.recovery / DT);
+      this.emit({ k: 'wallop', i: K.i, windup: move.windup, pose: move.pose });
+    }
 
     const live = this.phase === 'race' || this.phase === 'done';
     let steer = Math.max(-1, Math.min(1, I.steer || 0));
@@ -611,6 +621,34 @@ export class Race {
     K.item = null; K.held = 0;
     this.emit({ k: 'block', i: K.i, x: K.x - fx * 2.5, y: K.y + 1.4, z: K.z - fz * 2.5 });
     return true;
+  }
+
+  _wallops() {
+    for (const K of this.karts) {
+      if (K.wallopAt !== this.tick) continue;
+      K.wallopAt = 0;
+      if (K.fish || K.air || K.fin || K.spinT > 0 || K.ejectT > 0) continue;
+      const move = WALLOPS[K.id];
+      const fx = Math.sin(K.yaw), fz = Math.cos(K.yaw);
+      let target = null, best = move.range ** 2;
+      for (const O of this.karts) {
+        if (O === K || O.fin || O.fish || O.air || O.invT > 0 || O.sugarT > 0 || O.ejectT > 0 ||
+            Math.abs(O.y - K.y) > 2.2) continue;
+        const dx = O.x - K.x, dz = O.z - K.z, d2 = dx * dx + dz * dz;
+        if (d2 >= best || dx * fx + dz * fz < Math.sqrt(d2) * move.arc) continue;
+        target = O; best = d2;
+      }
+      if (!target) continue;
+      const dx = target.x - K.x, dz = target.z - K.z, d = Math.sqrt(best);
+      const kick = move.shove / Math.max(0.8, target.S.mass);
+      target.vx = target.vx * 0.68 + (d > 0.01 ? dx / d : fx) * kick;
+      target.vz = target.vz * 0.68 + (d > 0.01 ? dz / d : fz) * kick;
+      target.spinT = move.stagger;
+      target.spinDir = dx * fz - dz * fx < 0 ? -1 : 1;
+      target.invT = move.stagger + 0.7;
+      target.drift = target.charge = target.tier = target.boostT = 0;
+      this.emit({ k: 'wallop-hit', i: target.i, by: K.i });
+    }
   }
 
   /* a kart takes a hit: spin out, lose speed, a burst of feathers */

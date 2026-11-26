@@ -19,11 +19,12 @@ import * as THREE from 'three/webgpu';
 import { createRaceRemesh } from './race-remesh.js';
 import { Plush } from './plush.js';
 import { buildKart } from './karts.js';
+import { mat, rbox } from './geo.js';
 import { buildLookdevKart, driverStances } from './lookdev-karts.js';
 
 const previewKarts = typeof LOOKDEV_RACE !== 'undefined' && LOOKDEV_RACE;
 import { KEY, FILL } from '../../shared/grommet/fur.js';
-import { RACERS } from '../race/roster.js';
+import { RACERS, WALLOPS } from '../race/roster.js';
 import { stepSpring } from '../../shared/grommet/spring.js';
 
 export const SHELLS_NEAR = 12, SHELLS_FAR = 5;
@@ -82,7 +83,56 @@ export class Driver {
     return true;
   }
 
-  dispose(scene) { this.p.dispose(scene); }
+  displayFace(enabled, time) {
+    if (!enabled && !this.faceWasShown) return;
+    this.faceWasShown = enabled;
+    const p = this.p;
+    if (enabled && !this.faceDots) {
+      const dot = new THREE.SphereGeometry(1, 10, 7);
+      const shine = new THREE.MeshBasicMaterial({ color: '#fff2dd', toneMapped: false });
+      this.faceDots = p.eyes.map(eye => {
+        const bright = new THREE.Mesh(dot, shine);
+        const tiny = new THREE.Mesh(dot, shine);
+        bright.position.set(-0.25, 0.32, 0.93); bright.scale.set(0.21, 0.18, 0.07);
+        tiny.position.set(0.28, 0.01, 0.96); tiny.scale.set(0.085, 0.085, 0.05);
+        eye.add(bright, tiny);
+        return [bright, tiny];
+      });
+    }
+    // A pair of soft vinyl cheek patches on the three pale/spotted faces.
+    if (enabled && !this.faceCheeks && ['kevalanche', 'johnny', 'rubberta'].includes(this.id)) {
+      const geo = new THREE.SphereGeometry(1, 14, 8);
+      const tint = new THREE.MeshBasicMaterial({ color: this.id === 'rubberta' ? '#ffa199' : '#f49a9f', transparent: true, opacity: 0.68, depthWrite: false });
+      const P = new THREE.Vector3(), N = new THREE.Vector3(), Z = new THREE.Vector3(0, 0, 1);
+      const ey = p.info.eyes;
+      this.faceCheeks = [-1, 1].map(side => {
+        const cheek = new THREE.Mesh(geo, tint);
+        p.body.surfacePoint(ey.part || 'head', 0.5 + side * ey.u * 1.65, ey.v + 0.078, P, N);
+        cheek.position.copy(P).addScaledVector(N, 0.045);
+        cheek.quaternion.setFromUnitVectors(Z, N.normalize());
+        cheek.scale.set(ey.scale[0] * 0.54, ey.scale[1] * 0.27, 0.035);
+        p.group.add(cheek);
+        return cheek;
+      });
+    }
+    this.faceCheeks?.forEach(cheek => { cheek.visible = enabled; });
+    const blinkPhase = time % 4.8;
+    const blink = enabled && blinkPhase > 4.54 ? Math.sin((blinkPhase - 4.54) / 0.26 * Math.PI) ** 2 : 0;
+    p.eyes.forEach((eye, i) => {
+      const [x, y, z] = p.info.eyes.scale;
+      eye.scale.set(x * (enabled ? 1.08 : 1), y * (enabled ? 1.14 - 0.97 * blink : 1), z);
+      this.faceDots?.[i].forEach(dot => { dot.visible = enabled && blink < 0.6; });
+    });
+    p.eyeGlow?.forEach(glow => { glow.visible = !(enabled && (blink > 0.5 || this.id === 'zach')); });
+  }
+
+  dispose(scene) {
+    const dot = this.faceDots?.[0][0];
+    if (dot) { dot.geometry.dispose(); dot.material.dispose(); }
+    const cheek = this.faceCheeks?.[0];
+    if (cheek) { cheek.geometry.dispose(); cheek.material.dispose(); }
+    this.p.dispose(scene);
+  }
 }
 
 export class RacerView {
@@ -135,6 +185,24 @@ export class RacerView {
      (a rig-level pose every racer gets; the player's own also wakes its
      soft body for the arms-up taunt) */
   taunt(air) { this.driver.pose(air ? 'jump' : 'win', air ? 0.75 : 1.4); if (this.kart.parts.hydraulics && !air) this.hyd = 1.1; if (air) this.trickT = 0.75; this.showT = air ? 0.75 : 1.2; this.showLen = this.showT; }
+
+  wallop(windup) {
+    this.swipeT = 0;
+    this.swipeWindup = windup;
+    const pose = WALLOPS[this.id].pose;
+    if (pose === 'headbutt' || this.strike) return;
+    const pink = this.alt ? '#bc83ff' : '#ff81a6';
+    const geo = pose === 'punch' ? rbox(0.86, 0.65, 1.05, 0.28, 2)
+      : new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+        new THREE.Vector3(), new THREE.Vector3(.55, .14, .15),
+        new THREE.Vector3(.97, .21, .69), new THREE.Vector3(.64, .29, 1.13),
+      ]), 8, this.id === 'rubberta' ? .18 : .12, 5, false);
+    const color = pose === 'punch' ? this.id === 'kevalanche' ? '#e92749' : '#ffb647'
+      : this.id === 'zach' ? this.alt ? '#c0d7f1' : '#555083' : pink;
+    this.strike = new THREE.Mesh(geo, mat(color, { roughness: 0.68 }));
+    this.strike.visible = false;
+    this.kart.seat.add(this.strike);
+  }
 
   /* place it from the sim's kart K (interpolated pose passed in) */
   update(dt, K, pose, camPos, camQ) {
@@ -193,6 +261,28 @@ export class RacerView {
     d.rotation.x = Math.max(-0.15, Math.min(0.2, (K.boostT > 0 ? -0.12 : 0) + this.pitch * 0.4));
     d.rotation.y = (K.steer || 0) * 0.25 + (K.spinT > 0 ? Math.sin(this.t * 20) * 0.3 : 0);
     if (previewKarts) d.rotation.set(0, 0, 0);
+    if (K.lobby) {
+      d.rotation.z += Math.sin(this.t * 1.75) * 0.065;
+      d.rotation.y += Math.sin(this.t * 1.1) * 0.08;
+    }
+    if (this.swipeWindup) {
+      this.swipeT += dt;
+      const w = this.swipeWindup, recovers = this.swipeT - w;
+      const pose = WALLOPS[this.id].pose;
+      const power = recovers < 0 ? -0.46 * Math.sin(this.swipeT / w * Math.PI) : Math.max(0, 1 - recovers / 0.24) ** 2;
+      d.position.z = P.z + power * (pose === 'headbutt' ? 0.6 : 0.32);
+      d.rotation.x += power * (pose === 'headbutt' ? 0.42 : 0.19);
+      d.rotation.y += power * (pose === 'sweep' ? 0.85 : pose === 'punch' ? -0.62 : 0);
+      d.rotation.z += power * (pose === 'sweep' ? -0.29 : 0.05);
+      if (this.strike) {
+        this.strike.visible = power > 0.18 && !K.fish;
+        this.strike.position.set(P.scale * (pose === 'sweep' ? 0.15 : 0.68), P.y + P.scale * 1.06,
+          P.z + P.scale * (0.56 + power * (pose === 'sweep' ? .44 : 1)));
+        this.strike.rotation.y = pose === 'sweep' ? 0.58 - power * 1.4 : -0.16;
+        this.strike.scale.setScalar(P.scale * (0.66 + Math.max(0, power) * .54));
+      }
+      if (recovers > 0.24 || K.fish) this.swipeWindup = 0;
+    } else d.position.z = P.z;
     if (this.showT > 0) {
       this.showT -= dt;
       const u = 1 - Math.max(0, this.showT) / this.showLen, up = Math.sin(Math.min(1, u * 1.3) * Math.PI);
@@ -228,10 +318,12 @@ export class RacerView {
     this.setLod(dist > RacerView.lodNear ? 1 : 0);
     this.driver.light(camQ);
     if (!previewKarts) this.driver.update(dt, dist < 45 && this.mayWake !== false, !!this.racing);
+    this.driver.displayFace(Boolean(K.lobby), this.t);
     g.visible = dist < RacerView.farCull;
   }
 
   dispose(scene) {
+    this.strike?.geometry.dispose();
     this.raceMesh?.geometry.dispose();
     this.raceMesh?.material.dispose();
     this.driver.dispose(scene);

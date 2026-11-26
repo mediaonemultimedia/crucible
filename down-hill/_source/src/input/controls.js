@@ -21,15 +21,15 @@ export const KEYMAP = {
   ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
   ArrowUp: 'gas', KeyW: 'gas', ArrowDown: 'brake', KeyS: 'brake',
   ShiftLeft: 'drift', ShiftRight: 'drift', KeyK: 'drift',
-  Space: 'item', KeyJ: 'item', KeyT: 'taunt', KeyL: 'taunt', KeyQ: 'back', KeyC: 'back',
+  Space: 'item', KeyJ: 'item', KeyT: 'taunt', KeyL: 'taunt', KeyQ: 'back', KeyC: 'back', KeyX: 'wallop',
 };
 export const KEYMAP_LEFT = {
   KeyA: 'left', KeyD: 'right', KeyW: 'gas', KeyS: 'brake', ShiftLeft: 'drift', KeyF: 'drift',
-  Space: 'item', KeyE: 'item', KeyT: 'taunt', KeyR: 'taunt', KeyQ: 'back', KeyC: 'back',
+  Space: 'item', KeyE: 'item', KeyT: 'taunt', KeyR: 'taunt', KeyQ: 'back', KeyC: 'back', KeyX: 'wallop',
 };
 export const KEYMAP_RIGHT = {
   ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'gas', ArrowDown: 'brake', ShiftRight: 'drift', Slash: 'drift',
-  Enter: 'item', NumpadEnter: 'item', Period: 'item', KeyL: 'taunt', Quote: 'taunt', KeyK: 'back', Semicolon: 'back',
+  Enter: 'item', NumpadEnter: 'item', Period: 'item', KeyL: 'taunt', Quote: 'taunt', KeyK: 'back', Semicolon: 'back', KeyO: 'wallop',
 };
 export const MAPS = { all: KEYMAP, left: KEYMAP_LEFT, right: KEYMAP_RIGHT, none: {} };
 /* the menu keys of each half: move, confirm */
@@ -38,7 +38,7 @@ export const MENU_KEYS = {
   left: { left: ['KeyA'], right: ['KeyD'], up: ['KeyW'], down: ['KeyS'], confirm: ['Space', 'KeyE'] },
   right: { left: ['ArrowLeft'], right: ['ArrowRight'], up: ['ArrowUp'], down: ['ArrowDown'], confirm: ['Enter', 'NumpadEnter', 'Period'] },
 };
-const ACTS = ['gas', 'brake', 'drift', 'item', 'taunt', 'back'];
+const ACTS = ['gas', 'brake', 'drift', 'item', 'taunt', 'back', 'wallop'];
 const typing = (e) => { const t = e.target; return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA'); };
 export const gamepads = () => (typeof navigator !== 'undefined' && navigator.getGamepads ? [...navigator.getGamepads()].filter((g) => g && g.connected) : []);
 
@@ -84,7 +84,7 @@ export class Controls {
     if (Math.abs(steer) < 0.15) steer = 0;
     if (b(14)) steer = -1; if (b(15)) steer = 1;
     return {
-      steer, gas: b(0) || v(7) > 0.3 || b(12), brake: b(1) || v(6) > 0.3 || b(13), drift: b(5), item: b(4) || b(2), taunt: b(3),
+      steer, gas: b(0) || v(7) > 0.3 || b(12), brake: b(1) || v(6) > 0.3 || b(13), drift: b(5), item: b(4) || b(2), taunt: b(3), wallop: b(10),
       back: (gp.axes[3] || 0) > 0.6 || b(11), start: b(9), confirm: b(0), cancel: b(1),
     };
   }
@@ -94,7 +94,7 @@ export class Controls {
     this.tapped.clear();
     const I = {
       steer: (A.has('right') ? 1 : 0) - (A.has('left') ? 1 : 0),
-      gas: A.has('gas'), brake: A.has('brake'), drift: A.has('drift'), item: A.has('item'), taunt: A.has('taunt'), back: A.has('back'),
+      gas: A.has('gas'), brake: A.has('brake'), drift: A.has('drift'), item: A.has('item'), taunt: A.has('taunt'), back: A.has('back'), wallop: A.has('wallop'),
     };
     const P = this.pad();
     if (P) {
