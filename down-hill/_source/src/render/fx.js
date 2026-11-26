@@ -10,8 +10,8 @@
      clock (and its jump-scare over the leader); feather slicks on the
      ground;
    - the sock on a string that fishes a fallen kart back;
-   - stage 5: the boxes are big, glowing and instanced (three draws for every
-     box on the track); every kart carries its held item on its back (one
+   - stage 5: the boxes are big, glowing and instanced (two instanced draws for every
+     box row together); every kart carries its held item on its back (one
      shared low-poly mesh per item type, instanced: at most one draw per
      type, LOD'd away for far karts); the paper plane, the spring cushion's
      reticle, the hot wash's steam, the sugar rush's candy glow.          */
@@ -123,10 +123,10 @@ function itemGeos() {
   feather.computeVertexNormals();
   return {
     slick: colorMerge([[feather, '#ffffff', -0.25, 0.1, 0, 0, 0, 0.5], [feather, '#ffd1e0', 0.25, 0.1, 0, 0, 0, -0.4], [feather, '#ffffff', 0, 0.2, 0.05, 0, 0, 0.1], [S(0.32, 8, 6), '#f4efe6', 0, -0.45, 0, 0, 0, 0, 1.4, 0.5, 1.4]]),
-    missile: colorMerge([[pillowGeo(1.3, 0.65, 1.0, [6, 2, 6]), '#ffffff'], [B(1.34, 0.16, 0.24), '#ff3b6b']]),
-    espresso: colorMerge([[Cy(0.42, 0.32, 0.6), '#f4efe6'], [Cy(0.4, 0.4, 0.04), '#5a3218', 0, 0.29, 0], [Tor(0.18, 0.06, 6, 10), '#f4efe6', 0.46, 0, 0], [Cy(0.62, 0.62, 0.06, 14), '#f4efe6', 0, -0.32, 0]]),
+    missile: colorMerge([[pillowGeo(1.3, 0.65, 1.0, [6, 2, 6]), '#ffffff'], [B(1.34, 0.2, 0.26), '#f54864'], [B(0.27, 0.32, 1.02), '#f54864', 0.22, 0, 0]]),
+    espresso: colorMerge([[Cy(0.42, 0.32, 0.6), '#ffa33f'], [Cy(0.4, 0.4, 0.04), '#5a3218', 0, 0.29, 0], [Tor(0.18, 0.065, 6, 10), '#ffa33f', 0.46, 0, 0], [Cy(0.62, 0.62, 0.06, 14), '#f4efe6', 0, -0.32, 0]]),
     cuffs: colorMerge([[Tor(0.34, 0.15), '#ff6fb5', -0.38, 0, 0, 0, 0.6], [Tor(0.34, 0.15), '#ff6fb5', 0.38, 0, 0, 0, -0.6], [Tor(0.12, 0.04, 5, 8), '#d8d8de']]),
-    case: colorMerge([[pillowGeo(1.2, 0.5, 1.4, [6, 2, 6]), '#f4efe6'], [B(1.24, 0.1, 0.18), '#ffb3c8', 0, 0, 0.55]]),
+    case: colorMerge([[pillowGeo(1.2, 0.5, 1.4, [6, 2, 6]), '#b99af8', 0, 0.2, 0, Math.PI * 0.35], [B(1.24, 0.22, 0.18), '#fceaff', 0, -0.36, 0.25]]),
     alarm: colorMerge([[Cy(0.55, 0.55, 0.4, 16), '#e2463f', 0, 0, 0, Math.PI / 2], [Cy(0.47, 0.47, 0.05, 16), '#fff7e0', 0, 0, 0.21, Math.PI / 2], [S(0.24, 8, 6), '#e9c349', -0.36, 0.52, 0], [S(0.24, 8, 6), '#e9c349', 0.36, 0.52, 0], [B(0.05, 0.3, 0.04), '#222222', 0, 0.1, 0.25]]),
     sugar: colorMerge([[Cy(0.6, 0.6, 0.18, 18), '#ff6fb5', 0, 0.45, 0, Math.PI / 2], [Tor(0.38, 0.07, 6, 18), '#fff7e0', 0, 0.45, 0.1], [Tor(0.18, 0.06, 6, 14), '#ffd84a', 0, 0.45, 0.1], [Cy(0.06, 0.06, 0.9, 6), '#f4efe6', 0, -0.3, 0]]),
     plane: colorMerge([[plane, '#f4efe6'], [plane, '#dcd3ea', 0, -0.02, 0, 0, 0, 0, 0.96]]),
@@ -219,14 +219,14 @@ export class Fx {
       const im = this.heldMesh[kind];
       if (!im) continue;
       const pop = this.pops[K.i] > 0 ? Math.sin((1 - this.pops[K.i] / 0.45) * Math.PI) * 0.45 : 0;
-      const sc = (K.roulette > 0 ? 0.7 : 0.85) * (1 + pop);
+      const sc = (K.roulette > 0 ? 0.7 : 1.02) * (1 + pop);
       if (K.held) {
         // held behind on LOOK BACK: it dangles off the back of the kart
         const sw = Math.sin(this.t * 7 + K.i) * 0.35;
         P.set(Math.sin(sw) * 0.6, 1.3 - Math.abs(sw) * 0.2, -3.7); E.set(0.3, 0, sw * 0.6);
       } else {
         // above the rear bumper, facing the chase camera, a little bob
-        P.set(0, 1.55 + Math.sin(this.t * 4 + K.i) * 0.06 + pop * 0.5, -2.35); E.set(0, Math.PI + Math.sin(this.t * 1.7 + K.i) * 0.25, 0);
+        P.set(0, 1.67 + Math.sin(this.t * 4 + K.i) * 0.06 + pop * 0.5, -2.43); E.set(0, Math.PI + Math.sin(this.t * 1.7 + K.i) * 0.25, 0);
       }
       L.compose(P, Q.setFromEuler(E), S.set(sc, sc, sc));
       M.multiplyMatrices(v.group.matrixWorld, L);
@@ -277,60 +277,50 @@ export class Fx {
   // All active pickups share these three instanced meshes.
   _boxes() {
     const n = this.race.boxes.length;
+    // One atlas face carries the piping, stitch and raised vinyl mark.
     const label = canvasTex(256, 256, (g, w, h) => {
-      const grad = g.createLinearGradient(0, 0, w, h);
-      grad.addColorStop(0, '#297c83'); grad.addColorStop(0.45, '#143852'); grad.addColorStop(1, '#111a33');
-      g.fillStyle = grad; g.fillRect(0, 0, w, h);
-      g.strokeStyle = '#f3d392'; g.lineWidth = 7;
-      g.strokeRect(18, 18, 220, 220);
-      g.strokeStyle = '#71d5d6'; g.lineWidth = 2; g.strokeRect(30, 30, 196, 196);
-      // The club's feather sits behind the question mark on every face.
-      g.fillStyle = '#367682'; g.beginPath(); g.moveTo(63, 205);
-      g.bezierCurveTo(47, 101, 105, 52, 189, 51);
-      g.bezierCurveTo(193, 142, 123, 164, 63, 205); g.fill();
-      g.strokeStyle = '#6cb7af'; g.lineWidth = 4;
-      g.beginPath(); g.moveTo(65, 210); g.quadraticCurveTo(104, 136, 162, 74); g.stroke();
-      g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.font = '900 140px sans-serif';
-      g.strokeStyle = '#101729'; g.lineWidth = 13; g.strokeText('?', 129, 132);
-      g.fillStyle = '#fff9d6'; g.fillText('?', 129, 132);
+      const ink = '#271738';
+      const cloth = g.createLinearGradient(0, 0, w, h);
+      cloth.addColorStop(0, '#ff89d6'); cloth.addColorStop(0.58, '#ff3bac'); cloth.addColorStop(1, '#b51be7');
+      g.fillStyle = '#6f218d'; g.fillRect(0, 0, w, h);
+      const panel = (x, y, size, radius) => { g.beginPath(); g.roundRect(x, y, size, size, radius); };
+      panel(10, 10, 236, 45);
+      g.fillStyle = cloth; g.fill();
+      g.lineWidth = 8; g.strokeStyle = '#ffdc37'; g.stroke();
+      panel(27, 27, 202, 33);
+      g.lineWidth = 3; g.strokeStyle = '#fff4dd'; g.setLineDash([7, 7]); g.stroke(); g.setLineDash([]);
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+      g.font = '146px "Archivo Black", sans-serif';
+      g.lineWidth = 17; g.strokeStyle = ink; g.strokeText('?', 129, 141);
+      g.fillStyle = '#c96e44'; g.fillText('?', 129, 141);
+      g.strokeText('?', 129, 130);
+      const mark = g.createLinearGradient(0, 69, 0, 193);
+      mark.addColorStop(0, '#fff8d7'); mark.addColorStop(0.56, '#ffdb38'); mark.addColorStop(1, '#ffab12');
+      g.fillStyle = mark; g.fillText('?', 129, 130);
     });
-    const shell = new THREE.InstancedMesh(new THREE.BoxGeometry(3.25, 2.95, 3.25),
-      new THREE.MeshStandardMaterial({ map: label, roughness: 0.44, emissive: '#46888b',
-        emissiveMap: label, emissiveIntensity: 0.45 }), n);
-    const trim = [];
-    const metal = '#e8c073', corner = '#eef1db';
-    for (const x of [-1.62, 1.62]) for (const z of [-1.62, 1.62]) {
-      trim.push([rbox(0.30, 3.08, 0.30, 0.09, 1), metal, x, 0, z]);
-    }
-    for (const y of [-1.45, 1.45]) {
-      for (const x of [-1.62, 1.62]) trim.push([rbox(0.25, 0.23, 3.22, 0.07, 1), metal, x, y]);
-      for (const z of [-1.62, 1.62]) trim.push([rbox(3.22, 0.23, 0.25, 0.07, 1), metal, 0, y, z]);
-    }
-    trim.push([rbox(0.46, 0.32, 0.16, 0.06, 1), corner, 0, 1.24, 1.65],
-      [rbox(0.46, 0.32, 0.16, 0.06, 1), corner, 0, 1.24, -1.65]);
-    const frame = new THREE.InstancedMesh(colorMerge(trim),
-      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.33 }), n);
+    const shell = new THREE.InstancedMesh(rbox(3.35, 3.08, 3.35, 0.38, 2),
+      new THREE.MeshStandardMaterial({ map: label, roughness: 0.68, toneMapped: false,
+        emissive: '#d881b6', emissiveMap: label, emissiveIntensity: 0.62 }), n);
     const halo = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1),
       new THREE.MeshBasicMaterial({ map: dotTex(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), n);
-    const tint = ['#69d0e2', '#9fedb3', '#ffcc78', '#eaa2ee', '#a6d2ff'];
+    const tint = ['#ffffff', '#ffd9fa', '#ffd8bf', '#d9e6ff', '#ebd2ff'];
     const color = new THREE.Color();
     this.race.boxes.forEach((_, i) => {
       shell.setColorAt(i, color.set(tint[i % tint.length]));
-      halo.setColorAt(i, color.multiplyScalar(0.24));
+      halo.setColorAt(i, color.multiplyScalar(0.17));
     });
-    for (const m of [shell, frame, halo]) {
+    for (const m of [shell, halo]) {
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       m.frustumCulled = false;
       this.root.add(m);
     }
-    this.boxI = { body: shell, ribbon: frame, halo };
+    this.boxI = { body: shell, halo };
     const T = this.race.T;
     this.boxPh = this.race.boxes.map((B, i) => i * 0.7 + B.k * 0.013);
     this.boxYaw = this.race.boxes.map(B => Math.atan2(T.tx[B.k], T.tz[B.k]));
   }
   _boxesUpdate(t, camQ) {
-    const R = this.race, { body, ribbon, halo } = this.boxI;
+    const R = this.race, { body, halo } = this.boxI;
     const { M, P, Q, S, E } = this.tmp;
     R.boxes.forEach((B, i) => {
       const ph = this.boxPh[i];
@@ -339,12 +329,12 @@ export class Fx {
       P.set(B.x, B.y + 0.60 + Math.sin(t * 2.2 + ph) * 0.27, B.z);
       Q.setFromEuler(E.set(0, this.boxYaw[i] + Math.sin(t * 1.25 + ph) * 0.18, Math.sin(t * 1.7 + ph) * 0.05));
       M.compose(P, Q, S.set(s * 0.92, s, s * 0.92));
-      body.setMatrixAt(i, M); ribbon.setMatrixAt(i, M);
+      body.setMatrixAt(i, M);
       const hs = s * (5.1 + Math.sin(t * 3 + ph) * 0.35);
       M.compose(P, camQ, S.set(hs, hs, hs));
       halo.setMatrixAt(i, M);
     });
-    body.instanceMatrix.needsUpdate = ribbon.instanceMatrix.needsUpdate = halo.instanceMatrix.needsUpdate = true;
+    body.instanceMatrix.needsUpdate = halo.instanceMatrix.needsUpdate = true;
   }
 
   /* ── the sock on a string ── */

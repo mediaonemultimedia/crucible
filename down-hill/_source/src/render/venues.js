@@ -4,13 +4,13 @@ import { World, keepCameraAboveRoad } from './world.js';
 import { canvasTex, mesh, srand } from './geo.js';
 import { buildTrackBranding } from './track-branding.js';
 import { buildReadable } from './readable.js';
-import { lateral, rightX, rightZ, sceneryClearsRoad } from '../race/track.js';
+import { lateral, rightX, rightZ, sceneryClearsRoad, WET_RUNOFF_EDGE } from '../race/track.js';
 
 const VENUES = {
-  laundry: { sky: '#52a8e2', ground: '#338f64', lane: '#c64d29', deck: '#55382e', rail: '#007c65', light: '#ffe0b9', title: 'CENTRE COURT', sub: 'JOHNNY DEUCE INVITATIONAL' },
-  hockey: { sky: '#285eaa', ground: '#2559a8', lane: '#8edbff', deck: '#1b52a3', rail: '#e92d55', light: '#d6f7ff' },
-  dojo: { sky: '#5644a5', ground: '#624680', lane: '#e29b5c', deck: '#963849', rail: '#dc3154', light: '#ffdda5' },
-  park: { sky: '#55d8ff', ground: '#0cabb2', lane: '#ffd04c', deck: '#9d4c57', rail: '#ff674b', light: '#fff0b6' },
+  laundry: { sky: '#55c6ff', ground: '#25ae67', lane: '#c64d29', deck: '#55382e', rail: '#00a875', light: '#ffe0b9', title: 'CENTRE COURT', sub: 'JOHNNY DEUCE INVITATIONAL' },
+  hockey: { sky: '#3278da', ground: '#2066d0', lane: '#66d5ff', deck: '#1b52a3', rail: '#ff2f58', light: '#d6f7ff' },
+  dojo: { sky: '#694cd7', ground: '#733bb1', lane: '#ffc06d', deck: '#963849', rail: '#dc3154', light: '#ffdda5' },
+  park: { sky: '#55d8ff', ground: '#05c4c7', lane: '#ffcc24', deck: '#9d4c57', rail: '#ff5150', light: '#fff0b6' },
 };
 const standard = (color, roughness = 0.82) => new THREE.MeshStandardMaterial({ color, roughness });
 const box = (root, material, x, y, z, w, h, d) => mesh(new THREE.BoxGeometry(w, h, d), material, x, y, z, root);
@@ -46,8 +46,8 @@ function lanePaint(id, V, slick) {
     const base = g.createLinearGradient(0,0,w,0);
     const edges = {hockey:'#53a0e6',park:'#e28b31',dojo:'#ad573e'};
     const border = slick ? '#0866ce' : edges[id] || V.lane;
-    base.addColorStop(0,border); base.addColorStop(.16,slick?'#0e99f0':V.lane);
-    base.addColorStop(.84,slick?'#0e99f0':V.lane); base.addColorStop(1,border);
+    base.addColorStop(0,border); base.addColorStop(.16,slick?'#009bff':V.lane);
+    base.addColorStop(.84,slick?'#009bff':V.lane); base.addColorStop(1,border);
     g.fillStyle = base;
     g.fillRect(0, 0, w, h);
     g.fillStyle = slick ? '#46cde8' : '#fff3d0';
@@ -166,7 +166,7 @@ function groundPaint(id, V, T) {
       g.strokeStyle = '#f9f5e8c0';
       if (id === 'laundry') {
         for (const x of [155, 570]) {
-          g.fillStyle = '#80ad3f';
+          g.fillStyle = '#76bd26';
           g.fillRect(x - 25, 260, 350, 470);
           g.strokeRect(x, 272, 300, 443);
           g.strokeRect(x + 27, 272, 246, 443);
@@ -280,7 +280,10 @@ export class VenueWorld extends World {
     const flume = (k) => tagAt(T, k) === 'flume';
     const all = () => true;
     ribbon(T, root, dry, (k) => !flume(k), (w) => [[-w, 0], [w, 0]]);
-    if (id === 'park') ribbon(T, root, wet, flume, (w) => [[-w, 0], [w, 0]]);
+    if (id === 'park') {
+      ribbon(T, root, wet, flume, (w) => [[-w, 0], [w, 0]]);
+      ribbon(T, root, wet, (k) => tagAt(T, k) === 'runoff', (w) => [[w * WET_RUNOFF_EDGE, 0.12], [w - 0.1, 0.12]]);
+    }
     for (const s of [-1, 1]) {
       ribbon(T, root, edge, all, (w) => [[s * w, 0.02], [s * w, -2.5]]);
       if (id === 'park') ribbon(T, root, wet, flume, (w) => [[s * (w - 0.1), 0], [s * (w + 0.2), 2.5]]);

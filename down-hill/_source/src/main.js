@@ -91,7 +91,7 @@ const VIEW_HTML = `<div class="vdark"></div><div class="fabric"></div>
 <canvas class="minimap" width="460" height="340"></canvas>
 <div class="place">8<sup>th</sup></div>
 <div class="drift"><span>Drift</span><i></i><i></i><i></i></div>
-<div class="final">FINAL LAP!</div><div class="count"></div><div class="toast"></div>
+<div class="final">FINAL LAP!</div><div class="start-lights" aria-hidden="true"><i></i><i></i><i></i></div><div class="count"></div><div class="toast"></div>
 <div class="lookback">Look back</div><div class="ptag"></div><div class="scare"></div><div class="wait"></div>`;
 
 class App {
@@ -519,7 +519,7 @@ class App {
         j, i, rect: rects[j], el, q,
         place: q('.place'), lap: q('.lap .n'), time: q('.lap .tm'), item: q('.item'), itemName: q('.item-name'), drift: q('.drift'), final: q('.final'),
         tip: q('.tip'), tprompt: q('.tprompt'), tauntIc: q('.taunt-ic'), warn: q('.warn'), caption: q('.caption'), speed: q('.speed'), islot: q('.islot'),
-        count: q('.count'), toastEl: q('.toast'), fabric: q('.fabric'), scare: q('.scare'), dark: q('.vdark'), mm: q('.minimap'), wait: q('.wait'),
+        lights: q('.start-lights'), count: q('.count'), toastEl: q('.toast'), fabric: q('.fabric'), scare: q('.scare'), dark: q('.vdark'), mm: q('.minimap'), wait: q('.wait'),
         camera: new THREE.PerspectiveCamera(64, 1, 0.3, 1400),
         cam: { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 64, shake: 0 },
         lastItem: null, lookBack: false, lb: false, darkV: 0, tipUntil: 0, capUntil: 0, hud: {},
@@ -636,7 +636,7 @@ class App {
   /* the key (or button) for an action, as this view's player would press it */
   keyFor(H, act) {
     const p = this.humanP?.[H.j];
-    if (p && p.phone >= 0 && p.ctl.map === 'none') return act === 'item' ? 'ITEM' : 'TAUNT';
+    if (p && p.phone >= 0 && p.ctl.map === 'none') return act === 'item' ? 'SUPER' : 'TAUNT';
     if (p && p.ctl.map === 'none' && p.ctl.gamepad?.()) return act === 'item' ? 'LB' : 'Y';
     const m = p ? p.ctl.map : 'all';
     if (act === 'item') return m === 'right' ? 'Enter' : 'Space';
@@ -671,8 +671,39 @@ class App {
     const H = K ? this.hvOf(e.i) : null, mine = !!H;
     const g = (x) => (mine ? 1 : near ? 0.6 * x : 0);
     switch (e.k) {
-      case 'count': for (const v of this.allViews()) { v.count.textContent = e.n; v.count.className = 'count'; } A.play('dh-beep'); break;
-      case 'go': for (const v of this.allViews()) { v.count.textContent = 'GO!'; v.count.dataset.ink = 'GO!'; v.count.className = 'count go'; } A.play('dh-go'); A.music(this.world.music || 'race', this.recording?.url); setTimeout(() => { for (const v of this.allViews()) if (v.count.textContent === 'GO!') { v.count.textContent = ''; delete v.count.dataset.ink; } }, 900); break;
+      case 'count':
+        for (const v of this.allViews()) {
+          v.count.textContent = e.n;
+          v.count.className = 'count';
+          v.lights.dataset.phase = String(e.n);
+        }
+        A.play('dh-beep');
+        break;
+      case 'start-cue':
+        for (const v of this.allViews()) v.lights.dataset.phase = 'ready';
+        A.play('dh-beep', { rate: 1.42, gain: 0.9 });
+        break;
+      case 'go': {
+        const views = this.allViews();
+        for (const v of views) {
+          v.lights.dataset.phase = 'go';
+          v.count.textContent = 'GO!';
+          v.count.dataset.ink = 'GO!';
+          v.count.className = 'count go';
+        }
+        A.play('dh-go');
+        A.music(this.world.music || 'race', this.recording?.url);
+        setTimeout(() => {
+          for (const v of views) {
+            delete v.lights.dataset.phase;
+            if (v.count.textContent === 'GO!') {
+              v.count.textContent = '';
+              delete v.count.dataset.ink;
+            }
+          }
+        }, 900);
+        break;
+      }
       case 'hit': {
         const c = (K.alt ? ALT_COLORS : COLORS)[K.id];
         this.fx.burst(K.x, K.y + 2, K.z, ['#ffffff', '#ffffff', c[0], c[1], '#ffd1e0'], e.kind === 'alarm' ? 44 : 30, e.kind === 'missile' ? 11 : 8);
@@ -936,7 +967,8 @@ class App {
       H.lastItem = key;
       H.item.innerHTML = it ? ICONS[it] : '';
       H.item.classList.toggle('spin', spin);
-      H.itemName.innerHTML = it && !spin ? `${ITEM_NAMES[it]} <kbd>${this.keyFor(H, 'item')}</kbd>` : '';
+      H.itemName.innerHTML = it && !spin ? `<strong>${esc(ITEM_NAMES[it])}</strong><kbd>${this.keyFor(H, 'item')}</kbd>` : '';
+      H.islot.dataset.item = it && !spin ? it : '';
       H.islot.classList.toggle('has', !!it);
       if (it && !spin) { H.item.classList.remove('land'); void H.item.offsetWidth; H.item.classList.add('land'); }
     }

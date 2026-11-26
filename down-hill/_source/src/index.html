@@ -300,6 +300,28 @@ body.photo #photo{display:block;animation:jig .3s steps(2) infinite}
 .place sup{letter-spacing:0;-webkit-text-stroke:.12em var(--edge)}
 .lap .n,.lap .tm,.board .row{font-variant-numeric:tabular-nums}
 .count{--type-edge:clamp(6px,1.15vw,15px);--type-depth:8px;--type-shadow:#b93562}
+/* Held items use a stable silhouette, accent colour and name together. */
+.islot{--item-ink:#bb9cf6}
+.islot[data-item="slick"],.islot[data-item="wash"]{--item-ink:#57def2}
+.islot[data-item="missile"],.islot[data-item="alarm"]{--item-ink:#ff6d73}
+.islot[data-item="espresso"],.islot[data-item="spring"]{--item-ink:#ffc057}
+.islot[data-item="cuffs"],.islot[data-item="sugar"]{--item-ink:#ff9ad6}
+.islot[data-item="case"]{--item-ink:#c3a5ff}
+.islot[data-item="plane"]{--item-ink:#a8dcfb}
+.islot.has .item{background:radial-gradient(ellipse at 48% 0%,color-mix(in srgb,var(--item-ink) 28%,#261c42),#1c152d 84%);border-color:var(--item-ink);box-shadow:0 4px 0 #170d27}
+.islot .item svg{width:74px;height:74px}
+.item-name:empty{display:none}
+.item-name:not(:empty){display:flex;align-items:center;gap:7px;border:2px solid var(--item-ink);border-radius:7px;background:#20152f;padding:2px 7px 3px;letter-spacing:.026em;font-size:20px;line-height:1.1;text-shadow:none;box-shadow:0 3px 0 #120a20}
+.item-name strong{font-weight:700}
+.islot.has .taunt-ic{top:2px}
+.item-name kbd{margin:0;font-size:13px}
+.start-lights{display:none;position:absolute;left:50%;top:15%;transform:translateX(-50%);padding:8px 11px;gap:9px;align-items:center;background:#241631;border:2px solid #a48ac5;border-radius:30px;box-shadow:0 5px 0 #140d22;pointer-events:none}
+.start-lights[data-phase]{display:flex}
+.start-lights i{display:block;width:29px;height:29px;border:3px solid #533851;border-radius:50%;background:#3b2c42}
+.start-lights[data-phase="3"] i:first-child,.start-lights[data-phase="2"] i:nth-child(-n+2),.start-lights[data-phase="1"] i{background:#f84b61;border-color:#ffb7b6}
+.start-lights[data-phase="ready"]{border-color:#fff3a6;box-shadow:0 4px 0 #84482b,0 0 20px #ffc33e90}
+.start-lights[data-phase="ready"] i{background:#ffcb44;border-color:#fff3a6}
+.start-lights[data-phase="go"] i{background:#48efa0;border-color:#bfffdb}
 .count.go{color:#8ef5bf;--type-shadow:#277b62;text-shadow:0 8px 0 var(--type-shadow)}
 .toast{--type-edge:6px;--type-depth:4px;letter-spacing:-.035em}
 .toast::after,.count.go::after{position:absolute;inset:0;content:attr(data-ink) / "";pointer-events:none;text-shadow:none;-webkit-text-stroke:0;background-clip:text;color:transparent}
@@ -335,7 +357,7 @@ body.photo #photo{display:block;animation:jig .3s steps(2) infinite}
       <div><kbd>Q</kbd> / <kbd>C</kbd><b>Look back</b></div>
       <div><kbd>Esc</kbd> <kbd>M</kbd><b>Pause · mute</b></div>
       <h4 style="margin-top:6px">Up to 4 players · split screen</h4>
-      <div style="grid-column:1/-1;white-space:normal;max-width:640px;color:var(--dim)">Two on one keyboard (<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> and <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> — press <kbd>/</kbd> on the select screen), gamepads, and phones: scan the QR to race with your phone (stick to steer, tilt to drift).</div>
+      <div style="grid-column:1/-1;white-space:normal;max-width:640px;color:var(--dim)">Two on one keyboard (<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> and <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> — press <kbd>/</kbd> on the select screen), gamepads, and phones: scan the QR to race with your phone (stick to steer, button or tilt to drift).</div>
     </div>
   </section>
 

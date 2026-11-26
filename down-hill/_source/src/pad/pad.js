@@ -6,9 +6,11 @@ import { sheetHTML } from './sheet.js';
 import { driftPitch, motionDrift } from './tilt.js';
 import { ledOf } from './host.js';
 
+const ACCELERATE = 0, DRIFT_BUTTON = 1;
 const BUTTONS = [
-  { k: 3, x: 1645, y: 574, radius: 126, bit: BRAKE, label: 'BRAKE / REVERSE' },
-  { k: 0, x: 1970, y: 482, radius: 135, bit: GAS, label: 'ACCELERATE' },
+  { k: ACCELERATE, x: 1600, y: 510, radius: 112, bit: GAS, label: 'ACCELERATE' },
+  { k: 3, x: 1975, y: 394, radius: 111, bit: BRAKE, label: 'BRAKE / REVERSE' },
+  { k: DRIFT_BUTTON, x: 1827, y: 703, radius: 109, bit: DRIFT, label: 'DRIFT' },
 ];
 const STICK_MAX = 60, DEAD = 20, FOLLOW = 110, STEER_DEAD = 8;
 
@@ -75,7 +77,7 @@ export function panelSVG(skin, art) {
     const cols = C.caps;
     let o = '';
     o += `<g id="stickG">${stick(...L.stick, C.ring, C.ball)}</g>`;
-    BUTTONS.forEach(({ k, x, y, radius, label }) => { o += btn(x, y, cols[k], label, C.lab, k, radius); });
+    BUTTONS.forEach(({ k, x, y, radius, label }) => { o += btn(x, y, cols[k === DRIFT_BUTTON ? 2 : k], label, C.lab, k, radius); });
     o += pill(L.super[0], L.super[1], L.super[2], L.super[3], C.sup, 'SUPER', C.st);
     o += nesStart(L.start[0], L.start[1], L.start[2], L.start[3], C.slab || C.lab);
     const m = L.moves, tw = 230, th = 78, tx = m[0] - tw / 2, ty = 1100 - th;
@@ -193,7 +195,7 @@ export function runPad(params) {
 
   /* state */
   const S = { skin: '', seat: -1, link: null, connecting: false, rtt: 0, lastPing: 0, view: null, sheetOpen: false };
-  const btnDown = { 0: 0, 3: 0 };
+  const btnDown = [0, 0, 0, 0];
   let superDown = 0, startDown = 0;
   let stickBits = 0, stickX = 0;
   const counts = new Array(TAPS.length).fill(0);
@@ -370,9 +372,20 @@ export function runPad(params) {
       return;
     }
     if (q.t === 'btn') {
-      // slide from one button onto the next (arcade piano)
       const h = hit(p);
-      if (h && h.t === 'btn' && h.k !== q.k) { press(q, false); q.k = h.k; press(q, true); }
+      if (q.k === ACCELERATE && (q.chord || h?.k === DRIFT_BUTTON)) {
+        // Roll the throttle thumb onto drift without interrupting throttle.
+        // Returning to the throttle fires the drift release.
+        if (h?.k === DRIFT_BUTTON && !q.chord) {
+          q.chord = true;
+          press({ t: 'btn', k: DRIFT_BUTTON }, true);
+        } else if (h?.k === ACCELERATE && q.chord) {
+          q.chord = false;
+          press({ t: 'btn', k: DRIFT_BUTTON }, false);
+        }
+        return;
+      }
+      if (h?.t === 'btn' && h.k !== q.k) { press(q, false); q.k = h.k; press(q, true); }
     }
   });
   const up = (e) => {
@@ -380,6 +393,7 @@ export function runPad(params) {
     if (!q) return;
     ptrs.delete(e.pointerId);
     if (q.t === 'stick') { setStick(0, 0); ball?.setAttribute('transform', ''); return; }
+    if (q.chord) press({ t: 'btn', k: DRIFT_BUTTON }, false);
     press(q, false);
   };
   for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) svg.addEventListener(t, up);

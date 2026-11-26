@@ -1,8 +1,5 @@
-/* The engines: each kart its own synthesised hum (its racer's waveform and
-   base pitch from race/roster.js), rising with speed, a whine on boost, a
-   rattle on fluff. Four voices, given to the player and the three nearest
-   karts each frame; gains by distance. On the engine's SFX bus.          */
-
+/* Four local engine voices. A low motor note and a smaller exhaust
+   harmonic rise under throttle, with a pulse that quickens under load. */
 import { RACERS } from '../race/roster.js';
 
 export class Hum {
@@ -10,15 +7,17 @@ export class Hum {
 
   _make(ctx, dest) {
     const o = ctx.createOscillator(), o2 = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain(), lfo = ctx.createOscillator(), lg = ctx.createGain();
-    o.type = 'sawtooth'; o2.type = 'square'; o2.detune.value = 7;
-    f.type = 'lowpass'; f.frequency.value = 600; f.Q.value = 3;
+    o.type = 'triangle'; o2.type = 'triangle';
+    f.type = 'lowpass'; f.frequency.value = 340; f.Q.value = 0.55;
     g.gain.value = 0;
-    lfo.frequency.value = 18; lg.gain.value = 4;
-    lfo.connect(lg); lg.connect(o.frequency); lg.connect(o2.frequency);
-    const g2 = ctx.createGain(); g2.gain.value = 0.35;
-    o.connect(f); o2.connect(g2); g2.connect(f); f.connect(g); g.connect(dest);
+    lfo.frequency.value = 13; lg.gain.value = 0.12;
+    const pulse = ctx.createGain();
+    pulse.gain.value = 0.82;
+    lfo.connect(lg); lg.connect(pulse.gain);
+    const g2 = ctx.createGain(); g2.gain.value = 0.24;
+    o.connect(f); o2.connect(g2); g2.connect(f); f.connect(pulse); pulse.connect(g); g.connect(dest);
     o.start(); o2.start(); lfo.start();
-    return { o, o2, f, g, lfo, who: -1 };
+    return { o, o2, f, g, lfo, lg };
   }
 
   start() {
@@ -41,14 +40,19 @@ export class Hum {
       const e = order[j];
       if (!e) { v.g.gain.setTargetAtTime(0, t, 0.05); return; }
       const K = e.K, R = RACERS[K.id];
-      if (v.who !== K.i) { v.who = K.i; v.o.type = R.hum.wave; }
-      const sp = Math.min(1.5, Math.abs(K.fwd) / K.S.top);
-      const f0 = R.hum.base * (1 + sp * 1.7 + (K.boostT > 0 ? 0.35 : 0)) * (K.air ? 1.12 : 1);
-      v.o.frequency.setTargetAtTime(f0, t, 0.06); v.o2.frequency.setTargetAtTime(f0 * 2, t, 0.06);
-      v.f.frequency.setTargetAtTime(380 + sp * 1300 + (K.boostT > 0 ? 900 : 0), t, 0.08);
-      v.lfo.frequency.setTargetAtTime(K.surf !== 'track' ? 32 : 14 + sp * 10, t, 0.1);
+      const sp = Math.min(1.6, Math.abs(K.fwd) / K.S.top);
+      const gridRev = sp < 0.06 ? (K.rev || 0) : 0;
+      const throttle = Boolean(K.inp?.gas);
+      const boost = K.boostT > 0;
+      const load = K.air ? 0.15 : throttle ? 1 : 0.3;
+      const f0 = (40 + R.hum.base * 0.19) * (1 + sp * 0.75 + gridRev * 0.45 + (boost ? 0.13 : 0));
+      v.o.frequency.setTargetAtTime(f0, t, 0.075);
+      v.o2.frequency.setTargetAtTime(f0 * 2, t, 0.075);
+      v.f.frequency.setTargetAtTime(155 + sp * 230 + load * 160 + (boost ? 150 : 0), t, 0.085);
+      v.lfo.frequency.setTargetAtTime(12 + sp * 24 + gridRev * 9, t, 0.08);
+      v.lg.gain.setTargetAtTime(0.09 + load * 0.1 + (K.drift ? 0.03 : 0), t, 0.08);
       const near = K.i === me ? 1 : Math.max(0, 1 - e.d / 45);
-      const gain = (K.fish ? 0 : 0.05 + 0.07 * sp) * near * (K.i === me ? 1 : 0.6);
+      const gain = (K.fish ? 0 : 0.065 + 0.07 * sp + 0.025 * load + (boost ? 0.035 : 0)) * near * (K.i === me ? 1 : 0.6);
       v.g.gain.setTargetAtTime(gain, t, 0.08);
     });
   }

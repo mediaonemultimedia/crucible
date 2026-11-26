@@ -11,7 +11,7 @@
    through three spark tiers — white feathers, gold, mint — and released
    into a boost.                                                          */
 
-import { buildTrack, locate, lateral, along, groundAt, rightX, rightZ, TRACKS, podPos, sprinklerOn } from './track.js';
+import { buildTrack, locate, lateral, along, groundAt, rightX, rightZ, TRACKS, podPos, sprinklerOn, WET_RUNOFF_EDGE } from './track.js';
 import { RACERS, stats } from './roster.js';
 import { makeRng } from '../sim/rng.js';
 
@@ -124,8 +124,9 @@ export class Race {
     if (this.phase === 'count') {
       const left = COUNT_TICKS - this.tick;
       if (left % 60 === 0 && left > 0) this.emit({ k: 'count', n: left / 60 });
+      if (left === 33) this.emit({ k: 'start-cue' });  // 0.55 s before GO, inside the boost window
       if (left <= 0) { this.phase = 'race'; this.emit({ k: 'go' }); this.goTick = this.tick; }
-      // revving on the grid: the drift and gas held at GO give a little jump start
+      // revving on the grid: a short throttle hold timed to GO gives a jump start
       for (const K of this.karts) { const I = inputs[K.i] || noInput(); K.rev = I.gas ? Math.min(1, (K.rev || 0) + DT * 1.2) : 0; K.inp = I; }
       if (this.phase !== 'race') return;
       for (const K of this.karts) if (K.rev > 0.35 && K.rev < 0.95) { K.boostT = 0.8; this.emit({ k: 'boost', i: K.i, tier: 0, start: 1 }); }
@@ -196,6 +197,7 @@ export class Race {
       if (Math.abs(K.d) > T.w[K.k] + 0.6) surf = 'fluff';
       const tag = T.def.points[T.sec[K.k]].tag;
       if (surf === 'track' && (tag === 'flume' || tag === 'ice')) surf = tag;
+      if (tag === 'runoff' && K.d > T.w[K.k] * WET_RUNOFF_EDGE && Math.abs(K.d) <= T.w[K.k]) surf = 'pool';
       for (const P of T.def.patches) if ((K.x - P.x) ** 2 + (K.z - P.z) ** 2 < P.r * P.r) surf = P.kind;
     }
     if (K.cut || K.sugarT > 0) surf = 'track';      // a sugar rush ignores the fluff
@@ -230,9 +232,11 @@ export class Race {
       if (K.ejectT > 0) fwd *= 0.965;              // nobody at the wheel: it rolls to a stop
     }
 
-    // steering: a touch tighter at low speed, a touch looser flat out
+    // Feather the throttle or brake before a corner to regain bite.
     const sp = Math.abs(fwd);
-    let rate = 2.25 * Math.min(1, sp / 7) * (1 - 0.22 * Math.min(1, sp / S.top)) * S.grip;
+    const speedRatio = sp / S.top;
+    const push = Math.max(0, Math.min(1, (speedRatio - 0.78) / 0.55));
+    let rate = 2.25 * Math.min(1, sp / 7) * (1 - 0.22 * Math.min(1, speedRatio) - 0.11 * push) * S.grip;
     if (fwd < -0.5) rate = -rate * 0.8;
     let yawRate = -steer * rate;
 
@@ -269,7 +273,7 @@ export class Race {
     if (K.hop > 0) K.hop = Math.max(0, K.hop - DT);
 
     // grip: the sideways slip bleeds away (less in a drift, less in the air, less on fluff)
-    const grip = K.air ? 1.5 : surf === 'flume' ? 4 : surf === 'ice' ? 6 : K.drift ? 4.5 : surf === 'suds' ? 3.2 : surf === 'fluff' || surf === 'mulch' || surf === 'pool' ? 7 : 13;
+    const grip = K.air ? 1.5 : surf === 'flume' ? 4 : surf === 'ice' ? 6 : K.drift ? 4.5 : surf === 'suds' ? 3.2 : surf === 'pool' ? 5 : surf === 'fluff' || surf === 'mulch' ? 7 : 13 - 4 * push;
     lat *= Math.exp(-grip * DT);
     const nfx = Math.sin(K.yaw), nfz = Math.cos(K.yaw), nrx = -nfz, nrz = nfx;
     K.vx = nfx * fwd + nrx * lat; K.vz = nfz * fwd + nrz * lat;

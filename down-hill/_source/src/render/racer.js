@@ -166,8 +166,10 @@ export class RacerView {
     }
     // pitch with the slope / the vertical speed in the air; roll with the steer
     const pitchT = K.air ? Math.max(-0.5, Math.min(0.45, -K.vy * 0.025)) : Math.max(-0.4, Math.min(0.4, -(K.slopeVy || 0) / Math.max(6, Math.abs(K.fwd)) * 0.9));
-    this.pitch += (pitchT - this.pitch) * Math.min(1, dt * 8);
-    const rollT = (K.steer || 0) * Math.min(1, Math.abs(K.fwd) / 20) * 0.1 + (K.drift ? -K.drift * 0.06 : 0);
+    const speed = Math.min(1.4, Math.abs(K.fwd) / (K.S?.top || 30));
+    const launchLean = this.racing && K.boostT > 0 && !K.air ? 0.095 : 0;
+    this.pitch += (pitchT + launchLean - this.pitch) * Math.min(1, dt * 8);
+    const rollT = (K.steer || 0) * speed * 0.175 + (K.drift ? -K.drift * 0.1 : 0);
     this.roll += (rollT - this.roll) * Math.min(1, dt * 7);
     // (dt-safe: ≤ 1/120 s substeps — one step per frame went unstable under ~12 fps, the
     // kart bouncing and squashing over and over; bounded to its drawn range)
@@ -179,9 +181,9 @@ export class RacerView {
     let hy = 0;
     if (this.hyd > 0) { this.hyd -= dt; hy = Math.abs(Math.sin(this.hyd * 11)) * 0.9 * Math.min(1, this.hyd); }
     const hop = K.hop > 0 ? Math.sin((K.hop / 0.18) * Math.PI) * 0.35 : 0;
-    B.position.y = hy + hop + Math.sin(this.t * 9) * 0.02 * Math.min(1, Math.abs(K.fwd) / 10);
+    B.position.y = hy + hop + Math.sin(this.t * (8 + 4 * speed)) * 0.035 * speed;
     B.rotation.set(this.pitch + (hy ? Math.sin(this.hyd * 11) * 0.12 : 0), 0, this.roll + trickRoll + drumRoll);
-    const sq = Math.max(-0.3, Math.min(0.2, this.squash * 0.08));
+    const sq = Math.max(-0.33, Math.min(0.22, this.squash * 0.10));
     B.scale.set(1 - sq * 0.5, 1 + sq, 1 - sq * 0.5);
 
     // the plush in its seat: breathing, leaning into the steer, looking about

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs';
-import { Race, noInput, ITEMS } from '../src/race/sim.js';
+import { COUNT_TICKS, Race, noInput, ITEMS } from '../src/race/sim.js';
 import { CPU } from '../src/race/cpu.js';
 import { ORDER } from '../src/race/roster.js';
 import { buildTrack, TRACKS, groundAt, rightX, rightZ } from '../src/race/track.js';
@@ -134,4 +134,19 @@ test('falling off a drop edge (where nothing is drawn): the sock fishes you back
   for (let i = 0; i < 60 * 5; i++) { R.step([noInput()]); for (const e of R.events) seen.push(e.k); R.events.length = 0; }
   assert.ok(seen.includes('fall') && seen.includes('fished'), seen.join(' '));
   assert.ok(Math.abs(K.d) < 1 && !K.fish);
+});
+
+test('the amber cue gives enough time to charge a clean launch', () => {
+  for (const [from, expected] of [[COUNT_TICKS - 32, true], [COUNT_TICKS - 120, false], [COUNT_TICKS - 3, false]]) {
+    const R = new Race({ track: 'landing', racers: [{ id: 'k8e' }], humans: [0] });
+    let cue = null, burst = false;
+    for (let i = 1; i <= COUNT_TICKS; i++) {
+      R.step([{ ...noInput(), gas: i >= from }]);
+      if (R.events.some(e => e.k === 'start-cue')) cue = i;
+      if (R.events.some(e => e.k === 'boost' && e.start)) burst = true;
+      R.events.length = 0;
+    }
+    assert.equal(cue, COUNT_TICKS - 33);
+    assert.equal(burst, expected);
+  }
 });

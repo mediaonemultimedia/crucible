@@ -294,7 +294,7 @@ export class World {
     const f = mesh(new THREE.PlaneGeometry(R.x1 - R.x0, R.z1 - R.z0), floor, (R.x0 + R.x1) / 2, 0, 0, this.root);
     f.rotation.x = -Math.PI / 2;
     // the landing's runner carpet: the floor round the stairwell hole
-    const carpet = new THREE.MeshStandardMaterial({ map: carpetTex(landingLookdev ? '#512288' : '#6b3242', landingLookdev ? '#331453' : '#4a1f2c'), roughness: 0.95 });
+    const carpet = new THREE.MeshStandardMaterial({ map: carpetTex(landingLookdev ? '#6e2ac0' : '#6b3242', landingLookdev ? '#471c87' : '#4a1f2c'), roughness: 0.95 });
     const S = STAIRS;
     const pieces = [[H.x0, H.x1, H.z0, S.z0], [H.x0, H.x1, S.z1, H.z1], [H.x0, S.x0, S.z0, S.z1], [S.x1, H.x1, S.z0, S.z1]];
     for (const [x0, x1, z0, z1] of pieces) { const p = mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), carpet, (x0 + x1) / 2, 0, (z0 + z1) / 2, this.root); p.rotation.x = -Math.PI / 2; }

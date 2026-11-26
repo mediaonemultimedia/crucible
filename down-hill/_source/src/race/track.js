@@ -102,6 +102,7 @@ const court = (...p) => route('court', ...p);
 const ice = (...p) => route('ice', ...p);
 const boardwalk = (...p) => route('boardwalk', ...p);
 const flume = (...p) => route('flume', ...p);
+export const WET_RUNOFF_EDGE = 0.28; // fraction of road half-width at the puddle's dry edge
 
 export const CENTRE_COURT = {
   id: 'laundry',
@@ -116,8 +117,8 @@ export const CENTRE_COURT = {
     court(147, 0, -48), court(102, 0, -22),
     court(62, 0, 5), court(0, 0, 5), court(-68, 0, -3), court(-119, 0, -52),
     court(-165, 0, -71), court(-207, 0, -48), court(-210, 0, 1),
-    court(-169, 0, 36), court(-117, 0, 35), court(-91, 0, 6),
-    court(-105, 9, -24), court(-145, 19, -19), court(-164, 24, 13),
+    court(-169, 0, 36), court(-117, 7, 35), court(-91, 17, 6),
+    court(-105, 22, -24), court(-145, 23, -19), court(-164, 24, 13),
     court(-201, 22, 51), court(-224, 11, 83),
   ],
   patches: [], posts: [],
@@ -141,7 +142,7 @@ export const RUBBERTA_RAPIDS = {
     flume(97, 30, -24), flume(57, 19, -53), flume(5, 13, -54),
     flume(-37, 8, -26), flume(-34, 5, 24),
     flume(13, 5, 61), flume(75, 7, 62, { launch: 15 }),
-    boardwalk(129, 0, 59), boardwalk(180, 0, 80), boardwalk(173, 0, 124),
+    route('runoff', 129, 0, 59), boardwalk(180, 0, 80), boardwalk(173, 0, 124),
     boardwalk(116, 0, 148), boardwalk(57, 0, 130),
     boardwalk(3, 0, 132), boardwalk(-42, 0, 175),
     boardwalk(-110, 0, 191), boardwalk(-183, 0, 187),

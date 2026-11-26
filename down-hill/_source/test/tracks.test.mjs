@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Race, noInput } from '../src/race/sim.js';
 import { CPU } from '../src/race/cpu.js';
 import { ORDER } from '../src/race/roster.js';
-import { buildTrack, TRACKS, CUP, locate } from '../src/race/track.js';
+import { buildTrack, TRACKS, CUP, locate, rightX, rightZ } from '../src/race/track.js';
 
 const field = (lvl = 'hard') => [...ORDER, 'kevalanche'].map((id, i) => ({ id, alt: i === 7, cpu: lvl }));
 function run(track, seed, lvl = 'hard') {
@@ -66,4 +66,34 @@ test('the marked flume stays slick for a sustained descent', () => {
   R.step([noInput()]);
   assert.equal(K.surf, 'flume');
   assert.ok(T.y[k + 220] < T.y[k] - 25);
+});
+
+test('Centre Court: the full ramp footprint clears the lower route', () => {
+  const T = buildTrack(TRACKS.laundry);
+  let overlaps = 0;
+  for (let a = 0; a < T.N; a++) {
+    for (let b = a + 45; b < Math.min(T.N, T.N + a - 45); b++) {
+      if (Math.hypot(T.x[a] - T.x[b], T.z[a] - T.z[b]) > T.w[a] + T.w[b]) continue;
+      overlaps++;
+      assert.ok(Math.abs(T.y[a] - T.y[b]) > 12, `road edges at ${a}/${b} need clearance`);
+    }
+  }
+  assert.ok(overlaps > 0);
+});
+
+test('Rapids: the splashdown has a dry lane and a splashy run-off', () => {
+  const R = new Race({ track: 'park', racers: [{id:'k8e'}, {id:'zach'}], humans: [0, 1] });
+  const { T } = R;
+  const start = T.sec.findIndex(i => T.def.points[i].tag === 'runoff');
+  assert.ok(start > 0);
+  const k = start + 22;
+  for (const [i, K] of R.karts.entries()) {
+    const d = T.w[k] * (i ? 0.67 : -0.5);
+    Object.assign(K, { x: T.x[k] + rightX(T,k)*d, y:T.y[k], z:T.z[k] + rightZ(T,k)*d,
+      k, d, vy: 0, vx: 0, vz: 0, yaw: Math.atan2(T.tx[k], T.tz[k]) });
+  }
+  R.phase = 'race';
+  R.step([noInput(), noInput()]);
+  assert.deepEqual(R.karts.map(K => K.surf), ['track', 'pool']);
+  assert.ok(R.events.some(e => e.k === 'splash' && e.i === 1));
 });

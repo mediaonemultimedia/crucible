@@ -5,7 +5,7 @@ export function clayMaterial() {
   const color = canvasTex(512, 512, (g, w, h) => {
     const random = srand(72037);
     const shade = g.createLinearGradient(0, 0, w, 0);
-    for (const [u, ink] of [[0,'#a74724'],[0.08,'#e8713d'],[0.30,'#f18a4d'],[0.60,'#f49250'],[0.90,'#e7793f'],[1,'#a74724']]) {
+    for (const [u, ink] of [[0,'#a74724'],[0.08,'#ff6a30'],[0.30,'#ff8942'],[0.60,'#ff9349'],[0.90,'#fb762e'],[1,'#a74724']]) {
       shade.addColorStop(u, ink);
     }
     g.fillStyle = shade; g.fillRect(0,0,w,h);

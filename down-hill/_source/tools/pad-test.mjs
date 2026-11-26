@@ -89,7 +89,7 @@ async function phone(name, extra = '') {
 }
 // svg (2400×1100) → CSS px on a phone
 const at = (p, x, y) => p.evaluate(([x, y]) => { const s = document.getElementById('s'), m = s.getScreenCTM(), q = s.createSVGPoint(); q.x = x; q.y = y; const r = q.matrixTransform(m); return [r.x, r.y]; }, [x, y]);
-const L = { stick: [604, 517], accelerate: [1970, 482], brake: [1645, 574], super: [1097, 550], start: [1132, 215], moves: [2062, 1050] };
+const L = { stick: [604, 517], accelerate: [1600, 510], brake: [1975, 394], drift: [1827, 703], super: [1097, 550], start: [1132, 215], moves: [2062, 1050] };
 async function touch(p, type, id, x, y) {
   const T = p.T;
   if (type === 'end') T.delete(id); else T.set(id, [x, y]);
@@ -180,6 +180,18 @@ const steerL = await G.evaluate(() => __dh.pads.state[1].steer);
 await up(phones[1], 2); await tick(3);
 results.stick = { steerR, steerL };
 ok(steerR > 0.9 && steerL < -0.3 && steerL > -0.8, `stick → steer (full right ${steerR.toFixed(2)}, half left ${steerL.toFixed(2)})`);
+
+// One thumb can roll from accelerator to drift and back while holding gas.
+const chordPad = phones[0];
+const pedals = () => G.evaluate(() => __dh.pads.state[0].held & (16 | 32));
+await down(chordPad, 3, ...L.accelerate); await tick(2);
+ok(await pedals() === 16, 'gas pressed before drift');
+await move(chordPad, 3, ...L.drift); await tick(2);
+ok(await pedals() === 48, 'one thumb holds gas and drift');
+await move(chordPad, 3, ...L.accelerate); await tick(2);
+ok(await pedals() === 16, 'drift releases while gas stays on');
+await up(chordPad, 3); await tick(2);
+ok(await pedals() === 0, 'lifting the thumb releases both pedals');
 
 // 4. Tilt drift on phone 3 (P3)
 await tap(phones[2], ...L.moves); await sleep(500);
