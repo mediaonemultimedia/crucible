@@ -18,7 +18,7 @@ try {
     g.textBaseline = 'alphabetic';
 
     // A forward lean and a slight climb across the lockup, like the course.
-    g.translate(640, 258);
+    g.translate(640, 250);
     g.rotate(-0.052);
     g.transform(1, 0, -0.19, 1, 0, 0);
     function word(text, x, y, width, size, palette) {
@@ -48,26 +48,17 @@ try {
       g.fillText(text, 0, 0);
       g.restore();
     }
-    word('FLUFFED', -466, -36, 942, 235, ['#fffdf4', '#fffdf4', '#eef6ff', '#d3ecff', '#4383c7']);
-    word('FURIOUS', -500, 174, 1025, 251, ['#fff476', '#ffd33c', '#ff8f22', '#ffdb67', '#ba3047']);
+    const ice = ['#fffdf4', '#fffdf4', '#eef6ff', '#d3ecff', '#4383c7'];
+    const flame = ['#fff476', '#ffd33c', '#ff8f22', '#ffdb67', '#ba3047'];
+    const mint = ['#dcfff1', '#bdfdea', '#74e6cc', '#d6fff1', '#116b72'];
 
-    // The ampersand is a rubber pit badge set into the seam between words.
-    g.save();
-    g.translate(0, -23);
-    g.rotate(0.11);
-    g.fillStyle = '#15142f';
-    g.beginPath();
-    g.roundRect(-58, -43, 116, 90, 22);
-    g.fill();
-    g.fillStyle = '#116b72';
-    g.beginPath();
-    g.roundRect(-49, -37, 98, 71, 16);
-    g.fill();
-    g.fillStyle = '#bdfdea';
-    g.font = '62px "Title lettering"';
-    g.textAlign = 'center';
-    g.fillText('&', 0, 19);
-    g.restore();
+    // The oversized initials hang below their own baselines. Stagger the
+    // second row so the upper F drops into the space beside the lower F.
+    word('F', -550, -2, 184, 282, ice);
+    word('LUFFED', -372, -36, 798, 235, ice);
+    word('&', 441, -36, 90, 122, mint);
+    word('F', -470, 207, 188, 296, flame);
+    word('URIOUS', -289, 174, 804, 251, flame);
     return canvas.toDataURL('image/png').split(',')[1];
   }, font);
   await writeFile(new URL('fluffed-furious.png', assets), Buffer.from(png, 'base64'));
