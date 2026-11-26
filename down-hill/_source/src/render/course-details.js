@@ -17,9 +17,16 @@ function decalAtlas(colors) {
       const x = 256 * (i % 2), y = 128 * (i >> 1);
       g.fillStyle = colors[0]; g.fillRect(x, y, 256, 128);
       g.strokeStyle = colors[1 + i % 3]; g.lineWidth = 7; g.strokeRect(x + 8, y + 8, 240, 112);
-      g.fillStyle = colors[3]; g.font = '900 30px sans-serif'; g.textAlign = 'center';
-      g.fillText(labels[i], x + 128, y + 62, 211);
-      g.font = '700 12px sans-serif'; g.fillText('FLUFFED AND FURIOUS', x + 128, y + 90);
+      g.font = '28px "Archivo Black", sans-serif';
+      g.textAlign = 'center';
+      g.lineJoin = 'round';
+      g.lineWidth = 5;
+      g.strokeStyle = '#15142f';
+      g.strokeText(labels[i], x + 128, y + 62, 208);
+      g.fillStyle = colors[3];
+      g.fillText(labels[i], x + 128, y + 62, 208);
+      g.font = '700 15px "Barlow Condensed", sans-serif';
+      g.fillText('FLUFFED & FURIOUS', x + 128, y + 90);
       for (let j = 0; j < 8; j++) {
         g.fillStyle = colors[(j + i) % 4];
         g.fillRect(x + 32 + j * 24, y + 105, 19, 5);

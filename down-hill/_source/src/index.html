@@ -13,6 +13,8 @@
   --p1:#ff3b6b;--p2:#3ff0c8;--violet:#9b5cff;--gold:#ffc93a;--on-neon:#120d1f;
   --sans:"Helvetica Neue",Helvetica,Inter,"Segoe UI",Arial,sans-serif;
   --race-display:"Bungee",var(--heavy);
+  --lettering:"Archivo Black",var(--heavy);
+  --label:"Barlow Condensed",var(--cond);
   --heavy:"Bolster Display","Arial Black","Helvetica Neue",Helvetica,Arial,sans-serif;
   --cond:"Bolster Condensed","Oswald","Arial Narrow","Roboto Condensed","Helvetica Neue",Arial,sans-serif;
   --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
@@ -38,18 +40,14 @@ body.is-live #loading{opacity:0;pointer-events:none}
 #mark{position:absolute;top:22px;left:26px;font-size:14px;font-weight:300;letter-spacing:.52em;text-transform:uppercase;color:var(--ink);pointer-events:none}
 body.racing #mark{display:none}
 
-/* Title wordmark */
-.logo{position:absolute;left:50%;top:27%;transform:translate(-50%,-50%);text-align:center;white-space:nowrap}
-.logo .l1{display:grid;justify-items:center;gap:.01em;margin:0;text-transform:uppercase;font:400 clamp(32px,min(10vw,13vh),104px)/.9 var(--race-display);letter-spacing:-.045em}
-.logo .word{display:block;padding:0 .13em .04em;transform:skewX(-11deg);color:#e7f7ff;
-  background:linear-gradient(#fcfdff 15%,#d9ebf6 46%,#7397ac 49%,#cbe8f7 68%,#f2fbff 88%);background-clip:text;
-  -webkit-text-fill-color:transparent;-webkit-text-stroke:.012em #ebfbff;
-  filter:drop-shadow(0 .045em 0 #264356) drop-shadow(0 .07em .035em #0a1424)}
-.logo .word:last-child{background-image:linear-gradient(#fff082 14%,#ffd72e 46%,#dd5c08 49%,#ff9b16 70%,#ffe453 90%);-webkit-text-stroke-color:#ffde75}
-.logo .and{display:flex;align-items:center;gap:.6em;transform:skewX(-11deg);color:#ffe0ab;font-family:var(--cond);font-weight:700;font-size:.22em;letter-spacing:.18em;text-shadow:0 2px 2px #0a1424}
-.logo .and::before,.logo .and::after{content:"";display:block;width:2.2em;height:.15em;background:#f6be68}
-.logo .sub{display:inline-block;margin-top:clamp(8px,2vh,18px);font-family:var(--hand);font-size:clamp(18px,2vw,27px);color:#fff;background:#1a263d;padding:2px 16px 4px;border-radius:6px}
-.press{position:absolute;left:0;right:0;bottom:30%;text-align:center;font-family:var(--cond);font-weight:700;font-size:16px;letter-spacing:.34em;text-transform:uppercase;color:var(--ink);text-shadow:var(--glow-v);animation:blink 1.3s steps(2) infinite}
+/* Title wordmark and primary action */
+.logo{position:absolute;left:50%;top:27%;transform:translate(-50%,-50%);text-align:center;width:min(62vw,79vh,690px)}
+.logo .l1{margin:0}
+.logo img{display:block;width:100%;height:auto}
+.logo .sub{display:inline-block;margin-top:clamp(0px,.5vh,8px);font:700 clamp(16px,2.3vw,24px)/1.15 var(--label);letter-spacing:.04em;color:#fff;background:#1a263d;padding:4px 14px 6px;border:2px solid #5780a3;border-radius:7px}
+.press{position:absolute;left:50%;bottom:29%;transform:translateX(-50%) rotate(-2deg);white-space:nowrap;text-align:center;font:400 clamp(14px,2vw,24px)/1.1 var(--lettering);letter-spacing:.015em;text-transform:uppercase;color:#fff;paint-order:stroke fill;-webkit-text-stroke:3px #21132a;background:#4e2264;border:2px solid #b780ee;border-radius:10px;padding:5px 16px 7px;box-shadow:0 4px 0 #21132a;animation:title-press 2s ease-in-out infinite}
+@keyframes title-press{50%{box-shadow:0 4px 0 #21132a,0 0 18px #b780ee88}}
+@media(prefers-reduced-motion:reduce){.press{animation:none}}
 @keyframes blink{50%{opacity:.25}}
 .keys{position:absolute;left:50%;bottom:4%;transform:translateX(-50%);display:grid;grid-template-columns:repeat(4,auto);gap:6px 22px;background:rgba(29,22,48,.9);border:1px solid var(--line);border-radius:10px;padding:12px 18px;font-size:13px;box-shadow:0 0 20px rgba(155,92,255,.2)}
 .keys h4{grid-column:1/-1;margin:0 0 2px;font-family:var(--cond);font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--dim);font-weight:700}
@@ -277,6 +275,38 @@ body.photo #photo{display:block;animation:jig .3s steps(2) infinite}
 #cup .head{position:absolute;top:22px;left:0;right:0;text-align:center}
 #cup .panel-title{color:var(--gold);text-shadow:0 0 10px rgba(255,201,58,.8),0 0 26px rgba(255,201,58,.4)}
 @media (max-width:700px){.keys{grid-template-columns:repeat(2,auto)}.plate{width:60vw}.diff{top:auto;bottom:52%}.minimap{width:150px;height:110px}#players{top:70px;flex-wrap:wrap}}
+/* Display lettering carries the outline. Small functional text stays flat. */
+#loading,#mark,.eyebrow,.keys h4,.keys b,.plate .who,.plate .an,.plate .kart,.stats,.pill,
+.card .lab,.card .alt,.hintline,.lap,.item-name,.taunt-ic,.tip,.warn,.caption,.drift,.wait,
+#pads .pi,#pads .how,#setup button,#race-music,.setup-controls label,.setup-keys,.board .row,.again,#pause .box p{
+  font-family:var(--label);font-weight:700
+}
+#mark{letter-spacing:.35em}
+.keys h4,.keys b,.eyebrow,.stats,.hintline,.again{letter-spacing:.09em}
+.card .lab{line-height:1.12;letter-spacing:.025em}
+.plate .kart{letter-spacing:.04em}
+.panel-title,.plate .nm,.setup-header h2,.course-shot strong,.place,.count,.final,.tprompt,.toast,#photo,.scare b{
+  --edge:#211329;
+  color:#fff;paint-order:stroke fill;-webkit-text-stroke:var(--type-edge,4px) var(--edge);
+  text-shadow:0 var(--type-depth,4px) 0 var(--type-shadow,#624584)
+}
+.panel-title,.plate .nm,.setup-header h2,.course-shot strong,.place,.toast,.final,#photo{font-family:var(--lettering);font-weight:400}
+.panel-title,.plate .nm{letter-spacing:-.025em;font-style:normal}
+.plate .nm{font-size:clamp(19px,2.55vw,43px);overflow-wrap:normal}
+.setup-header h2,.course-shot strong{letter-spacing:-.02em}
+.course-shot strong{--type-edge:3px;--type-depth:2px}
+.place{--type-edge:clamp(5px,.72vw,9px);--type-depth:7px;--type-shadow:#b93562;letter-spacing:-.06em}
+.place.p1{--type-shadow:#bc7317;text-shadow:0 7px 0 var(--type-shadow)}
+.place sup{letter-spacing:0;-webkit-text-stroke:.12em var(--edge)}
+.lap .n,.lap .tm,.board .row{font-variant-numeric:tabular-nums}
+.count{--type-edge:clamp(6px,1.15vw,15px);--type-depth:8px;--type-shadow:#b93562}
+.count.go{color:#8ef5bf;--type-shadow:#277b62;text-shadow:0 8px 0 var(--type-shadow)}
+.toast{--type-edge:6px;--type-depth:4px;letter-spacing:-.035em}
+.toast::after,.count.go::after{position:absolute;inset:0;content:attr(data-ink) / "";pointer-events:none;text-shadow:none;-webkit-text-stroke:0;background-clip:text;color:transparent}
+.toast::after{background-image:linear-gradient(#fff4ca 12%,var(--toast-ink) 47%,var(--toast-ink) 64%,#f39348 100%)}
+.count.go::after{background-image:linear-gradient(#dcffd9 17%,#84f4ba 47%,#39c695 100%)}
+#setup #setup-start{background:linear-gradient(#ffed86,#ffbf36 65%,#f89722);border:2px solid #ffe698;box-shadow:0 3px 0 #a64c1a;color:#2b1730;font-family:var(--lettering);font-weight:400}
+#setup #setup-start:focus-visible{outline:3px solid #fff;outline-offset:4px}
 </style>
 </head>
 <body data-screen="title">
@@ -290,7 +320,7 @@ body.photo #photo{display:block;animation:jig .3s steps(2) infinite}
 
   <section class="screen on" id="title">
     <div class="logo">
-      <h1 class="l1"><span class="word">Fluffed</span> <span class="and">and</span> <span class="word">Furious</span></h1>
+      <h1 class="l1"><img src="__TITLE_WORDMARK__" width="1280" height="532" alt="Fluffed &amp; Furious"></h1>
       <span class="sub">a Pillow Fight kart race</span>
     </div>
     <div class="press">Press Enter</div>
@@ -305,7 +335,7 @@ body.photo #photo{display:block;animation:jig .3s steps(2) infinite}
       <div><kbd>Q</kbd> / <kbd>C</kbd><b>Look back</b></div>
       <div><kbd>Esc</kbd> <kbd>M</kbd><b>Pause · mute</b></div>
       <h4 style="margin-top:6px">Up to 4 players · split screen</h4>
-      <div style="grid-column:1/-1;white-space:normal;max-width:640px;color:var(--dim)">Two on one keyboard (<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> and <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> — press <kbd>/</kbd> on the select screen), gamepads, and phones: scan the QR to race with your phone (stick or tilt to steer).</div>
+      <div style="grid-column:1/-1;white-space:normal;max-width:640px;color:var(--dim)">Two on one keyboard (<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> and <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> — press <kbd>/</kbd> on the select screen), gamepads, and phones: scan the QR to race with your phone (stick to steer, tilt to drift).</div>
     </div>
   </section>
 

@@ -672,7 +672,7 @@ class App {
     const g = (x) => (mine ? 1 : near ? 0.6 * x : 0);
     switch (e.k) {
       case 'count': for (const v of this.allViews()) { v.count.textContent = e.n; v.count.className = 'count'; } A.play('dh-beep'); break;
-      case 'go': for (const v of this.allViews()) { v.count.textContent = 'GO!'; v.count.className = 'count go'; } A.play('dh-go'); A.music(this.world.music || 'race', this.recording?.url); setTimeout(() => { for (const v of this.allViews()) if (v.count.textContent === 'GO!') v.count.textContent = ''; }, 900); break;
+      case 'go': for (const v of this.allViews()) { v.count.textContent = 'GO!'; v.count.dataset.ink = 'GO!'; v.count.className = 'count go'; } A.play('dh-go'); A.music(this.world.music || 'race', this.recording?.url); setTimeout(() => { for (const v of this.allViews()) if (v.count.textContent === 'GO!') { v.count.textContent = ''; delete v.count.dataset.ink; } }, 900); break;
       case 'hit': {
         const c = (K.alt ? ALT_COLORS : COLORS)[K.id];
         this.fx.burst(K.x, K.y + 2, K.z, ['#ffffff', '#ffffff', c[0], c[1], '#ffd1e0'], e.kind === 'alarm' ? 44 : 30, e.kind === 'missile' ? 11 : 8);
@@ -827,7 +827,7 @@ class App {
   toast(H, text, color) {
     if (!H) return;
     const t = H.toastEl;
-    t.textContent = text; t.style.color = color; t.style.textShadow = `0 4px 0 #120d1f, 0 0 24px ${color}`;
+    t.textContent = text; t.dataset.ink = text; t.style.setProperty('--toast-ink', color);
     t.classList.remove('on'); void t.offsetWidth; t.classList.add('on');
   }
 
@@ -1512,6 +1512,8 @@ async function start() {
     document.fonts.load('700 51px "Bolster Condensed"'),
     document.fonts.load('58px "Bolster Hand"'),
     document.fonts.load('105px Bungee'),
+    document.fonts.load('28px "Archivo Black"'),
+    document.fonts.load('700 15px "Barlow Condensed"'),
     document.fonts.load('102px "Bolster Display"'),
   ]);
   const app = new App(renderer, canvas);

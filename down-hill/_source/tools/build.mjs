@@ -39,7 +39,15 @@ const font2 = fs.readFileSync(path.join(src, 'assets/lilita-one-subset.woff2')).
 const bungee = fs.readFileSync(path.join(src, 'assets/bungee-latin.woff2')).toString('base64');
 const bungeeLicense = fs.readFileSync(path.join(src, 'assets/bungee-OFL.txt'), 'utf8').trim();
 const cond = fs.readFileSync(path.join(src, 'assets/oswald-subset.woff2')).toString('base64');
-const face = `/* ${bungeeLicense} */
+const archivo = fs.readFileSync(path.join(src, 'assets/archivo-black.woff2')).toString('base64');
+const barlow = fs.readFileSync(path.join(src, 'assets/barlow-condensed.woff2')).toString('base64');
+const typeLicenses = ['archivo-black', 'barlow-condensed'].map((name) =>
+  fs.readFileSync(path.join(src, 'assets', name + '-OFL.txt'), 'utf8').trim()).join('\n\n');
+const wordmark = fs.readFileSync(path.join(src, 'assets/fluffed-furious.png')).toString('base64');
+const face = `/* ${bungeeLicense}
+${typeLicenses} */
+@font-face{font-family:"Archivo Black";src:url(data:font/woff2;base64,${archivo}) format("woff2");font-display:block}
+@font-face{font-family:"Barlow Condensed";src:url(data:font/woff2;base64,${barlow}) format("woff2");font-weight:700;font-display:block}
 /* Bubble lettering: a subset of Gochi Hand, Copyright (c) 2011 HT Fonts, SIL Open Font License 1.1.
    Display type: a subset of Lilita One, Copyright (c) 2011 Juan Montoreano, SIL Open Font License 1.1.
    Race title and countdown: Bungee, Copyright 2023 The Bungee Project Authors, SIL Open Font License 1.1.
@@ -48,7 +56,7 @@ const face = `/* ${bungeeLicense} */
 @font-face{font-family:"Bungee";src:url(data:font/woff2;base64,${bungee}) format("woff2");font-display:block}
 @font-face{font-family:"Bolster Display";src:url(data:font/woff2;base64,${font2}) format("woff2");font-display:block}
 @font-face{font-family:"Bolster Condensed";src:url(data:font/woff2;base64,${cond}) format("woff2");font-weight:700;font-display:block}`;
-html = html.replace('/*FONTFACE*/', () => face);
+html = html.replace('/*FONTFACE*/', () => face).replace('__TITLE_WORDMARK__', () => 'data:image/png;base64,' + wordmark);
 
 const courses = Object.fromEntries(['landing', 'laundry', 'park', 'hockey', 'dojo'].map((id) => [
   id, 'data:image/webp;base64,' + fs.readFileSync(path.join(src, 'assets/courses', id + '.webp')).toString('base64')
