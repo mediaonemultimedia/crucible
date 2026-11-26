@@ -18,7 +18,7 @@ try {
     g.textBaseline = 'alphabetic';
 
     // A forward lean and a slight climb across the lockup, like the course.
-    g.translate(640, 250);
+    g.translate(640, 247);
     g.rotate(-0.052);
     g.transform(1, 0, -0.19, 1, 0, 0);
     function word(text, x, y, width, size, palette) {
@@ -50,14 +50,13 @@ try {
     }
     const ice = ['#fffdf4', '#fffdf4', '#eef6ff', '#d3ecff', '#4383c7'];
     const flame = ['#fff476', '#ffd33c', '#ff8f22', '#ffdb67', '#ba3047'];
-    const mint = ['#dcfff1', '#bdfdea', '#74e6cc', '#d6fff1', '#116b72'];
 
     // The oversized initials hang below their own baselines. Stagger the
     // second row so the upper F drops into the space beside the lower F.
-    word('F', -550, -2, 184, 282, ice);
+    word('F', -567, 3, 201, 299, ice);
     word('LUFFED', -372, -36, 798, 235, ice);
-    word('&', 441, -36, 90, 122, mint);
-    word('F', -470, 207, 188, 296, flame);
+    word('&', 441, -36, 90, 122, ice);
+    word('F', -486, 211, 204, 311, flame);
     word('URIOUS', -289, 174, 804, 251, flame);
     return canvas.toDataURL('image/png').split(',')[1];
   }, font);
