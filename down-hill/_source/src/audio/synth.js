@@ -315,6 +315,37 @@ export function playSynthSfx(ctx, dest, id, t, rate = 1, gain = 1) {
       l.connect(lg); lg.connect(ng.gain); l.start(t); l.stop(t + 0.82); srcs.push(l);
     }
     // ── Down Hill (dh-): the kart race's own ──
+    else if (k === 'wallop-pillow') {
+      len = .32;
+      O(.18, 'sine', 178, 63, .55, .004);
+      N(.29, 'lowpass', 1600, 310, .8, .42, .013, .7);
+    }
+    else if (k === 'wallop-ball') {
+      len = .18;
+      N(.09, 'bandpass', 2600, 1850, 1.4, .39, .003);
+      O(.15, 'triangle', 436, 274, .43, .004);
+    }
+    else if (k === 'wallop-puck') {
+      len = .39;
+      O(.11, 'triangle', 725, 418, .41, .003);
+      N(.06, 'bandpass', 3600, 2450, 3, .34, .002, 1.6);
+      N(.36, 'bandpass', 2050, 580, 1.2, .20, .035, 1.4);
+    }
+    else if (k === 'wallop-beach' || k === 'beach-hop') {
+      const first = k === 'wallop-beach';
+      len = first ? .42 : .27;
+      O(len, 'sine', first ? 115 : 170, first ? 590 : 435, first ? .55 : .39, .009);
+      O(len * .7, 'triangle', 260, 790, .16, .006);
+      N(.13, 'bandpass', 1050, 2400, 1.2, .23, .01, .8);
+    }
+    else if (k === 'wallop-gong') {
+      len = 3.4;
+      N(.21, 'bandpass', 2400, 950, 1.1, .31, .003);
+      for (const [frequency, tail, volume] of [[173, 3.4, .44], [181, 3, .23],
+        [278, 2.9, .26], [443, 2.6, .23], [722, 2.15, .20], [1196, 1.6, .12], [1981, .9, .08]]) {
+        O(tail, 'sine', frequency * 1.012, frequency, volume, .012);
+      }
+    }
     else if (k === 'boost') { len = 0.6; N(0.6, 'bandpass', 500, 3200, 1.1, 0.36, 0.01, 1); O(0.45, 'sawtooth', 160, 520, 0.07, 0.01); }
     else if (k === 'pad') { len = 0.32; O(0.12, 'square', 660, 990, 0.08); O(0.16, 'square', 990, 1480, 0.08, 0.004, 0.08); N(0.3, 'bandpass', 2000, 4200, 1.4, 0.12, 0.01, 1.4); }
     else if (k === 'tier') { len = 0.3; O(0.25, 'triangle', 1200, 1250, 0.16, 0.003); O(0.2, 'sine', 2400, 2500, 0.06, 0.003, 0.03); }

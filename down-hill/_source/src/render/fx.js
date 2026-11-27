@@ -313,7 +313,11 @@ export class Fx {
     this.wallopProp = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ map, roughness,
       metalness: gong ? .32 : 0 }));
     this.wallopAxis = new THREE.Vector3(1, 0, 0);
-    this.root.add(this.wallopProp);
+    if (beach) {
+      this.beachRig = new THREE.Group();
+      this.beachRig.add(this.wallopProp);
+      this.root.add(this.beachRig);
+    } else this.root.add(this.wallopProp);
     if (gong) {
       const C = this.T.cut, s = C.m0 + 1, T = this.T;
       const beams = [
@@ -617,26 +621,53 @@ export class Fx {
     const R = this.race, t = this.t;
     const P = R.wallopProp;
     if (P) {
-      const model = this.wallopProp, ball = P.type === 'ball' || P.type === 'beach', gong = P.type === 'gong';
+      const model = this.wallopProp, gong = P.type === 'gong';
+      const age = P.owner >= 0 ? (R.tick - P.struckAt) / 60 : Infinity;
+      const recoil = Math.max(0, 1 - age * 3.4);
       const scale = !gong && P.reset ? Math.max(0, 1 - (95 - P.reset) / 15) : 1;
       model.visible = scale > 0;
       model.scale.setScalar(scale);
-      const height = ball ? P.radius + P.lift : gong ? 2.55 : P.type === 'pillow' ? 1.25 : 0.39;
-      model.position.set(P.x, P.y + height * scale, P.z);
+      model.position.set(P.x, P.y, P.z);
       if (gong) {
         const yaw = Math.atan2(this.T.tx[P.k], this.T.tz[P.k]);
-        const strikeAge = (480 - P.reset) / 60;
-        const swing = P.reset ? Math.sin(strikeAge * 27) * Math.exp(-strikeAge * 5) * 0.45 : 0;
-        model.rotation.set(Math.PI / 2 + swing, yaw, 0, 'YXZ');
+        const swing = Number.isFinite(age) ? Math.sin(age * 23) * Math.exp(-age * 2.9) * 0.53 : 0;
+        model.position.y += 2.55 + Math.abs(swing) * .32;
+        model.rotation.set(Math.PI / 2 + swing, yaw, swing * .19, 'YXZ');
         const gate = this.wallopGate;
-        gate.visible = !P.reset && !karts.some(K => K.cut && K.k < this.T.cut.kA + 32);
-      } else if (ball) {
+        const clear = P.reset || karts.some(K => K.cut && K.k < this.T.cut.kA + 32);
+        if (P.reset) {
+          const progress = Math.min(1, age / .34);
+          gate.position.y = 2.5 + 6.8 * progress * progress * (3 - 2 * progress);
+        } else if (clear) gate.position.y = 9.3;
+        else gate.position.y = Math.max(2.5, gate.position.y - dt * 14);
+      } else if (P.type === 'beach' || P.type === 'ball') {
         if (P.life) this.wallopAxis.set(P.vz, 0, -P.vx).normalize();
         model.quaternion.setFromAxisAngle(this.wallopAxis, P.roll);
+        const beach = P.type === 'beach';
+        const hop = beach ? Math.min(1, P.lift / 4.4) : 0;
+        const squeeze = beach && P.life ? .27 * (1 - hop) ** 5 : .16 * recoil;
+        const stretch = beach && P.life ? .19 * Math.sin(Math.PI * hop) : 0;
+        model.scale.set(scale * (1 + squeeze * .65), scale * (1 - squeeze + stretch), scale * (1 + squeeze * .65));
+        // Squeeze in world-up, even as the coloured panels roll forward.
+        if (beach) {
+          model.scale.setScalar(scale);
+          model.position.y += (P.radius * (1 - squeeze + stretch) + P.lift * 1.34) * scale;
+          this.beachRig.position.copy(model.position);
+          this.beachRig.scale.set(1 + squeeze * .65, 1 - squeeze + stretch, 1 + squeeze * .65);
+          model.position.set(0, 0, 0);
+        } else {
+          model.position.y += (P.radius + recoil * .7) * scale;
+        }
       } else if (P.type === 'pillow') {
         const T = this.T;
-        model.rotation.set(-0.12, Math.atan2(T.tx[P.k], T.tz[P.k]) + 0.24, 0.13, 'YXZ');
-      } else model.rotation.y = P.roll * 0.4;
+        const pop = Math.max(0, Math.sin(Math.min(1, age * 4) * Math.PI));
+        model.scale.set(scale * (1 + recoil * .35), scale * (1 - recoil * .62 + pop * .27), scale * (1 + recoil * .24));
+        model.position.y += (1.25 * (1 - recoil * .58) + pop * 1.9) * scale;
+        model.rotation.set(-.12 - pop * .28, Math.atan2(T.tx[P.k], T.tz[P.k]) + .24, .13 + pop * .42, 'YXZ');
+      } else {
+        model.position.y += (.39 + recoil * .39) * scale;
+        model.rotation.set(recoil * .28, P.roll * .4, recoil ? recoil * Math.sin(age * 41) * .19 : 0);
+      }
     }
     // boxes
     this._boxesUpdate(t, camQ);

@@ -727,13 +727,24 @@ class App {
         break;
       case 'wallop-prop': {
         const P = R.wallopProp;
-        this.fx.burst(P.x, P.y + 1.5, P.z, ['#fff9ce', '#edff3c', '#42edff'], 12, 7);
-        if (near) A.play(P.type === 'gong' ? 'dh-clink' : 'dh-bonk', { gain: g(0.9), rate: P.type === 'gong' ? 0.55 : P.type === 'ball' ? 1.12 : 0.85 });
+        const colors = {
+          pillow: ['#ffe1f3', '#ffffff', '#ff6ea3'], ball: ['#efff72', '#ffffd8'],
+          puck: ['#dbf9ff', '#70dfff'], beach: ['#4cecff', '#fff293', '#ff6588'],
+          gong: ['#ffc252', '#fff0a2'],
+        }[P.type];
+        this.fx.burst(P.x, P.y + 1.5, P.z, colors, P.type === 'pillow' ? 24 : 12, 7);
+        if (near) A.play(`dh-wallop-${P.type}`, { gain: mine ? 1 : 0.65 });
         const labels = { pillow: 'PILLOW POP BOOST!', ball: 'BALL IN PLAY!', puck: 'PUCK IN PLAY!',
           beach: 'BEACH BALL BOUNCE!', gong: 'SHORTCUT OPEN!' };
         if (mine || P.type === 'gong') for (const view of P.type === 'gong' ? this.hv : [H]) this.toast(view, labels[P.type], '#efff65');
         break;
       }
+      case 'beach-hop':
+        if (this._dist(e) < 55) {
+          A.play('dh-beach-hop', { gain: Math.max(.24, .66 - e.hop * .08), rate: 1 + e.hop * .06 });
+          this.fx.burst(e.x, e.y + .45, e.z, ['#d4fcff', '#54d1ff'], 5, 4);
+        }
+        break;
       case 'beach-bump':
         V.hit();
         if (near) A.play('dh-bonk', { gain: g(0.8), rate: 1.3 });

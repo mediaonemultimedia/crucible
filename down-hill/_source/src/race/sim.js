@@ -121,7 +121,13 @@ export class Race {
     P.z += P.vz * DT;
     const k = P.k = locate(T, P.x, P.z, P.k, 6, P.y);
     P.y = T.y[k];
-    if (P.type === 'beach') P.lift = Math.abs(Math.sin((156 - P.life) * 0.105)) * 4.4;
+    if (P.type === 'beach') {
+      const age = 156 - P.life;
+      P.lift = Math.abs(Math.sin(age * 0.105)) * 4.4;
+      if (age > 0 && Math.floor(age * 0.105 / Math.PI) > Math.floor((age - 1) * 0.105 / Math.PI)) {
+        this.emit({ k: 'beach-hop', x: P.x, y: P.y, z: P.z, hop: Math.floor(age * 0.105 / Math.PI) });
+      }
+    }
     P.roll += Math.hypot(P.vx, P.vz) * DT / P.radius;
     const d = lateral(T, k, P.x, P.z);
     if (Math.abs(d) > T.w[k] - P.radius) {
@@ -750,6 +756,7 @@ export class Race {
 
   _strikeWallopProp(P, K, move, fx, fz) {
     P.owner = K.i;
+    P.struckAt = this.tick;
     if (P.type === 'pillow') {
       K.boostT = Math.max(K.boostT, 1.2);
       this.emit({ k: 'boost', i: K.i, tier: 0 });
