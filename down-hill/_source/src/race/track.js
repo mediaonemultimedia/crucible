@@ -204,6 +204,7 @@ export const DOJO = {
   ],
   patches: [], posts: [],
   boxes: [0.05, 0.19, 0.34, 0.5, 0.65, 0.82, 0.92],
+  cut: { from: [-164, -9], to: [-175, 67], w: 4.4, drum: [0, 0], tight: true, gated: true },
   mapHigh: [5, 42],
   music: 'race',
 };
@@ -347,7 +348,7 @@ function buildCut(T, c) {
     const off = Math.abs(lateral(T, k, x, z)) > T.w[k] + T.m[k] - 1;
     if (off) { m0 = Math.min(m0, s); m1 = Math.max(m1, s); }
   }
-  return { ax, az, bx, bz, len, ux, uz, w: c.w, tight: c.tight, m0, m1, d0: len * c.drum[0], d1: len * c.drum[1], kA: locateGlobal(T, ax, az), kB: locateGlobal(T, bx, bz) };
+  return { ax, az, bx, bz, len, ux, uz, w: c.w, tight: c.tight, gated: c.gated, m0, m1, d0: len * c.drum[0], d1: len * c.drum[1], kA: locateGlobal(T, ax, az), kB: locateGlobal(T, bx, bz) };
 }
 /* a detergent pod's place at a tick (pure: the sim and the renderer agree) */
 export function podPos(T, P, tick) {

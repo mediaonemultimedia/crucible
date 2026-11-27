@@ -718,10 +718,17 @@ class App {
       case 'wallop-prop': {
         const P = R.wallopProp;
         this.fx.burst(P.x, P.y + 1.5, P.z, ['#fff9ce', '#edff3c', '#42edff'], 12, 7);
-        if (near) A.play('dh-bonk', { gain: g(0.9), rate: P.type === 'ball' ? 1.12 : 0.85 });
-        if (mine) this.toast(H, P.type === 'ball' ? 'BALL IN PLAY!' : 'PUCK IN PLAY!', '#efff65');
+        if (near) A.play(P.type === 'gong' ? 'dh-clink' : 'dh-bonk', { gain: g(0.9), rate: P.type === 'gong' ? 0.55 : P.type === 'ball' ? 1.12 : 0.85 });
+        const labels = { pillow: 'PILLOW POP BOOST!', ball: 'BALL IN PLAY!', puck: 'PUCK IN PLAY!',
+          beach: 'BEACH BALL BOUNCE!', gong: 'SHORTCUT OPEN!' };
+        if (mine || P.type === 'gong') for (const view of P.type === 'gong' ? this.hv : [H]) this.toast(view, labels[P.type], '#efff65');
         break;
       }
+      case 'beach-bump':
+        V.hit();
+        if (near) A.play('dh-bonk', { gain: g(0.8), rate: 1.3 });
+        if (mine) this.toast(H, 'BOUNCED OFF LINE!', '#55f9ff');
+        break;
       case 'wallop-hit': {
         V.hit();
         this.fx.burst(K.x, K.y + 2, K.z, ['#fff8d8', '#ffcd50', '#ff70ad'], 9, 6.5);

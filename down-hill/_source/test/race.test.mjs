@@ -211,5 +211,42 @@ test('track Wallops launch the ball and puck, hit a rival, then reset in their l
     for (let i = 0; i < 95; i++) R._moveWallopProp();
     assert.deepEqual([P.x, P.y, P.z, P.owner, P.reset], [x, y, z, -1, 0]);
   }
-  assert.equal(new Race({ track: 'landing', racers: [] }).wallopProp, undefined);
+  assert.equal(new Race({ track: 'landing', racers: [] }).wallopProp.type, 'pillow');
+});
+
+test('Landing pillow boosts the hitter and Rapids beach ball bumps without spinning', () => {
+  const landing = new Race({ track: 'landing', racers: [{ id: 'kevalanche' }] });
+  const [bear] = landing.karts;
+  landing._strikeWallopProp(landing.wallopProp, bear);
+  assert.equal(bear.boostT, 1.2);
+  assert.ok(landing.wallopProp.reset > 0);
+
+  const rapids = new Race({ track: 'park', racers: [{ id: 'rubberta' }, { id: 'zach' }] });
+  const P = rapids.wallopProp, [A, B] = rapids.karts;
+  rapids._strikeWallopProp(P, A);
+  Object.assign(B, { x: P.x, y: P.y, z: P.z });
+  rapids._moveWallopProp();
+  assert.equal(B.wobT, 0.55);
+  assert.equal(B.spinT, 0);
+  assert.ok(Math.hypot(B.vx, B.vz) > 10);
+  const vx = B.vx;
+  rapids._moveWallopProp();
+  assert.equal(B.vx, vx);
+  assert.ok(P.lift > 0);
+});
+
+test('Dojo gong opens the bypass temporarily and clears karts already inside', () => {
+  const R = new Race({ track: 'dojo', racers: [{ id: 'sumaura' }, { id: 'k8e' }] });
+  const C = R.T.cut, [K, follower] = R.karts;
+  const entry = { x: C.ax + C.ux * 3, z: C.az + C.uz * 3, k: C.kA, y: 0, yaw: Math.atan2(C.ux, C.uz), fwd: 20 };
+  Object.assign(K, entry);
+  assert.equal(R._cut(K), false);
+  R._strikeWallopProp(R.wallopProp, K);
+  assert.equal(R._cut(K), true);
+  for (let i = 0; i < 480; i++) R._moveWallopProp();
+  Object.assign(follower, entry);
+  assert.equal(R._cut(follower), false);
+  Object.assign(K, { x: C.ax + C.ux * (C.len / 2), z: C.az + C.uz * (C.len / 2) });
+  assert.equal(R._cut(K), true);
+  assert.ok(K.k > C.kA && K.k < C.kB);
 });

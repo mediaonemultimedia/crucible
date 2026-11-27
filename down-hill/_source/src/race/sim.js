@@ -83,10 +83,13 @@ export class Race {
     this.pods = T.pods.map((P) => ({ ...P, ...podPos(T, P, 0) }));
     this.piles = (T.def.piles || []).map((P) => ({ ...P, kicked: 0 }));
     this.sprinklers = (T.def.sprinklers || []).map((S) => ({ ...S, on: false }));
-    const propType = { laundry: 'ball', hockey: 'puck' }[T.def.id];
-    if (propType) {
-      const home = (this.startK + 26) % T.N;
-      this.wallopProp = { type: propType, home, k: home, radius: propType === 'ball' ? 2.35 : 1.8 };
+    const prop = { landing: ['pillow', 2.4], laundry: ['ball', 2.35], hockey: ['puck', 1.8],
+      park: ['beach', 2.55], dojo: ['gong', 2.25] }[T.def.id];
+    if (prop) {
+      const [type, radius] = prop;
+      const home = type === 'gong' ? (T.cut.kA - 6 + T.N) % T.N
+        : type === 'beach' ? this._nearest([160, 76, -129]) : (this.startK + 26) % T.N;
+      this.wallopProp = { type, home, radius };
       this._resetWallopProp();
     }
     this._place();
@@ -95,7 +98,7 @@ export class Race {
   _resetWallopProp() {
     const P = this.wallopProp, T = this.T, k = P.home, d = T.w[k] * 0.54;
     Object.assign(P, { k, x: T.x[k] + rightX(T, k) * d, y: T.y[k], z: T.z[k] + rightZ(T, k) * d,
-      vx: 0, vz: 0, life: 0, reset: 0, owner: -1, roll: 0 });
+      vx: 0, vz: 0, life: 0, reset: 0, owner: -1, roll: 0, lift: 0, bumped: new Set() });
   }
 
   _moveWallopProp() {
@@ -103,11 +106,13 @@ export class Race {
     if (!P) return;
     const T = this.T;
     if (P.reset && --P.reset === 0) this._resetWallopProp();
+    if (P.type === 'gong') return;
     if (!P.life) return;
     P.x += P.vx * DT;
     P.z += P.vz * DT;
     const k = P.k = locate(T, P.x, P.z, P.k, 6, P.y);
     P.y = T.y[k];
+    if (P.type === 'beach') P.lift = Math.abs(Math.sin((156 - P.life) * 0.105)) * 4.4;
     P.roll += Math.hypot(P.vx, P.vz) * DT / P.radius;
     const d = lateral(T, k, P.x, P.z);
     if (Math.abs(d) > T.w[k] - P.radius) {
@@ -116,17 +121,28 @@ export class Race {
       const out = (P.vx * nX + P.vz * nZ) * Math.sign(d);
       if (out > 0) { P.vx -= nX * out * Math.sign(d) * 1.45; P.vz -= nZ * out * Math.sign(d) * 1.45; }
     }
-    const drag = P.type === 'puck' ? 0.991 : 0.98;
+    const drag = P.type === 'beach' ? 0.995 : P.type === 'puck' ? 0.991 : 0.98;
     P.vx *= drag; P.vz *= drag;
     for (const K of this.karts) {
       if (K.i === P.owner || K.air || Math.abs(K.y - P.y) > 2 || Math.hypot(K.x - P.x, K.z - P.z) > P.radius + KART_R) continue;
+      if (P.type === 'beach') {
+        if (P.lift < 2 && !K.fish && !K.fin && K.invT <= 0 && K.sugarT <= 0 && !P.bumped.has(K.i)) {
+          P.bumped.add(K.i);
+          const side = Math.sign(P.vx * rightX(T, k) + P.vz * rightZ(T, k));
+          K.vx += rightX(T, k) * side * 12;
+          K.vz += rightZ(T, k) * side * 12;
+          K.wobT = 0.55;
+          this.emit({ k: 'beach-bump', i: K.i });
+        }
+        continue;
+      }
       if (this.hit(K, 'wallop-prop', P.owner)) {
         K.spinT = 0.48;
         P.life = 1;
         break;
       }
     }
-    if (--P.life === 0) { P.vx = P.vz = 0; P.reset = 95; }
+    if (--P.life === 0) { P.vx = P.vz = P.lift = 0; P.reset = 95; }
   }
 
   _nearest([x, y, z]) {
@@ -511,6 +527,7 @@ export class Race {
     const half = C.w + 0.4 + Math.max(0, Math.min(10, Math.max((C.m0 - s) * 0.3, (s - C.m1) * 0.3)));
     const inside = s > -3 && s < C.len + 3 && Math.abs(l) < half;
     if (!K.cut) {
+      if (C.gated && !this.wallopProp.reset) return false;
       // in from the road only: the mouth or the exit, where the corridor overlaps it
       if (!inside || (s > C.m0 && s < C.m1)) return false;
       const k = locate(T, K.x, K.z, K.k, 20);
@@ -693,10 +710,7 @@ export class Race {
         const dx = P.x - K.x, dz = P.z - K.z, dist = Math.hypot(dx, dz);
         const reach = Math.max(0, dist - P.radius);
         if (reach ** 2 < best && dx * fx + dz * fz >= dist * move.arc) {
-          const speed = 17 + move.shove * 1.25;
-          P.vx = fx * speed; P.vz = fz * speed; P.owner = K.i;
-          P.life = P.type === 'puck' ? 124 : 96;
-          P.reset = 0;
+          this._strikeWallopProp(P, K, move, fx, fz);
           this.emit({ k: 'wallop-prop', i: K.i });
           continue;
         }
@@ -711,6 +725,28 @@ export class Race {
       target.invT = move.stagger + 0.7;
       target.drift = target.charge = target.tier = target.boostT = 0;
       this.emit({ k: 'wallop-hit', i: target.i, by: K.i });
+    }
+  }
+
+  _strikeWallopProp(P, K, move, fx, fz) {
+    P.owner = K.i;
+    if (P.type === 'pillow') {
+      K.boostT = Math.max(K.boostT, 1.2);
+      this.emit({ k: 'boost', i: K.i, tier: 0 });
+      P.reset = 95;
+    } else if (P.type === 'gong') {
+      P.reset = 8 * 60;
+    } else if (P.type === 'beach') {
+      const k = P.k, T = this.T;
+      const side = lateral(T, k, P.x, P.z) > 0 ? -1 : 1;
+      P.vx = T.tx[k] * 18 + rightX(T, k) * side * 21;
+      P.vz = T.tz[k] * 18 + rightZ(T, k) * side * 21;
+      P.life = 156;
+      P.bumped.clear();
+    } else {
+      const speed = 17 + move.shove * 1.25;
+      P.vx = fx * speed; P.vz = fz * speed;
+      P.life = P.type === 'puck' ? 124 : 96;
     }
   }
 

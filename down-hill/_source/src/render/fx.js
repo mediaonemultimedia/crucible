@@ -177,10 +177,38 @@ export class Fx {
   }
 
   _makeWallopProp(P) {
-    const ball = P.type === 'ball';
-    const geometry = ball ? new THREE.SphereGeometry(P.radius, 24, 16)
-      : new THREE.CylinderGeometry(P.radius, P.radius, 0.76, 24);
+    const ball = P.type === 'ball', beach = P.type === 'beach', gong = P.type === 'gong', pillow = P.type === 'pillow';
+    const geometry = ball || beach ? new THREE.SphereGeometry(P.radius, 24, 16)
+      : pillow ? pillowGeo(4.8, 2.4, 3.8, [8, 4, 8])
+      : new THREE.CylinderGeometry(P.radius, P.radius, gong ? 0.35 : 0.76, 24);
     const map = canvasTex(256, 128, (ctx, w, h) => {
+      if (beach) {
+        ['#ff3c67', '#ffe54b', '#4ae4ff', '#fffbec', '#ff793b', '#7a5bff'].forEach((color, i, colors) => {
+          ctx.fillStyle = color;
+          ctx.fillRect(Math.floor(i * w / colors.length), 0, Math.ceil(w / colors.length) + 1, h);
+        });
+        return;
+      }
+      if (gong) {
+        ctx.fillStyle = '#ce7418'; ctx.fillRect(0, 0, w, h);
+        const rings = ['#7d4719', '#fad04e', '#db861d', '#ffe68e'];
+        rings.forEach((color, i) => {
+          const radius = 0.48 - i * 0.11;
+          ctx.fillStyle = color; ctx.beginPath();
+          ctx.ellipse(w / 2, h / 2, w * radius, h * radius, 0, 0, TAU);
+          ctx.fill();
+        });
+        return;
+      }
+      if (pillow) {
+        ctx.fillStyle = '#ea3483';
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = '#ffbbdf'; ctx.lineWidth = 8;
+        ctx.strokeRect(8, 8, w - 16, h - 16);
+        ctx.fillStyle = '#fff9d5'; ctx.font = '900 39px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('BOOST', w / 2, h * .62);
+        return;
+      }
       ctx.fillStyle = ball ? '#daf32e' : '#27243f';
       ctx.fillRect(0, 0, w, h);
       ctx.strokeStyle = ball ? '#fffce6' : '#52eafa';
@@ -203,12 +231,44 @@ export class Fx {
     this.wallopProp = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ map, roughness: 0.79 }));
     this.wallopAxis = new THREE.Vector3(1, 0, 0);
     this.root.add(this.wallopProp);
+    if (gong) {
+      const C = this.T.cut, s = C.m0 + 1, T = this.T;
+      const frame = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1),
+        new THREE.MeshStandardMaterial({ color: '#722040', roughness: 0.65 }), 3);
+      const beam = new THREE.Object3D();
+      [[-2.6, 2.75, 0.36, 5.5], [2.6, 2.75, 0.36, 5.5], [0, 5.42, 5.9, 0.45]].forEach(([side, y, w, h], i) => {
+        beam.position.set(P.x - T.tz[P.k] * side, P.y + y, P.z + T.tx[P.k] * side);
+        beam.rotation.y = Math.atan2(T.tx[P.k], T.tz[P.k]);
+        beam.scale.set(w, h, 0.48);
+        beam.updateMatrix();
+        frame.setMatrixAt(i, beam.matrix);
+      });
+      this.wallopGongFrame = frame;
+      this.root.add(frame);
+      const gateMap = canvasTex(256, 128, (ctx, w, h) => {
+        ctx.fillStyle = '#791e59'; ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = '#ffc443'; ctx.lineWidth = 9; ctx.strokeRect(5, 5, w - 10, h - 10);
+        ctx.fillStyle = '#fff2ae'; ctx.textAlign = 'center'; ctx.font = 'bold 37px sans-serif';
+        ctx.fillText('STRIKE GONG', w / 2, 76);
+      });
+      this.wallopGate = new THREE.Mesh(new THREE.BoxGeometry(C.w * 2 + 0.4, 5, 0.5),
+        new THREE.MeshStandardMaterial({ map: gateMap, roughness: 0.65 }));
+      this.wallopGate.position.set(C.ax + C.ux * s, 2.5, C.az + C.uz * s);
+      this.wallopGate.rotation.y = Math.atan2(C.ux, C.uz);
+      this.root.add(this.wallopGate);
+    }
   }
 
   dispose() {
     this.wallopProp?.geometry.dispose();
     this.wallopProp?.material.map.dispose();
     this.wallopProp?.material.dispose();
+    this.wallopGongFrame?.dispose();
+    this.wallopGongFrame?.geometry.dispose();
+    this.wallopGongFrame?.material.dispose();
+    this.wallopGate?.geometry.dispose();
+    this.wallopGate?.material.map.dispose();
+    this.wallopGate?.material.dispose();
     const templates = this.warmedModels;
     if (!templates) return;
     this.pipelineWarmup.finally(() => {
@@ -466,12 +526,20 @@ export class Fx {
     const R = this.race, t = this.t;
     const P = R.wallopProp;
     if (P) {
-      const model = this.wallopProp, ball = P.type === 'ball';
-      const scale = P.reset ? Math.max(0, 1 - (95 - P.reset) / 15) : 1;
+      const model = this.wallopProp, ball = P.type === 'ball' || P.type === 'beach', gong = P.type === 'gong';
+      const scale = !gong && P.reset ? Math.max(0, 1 - (95 - P.reset) / 15) : 1;
       model.visible = scale > 0;
       model.scale.setScalar(scale);
-      model.position.set(P.x, P.y + (ball ? P.radius : 0.39) * scale, P.z);
-      if (ball) {
+      const height = ball ? P.radius + P.lift : gong ? 2.55 : P.type === 'pillow' ? 1.1 : 0.39;
+      model.position.set(P.x, P.y + height * scale, P.z);
+      if (gong) {
+        const yaw = Math.atan2(this.T.tx[P.k], this.T.tz[P.k]);
+        const strikeAge = (480 - P.reset) / 60;
+        const swing = P.reset ? Math.sin(strikeAge * 27) * Math.exp(-strikeAge * 5) * 0.45 : 0;
+        model.rotation.set(Math.PI / 2 + swing, yaw, 0, 'YXZ');
+        const gate = this.wallopGate;
+        gate.visible = !P.reset && !karts.some(K => K.cut && K.k < this.T.cut.kA + 32);
+      } else if (ball) {
         if (P.life) this.wallopAxis.set(P.vz, 0, -P.vx).normalize();
         model.quaternion.setFromAxisAngle(this.wallopAxis, P.roll);
       } else model.rotation.y = P.roll * 0.4;

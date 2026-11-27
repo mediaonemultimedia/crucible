@@ -420,6 +420,15 @@ export class VenueWorld extends World {
     const root = this.root;
     const timber = standard('#a6334d'), plaster = standard('#ffce95'), roof = standard('#50317c');
     const gold = new THREE.MeshBasicMaterial({ color: '#ffc34b' });
+    const C = this.T.cut, s = (C.m0 + C.m1) / 2;
+    const x = C.ax + C.ux * s, z = C.az + C.uz * s, yaw = Math.atan2(C.ux, C.uz);
+    const len = C.m1 - C.m0 + 5;
+    const deck = box(root, timber, x, -0.42, z, C.w * 2, 0.88, len);
+    deck.rotation.y = yaw;
+    for (const side of [-1, 1]) {
+      const rail = box(root, gold, x + side * C.uz * C.w, 0.4, z - side * C.ux * C.w, 0.38, 0.78, len - 4);
+      rail.rotation.y = yaw;
+    }
     const tile = new THREE.CylinderGeometry(1, 1, 1, 4);
     for (const [x, z, width] of [[-148, -175, 56], [-60, -173, 55], [4, 5, 47], [-75, 72, 42], [98, -187, 63], [232, -170, 55]]) {
       if (!sceneryClearsRoad(this.T, x, z, width / 2 + 5, 19)) continue;
