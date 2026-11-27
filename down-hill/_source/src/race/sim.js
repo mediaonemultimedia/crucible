@@ -706,14 +706,10 @@ export class Race {
         target = O; best = d2;
       }
       const P = this.wallopProp;
-      if (P && !P.reset && Math.abs(P.y - K.y) <= 2.2) {
-        const dx = P.x - K.x, dz = P.z - K.z, dist = Math.hypot(dx, dz);
-        const reach = Math.max(0, dist - P.radius);
-        if (reach ** 2 < best && dx * fx + dz * fz >= dist * move.arc) {
-          this._strikeWallopProp(P, K, move, fx, fz);
-          this.emit({ k: 'wallop-prop', i: K.i });
-          continue;
-        }
+      if (this.wallopPropReach(K, move, fx, fz) ** 2 < best) {
+        this._strikeWallopProp(P, K, move, fx, fz);
+        this.emit({ k: 'wallop-prop', i: K.i });
+        continue;
       }
       if (!target) continue;
       const dx = target.x - K.x, dz = target.z - K.z, d = Math.sqrt(best);
@@ -726,6 +722,14 @@ export class Race {
       target.drift = target.charge = target.tier = target.boostT = 0;
       this.emit({ k: 'wallop-hit', i: target.i, by: K.i });
     }
+  }
+
+  wallopPropReach(K, move, fx = Math.sin(K.yaw), fz = Math.cos(K.yaw)) {
+    const P = this.wallopProp;
+    if (!P || P.reset || Math.abs(P.y - K.y) > 2.2) return Infinity;
+    const dx = P.x - K.x, dz = P.z - K.z, dist = Math.hypot(dx, dz);
+    const reach = Math.max(0, dist - P.radius);
+    return reach < move.range && dx * fx + dz * fz >= dist * move.arc ? reach : Infinity;
   }
 
   _strikeWallopProp(P, K, move, fx, fz) {

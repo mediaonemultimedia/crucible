@@ -83,6 +83,15 @@ export function layout(n) {
   return [[0, 0, 0.5, 0.5], [0.5, 0, 0.5, 0.5], [0, 0.5, 0.5, 0.5], [0.5, 0.5, 0.5, 0.5]];
 }
 
+const PROP_CUES = {
+  pillow: ['Pillow boost', 'Wallop for a speed burst', '#ff71be', 3],
+  ball: ['Tennis ball', 'Wallop to spin a rival', '#f5ff58', 5.2],
+  puck: ['Hockey puck', 'Wallop to slide it at rivals', '#6bf6ff', 1.8],
+  beach: ['Beach ball', 'Wallop to knock rivals sideways', '#ffe168', 5.7],
+  gong: ['Shortcut gong', 'Wallop to open the gate', '#ffcb5b', 5.9],
+};
+const cueProjection = new THREE.Vector3();
+
 const VIEW_HTML = `<div class="vdark"></div><div class="fabric"></div>
 <div class="speed"></div>
 <div class="islot"><div class="item"></div><div class="item-name"></div><div class="taunt-ic"><b>Taunt</b><kbd class="tk">T</kbd></div></div>
@@ -92,7 +101,8 @@ const VIEW_HTML = `<div class="vdark"></div><div class="fabric"></div>
 <div class="place">8<sup>th</sup></div>
 <div class="drift"><span>Drift</span><i></i><i></i><i></i></div>
 <div class="final">FINAL LAP!</div><div class="start-lights" aria-hidden="true"><i></i><i></i><i></i></div><div class="count"></div><div class="toast"></div>
-<div class="wallop-hud"></div><div class="wrong-way" hidden>WRONG WAY!</div><div class="lookback">Look back</div><div class="ptag"></div><div class="scare"></div><div class="wait"></div>`;
+<div class="wallop-hud"></div><div class="prop-cue" hidden><b></b><span></span></div>
+<div class="prop-cue gate-cue" hidden><b>Shortcut open</b><span></span></div><div class="wrong-way" hidden>WRONG WAY!</div><div class="lookback">Look back</div><div class="ptag"></div><div class="scare"></div><div class="wait"></div>`;
 
 class App {
   constructor(renderer, canvas) {
@@ -521,7 +531,7 @@ class App {
         j, i, rect: rects[j], el, q,
         place: q('.place'), lap: q('.lap .n'), time: q('.lap .tm'), item: q('.item'), itemName: q('.item-name'), drift: q('.drift'), final: q('.final'),
         tip: q('.tip'), tprompt: q('.tprompt'), tauntIc: q('.taunt-ic'), warn: q('.warn'), caption: q('.caption'), speed: q('.speed'), islot: q('.islot'),
-        lights: q('.start-lights'), count: q('.count'), toastEl: q('.toast'), wallop: q('.wallop-hud'), wrongWay: q('.wrong-way'), fabric: q('.fabric'), scare: q('.scare'), dark: q('.vdark'), mm: q('.minimap'), wait: q('.wait'),
+        lights: q('.start-lights'), count: q('.count'), toastEl: q('.toast'), wallop: q('.wallop-hud'), propCue: q('.prop-cue'), gateCue: q('.gate-cue'), wrongWay: q('.wrong-way'), fabric: q('.fabric'), scare: q('.scare'), dark: q('.vdark'), mm: q('.minimap'), wait: q('.wait'),
         camera: new THREE.PerspectiveCamera(64, 1, 0.3, 1400),
         cam: { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 64, shake: 0 },
         lastItem: null, lookBack: false, lb: false, darkV: 0, tipUntil: 0, capUntil: 0, hud: {},
@@ -996,6 +1006,65 @@ class App {
     return { x: lerp(P.x, K.x, a), y: lerp(P.y, K.y, a), z: lerp(P.z, K.z, a), yaw: angLerp(P.yaw, K.yaw, a) };
   }
 
+  _propCues(H, R, K) {
+    const P = R.wallopProp, C = R.T.cut;
+    const active = R.phase === 'race' && !K.fin && !K.fish && !H.lookBack;
+    const nearProp = active && P && !P.reset && this._cueNear(R.T, K, P.k, P.x, P.y, P.z, 56);
+    const gateAt = C?.m0 + 1;
+    const gx = C ? C.ax + gateAt * C.ux : 0, gz = C ? C.az + gateAt * C.uz : 0;
+    const nearGate = active && P?.type === 'gong' && P.reset && !K.cut &&
+      this._cueNear(R.T, K, C.kA, gx, 0, gz, 76);
+    if (!nearProp && !nearGate) {
+      H.propCue.hidden = H.gateCue.hidden = true;
+      return;
+    }
+
+    H.camera.updateMatrixWorld();
+    const place = (el, x, y, z) => {
+      cueProjection.set(x, y, z).project(H.camera);
+      const p = cueProjection;
+      el.hidden = p.z < -1 || p.z > 1 || Math.abs(p.x) > 1.1 || Math.abs(p.y) > 1.1;
+      if (!el.hidden) {
+        el.style.left = `${Math.min(80, Math.max(20, (p.x + 1) * 50)).toFixed(1)}%`;
+        el.style.top = `${Math.min(82, Math.max(24, (1 - p.y) * 50)).toFixed(1)}%`;
+      }
+    };
+
+    H.propCue.hidden = !nearProp;
+    if (nearProp) {
+      const [title, hint, color, height] = PROP_CUES[P.type];
+      const inReach = !K.air && K.spinT <= 0 && K.ejectT <= 0 && K.wallopReady <= R.tick &&
+        Number.isFinite(R.wallopPropReach(K, WALLOPS[K.id]));
+      if (H.hud.propReach !== inReach) {
+        H.hud.propReach = inReach;
+        H.propCue.classList.toggle('in-reach', inReach);
+        H.propCue.firstElementChild.textContent = inReach ? `Wallop now · ${this.keyFor(H, 'wallop')}` : title;
+      }
+      if (!H.hud.propStyle) {
+        H.hud.propStyle = true;
+        H.propCue.lastElementChild.textContent = hint;
+        H.propCue.style.setProperty('--cue', color);
+      }
+      place(H.propCue, P.x, P.y + P.lift + height, P.z);
+    }
+
+    H.gateCue.hidden = !nearGate;
+    if (nearGate) {
+      const seconds = Math.ceil(P.reset / 60);
+      if (H.hud.gateSeconds !== seconds) {
+        H.hud.gateSeconds = seconds;
+        H.gateCue.lastElementChild.textContent = `Take the bypass · ${seconds}s`;
+      }
+      place(H.gateCue, gx, 5.2, gz);
+    }
+  }
+
+  _cueNear(T, K, sample, x, y, z, range) {
+    const dk = Math.abs(K.k - sample);
+    return Math.min(dk, T.N - dk) * T.step < range * 1.4 &&
+      Math.abs(K.y - y) < 24 && (K.x - x) ** 2 + (K.z - z) ** 2 < range ** 2;
+  }
+
   /* ── HUD (one per human view) ── */
   _hud(H) {
     const R = this.race, K = R.karts[H.i];
@@ -1244,7 +1313,7 @@ class App {
       });
       this.fx.camPos = this.hv[0].camera.position;
       this.fx.update(this.paused ? 0 : rdt, this.hv[0].camera.quaternion, R.karts, this.rviews);
-      for (const H of this.hv) this._hud(H);
+      for (const H of this.hv) { this._hud(H); if (render) this._propCues(H, R, R.karts[H.i]); }
       this.hum.update(R.karts, this.cpus[this.me] ? -1 : this.me, this.hv[0].camera.position);
       this.world.race?.(R, this.paused ? 0 : rdt, this);
       const humansIn = this.hv.every((H) => R.karts[H.i].fin) || this.cpus[this.me];
