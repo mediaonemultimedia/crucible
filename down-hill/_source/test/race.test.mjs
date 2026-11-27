@@ -250,3 +250,26 @@ test('Dojo gong opens the bypass temporarily and clears karts already inside', (
   assert.equal(R._cut(K), true);
   assert.ok(K.k > C.kA && K.k < C.kB);
 });
+
+test('spin-outs hand back steering inside the forward half of the local road', () => {
+  let keptAnAngle = false;
+  for (const [track, kind, seconds] of [['landing', 'missile', 1.2], ['hockey', 'slick', 1.1],
+    ['park', 'alarm', 1.6], ['dojo', 'wallop', 0.32]]) {
+    for (const dir of [-1, 1]) for (const heading of [-2.8, -1, 0, 1, 2.8]) {
+      const R = new Race({ track, racers: [{ id: 'kevalanche' }] });
+      const T = R.T, [K] = R.karts, k = (R.startK + 55) % T.N;
+      R.phase = 'race';
+      Object.assign(K, { k, x: T.x[k], y: T.y[k], z: T.z[k], yaw: Math.atan2(T.tx[k], T.tz[k]) + heading });
+      if (kind === 'wallop') K.spinT = seconds;
+      else assert.equal(R.hit(K, kind), true);
+      K.spinDir = dir;
+      for (let i = 0; i < 120 && K.spinT > 0; i++) R.step([noInput()]);
+      assert.equal(K.spinT, 0);
+      assert.equal(K.fish, null);
+      const dot = Math.sin(K.yaw) * T.tx[K.k] + Math.cos(K.yaw) * T.tz[K.k];
+      assert.ok(dot > 0, `${kind} ended pointing back: ${dot}`);
+      keptAnAngle ||= dot < 0.75;
+    }
+  }
+  assert.ok(keptAnAngle, 'recovery can leave the kart angled across the track');
+});

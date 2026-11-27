@@ -49,6 +49,8 @@ const ODDS = [
   [2, 4, 14, 9, 7, 13, 17, 7, 14, 13],
 ];
 
+export const SPIN_RECOVER = 0.24;
+const SPIN_EXIT_ANGLE = Math.PI * 0.46; // just inside the forward half of the road
 export const KART_R = 1.55;           // kart radius for bumps
 
 /* the inputs a kart reads each tick (keyboard, pad or CPU) */
@@ -218,6 +220,7 @@ export class Race {
     const T = this.T, N = T.N, S = K.S;
     K.prevInp = K.inp; K.inp = I;
     const pressed = (b) => I[b] && !K.prevInp[b];
+    const spinBefore = K.spinT;
     for (const t of ['boostT', 'padT', 'spinT', 'invT', 'jitterT', 'caseT', 'wobT', 'cuffT', 'tauntT', 'trickT', 'bounceT', 'land', 'sugarT', 'shrinkT', 'flatT', 'flatCd']) if (K[t] > 0) K[t] = Math.max(0, K[t] - DT);
     if (K.ejectT > 0) { K.ejectT = Math.max(0, K.ejectT - DT); if (!K.ejectT) { K.invT = Math.max(K.invT, 0.8); this.emit({ k: 'ejectLand', i: K.i }); } }
     if (K.cuffT <= 0 && K.cuff >= 0) K.cuff = -1;
@@ -483,6 +486,15 @@ export class Race {
       // stuck (CPU or not): a long crawl into something gets fished back
       if (this.phase === 'race' && Math.abs(fwd) < 2.5 && I.gas && K.spinT <= 0) { K.stuckT += DT; if (K.stuckT > 4) { K.stuckT = 0; K.fish = { t: 0, dur: 1.6, k: K.lastGood, x: K.x, y: K.y, z: K.z }; this.emit({ k: 'fall', i: K.i, why: 'stuck' }); } }
       else K.stuckT = 0;
+    }
+
+    // At the handoff to player steering, keep the nose in the forward
+    // half of the current road. The spin and its sideways momentum come first.
+    if (spinBefore > 0 && K.spinT === 0 && !K.fish && this.humans.includes(K.i)) {
+      const C = K.cut ? T.cut : null;
+      const forward = C ? Math.atan2(C.ux, C.uz) : Math.atan2(T.tx[K.k], T.tz[K.k]);
+      const offset = Math.atan2(Math.sin(K.yaw - forward), Math.cos(K.yaw - forward));
+      K.yaw += Math.max(-SPIN_EXIT_ANGLE, Math.min(SPIN_EXIT_ANGLE, offset)) - offset;
     }
 
     // Measure actual travel along the road, so backing up and driving

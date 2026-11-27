@@ -15,6 +15,7 @@
    kart's own bits move (the lowrider's hydraulics, the washtub's paddling
    tentacles, the resurfacer's roller, the disco ball).                  */
 
+import { SPIN_RECOVER } from '../race/sim.js';
 import * as THREE from 'three/webgpu';
 import { createRaceRemesh } from './race-remesh.js';
 import { Plush } from './plush.js';
@@ -219,7 +220,13 @@ export class RacerView {
     const driftA = K.drift ? K.drift * -0.42 : 0;
     this.driftA = (this.driftA || 0) + (driftA - (this.driftA || 0)) * Math.min(1, dt * 9);
     // the spin-out
-    if (K.spinT > 0) this.spin += dt * 13 * K.spinDir; else this.spin *= Math.max(0, 1 - dt * 6);
+    if (K.spinT >= SPIN_RECOVER) {
+      const angle = this.spin + dt * 13 * K.spinDir;
+      this.spin = Math.atan2(Math.sin(angle), Math.cos(angle));
+    } else if (K.spinT > 0) {
+      this.spin *= Math.min(1, K.spinT / Math.max(K.spinT, this.spinLeft || SPIN_RECOVER));
+    } else this.spin = 0;
+    this.spinLeft = K.spinT;
     // the trick: a full barrel roll in the air
     let trickRoll = 0;
     if (this.trickT > 0) { this.trickT -= dt; trickRoll = (1 - Math.max(0, this.trickT) / 0.75) * Math.PI * 2; }
