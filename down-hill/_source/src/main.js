@@ -18,7 +18,7 @@ import { makeRenderer } from './render/renderer.js';
 import { makeWorld } from './render/worlds.js';
 import { RacerView } from './render/racer.js';
 import { Fx, TIER_COLORS } from './render/fx.js';
-import { Race, DT, ITEMS, ITEM_NAMES, ITEM_TIPS, COUNT_TICKS } from './race/sim.js';
+import { Race, DT, SPIN_RECOVER, spinRecoveryYaw, ITEMS, ITEM_NAMES, ITEM_TIPS, COUNT_TICKS } from './race/sim.js';
 import { CPU, LEVEL_NAMES, cupStrength } from './race/cpu.js';
 import { buildTrack, TRACKS, CUP, rightX, rightZ } from './race/track.js';
 import { RACERS, ORDER, racerId, WEIGHTS, WALLOPS } from './race/roster.js';
@@ -605,7 +605,7 @@ class App {
     this.fx = new Fx(this.scene, this.race);
     this.world.setStart(this.race.startK);
     this.world.reset?.(this.race);
-    this.prev = this.race.karts.map((K) => ({ x: K.x, y: K.y, z: K.z, yaw: K.yaw }));
+    this.prev = this.race.karts.map((K) => ({ x: K.x, y: K.y, z: K.z, yaw: K.yaw, spinT: K.spinT }));
     this.acc = 0;
     this.resultsAt = 0;
     this._views(humans.length, humans);
@@ -630,7 +630,7 @@ class App {
   /* one sim tick: inputs (each human's controls, the CPUs think), step, events */
   tick() {
     const R = this.race;
-    this.prev = R.karts.map((K) => ({ x: K.x, y: K.y, z: K.z, yaw: K.yaw }));
+    this.prev = R.karts.map((K) => ({ x: K.x, y: K.y, z: K.z, yaw: K.yaw, spinT: K.spinT }));
     const inputs = R.karts.map((K, i) => {
       if (this.cpus[i]) return this.cpus[i].think();
       if (R.karts[i].fin) return this._autopilot(i);
@@ -1003,7 +1003,19 @@ class App {
 
   _pose(K, P, a) {
     if (K.fish) return this.fx.fishPose(K, { yaw0: K.yaw, yaw: K.yaw });
-    return { x: lerp(P.x, K.x, a), y: lerp(P.y, K.y, a), z: lerp(P.z, K.z, a), yaw: angLerp(P.yaw, K.yaw, a) };
+    let yaw = angLerp(P.yaw, K.yaw, a);
+    if (K.spinT === 0 && P.spinT > 0 && this.race.humans.includes(K.i)) {
+      yaw = angLerp(spinRecoveryYaw(this.race.T, K, P.yaw), K.yaw, a);
+    } else if (K.spinT > 0 && K.spinT < SPIN_RECOVER && this.race.humans.includes(K.i)) {
+      // Predict the remaining tapered spin, then ease in only the final
+      // correction. Kart and chase camera share this presentation heading.
+      const ticks = Math.floor(K.spinT / DT);
+      const remainingTurn = K.spinDir * 11 * 1.4 * DT * (K.air ? 0.55 : 1) *
+        (ticks * K.spinT - DT * ticks * (ticks + 1) / 2);
+      const exit = K.yaw + remainingTurn;
+      yaw += (spinRecoveryYaw(this.race.T, K, exit) - exit) * smooth01(1 - K.spinT / SPIN_RECOVER);
+    }
+    return { x: lerp(P.x, K.x, a), y: lerp(P.y, K.y, a), z: lerp(P.z, K.z, a), yaw };
   }
 
   _propCues(H, R, K) {

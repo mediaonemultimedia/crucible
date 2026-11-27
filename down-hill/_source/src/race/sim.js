@@ -51,6 +51,13 @@ const ODDS = [
 
 export const SPIN_RECOVER = 0.24;
 const SPIN_EXIT_ANGLE = Math.PI * 0.46; // just inside the forward half of the road
+export function spinRecoveryYaw(T, K, yaw) {
+  const C = K.cut ? T.cut : null;
+  const forward = C ? Math.atan2(C.ux, C.uz) : Math.atan2(T.tx[K.k], T.tz[K.k]);
+  const offset = Math.atan2(Math.sin(yaw - forward), Math.cos(yaw - forward));
+  return yaw + Math.max(-SPIN_EXIT_ANGLE, Math.min(SPIN_EXIT_ANGLE, offset)) - offset;
+}
+
 export const KART_R = 1.55;           // kart radius for bumps
 
 /* the inputs a kart reads each tick (keyboard, pad or CPU) */
@@ -491,10 +498,7 @@ export class Race {
     // At the handoff to player steering, keep the nose in the forward
     // half of the current road. The spin and its sideways momentum come first.
     if (spinBefore > 0 && K.spinT === 0 && !K.fish && this.humans.includes(K.i)) {
-      const C = K.cut ? T.cut : null;
-      const forward = C ? Math.atan2(C.ux, C.uz) : Math.atan2(T.tx[K.k], T.tz[K.k]);
-      const offset = Math.atan2(Math.sin(K.yaw - forward), Math.cos(K.yaw - forward));
-      K.yaw += Math.max(-SPIN_EXIT_ANGLE, Math.min(SPIN_EXIT_ANGLE, offset)) - offset;
+      K.yaw = spinRecoveryYaw(T, K, K.yaw);
     }
 
     // Measure actual travel along the road, so backing up and driving

@@ -22,6 +22,23 @@ import { rbox, pillowGeo, mat, glowMat, mesh, canvasTex } from './geo.js';
 const TAU = Math.PI * 2;
 export const TIER_COLORS = [null, '#ffffff', '#ffc93a', '#4dffc3'];
 
+// A rounded-square fabric shell, widest at the piping, with padded faces.
+function boostPillowGeometry() {
+  const geometry = new THREE.SphereGeometry(1, 40, 24);
+  const p = geometry.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i), theta = Math.atan2(p.getZ(i), p.getX(i));
+    const c = Math.cos(theta), s = Math.sin(theta);
+    const width = Math.max(0, 1 - y * y) ** 0.29;
+    const piping = 1 + 0.035 * Math.exp(-1800 * y * y);
+    p.setXYZ(i, 2.55 * Math.sign(c) * Math.abs(c) ** 0.56 * width * piping,
+      y * (1.32 - 0.18 * Math.sin(theta * 2) ** 2 * (1 - y * y)),
+      1.98 * Math.sign(s) * Math.abs(s) ** 0.56 * width * piping);
+  }
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 function featherTex() {
   return canvasTex(64, 128, (g, w, h) => {
     g.clearRect(0, 0, w, h);
@@ -179,7 +196,7 @@ export class Fx {
   _makeWallopProp(P) {
     const ball = P.type === 'ball', beach = P.type === 'beach', gong = P.type === 'gong', pillow = P.type === 'pillow';
     const geometry = ball || beach ? new THREE.SphereGeometry(P.radius, 24, 16)
-      : pillow ? pillowGeo(4.8, 2.4, 3.8, [8, 4, 8])
+      : pillow ? boostPillowGeometry()
       : new THREE.CylinderGeometry(P.radius, P.radius, gong ? 0.35 : 0.76, 24);
     const map = canvasTex(256, 128, (ctx, w, h) => {
       if (beach) {
@@ -201,12 +218,23 @@ export class Fx {
         return;
       }
       if (pillow) {
-        ctx.fillStyle = '#ea3483';
+        const fabric = ctx.createLinearGradient(0, 0, 0, h);
+        fabric.addColorStop(0, '#ffc9e8');
+        fabric.addColorStop(.45, '#ff65b5');
+        fabric.addColorStop(.55, '#ed4b9e');
+        fabric.addColorStop(1, '#ffa7d8');
+        ctx.fillStyle = fabric;
         ctx.fillRect(0, 0, w, h);
-        ctx.strokeStyle = '#ffbbdf'; ctx.lineWidth = 8;
-        ctx.strokeRect(8, 8, w - 16, h - 16);
-        ctx.fillStyle = '#fff9d5'; ctx.font = '900 39px sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText('BOOST', w / 2, h * .62);
+        ctx.fillStyle = '#be286f'; ctx.fillRect(0, h / 2 - 5, w, 10);
+        ctx.fillStyle = '#ffe9bf'; ctx.fillRect(0, h / 2 - 3, w, 5);
+        ctx.fillStyle = '#a93b72';
+        for (let x = 0; x < w; x += 8) ctx.fillRect(x, h / 2 - 1, 4, 1.5);
+        ctx.fillStyle = '#fff0d6';
+        for (const y of [30, 94]) for (let x = 16; x < w; x += 32) {
+          ctx.beginPath();
+          ctx.moveTo(x, y - 6); ctx.lineTo(x + 4, y); ctx.lineTo(x, y + 6); ctx.lineTo(x - 4, y);
+          ctx.closePath(); ctx.fill();
+        }
         return;
       }
       ctx.fillStyle = ball ? '#daf32e' : '#27243f';
@@ -530,7 +558,7 @@ export class Fx {
       const scale = !gong && P.reset ? Math.max(0, 1 - (95 - P.reset) / 15) : 1;
       model.visible = scale > 0;
       model.scale.setScalar(scale);
-      const height = ball ? P.radius + P.lift : gong ? 2.55 : P.type === 'pillow' ? 1.1 : 0.39;
+      const height = ball ? P.radius + P.lift : gong ? 2.55 : P.type === 'pillow' ? 1.25 : 0.39;
       model.position.set(P.x, P.y + height * scale, P.z);
       if (gong) {
         const yaw = Math.atan2(this.T.tx[P.k], this.T.tz[P.k]);
@@ -542,6 +570,9 @@ export class Fx {
       } else if (ball) {
         if (P.life) this.wallopAxis.set(P.vz, 0, -P.vx).normalize();
         model.quaternion.setFromAxisAngle(this.wallopAxis, P.roll);
+      } else if (P.type === 'pillow') {
+        const T = this.T;
+        model.rotation.set(-0.12, Math.atan2(T.tx[P.k], T.tz[P.k]) + 0.24, 0.13, 'YXZ');
       } else model.rotation.y = P.roll * 0.4;
     }
     // boxes
