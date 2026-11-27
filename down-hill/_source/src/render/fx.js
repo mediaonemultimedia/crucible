@@ -17,7 +17,7 @@
      reticle, the hot wash's steam, the sugar rush's candy glow.          */
 
 import * as THREE from 'three/webgpu';
-import { rbox, pillowGeo, mat, glowMat, mesh, canvasTex } from './geo.js';
+import { rbox, pillowGeo, mat, glowMat, mesh, canvasTex, srand } from './geo.js';
 
 const TAU = Math.PI * 2;
 export const TIER_COLORS = [null, '#ffffff', '#ffc93a', '#4dffc3'];
@@ -37,6 +37,84 @@ function boostPillowGeometry() {
   }
   geometry.computeVertexNormals();
   return geometry;
+}
+
+function gongGeometry(radius) {
+  // Rolled rim, dished face and raised boss, in one low-poly surface.
+  const face = [[0, .30], [.19, .30], [.27, .24], [.34, .10], [.65, .075],
+    [.89, .105], [.96, .17], [1, .11], [1, -.07], [.96, -.13],
+    [.86, -.10], [.37, -.045], [0, -.045]];
+  return new THREE.LatheGeometry(face.map(([r, y]) => new THREE.Vector2(r * radius, -y)), 40);
+}
+
+function paintBeachBall(ctx, w, h) {
+  const panels = [['#ff557f', '#d91b53'], ['#fff9da', '#c6deed'], ['#25e9ff', '#087fc7'],
+    ['#fff9da', '#c6deed'], ['#ffe548', '#f7971f'], ['#fff9da', '#c6deed']];
+  const width = w / panels.length;
+  panels.forEach(([bright, shade], i) => {
+    const x = i * width;
+    const vinyl = ctx.createLinearGradient(x, 0, x + width, 0);
+    vinyl.addColorStop(0, shade);
+    vinyl.addColorStop(.27, bright);
+    vinyl.addColorStop(.78, bright);
+    vinyl.addColorStop(1, shade);
+    ctx.fillStyle = vinyl; ctx.fillRect(Math.floor(x), 0, Math.ceil(width) + 1, h);
+    ctx.fillStyle = '#ffffff96'; ctx.fillRect(x + 1, 0, 2, h);
+  });
+  ctx.fillStyle = '#fff7dd';
+  ctx.fillRect(0, 0, w, 12); ctx.fillRect(0, h - 12, w, 12);
+  ctx.fillStyle = '#ffca54';
+  ctx.fillRect(0, 10, w, 2); ctx.fillRect(0, h - 12, w, 2);
+  ctx.fillStyle = '#cfdbdf'; ctx.fillRect(0, 0, w, 4);
+}
+
+function paintGong(ctx, w, h) {
+  const brass = ctx.createLinearGradient(0, 0, 0, h);
+  for (const [at, color] of [[0, '#ffe6a0'], [.11, '#b47326'], [.27, '#efaf37'],
+    [.42, '#8f4717'], [.49, '#fff29b'], [.55, '#b96b1e'], [.65, '#ffc557'],
+    [.79, '#df9c2d'], [.86, '#98501a'], [.94, '#fff6a2'], [1, '#ffdc6d']]) brass.addColorStop(at, color);
+  ctx.fillStyle = brass; ctx.fillRect(0, 0, w, h);
+  for (let i = 0; i < 22; i++) {
+    const x = i * w / 22 + 2, y = h * .35 + (i % 2) * 6;
+    ctx.fillStyle = '#70421955'; ctx.fillRect(x, y + 2, 5, 3);
+    ctx.fillStyle = '#ffec9c65'; ctx.fillRect(x, y, 5, 2);
+  }
+}
+
+function paintTennisBall(ctx, w, h) {
+  const felt = ctx.createLinearGradient(0, 0, 0, h);
+  felt.addColorStop(0, '#e9fb47'); felt.addColorStop(.5, '#d2ee1c'); felt.addColorStop(1, '#9fc91a');
+  ctx.fillStyle = felt; ctx.fillRect(0, 0, w, h);
+  const rnd = srand(29);
+  for (let i = 0; i < 1900; i++) {
+    ctx.fillStyle = i % 2 ? '#fcffb65e' : '#64860b33';
+    ctx.fillRect(rnd() * w, rnd() * h, 1.6, .8);
+  }
+  ctx.beginPath();
+  for (let x = 0; x <= w; x++) {
+    const y = h / 2 + Math.cos(x / w * TAU) * h * .30;
+    if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = '#9eb12b'; ctx.lineWidth = 10; ctx.stroke();
+  ctx.strokeStyle = '#fff8d2'; ctx.lineWidth = 6; ctx.stroke();
+}
+
+function paintPuck(ctx, w, h) {
+  // The cylinder's caps occupy the upper three quarters of this atlas.
+  const edge = h * .75;
+  ctx.fillStyle = '#20273b'; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#374057';
+  for (let x = 1; x < w; x += 6) ctx.fillRect(x, edge + 3, 2, h - edge - 6);
+  ctx.fillStyle = '#48dcff'; ctx.fillRect(0, edge + 3, w, 4);
+  ctx.fillStyle = '#121628'; ctx.fillRect(0, h - 5, w, 5);
+  ctx.translate(w / 2, edge / 2);
+  ctx.scale(w / 2, edge / 2);
+  for (const [radius, color] of [[.94, '#131b2d'], [.81, '#5bddf4'], [.69, '#1b3673']]) {
+    ctx.fillStyle = color; ctx.beginPath(); ctx.arc(0, 0, radius, 0, TAU); ctx.fill();
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#fff5cf'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '900 55px sans-serif'; ctx.fillText('88', w / 2, edge / 2 + 2);
 }
 
 function featherTex() {
@@ -195,28 +273,19 @@ export class Fx {
 
   _makeWallopProp(P) {
     const ball = P.type === 'ball', beach = P.type === 'beach', gong = P.type === 'gong', pillow = P.type === 'pillow';
-    const geometry = ball || beach ? new THREE.SphereGeometry(P.radius, 24, 16)
+    const geometry = ball || beach ? new THREE.SphereGeometry(P.radius, 28, 18)
       : pillow ? boostPillowGeometry()
-      : new THREE.CylinderGeometry(P.radius, P.radius, gong ? 0.35 : 0.76, 24);
+      : gong ? gongGeometry(P.radius) : new THREE.CylinderGeometry(P.radius, P.radius, .76, 32);
+    if (P.type === 'puck') {
+      const uv = geometry.attributes.uv;
+      for (const [group, { start, count }] of geometry.groups.entries()) {
+        const vertices = new Set(geometry.index.array.subarray(start, start + count));
+        for (const i of vertices) uv.setY(i, group === 0 ? uv.getY(i) * .25 : .25 + uv.getY(i) * .75);
+      }
+    }
     const map = canvasTex(256, 128, (ctx, w, h) => {
-      if (beach) {
-        ['#ff3c67', '#ffe54b', '#4ae4ff', '#fffbec', '#ff793b', '#7a5bff'].forEach((color, i, colors) => {
-          ctx.fillStyle = color;
-          ctx.fillRect(Math.floor(i * w / colors.length), 0, Math.ceil(w / colors.length) + 1, h);
-        });
-        return;
-      }
-      if (gong) {
-        ctx.fillStyle = '#ce7418'; ctx.fillRect(0, 0, w, h);
-        const rings = ['#7d4719', '#fad04e', '#db861d', '#ffe68e'];
-        rings.forEach((color, i) => {
-          const radius = 0.48 - i * 0.11;
-          ctx.fillStyle = color; ctx.beginPath();
-          ctx.ellipse(w / 2, h / 2, w * radius, h * radius, 0, 0, TAU);
-          ctx.fill();
-        });
-        return;
-      }
+      if (beach) { paintBeachBall(ctx, w, h); return; }
+      if (gong) { paintGong(ctx, w, h); return; }
       if (pillow) {
         const fabric = ctx.createLinearGradient(0, 0, 0, h);
         fabric.addColorStop(0, '#ffc9e8');
@@ -237,39 +306,33 @@ export class Fx {
         }
         return;
       }
-      ctx.fillStyle = ball ? '#daf32e' : '#27243f';
-      ctx.fillRect(0, 0, w, h);
-      ctx.strokeStyle = ball ? '#fffce6' : '#52eafa';
-      ctx.lineWidth = ball ? 5 : 9;
-      ctx.beginPath();
-      for (let x = 0; x <= w; x++) {
-        const wave = Math.cos(x / w * TAU) * (ball ? 26 : 0);
-        const y = h / 2 + wave;
-        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-      if (!ball) {
-        ctx.fillStyle = '#fff9dc';
-        ctx.font = 'bold 70px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('88', w / 2, h / 2);
-      }
+      if (ball) paintTennisBall(ctx, w, h);
+      else paintPuck(ctx, w, h);
     });
-    this.wallopProp = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ map, roughness: 0.79 }));
+    const roughness = beach ? .31 : gong ? .43 : .79;
+    this.wallopProp = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ map, roughness,
+      metalness: gong ? .32 : 0 }));
     this.wallopAxis = new THREE.Vector3(1, 0, 0);
     this.root.add(this.wallopProp);
     if (gong) {
       const C = this.T.cut, s = C.m0 + 1, T = this.T;
+      const beams = [
+        [-2.65, 2.72, .48, 5.45, .55, '#8e2246'], [2.65, 2.72, .48, 5.45, .55, '#8e2246'],
+        [0, 5.48, 6.4, .4, .68, '#a63144'], [0, 5.79, 7, .24, .8, '#452046'],
+        [-2.65, .18, .85, .36, 1.05, '#472244'], [2.65, .18, .85, .36, 1.05, '#472244'],
+        [-2.65, 4.72, .53, .18, .6, '#ffd46f'], [2.65, 4.72, .53, .18, .6, '#ffd46f'],
+        [-.82, 5.15, .12, .62, .12, '#ffd46f'], [.82, 5.15, .12, .62, .12, '#ffd46f'],
+      ];
       const frame = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1),
-        new THREE.MeshStandardMaterial({ color: '#722040', roughness: 0.65 }), 3);
-      const beam = new THREE.Object3D();
-      [[-2.6, 2.75, 0.36, 5.5], [2.6, 2.75, 0.36, 5.5], [0, 5.42, 5.9, 0.45]].forEach(([side, y, w, h], i) => {
+        new THREE.MeshStandardMaterial({ roughness: 0.65 }), beams.length);
+      const beam = new THREE.Object3D(), tint = new THREE.Color();
+      beams.forEach(([side, y, w, h, depth, color], i) => {
         beam.position.set(P.x - T.tz[P.k] * side, P.y + y, P.z + T.tx[P.k] * side);
         beam.rotation.y = Math.atan2(T.tx[P.k], T.tz[P.k]);
-        beam.scale.set(w, h, 0.48);
+        beam.scale.set(w, h, depth);
         beam.updateMatrix();
         frame.setMatrixAt(i, beam.matrix);
+        frame.setColorAt(i, tint.set(color));
       });
       this.wallopGongFrame = frame;
       this.root.add(frame);
