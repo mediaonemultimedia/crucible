@@ -24,8 +24,8 @@ async function open(q) {
 }
 const snap = async (p, name, settle = 0) => { if (settle) { await p.waitForTimeout(settle); await p.evaluate(() => __dh.step(1 / 60)); } await p.waitForTimeout(400); await p.screenshot({ path: path.join(outDir, name + '.png'), timeout: 240000 }); console.log('shot', name); };
 const race = (track, extra = '') => async () => {
-  const p = await open(`?hold&p1=zach&p1cpu=hard&cpu=normal&seed=4&track=${track}${extra}`);
-  await p.evaluate(async () => { await __dh.fx?.pipelineWarmup; __dh.step(12, false); __dh.step(1 / 60); });
+  const p = await open(`?hold&p1=k8e&p1cpu=hard&cpu=normal&seed=3&track=${track}${extra}`);
+  await p.evaluate(async () => { await __dh.fx?.pipelineWarmup; __dh.step(20, false); __dh.step(1 / 60); });
   await snap(p, track, 3500); await p.close();
 };
 

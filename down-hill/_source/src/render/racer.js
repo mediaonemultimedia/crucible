@@ -157,7 +157,7 @@ export class RacerView {
     this.kart.seat.add(d);
     if (previewKarts) driverStances(this.driver, this.kart.body)(true);
     addRim(this.group);
-    this.blob = blobShadow(this.kart.blobW || 2.9, this.kart.blobL || 3.9);
+    this.blob = blobShadow(this.kart.blobW || 3.5, this.kart.blobL || 4.8);
     this.group.add(this.blob);
     scene.add(this.group);
     this.t = Math.random() * 10;

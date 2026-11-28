@@ -8,7 +8,7 @@ const steering = {
   radius: 0.26,
   tilt: -0.62
 };
-const seating = { scale: 0.88, y: 0.09, z: -0.44 };
+const seating = { scale: 0.96, y: 0.09, z: -0.44 };
 
 export const LOOKDEV_KARTS = [
   { id: 'kevalanche', paint: '#eeeee3', stripe: '#c92632', hub: '#254ba2', number: '88', badge: 'KEV 88', sponsor: 'DOWN FEATHER RACING' },
@@ -24,7 +24,7 @@ const frame = mat('#47494e', { metalness: 0.32, roughness: 0.36 });
 const chrome = mat('#d7e0ea', { metalness: 0.55, roughness: 0.26 });
 const lamp = mat('#fff0c3', { emissive: '#ffe3a7', emissiveIntensity: 0.25 });
 const glass = mat('#302f2c', { roughness: 0.28 });
-const redLens = mat('#ae2533', { emissive: '#790e1a', emissiveIntensity: 0.24 });
+const redLens = mat('#d01226', { emissive: '#e8001a', emissiveIntensity: 0.55 });
 const ivory = mat('#f8e4ae');
 const box = (root, m, size, at, radius = 0.08) => mesh(rbox(...size, radius, Math.min(...size) < 0.2 ? 1 : 2), m, ...at, root);
 
@@ -48,7 +48,7 @@ function livery(spec) {
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       g.fillStyle = color;
-      g.fillText(label, x, y);
+      g.fillText(label, x, y, size > 30 && label.length > 3 ? 228 : undefined);
     };
     g.fillStyle = spec.paint;
     g.fillRect(4, 4, 248, 88);
@@ -277,6 +277,19 @@ function shell(root, spec, kind, ink, length) {
     [0, bus ? 1.496 : ice ? 1.223 : 0.888, ice ? nose - 0.46 : nose - 0.39], -Math.PI / 2);
 }
 
+// Overhaul: the kart reads from the chase cam: a badge plate and big glowing tail lamps
+// on the back (shared materials, so mergeStatic adds no draws).
+function rearFace(root, ink, length, kind) {
+  const z = -length / 2 - 0.03;
+  const y = kind === 'bus' ? 0.9 : 0.6;
+  box(root, glass, [1.24, 0.34, 0.08], [0, y, z + 0.05], 0.06);
+  decal(root, ink, [262, 6, 244, 54], [1.1, 0.25], [0, y, z], 0, Math.PI);
+  for (const side of [-1, 1]) {
+    box(root, redLens, [0.24, 0.2, 0.1], [side * 0.8, y, z + 0.04], 0.07);
+    box(root, chrome, [0.32, 0.27, 0.06], [side * 0.8, y, z + 0.08], 0.06);
+  }
+}
+
 // Pose the existing plush particles once and keep both stances for the toggle.
 export function driverStances(driver, body) {
   const plush = driver.p;
@@ -380,6 +393,7 @@ export function buildLookdevKart(kind, alt, original, { animateWheels = false } 
   const ink = livery(skin);
   const wheels = chassis(body, ink, length, animateWheels);
   shell(body, skin, kind, ink, length);
+  rearFace(body, ink, length, kind);
   mergeStatic(body);
   body.add(seat);
   const plush = { ...seating, y: spec.seatY ?? seating.y };

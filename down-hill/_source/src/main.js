@@ -992,7 +992,7 @@ class App {
     C.reveal = lerp(C.reveal || 0, reveal, Math.min(1, dt * 8));
     const lift = H.lookBack || H.lb || K.fish ? 0 : C.reveal;
     // overhaul: low and close, so the kart and its plush fill the frame (tv and the banister reveal as before)
-    const dist = ((6.3 + sp * 0.045) * (1 + intro * 2.5) + tv * 9.3 + punch * 2.2 + lift * 5.4) * C.size;
+    const dist = ((5.9 + sp * 0.04) * (1 + intro * 2.5) + tv * 9.3 + punch * 2.2 + lift * 5.4) * C.size;
     const h = (2.75 + intro * 9 + (K.air ? 0.9 : 0) + tv * 7.5 + lift * 6.1) * C.size;
     const fx = Math.sin(yaw), fz = Math.cos(yaw);
     const want = new THREE.Vector3(pose.x - fx * dist * back, pose.y + h, pose.z - fz * dist * back);
@@ -1002,7 +1002,11 @@ class App {
     this.world.camFix(want, pose, K.k);
     const k = H.lookBack !== H.lb ? 1 : Math.min(1, dt * (K.fish ? 2.5 : tv ? 3 : 7.5));
     H.lb = H.lookBack;
-    C.pos.lerp(want, k);
+    // overhaul: smooth the camera's offset from the kart (not its world position), so it
+    // doesn't fall behind at speed and shrink the kart; height still eases on its own
+    const ox = want.x - pose.x, oz = want.z - pose.z;
+    if (C.ox === undefined || k === 1) { C.ox = ox; C.oz = oz; } else { C.ox += (ox - C.ox) * k; C.oz += (oz - C.oz) * k; }
+    C.pos.set(pose.x + C.ox, C.pos.y + (want.y - C.pos.y) * (k === 1 ? 1 : Math.min(1, dt * 9)), pose.z + C.oz);
     this.world.camFix(C.pos, pose, K.k);
     const look = new THREE.Vector3(pose.x + fx * (5.5 + lift * 0.9) * back, pose.y + 1.45 - lift * 3.35, pose.z + fz * (5.5 + lift * 0.9) * back);
     // look-ahead: lean the aim toward where the road goes next

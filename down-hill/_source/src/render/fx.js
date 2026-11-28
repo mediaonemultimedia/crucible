@@ -17,6 +17,7 @@
      reticle, the hot wash's steam, the sugar rush's candy glow.          */
 
 import * as THREE from 'three/webgpu';
+import { nearCull } from './look.js';
 import { rbox, pillowGeo, mat, glowMat, mesh, canvasTex, srand } from './geo.js';
 
 const TAU = Math.PI * 2;
@@ -139,6 +140,7 @@ function dotTex() {
 class Pool {
   constructor(scene, n, material, geo) {
     this.n = n;
+    nearCull(material);
     this.mesh = new THREE.InstancedMesh(geo, material, n);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;

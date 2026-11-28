@@ -11,7 +11,7 @@
    - blob contact shadows: one soft disc per kart, held on the ground.   */
 
 import * as THREE from 'three/webgpu';
-import { Fn, uniform, vec3, vec4, float, dot, mix, max, pow, smoothstep, clamp, normalView, positionView, normalize, abs } from 'three/tsl';
+import { Fn, uniform, vec3, vec4, float, dot, mix, max, pow, smoothstep, clamp, normalView, positionView, normalize, abs, Discard } from 'three/tsl';
 import { canvasTex } from './geo.js';
 
 export const GRADE = {
@@ -25,7 +25,7 @@ export const GRADE = {
 const GRADES = {
   landing: { sat: 1.22, warm: [1.05, 0.99, 0.9], cool: [0.9, 0.95, 1.1], contrast: 1.07, lift: 0.01, exposure: 1.0 },
   laundry: { sat: 1.2, warm: [1.06, 1.0, 0.9], cool: [0.92, 0.97, 1.06], contrast: 1.05, lift: 0.01, exposure: 1.08 },
-  hockey: { sat: 1.18, warm: [1.0, 1.0, 1.0], cool: [0.9, 0.97, 1.1], contrast: 1.07, lift: 0.012, exposure: 1.1 },
+  hockey: { sat: 1.06, warm: [1.0, 1.0, 1.0], cool: [0.9, 0.97, 1.1], contrast: 1.07, lift: 0.012, exposure: 1.1 },
   park: { sat: 1.24, warm: [1.06, 1.0, 0.9], cool: [0.9, 0.98, 1.06], contrast: 1.05, lift: 0.01, exposure: 1.1 },
   dojo: { sat: 1.2, warm: [1.1, 0.98, 0.85], cool: [0.86, 0.92, 1.14], contrast: 1.08, lift: 0.02, exposure: 1.18 },
   menu: { sat: 1.15, warm: [1.04, 1.0, 0.92], cool: [0.93, 0.97, 1.06], contrast: 1.04, lift: 0.01, exposure: 1.05 },
@@ -44,7 +44,8 @@ const grade = Fn(([c]) => {
   // vibrance: dull colours get the lift, already-saturated ones barely move (no neon clay)
   const mx = max(max(c.r, c.g), c.b), mn = c.r.min(c.g).min(c.b);
   const s0 = mx.sub(mn).div(mx.max(0.0001));
-  const k = mix(GRADE.sat, float(1), smoothstep(0.25, 0.85, s0));
+  // …and near-whites stay white (clouds, cream paint)
+  const k = mix(GRADE.sat, float(1), smoothstep(0.25, 0.85, s0).max(smoothstep(0.55, 0.9, lum)));
   const sat = mix(vec3(lum), c, k).max(0);
   // split tone by luminance: cool in the shadows, warm in the lights
   const t = smoothstep(0.05, 0.7, lum);
@@ -63,6 +64,9 @@ export function installLook(r) {
   proto._lookPatched = true;
   const base = proto.setupOutput;
   proto.setupOutput = function (builder, out) {
+    // particles right in front of the low chase cam would fill the frame: drop them
+    const near = this.userData?.nearCull;
+    if (near) Discard(positionView.z.negate().lessThan(near));
     if (this.userData?.noGrade || this.blending === THREE.AdditiveBlending) return base.call(this, builder, out);
     let rgb = out.rgb;
     const rim = this.userData?.rim;
@@ -95,13 +99,16 @@ export function addRim(group, rim = [1.0, 0.92, 0.78, 0.7, 2.4]) {
   });
 }
 
+/* particles: never drawn closer than `d` to the eye */
+export function nearCull(m, d = 2.6) { m.userData.nearCull = d; markLook(m, 'near' + d); }
+
 /* the blob shadow: a soft dark disc, one shared texture + material */
 let blobMat = null;
 export function blobShadow(w = 2.6, l = 3.6) {
   blobMat ??= new THREE.MeshBasicMaterial({
     map: canvasTex(128, 128, (g, s) => {
       const gr = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-      gr.addColorStop(0, 'rgba(20,12,40,0.62)'); gr.addColorStop(0.55, 'rgba(20,12,40,0.38)'); gr.addColorStop(1, 'rgba(20,12,40,0)');
+      gr.addColorStop(0, 'rgba(24,10,48,0.72)'); gr.addColorStop(0.5, 'rgba(24,10,48,0.5)'); gr.addColorStop(1, 'rgba(20,12,40,0)');
       g.fillStyle = gr; g.fillRect(0, 0, s, s);
     }),
     transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
