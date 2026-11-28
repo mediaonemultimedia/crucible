@@ -210,3 +210,6 @@ body.howto .kstrip{display:none}
 @keyframes k-kpop{0%{opacity:0;transform:translate(-50%,40%) scale(.3,1.4)}22%{opacity:1;transform:translate(-50%,-10%) scale(1.2,.85)}38%{transform:translate(-50%,0) scale(.95,1.06)}78%{opacity:1;transform:translate(-50%,-20%) scale(1)}100%{opacity:0;transform:translate(-50%,-90%) scale(.9)}}
 #hud .view.impact::after,#hud.impact::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 55%,rgba(255,255,255,.0) 30%,rgba(255,255,255,.55) 100%);animation:k-impact .22s ease-out forwards}
 @keyframes k-impact{0%{opacity:1}100%{opacity:0}}
+/* the header image is taller than the old text title: the player pills sit under it */
+body[data-screen=select] #players{top:calc(clamp(60px,9vh,96px) + 62px)!important}
+#s-flash{top:calc(clamp(60px,9vh,96px) + 128px)!important}
