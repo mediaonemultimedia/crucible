@@ -16,7 +16,7 @@
 import * as THREE from 'three/webgpu';
 import { makeRenderer } from './render/renderer.js';
 import { installLook, setGrade } from './render/look.js';
-import { installTypeArt, typeImg, placeImg, countImg, resultsButtons, paintMusic } from './ui/typeart.js';
+import { installTypeArt, typeImg, placeImg, countImg, resultsButtons, paintMusic, toastArt } from './ui/typeart.js';
 import { TIER_AT } from './race/sim.js';
 import { makeWorld } from './render/worlds.js';
 import { RacerView } from './render/racer.js';
@@ -103,7 +103,7 @@ const VIEW_HTML = `<div class="vdark"></div><div class="fabric"></div>
 <canvas class="minimap" width="400" height="400"></canvas>
 <div class="place">8<sup>th</sup></div>
 <div class="drift"><span>Drift</span><i></i><i></i><i></i></div>
-<div class="final">${typeImg('final-lap', 'FINAL LAP!')}</div><div class="start-lights" aria-hidden="true"><i></i><i></i><i></i></div><div class="count"></div><div class="toast"></div>
+<div class="kpop"></div><div class="final">${typeImg('final-lap', 'FINAL LAP!')}</div><div class="start-lights" aria-hidden="true"><i></i><i></i><i></i></div><div class="count"></div><div class="toast"></div>
 <div class="wallop-hud"></div><div class="prop-cue" hidden><b></b><span></span></div>
 <div class="prop-cue gate-cue" hidden><b>Shortcut open</b><span></span></div><div class="wrong-way" hidden>${typeImg('wrong-way', 'WRONG WAY!')}</div><div class="lookback">Look back</div><div class="ptag"></div><div class="scare"></div><div class="wait"></div>`;
 
@@ -543,7 +543,7 @@ class App {
         j, i, rect: rects[j], el, q,
         place: q('.place'), lap: q('.lap .n'), time: q('.lap .tm'), item: q('.item'), itemName: q('.item-name'), drift: q('.drift'), final: q('.final'),
         tip: q('.tip'), tprompt: q('.tprompt'), tauntIc: q('.taunt-ic'), warn: q('.warn'), caption: q('.caption'), speed: q('.speed'), islot: q('.islot'),
-        lights: q('.start-lights'), count: q('.count'), toastEl: q('.toast'), wallop: q('.wallop-hud'), propCue: q('.prop-cue'), gateCue: q('.gate-cue'), wrongWay: q('.wrong-way'), fabric: q('.fabric'), scare: q('.scare'), dark: q('.vdark'), mm: q('.minimap'), wait: q('.wait'),
+        lights: q('.start-lights'), count: q('.count'), toastEl: q('.toast'), kpop: q('.kpop'), wallop: q('.wallop-hud'), propCue: q('.prop-cue'), gateCue: q('.gate-cue'), wrongWay: q('.wrong-way'), fabric: q('.fabric'), scare: q('.scare'), dark: q('.vdark'), mm: q('.minimap'), wait: q('.wait'),
         camera: new THREE.PerspectiveCamera(64, 1, 0.3, 1400),
         cam: { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 64, shake: 0 },
         lastItem: null, lookBack: false, lb: false, darkV: 0, tipUntil: 0, capUntil: 0, hud: {},
@@ -721,6 +721,7 @@ class App {
           v.count.className = 'count go';
         }
         A.play('dh-go');
+        for (const h of this.hv) { const k = R.karts[h.i]; this.fx.burst(k.x, k.y + 4, k.z, ['#ffc93a', '#3ff0c8', '#ff3b6b', '#9b5cff', '#2e9bff', '#ffffff'], 40, 11); }
         A.music(this.world.music || 'race', this.recording?.url);
         setTimeout(() => {
           for (const v of views) {
@@ -766,9 +767,9 @@ class App {
         V.hit();
         this.fx.burst(K.x, K.y + 2, K.z, ['#fff8d8', '#ffcd50', '#ff70ad'], 9, 6.5);
         if (near) A.play('dh-bonk', { gain: g(0.9) });
-        if (mine) { H.cam.shake = 0.22; this.toast(H, 'WALLOPED!', '#ff84b2'); this.buzz(e.i, 'bump'); }
+        if (mine) { H.cam.shake = 0.4; this.hitStop(H, 0.07); this.toast(H, 'WALLOPED!', '#ff84b2'); this.buzz(e.i, 'bump'); }
         const hitter = this.hvOf(e.by);
-        if (hitter) this.toast(hitter, 'WALLOP!', '#ffcc52');
+        if (hitter) { this.hitStop(hitter, 0.05); this.toast(hitter, 'WALLOP!', '#ffcc52'); }
         break;
       }
       case 'hit': {
@@ -778,7 +779,8 @@ class App {
         if (near) { A.play('dh-grunt', { rate: RACERS[K.id].voice * (K.alt ? 0.85 : 1), gain: g(1) }); A.play('dh-spin', { gain: g(0.8) }); A.play('feather-burst', { gain: g(0.8) }); }
         if (e.kind === 'missile' && near) A.play('dh-bonk', { gain: g(1) });
         if (mine) {
-          H.cam.shake = 0.6;
+          H.cam.shake = e.kind === 'missile' || e.kind === 'alarm' ? 0.9 : 0.6;
+          this.hitStop(H, e.kind === 'missile' || e.kind === 'alarm' ? 0.1 : 0.07);
           this.toast(H, { slick: 'SLICKED!', alarm: 'WAKE UP!', pod: 'PODDED!', splash: 'SOAKED!', plane: 'PAPER CUT!', sugar: 'SUGAR CRASH!' }[e.kind] || 'BONK!', '#ff3b6b');
           this.buzz(e.i, e.kind);
         }
@@ -802,7 +804,7 @@ class App {
         A.play('dh-boing', { gain: mine ? 1 : near ? 0.8 : 0.4 });
         if (near) A.play('dh-grunt', { rate: RACERS[K.id].voice * 1.4, gain: g(0.8) });
         this.fx.burst(K.x, K.y + 2, K.z, ['#ff3b6b', '#ffc0d0', '#ffffff'], 18, 7);
-        if (mine) { this.toast(H, 'SPRUNG!', '#ff3b6b'); this.buzz(e.i, 'missile'); H.cam.shake = 0.5; }
+        if (mine) { this.toast(H, 'SPRUNG!', '#ff3b6b'); this.buzz(e.i, 'missile'); H.cam.shake = 0.6; this.hitStop(H, 0.08); }
         const hf = this.hvOf(e.from); if (hf) this.toast(hf, 'BOING!', '#ffd84a');
         this.caption('spring', e.i);
         break;
@@ -825,6 +827,8 @@ class App {
         // a feather burst out the back
         this.fx.tailBurst(K, e.tier === 3 ? '#4dffc3' : e.tier === 2 ? '#ffc93a' : '#ffffff', e.tier === 3 || e.espresso ? 22 : 14);
         if (mine) H.cam.punch = Math.max(H.cam.punch || 0, e.tier === 3 || e.espresso ? 1 : e.tier === 2 ? 0.8 : 0.6);
+        if (mine && e.tier) { this.kpop(H, e.tier === 3 ? 'super-turbo' : 'mini-turbo'); A.play('dh-ding', { gain: 0.45, rate: 1 + e.tier * 0.18 }); }
+        if (e.tier || e.espresso) V?.wheelie(e.tier === 3 || e.espresso ? 1 : 0.7);
         break;
       }
       case 'tier': if (mine) A.play('dh-tier', { rate: 0.8 + e.tier * 0.25 }); break;
@@ -935,8 +939,26 @@ class App {
   toast(H, text, color) {
     if (!H) return;
     const t = H.toastEl;
-    t.textContent = text; t.dataset.ink = text; t.style.setProperty('--toast-ink', color);
+    const art = toastArt(text);
+    if (art) t.innerHTML = art; else t.textContent = text;
+    t.dataset.ink = art ? '' : text; t.style.setProperty('--toast-ink', color);
+    t.classList.toggle('sticker', !!art);
     t.classList.remove('on'); void t.offsetWidth; t.classList.add('on');
+  }
+
+  /* overhaul: the second sticker slot, low and near the kart (MINI-TURBO!, OVERTAKE!) */
+  kpop(H, id) {
+    if (!H?.kpop) return;
+    H.kpop.innerHTML = typeImg(id, id);
+    H.kpop.classList.remove('on'); void H.kpop.offsetWidth; H.kpop.classList.add('on');
+  }
+
+  /* overhaul: the hit pause — the 1P race holds for a beat; in split screen only that view's camera holds */
+  hitStop(H, secs) {
+    if (!H) return;
+    if (this.hv.length === 1) this.hitT = Math.max(this.hitT || 0, secs);
+    H.stop = Math.max(H.stop || 0, secs);
+    H.el.classList.remove('impact'); void H.el.offsetWidth; H.el.classList.add('impact');
   }
 
   /* a speech bubble over racer i, for `secs` */
@@ -976,6 +998,7 @@ class App {
   /* ── the chase cameras ── */
   _camera(H, dt, alpha) {
     const R = this.race;
+    if (H.stop > 0) { H.stop -= dt; return; }
     let i = H.i;
     if (H.tv) i = R.order[0];
     const K = R.karts[i], P = this.prev[i];
@@ -1121,6 +1144,11 @@ class App {
       H.hud.place = K.place;
       H.place.innerHTML = placeImg(K.place);
       H.place.className = 'place' + (K.place === 1 ? ' p1' : '') + (was ? (K.place < was ? ' gain' : ' lose') : ' bump');
+      if (was && R.phase === 'race' && !K.fin && R.tick > 60 * 6) {
+        const V = this.rviews[H.i];
+        if (K.place < was) { if (!(H.otT > this.t)) { H.otT = this.t + 1.6; this.kpop(H, 'overtake'); this.audio.play('dh-ding', { gain: 0.5, rate: 1.25 }); } V?.cheerHop(); }
+        else V?.sulk();
+      }
     }
     H.lap.textContent = `${R.lapOf(K)}/${R.laps}`;
     H.time.textContent = fmt(R.timeOf(K));
@@ -1345,6 +1373,7 @@ class App {
     let rdt = dt;
     if (this.screen === 'race' && this.race) {
       rdt = this.slowmo ? dt * this.slowmo.k : dt;
+      if (this.hitT > 0) { this.hitT -= dt; rdt *= 0.08; }
       if (!this.paused) {
         this.acc += rdt;
         let n = 0;

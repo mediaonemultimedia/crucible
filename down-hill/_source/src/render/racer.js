@@ -182,10 +182,14 @@ export class RacerView {
     for (const o of this.kart.detail) o.visible = !l;
   }
 
-  hit() { this.squashV -= 6; this.driver.pose('hitstun', 0.5); }
+  hit() { this.squashV -= 9; this.driver.pose('hitstun', 0.5); this.dizzyT = 1.1; }
+  /* overhaul: little reactions — a hop when you overtake, a droop when you're passed, a wheelie on boost */
+  cheerHop() { this.hopT = 0.45; }
+  sulk() { this.sadT = 0.9; }
+  wheelie(k = 1) { this.wheelieT = 0.55 * k; this.wheelieK = k; }
   /* the spring cushion: the plush is launched high out of its seat, flails, and drops back in */
   eject(secs) { this.ejT = secs; this.ejLen = secs; this.driver.pose('hitstun', secs); }
-  land(h) { this.squashV -= 3 + h * 6; }
+  land(h) { this.squashV -= 5 + h * 10; }
   /* the showy pose: the plush stands up in its seat and spins once round
      (a rig-level pose every racer gets; the player's own also wakes its
      soft body for the arms-up taunt) */
@@ -247,9 +251,11 @@ export class RacerView {
     const pitchT = K.air ? Math.max(-0.5, Math.min(0.45, -K.vy * 0.025)) : Math.max(-0.4, Math.min(0.4, -(K.slopeVy || 0) / Math.max(6, Math.abs(K.fwd)) * 0.9));
     const speed = Math.min(1.4, Math.abs(K.fwd) / (K.S?.top || 30));
     const launchLean = this.racing && K.boostT > 0 && !K.air ? 0.095 : 0;
-    this.pitch += (pitchT + launchLean - this.pitch) * Math.min(1, dt * 8);
-    const rollT = (K.steer || 0) * speed * 0.175 + (K.drift ? -K.drift * 0.1 : 0);
-    this.roll += (rollT - this.roll) * Math.min(1, dt * 7);
+    // overhaul: springs (substepped, so low frame rates can't make them ring) with a little overshoot
+    const SP = this._sp || (this._sp = { p: { x: 0, v: 0 }, r: { x: 0, v: 0 } });
+    SP.p.x = this.pitch; stepSpring(SP.p, pitchT + launchLean, 120, 0.45, dt, -0.7, 0.7); this.pitch = SP.p.x;
+    const rollT = (K.steer || 0) * speed * 0.24 + (K.drift ? -K.drift * 0.2 : 0);
+    SP.r.x = this.roll; stepSpring(SP.r, rollT, 95, 0.4, dt, -0.6, 0.6); this.roll = SP.r.x;
     // (dt-safe: ≤ 1/120 s substeps — one step per frame went unstable under ~12 fps, the
     // kart bouncing and squashing over and over; bounded to its drawn range)
     const ks = 320, SQ = this._sq || (this._sq = { x: 0, v: 0 });
@@ -262,8 +268,19 @@ export class RacerView {
     const hop = K.hop > 0 ? Math.sin((K.hop / 0.18) * Math.PI) * 0.35 : 0;
     B.position.y = hy + hop + Math.sin(this.t * (8 + 4 * speed)) * 0.035 * speed;
     B.rotation.set(this.pitch + (hy ? Math.sin(this.hyd * 11) * 0.12 : 0), 0, this.roll + trickRoll + drumRoll);
-    const sq = Math.max(-0.33, Math.min(0.22, this.squash * 0.10));
-    B.scale.set(1 - sq * 0.5, 1 + sq, 1 - sq * 0.5);
+    const sq = Math.max(-0.4, Math.min(0.25, this.squash * 0.10));
+    // stretch on the way up a jump, squash on the way down into the landing
+    const st = K.air ? Math.max(-0.06, Math.min(0.16, (K.vy || 0) * 0.012)) : 0;
+    this.st = (this.st || 0) + (st - (this.st || 0)) * Math.min(1, dt * 14);
+    B.scale.set(1 - sq * 0.5 - this.st * 0.45, 1 + sq + this.st, 1 - sq * 0.5 - this.st * 0.45);
+    // the boost wheelie: nose up, back down with a bounce
+    if (this.wheelieT > 0) {
+      this.wheelieT -= dt;
+      const u = 1 - Math.max(0, this.wheelieT) / (0.55 * (this.wheelieK || 1));
+      const w = Math.sin(Math.min(1, u) * Math.PI) * (u < 0.85 ? 1 : 0.6) * 0.24 * (this.wheelieK || 1);
+      B.rotation.x -= w; B.position.y += w * 0.55;
+      if (this.wheelieT <= 0) this.squashV -= 4;
+    }
 
     // the plush in its seat: breathing, leaning into the steer, looking about
     const d = this.driver.root, P = this.kart.plush;
@@ -271,7 +288,17 @@ export class RacerView {
     d.rotation.z = -(K.steer || 0) * 0.16 * Math.min(1, Math.abs(K.fwd) / 12) + (K.caseT > 0 || K.wobT > 0 ? Math.sin(this.t * 14) * 0.18 : 0);
     d.rotation.x = Math.max(-0.15, Math.min(0.2, (K.boostT > 0 ? -0.12 : 0) + this.pitch * 0.4));
     d.rotation.y = (K.steer || 0) * 0.25 + (K.spinT > 0 ? Math.sin(this.t * 20) * 0.3 : 0);
-    if (previewKarts) d.rotation.set(0, 0, 0);
+    if (previewKarts) {
+      // overhaul: the plush's secondary motion — leans out of the turn, looks into it, sits back on boost,
+      // bobs with the speed and gets shoved by the kart's squash
+      const DS = this._ds || (this._ds = { z: { x: 0, v: 0 }, x: { x: 0, v: 0 }, y: { x: 0, v: 0 } });
+      const go = Math.min(1, Math.abs(K.fwd) / 12);
+      stepSpring(DS.z, -(K.steer || 0) * 0.2 * go + (K.drift ? K.drift * 0.14 : 0), 70, 0.3, dt, -0.6, 0.6);
+      stepSpring(DS.x, (K.boostT > 0 ? -0.2 : 0) + (K.air ? -0.1 : 0) + Math.max(0, -this.squash) * 0.03, 85, 0.33, dt, -0.6, 0.6);
+      stepSpring(DS.y, (K.steer || 0) * 0.24 * go, 60, 0.4, dt, -0.7, 0.7);
+      d.rotation.set(DS.x.x, DS.y.x, DS.z.x);
+      d.position.y += Math.abs(Math.sin(this.t * (7 + 5 * speed))) * 0.05 * speed * P.scale;
+    }
     if (K.lobby) {
       d.rotation.z += Math.sin(this.t * 1.75) * 0.065;
       d.rotation.y += Math.sin(this.t * 1.1) * 0.08;
@@ -339,6 +366,9 @@ export class RacerView {
         d.rotation.x += 0.32; d.rotation.z += Math.sin(t * 0.8) * 0.05; d.position.y -= 0.12 * sc;
       }
     }
+    if (this.hopT > 0) { this.hopT -= dt; const u = 1 - Math.max(0, this.hopT) / 0.45; d.position.y += Math.sin(u * Math.PI) * 0.8 * P.scale; d.rotation.z += Math.sin(u * Math.PI * 2) * 0.18; }
+    if (this.sadT > 0) { this.sadT -= dt; const k = Math.min(1, this.sadT * 3); d.rotation.x += 0.26 * k; d.rotation.z += 0.14 * k; }
+    if (this.dizzyT > 0) { this.dizzyT -= dt; const k = Math.min(1, this.dizzyT * 1.5); d.rotation.z += Math.sin(this.t * 13) * 0.22 * k; d.rotation.x += Math.sin(this.t * 9.5) * 0.12 * k; }
     // launched out of the seat: up high, flailing, and back down into it
     if (this.ejT > 0) {
       this.ejT = Math.max(0, this.ejT - dt);

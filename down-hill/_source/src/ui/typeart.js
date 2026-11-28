@@ -70,3 +70,12 @@ export function paintMusic() {
   m.querySelector('small').hidden = false;
   const d = m.querySelector('.k-disc'); d.classList.remove('spin'); void d.offsetWidth; d.classList.add('spin');
 }
+
+/* a toast's comic sticker, if one was rendered for it ('1st!' etc. use the place badges) */
+const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+export function toastArt(text) {
+  const p = /^([1-8])(st|nd|rd|th)!$/.exec(text);
+  if (p) return placeImg(+p[1]);
+  const id = 'toast-' + slug(text);
+  return TYPE[id] ? typeImg(id, text) : null;
+}

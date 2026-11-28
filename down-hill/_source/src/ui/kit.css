@@ -196,3 +196,17 @@ body.howto .kstrip{display:none}
 #music-preview{font-size:15px!important}
 
 .k-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ── stage 3: comic stickers, the second sticker slot, the impact flash ── */
+.toast.sticker{font-size:0!important;-webkit-text-stroke:0!important;text-shadow:none!important;top:32%!important}
+.toast.sticker img{display:block;height:clamp(70px,13vh,150px);width:auto;max-width:80vw;object-fit:contain}
+.toast.sticker::before{content:"";position:absolute;left:50%;top:50%;width:118%;opacity:.75;aspect-ratio:1;transform:translate(-50%,-50%);z-index:-1;
+  background:repeating-conic-gradient(from 8deg,rgba(255,240,140,.95) 0 9deg,rgba(255,255,255,0) 9deg 20deg);-webkit-mask:radial-gradient(closest-side,#000 30%,transparent 72%);mask:radial-gradient(closest-side,#000 30%,transparent 72%)}
+.toast.sticker.on{animation:k-sticker 1.35s var(--k-pop) forwards!important}
+@keyframes k-sticker{0%{opacity:0;transform:translate(-50%,-50%) scale(.2) rotate(-24deg)}14%{opacity:1;transform:translate(-50%,-50%) scale(1.3) rotate(8deg)}24%{transform:translate(-50%,-50%) scale(.92) rotate(-4deg)}34%{transform:translate(-50%,-50%) scale(1.04) rotate(2deg)}80%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}100%{opacity:0;transform:translate(-50%,-62%) scale(.85) rotate(-6deg)}}
+.kpop{position:absolute;left:50%;bottom:30%;transform:translateX(-50%);pointer-events:none;opacity:0}
+.kpop img{display:block;height:clamp(46px,8vh,96px);width:auto}
+.kpop.on{animation:k-kpop 1s var(--k-pop) forwards}
+@keyframes k-kpop{0%{opacity:0;transform:translate(-50%,40%) scale(.3,1.4)}22%{opacity:1;transform:translate(-50%,-10%) scale(1.2,.85)}38%{transform:translate(-50%,0) scale(.95,1.06)}78%{opacity:1;transform:translate(-50%,-20%) scale(1)}100%{opacity:0;transform:translate(-50%,-90%) scale(.9)}}
+#hud .view.impact::after,#hud.impact::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 55%,rgba(255,255,255,.0) 30%,rgba(255,255,255,.55) 100%);animation:k-impact .22s ease-out forwards}
+@keyframes k-impact{0%{opacity:1}100%{opacity:0}}
