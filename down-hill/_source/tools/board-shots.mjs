@@ -29,7 +29,18 @@ const race = (track, extra = '') => async () => {
   await snap(p, track, 3500); await p.close();
 };
 
+const tour = (track) => async () => {
+  const p = await open(`?hold&p1=kevalanche&p1cpu=hard&cpu=easy&seed=3&track=${track}&laps=3`);
+  await p.evaluate(async () => { await __dh.fx?.pipelineWarmup; __dh.step(4, false); });
+  for (let n = 0; n < 10; n++) {
+    await p.evaluate(() => { __dh.step(5.5, false); __dh.step(1 / 60); });
+    await snap(p, `tour-${track}-${n}`);
+  }
+  await p.close();
+};
+
 const SCENES = {
+  'tour-landing': tour('landing'), 'tour-laundry': tour('laundry'), 'tour-hockey': tour('hockey'), 'tour-park': tour('park'), 'tour-dojo': tour('dojo'),
   async title() { const p = await open('?hold'); await p.evaluate(() => __dh.step(2.5)); await snap(p, 'title'); await p.close(); },
   async select() {
     const p = await open('?hold&screen=select');
@@ -74,7 +85,7 @@ const SCENES = {
   },
 };
 
-for (const [name, f] of Object.entries(SCENES)) if (!want.length || want.includes(name)) {
+for (const [name, f] of Object.entries(SCENES)) if (want.length ? want.includes(name) : !name.startsWith('tour')) {
   try { await f(); } catch (e) { problems.push(`${name}: ${e.message}`); }
 }
 await browser.close();

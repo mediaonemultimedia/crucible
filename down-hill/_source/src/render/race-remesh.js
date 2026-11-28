@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { Fn, attribute, varying, texture, vec3, vec4, mix, max, dot, normalWorld, smoothstep } from 'three/tsl';
+import { Fn, attribute, varying, texture, vec3, vec4, mix, max, dot, normalWorld, smoothstep, float } from 'three/tsl';
 
 function remesh(plush, faceted) {
   const body = plush.body;
@@ -69,8 +69,10 @@ export function createRaceRemesh(plush, style) {
     base.assign(mix(base, vec3(U.stitch), mask.b));
     const key = dot(normalWorld, U.key).mul(0.5).add(0.5);
     const fill = max(dot(normalWorld, U.fill), 0);
-    const light = smoothstep(0.15, 0.85, key).mul(0.65).add(fill.mul(0.18)).add(0.42);
-    return vec4(mix(base.mul(light), vec3(U.spot), pat.r.mul(U.glow)), 1);
+    const light = smoothstep(0.15, 0.85, key).mul(0.6).add(fill.mul(0.14)).add(0.34);
+    // overhaul: soft ground occlusion, so a plush seen from behind still has a round, shaded form
+    const occ = mix(float(0.62), float(1.0), smoothstep(-0.7, 0.55, normalWorld.y));
+    return vec4(mix(base.mul(light).mul(occ), vec3(U.spot), pat.r.mul(U.glow)), 1);
   });
   const material = new THREE.MeshBasicNodeMaterial();
   material.colorNode = paint();

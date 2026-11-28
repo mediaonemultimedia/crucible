@@ -428,6 +428,7 @@ export class Race {
 
     // ── height: on the ground, off a ramp, in the air, off the edge ──
     const g = groundAt(T, K.k, d, a);
+    K.gy = g === -Infinity ? null : g;
     if (!K.air) {
       // crossing a launch point (a ramp's lip, the pillow pile's bounce)
       let launch = 0;

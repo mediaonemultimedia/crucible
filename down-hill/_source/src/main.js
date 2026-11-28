@@ -15,6 +15,7 @@
 
 import * as THREE from 'three/webgpu';
 import { makeRenderer } from './render/renderer.js';
+import { installLook, setGrade } from './render/look.js';
 import { makeWorld } from './render/worlds.js';
 import { RacerView } from './render/racer.js';
 import { Fx, TIER_COLORS } from './render/fx.js';
@@ -107,6 +108,7 @@ const VIEW_HTML = `<div class="vdark"></div><div class="fabric"></div>
 class App {
   constructor(renderer, canvas) {
     this.renderer = renderer; this.canvas = canvas;
+    installLook(renderer);
     this.hold = Q.has('hold');
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(64, innerWidth / innerHeight, 0.3, 1400);
@@ -183,6 +185,7 @@ class App {
 
   setScreen(s) {
     this.screen = s;
+    setGrade(s === 'race' ? this.trackId : 'menu');
     if (raceMeshStyle) for (const v of this.views.values()) {
       v.setRaceMesh(s === 'race' && this.rviews.includes(v) ? raceMeshStyle : null);
     }
@@ -988,8 +991,9 @@ class App {
     }
     C.reveal = lerp(C.reveal || 0, reveal, Math.min(1, dt * 8));
     const lift = H.lookBack || H.lb || K.fish ? 0 : C.reveal;
-    const dist = ((8.6 + sp * 0.06) * (1 + intro * 2.5) + tv * 7 + punch * 2.6 + lift * 3.1) * C.size;
-    const h = (4.3 + intro * 9 + (K.air ? 1.2 : 0) + tv * 6 + lift * 4.6) * C.size;
+    // overhaul: low and close, so the kart and its plush fill the frame (tv and the banister reveal as before)
+    const dist = ((6.3 + sp * 0.045) * (1 + intro * 2.5) + tv * 9.3 + punch * 2.2 + lift * 5.4) * C.size;
+    const h = (2.75 + intro * 9 + (K.air ? 0.9 : 0) + tv * 7.5 + lift * 6.1) * C.size;
     const fx = Math.sin(yaw), fz = Math.cos(yaw);
     const want = new THREE.Vector3(pose.x - fx * dist * back, pose.y + h, pose.z - fz * dist * back);
     const [bx0, bx1, bz0, bz1] = this.world.info.bounds;
@@ -1000,9 +1004,17 @@ class App {
     H.lb = H.lookBack;
     C.pos.lerp(want, k);
     this.world.camFix(C.pos, pose, K.k);
-    const look = new THREE.Vector3(pose.x + fx * (5 + lift * 1.4) * back, pose.y + 1.8 - lift * 3.8, pose.z + fz * (5 + lift * 1.4) * back);
+    const look = new THREE.Vector3(pose.x + fx * (5.5 + lift * 0.9) * back, pose.y + 1.45 - lift * 3.35, pose.z + fz * (5.5 + lift * 0.9) * back);
+    // look-ahead: lean the aim toward where the road goes next
+    if (!H.lookBack && !K.fish && !tv && R.T) {
+      const T = R.T, ka = (K.k + 14) % T.N;
+      const ax = T.x[ka] - pose.x, az = T.z[ka] - pose.z;
+      const side = ax * fz - az * fx; // + = road bends right of the nose
+      C.lean = lerp(C.lean || 0, Math.max(-6, Math.min(6, side * 0.22)), Math.min(1, dt * 3));
+      look.x += fz * C.lean; look.z -= fx * C.lean;
+    }
     C.look.lerp(look, Math.min(1, dt * 12));
-    const fov = (64 + Math.min(1.45, sp / top) * 9 + (K.boostT > 0 ? 8 : 0) + punch * 9) * (this.hv.length === 2 && !tv ? 0.82 : 1);
+    const fov = (60 + Math.min(1.45, sp / top) * 9 + (K.boostT > 0 ? 9 : 0) + punch * 10) * (this.hv.length === 2 && !tv ? 0.82 : 1);
     C.fov = lerp(C.fov, fov, Math.min(1, dt * 4));
     cam.fov = C.fov; cam.updateProjectionMatrix();
     cam.position.copy(C.pos);

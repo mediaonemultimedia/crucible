@@ -21,6 +21,7 @@ import { createRaceRemesh } from './race-remesh.js';
 import { Plush } from './plush.js';
 import { buildKart } from './karts.js';
 import { mat, rbox } from './geo.js';
+import { addRim, blobShadow, markLook } from './look.js';
 import { buildLookdevKart, driverStances } from './lookdev-karts.js';
 
 const previewKarts = typeof LOOKDEV_RACE !== 'undefined' && LOOKDEV_RACE;
@@ -155,6 +156,9 @@ export class RacerView {
     d.position.set(0, P.y, P.z);
     this.kart.seat.add(d);
     if (previewKarts) driverStances(this.driver, this.kart.body)(true);
+    addRim(this.group);
+    this.blob = blobShadow(this.kart.blobW || 2.9, this.kart.blobL || 3.9);
+    this.group.add(this.blob);
     scene.add(this.group);
     this.t = Math.random() * 10;
     this.lean = 0; this.pitch = 0; this.roll = 0; this.bob = 0; this.squash = 0; this.squashV = 0;
@@ -167,7 +171,7 @@ export class RacerView {
       if (this.raceMesh) Object.assign(p.shells, { geometry: p.body.geometry, material: p.fur.material });
       return;
     }
-    this.raceMesh ??= createRaceRemesh(p, style);
+    if (!this.raceMesh) { this.raceMesh = createRaceRemesh(p, style); this.raceMesh.material.userData.rim = [1.0, 0.9, 0.74, 1.1, 2.0]; markLook(this.raceMesh.material, 'rim-plush'); }
     Object.assign(p.shells, this.raceMesh);
   }
 
@@ -324,6 +328,15 @@ export class RacerView {
       d.rotation.z += Math.sin(u * 31) * 0.7 * arc;
     }
 
+    // the contact shadow: on the ground under the kart, smaller and fainter the higher it flies
+    {
+      const sz = this.size;
+      const up = K.air && K.gy != null ? Math.max(0, pose.y - K.gy) : 0;
+      this.blob.position.y = (0.06 - up) / (g.scale.y || 1);
+      const s = Math.max(0.35, 1 - up * 0.07);
+      this.blob.scale.set(s, s, 1);
+      this.blob.visible = !K.fish && !(K.drum > 0) && up < 14 && sz > 0;
+    }
     // wheels: roll with the speed; the front ones steer
     this.wheelA += (K.fwd * dt) / 0.45;
     for (const w of this.kart.wheels) {

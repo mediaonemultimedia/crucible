@@ -49,7 +49,7 @@ function planksTex() {
       let x = -r() * 200;
       while (x < w) {
         const L = 180 + r() * 220, l = 0.42 + r() * 0.12;
-        g.fillStyle = `hsl(${24 + r() * 8},${38 + r() * 12}%,${l * 52}%)`;
+        g.fillStyle = `hsl(${24 + r() * 8},${38 + r() * 12}%,${l * (landingLookdev ? 74 : 52)}%)`;
         g.fillRect(x, i * rh, L, rh);
         g.globalAlpha = 0.12;
         for (let k = 0; k < 7; k++) { g.fillStyle = r() < 0.5 ? '#2a160b' : '#c98f5c'; g.fillRect(x, i * rh + r() * rh, L, 1 + r() * 2); }
@@ -71,10 +71,15 @@ function carpetTex(c1, c2) {
 }
 function wallpaperTex() {
   return canvasTex(256, 256, (g, w, h) => {
-    const base = landingLookdev ? '#174ab6' : '#3a3566';
+    const base = landingLookdev ? '#3f9cf2' : '#3a3566';
     g.fillStyle = base; g.fillRect(0, 0, w, h);
-    g.fillStyle = landingLookdev ? '#205dcc' : '#433d74';
+    g.fillStyle = landingLookdev ? '#58adf7' : '#433d74';
     for (let x = 0; x < w; x += 32) g.fillRect(x, 0, 14, h);
+    if (landingLookdev) {
+      // puffy daytime clouds
+      g.fillStyle = '#ffffff';
+      for (const [cx, cy, s] of [[60, 150, 1], [190, 70, 0.8], [150, 230, 0.7]]) for (const [dx, dy, r] of [[0, 0, 15], [16, -6, 12], [-16, -3, 11], [8, 6, 12], [-6, 7, 11]]) { g.beginPath(); g.arc(cx + dx * s, cy + dy * s, r * s, 0, TAU); g.fill(); }
+    }
     // little stars and moons
     g.fillStyle = landingLookdev ? '#ffcb35' : '#f3d98b';
     const star = (x, y, s) => { g.beginPath(); for (let i = 0; i < 10; i++) { const a = (i / 10) * TAU - Math.PI / 2, rr = i % 2 ? s * 0.45 : s; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } g.fill(); };
@@ -84,8 +89,8 @@ function wallpaperTex() {
 }
 function hallPaperTex() {
   return canvasTex(256, 256, (g, w, h) => {
-    g.fillStyle = '#5c3b4a'; g.fillRect(0, 0, w, h);
-    g.strokeStyle = '#6e4858'; g.lineWidth = 3;
+    g.fillStyle = landingLookdev ? '#f6a98c' : '#5c3b4a'; g.fillRect(0, 0, w, h);
+    g.strokeStyle = landingLookdev ? '#ffe0c4' : '#6e4858'; g.lineWidth = landingLookdev ? 5 : 3;
     for (let y = 0; y < h; y += 64) for (let x = 0; x < w; x += 64) { g.beginPath(); g.moveTo(x + 32, y + 8); g.lineTo(x + 56, y + 32); g.lineTo(x + 32, y + 56); g.lineTo(x + 8, y + 32); g.closePath(); g.stroke(); }
   }, { repeat: [14, 5] });
 }
@@ -189,6 +194,8 @@ export class World {
     this.anim = [];
     this.noDash = new Set(['books']);
     this.runnerTags = new Set(['rug', 'landing', 'door', 'underbed']);
+    // overhaul: a continuous candy-striped painted edge instead of sparse dashes (subclasses opt in)
+    this.edgeCols ??= landingLookdev && new.target === World ? ['#ff3d5a', '#fff6e6'] : null;
     this.build();
     if (roomProps) this.props = addProps(this);
     if (landingLookdev) dressCourse(this);
@@ -256,11 +263,12 @@ export class World {
   _lights() {
     const S = (this.lightsG = new THREE.Group());
     this.scene.add(S);
-    this.hemi = landingLookdev ? new THREE.HemisphereLight('#d9eaff', '#c28c69', 1.48)
+    this.hemi = landingLookdev ? new THREE.HemisphereLight('#cfe9ff', '#f0b47a', 1.75)
       : new THREE.HemisphereLight('#5d63b8', '#2a1c22', 1.25);
     S.add(this.hemi);
     // the moon through the west window: low and cool, casting the furniture's shadows (once)
-    const moon = (this.moon = new THREE.DirectionalLight(landingLookdev ? '#dceaff' : '#a9bcff', landingLookdev ? 2.48 : 2.1));
+    // (look-dev: the afternoon sun instead, warm and strong)
+    const moon = (this.moon = new THREE.DirectionalLight(landingLookdev ? '#ffe0ad' : '#a9bcff', landingLookdev ? 3.3 : 2.1));
     moon.position.set(-420, 300, 60);
     moon.target.position.set(80, 0, 0);
     moon.castShadow = true;
@@ -290,7 +298,7 @@ export class World {
 
   _rooms() {
     const R = ROOM, H = HALL;
-    const floor = new THREE.MeshStandardMaterial({ map: planksTex(), roughness: 0.62, color: landingLookdev ? '#e2bd91' : '#b89a86' });
+    const floor = new THREE.MeshStandardMaterial({ map: planksTex(), roughness: 0.62, color: landingLookdev ? '#ffd7a6' : '#b89a86' });
     const f = mesh(new THREE.PlaneGeometry(R.x1 - R.x0, R.z1 - R.z0), floor, (R.x0 + R.x1) / 2, 0, 0, this.root);
     f.rotation.x = -Math.PI / 2;
     // the landing's runner carpet: the floor round the stairwell hole
@@ -348,17 +356,22 @@ export class World {
     // the window: frame, sill, curtains, the night sky and moon outside
     const fx = R.x0;
     const sky = mesh(new THREE.PlaneGeometry(wz1 - wz0 + 30, wy1 - wy0 + 20), new THREE.MeshBasicMaterial({ map: canvasTex(256, 256, (g, w, h) => {
-      const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#0e1240'); gr.addColorStop(1, '#2c2a6a'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
-      const r = srand(5); g.fillStyle = '#fff'; for (let i = 0; i < 90; i++) { g.globalAlpha = 0.3 + r() * 0.7; g.fillRect(r() * w, r() * h * 0.8, 1.5, 1.5); }
+      const day = landingLookdev;
+      const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, day ? '#2f8cf5' : '#0e1240'); gr.addColorStop(1, day ? '#bfe6ff' : '#2c2a6a'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+      const r = srand(5); g.fillStyle = '#fff';
+      if (day) { for (const [cx, cy, s] of [[60, 70, 1.3], [180, 110, 1], [120, 40, 0.7]]) for (const [dx, dy, rr] of [[0, 0, 14], [15, -5, 11], [-15, -2, 10], [7, 6, 11]]) { g.beginPath(); g.arc(cx + dx * s, cy + dy * s, rr * s, 0, TAU); g.fill(); } }
+      else for (let i = 0; i < 90; i++) { g.globalAlpha = 0.3 + r() * 0.7; g.fillRect(r() * w, r() * h * 0.8, 1.5, 1.5); }
+      if (day) { g.fillStyle = '#5cc94a'; g.beginPath(); g.ellipse(70, h * 0.86, 110, 40, 0, 0, TAU); g.fill(); g.fillStyle = '#43b03a'; g.beginPath(); g.ellipse(210, h * 0.9, 100, 36, 0, 0, TAU); g.fill(); }
       g.globalAlpha = 1;
       // rooftops
-      g.fillStyle = '#0a0a1e'; g.beginPath(); g.moveTo(0, h); let x = 0; while (x < w) { const hh = h * (0.72 + r() * 0.12); g.lineTo(x, hh); g.lineTo(x + 30, hh - 14); g.lineTo(x + 60, hh); x += 60; } g.lineTo(w, h); g.fill();
-      g.fillStyle = '#ffd98a'; for (let i = 0; i < 9; i++) g.fillRect(r() * w, h * (0.82 + r() * 0.12), 4, 5);
+      g.fillStyle = day ? '#ff7a5c' : '#0a0a1e'; g.beginPath(); g.moveTo(0, h); let x = 0; while (x < w) { const hh = h * (0.72 + r() * 0.12); g.lineTo(x, hh); g.lineTo(x + 30, hh - 14); g.lineTo(x + 60, hh); x += 60; } g.lineTo(w, h); g.fill();
+      g.fillStyle = day ? '#fff1c9' : '#ffd98a'; for (let i = 0; i < 9; i++) g.fillRect(r() * w, h * (0.82 + r() * 0.12), 4, 5);
     }) }), fx - 12, (wy0 + wy1) / 2, (wz0 + wz1) / 2, this.root);
     sky.rotation.y = Math.PI / 2; sky.userData.noShadow = true;
-    const moonDisc = mesh(new THREE.CircleGeometry(7, 32), new THREE.MeshBasicMaterial({ color: '#fff6d8' }), fx - 11, wy1 - 16, wz0 + 18, this.root);
+    const moonDisc = mesh(new THREE.CircleGeometry(7, 32), new THREE.MeshBasicMaterial({ color: landingLookdev ? '#fff2a8' : '#fff6d8' }), fx - 11, wy1 - 16, wz0 + 18, this.root);
+    if (landingLookdev) moonDisc.scale.setScalar(1.3);
     moonDisc.rotation.y = Math.PI / 2; moonDisc.userData.noShadow = true;
-    this.glow('#c9d6ff', 60, fx - 10, wy1 - 16, wz0 + 18, 0.6);
+    this.glow(landingLookdev ? '#ffe28a' : '#c9d6ff', landingLookdev ? 80 : 60, fx - 10, wy1 - 16, wz0 + 18, 0.6);
     const fr = mat('#f2ece0', { roughness: 0.4 });
     mesh(new THREE.BoxGeometry(4, 3, wz1 - wz0 + 8), fr, fx + 1, wy0 - 1, (wz0 + wz1) / 2, this.root);
     mesh(new THREE.BoxGeometry(4, 3, wz1 - wz0 + 8), fr, fx + 1, wy1 + 1, (wz0 + wz1) / 2, this.root);
@@ -376,13 +389,13 @@ export class World {
     }
     // the moonbeam: a soft additive shaft from the window across the rug
     const beamTex = canvasTex(64, 256, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, 'rgba(255,255,255,0.0)'); gr.addColorStop(0.15, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); const g2 = g.createLinearGradient(0, 0, w, 0); g2.addColorStop(0, 'rgba(0,0,0,1)'); g2.addColorStop(0.5, 'rgba(0,0,0,0)'); g2.addColorStop(1, 'rgba(0,0,0,1)'); g.globalCompositeOperation = 'destination-out'; g.fillStyle = g2; g.fillRect(0, 0, w, h); });
-    const beamM = new THREE.MeshBasicMaterial({ map: beamTex, color: '#9fb4ff', transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const beamM = new THREE.MeshBasicMaterial({ map: beamTex, color: landingLookdev ? '#ffe2a0' : '#9fb4ff', transparent: true, opacity: landingLookdev ? 0.34 : 0.28, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
     for (let i = 0; i < 3; i++) {
       const b = mesh(new THREE.PlaneGeometry(70 - i * 12, 190), beamM, fx + 70, 36, (wz0 + wz1) / 2 + (i - 1) * 6, this.root);
       b.rotation.set(0, Math.PI / 2 + (i - 1) * 0.4, -1.08); b.userData.noShadow = true;
     }
     // the moon's pool on the floor (the window's shape, soft)
-    const pool = mesh(new THREE.PlaneGeometry(90, 70), new THREE.MeshBasicMaterial({ map: this.glowTex, color: '#7d8fd8', transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }), -70, 0.25, 22, this.root);
+    const pool = mesh(new THREE.PlaneGeometry(90, 70), new THREE.MeshBasicMaterial({ map: this.glowTex, color: landingLookdev ? '#ffcf7a' : '#7d8fd8', transparent: true, opacity: landingLookdev ? 0.45 : 0.35, blending: THREE.AdditiveBlending, depthWrite: false }), -70, 0.25, 22, this.root);
     pool.rotation.x = -Math.PI / 2; pool.userData.noShadow = true;
     // the rug
     const rug = mesh(new THREE.CircleGeometry(62, 64), new THREE.MeshStandardMaterial({ map: rugTex(), roughness: 1 }), -84, 0.15, 52, this.root);
@@ -669,6 +682,39 @@ export class World {
     }
   }
 
+  /* overhaul: both road edges as one striped ribbon (a single draw), lifted like the dashes */
+  _candyEdges() {
+    const T = this.T, N = T.N, def = T.def;
+    const [a, b] = this.edgeCols;
+    const tex = canvasTex(8, 64, (g, w, h) => { g.fillStyle = a; g.fillRect(0, 0, w, h); g.fillStyle = b; g.fillRect(0, 0, w, h / 2); g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(w - 2, 0, 2, h); });
+    tex.wrapT = THREE.RepeatWrapping; tex.magFilter = THREE.NearestFilter;
+    const m = new THREE.MeshBasicMaterial({ map: tex, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+    const pos = [], uv = [], idx = [];
+    const inner = 0.15, outer = 1.05;
+    let v = 0;
+    for (const s of [-1, 1]) {
+      let prev = -1;
+      v = 0;
+      for (let k = 0; k <= N; k++) {
+        const kk = k % N, ok = !this.noDash.has(def.points[T.sec[kk]].tag);
+        if (!ok) { prev = -1; continue; }
+        const y = T.y[kk] + 0.2 + (this.dashLift ? this.dashLift(kk) : T.y[kk] > 19 ? 0.9 : 0);
+        const rx = rightX(T, kk) * s, rz = rightZ(T, kk) * s, w = T.w[kk];
+        const base = pos.length / 3;
+        pos.push(T.x[kk] + rx * (w - inner), y, T.z[kk] + rz * (w - inner), T.x[kk] + rx * (w + outer), y, T.z[kk] + rz * (w + outer));
+        uv.push(0, v, 1, v);
+        if (prev >= 0) idx.push(prev, base, prev + 1, prev + 1, base, base + 1);
+        prev = base;
+        v += T.step / 4.5;
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx); g.computeVertexNormals();
+    const e = mesh(g, m, 0, 0, 0, this.root); e.userData.noShadow = true; e.material.side = THREE.DoubleSide;
+  }
+
   /* guide lines: stitched dashes at the track's edges, a felt runner on the
      floor sections, the start line, the boost pads */
   _guides() {
@@ -685,7 +731,9 @@ export class World {
       if (this.noDash.has(tag)) continue;
       for (const s of [-1, 1]) insts.push([k, s]);
     }
-    const im = new THREE.InstancedMesh(dg, dash, insts.length);
+    if (this.edgeCols) { this._candyEdges(); insts.length = 0; }
+    const im = new THREE.InstancedMesh(dg, dash, Math.max(1, insts.length));
+    im.count = insts.length;
     const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), P = new THREE.Vector3(), S = new THREE.Vector3(1, 1, 1);
     insts.forEach(([k, s], i) => {
       const w = T.w[k];
