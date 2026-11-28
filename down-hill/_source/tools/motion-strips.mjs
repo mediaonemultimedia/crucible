@@ -16,10 +16,10 @@ const browser = await chromium.launch({ channel: 'chrome' });
 const W = 960, H = 540;
 
 const MOMENTS = {
-  drift: { q: 'p1=k8e&p1cpu=hard&seed=7', find: 'e.k === "boost" && e.tier >= 2 && e.i === A.me', lead: 14 },
+  drift: { q: 'p1=k8e&p1cpu=hard&seed=7', find: 'e.k === "boost" && e.tier >= 2 && e.i === A.me', lead: 6 },
   hit: { q: 'p1=zach&p1cpu=normal&cpu=hard&seed=11', find: '(e.k === "hit" || e.k === "wallop-hit" || e.k === "eject") && e.i === A.me', lead: 6 },
-  jump: { q: 'p1=kevalanche&p1cpu=hard&seed=3', find: 'e.k === "land" && e.i === A.me && e.hard > 0.35', lead: 14 },
-  boost: { q: 'p1=sumaura&p1cpu=hard&seed=5', find: '(e.k === "trickBoost" || e.k === "pad") && e.i === A.me', lead: 4 },
+  jump: { q: 'p1=kevalanche&p1cpu=hard&seed=3', find: 'e.k === "land" && e.i === A.me && e.hard > 0.35 && e.tick > 1200', lead: 7 },
+  boost: { q: 'p1=sumaura&p1cpu=hard&seed=5', find: '(e.k === "trickBoost" || e.k === "pad") && e.i === A.me && e.tick > 900', lead: 3 },
   overtake: { q: 'p1=johnny&p1cpu=hard&cpu=easy&seed=8', find: 'e.k === "__overtake"', lead: 4 },
   countdown: { q: 'p1=rubberta&seed=2', find: 'e.k === "go"', lead: 8 },
   podium: { q: 'p1=sumaura&p1cpu=hard&seed=9&laps=1', podium: true },
@@ -30,6 +30,7 @@ async function open(q) {
   await p.goto('file://' + path.resolve(html) + '?hold&noportraits&' + q);
   await p.waitForFunction(() => window.__dh && document.body.classList.contains('is-live'));
   await p.waitForTimeout(900); // let the loading screen's fade finish before CSS is taken over
+  if (process.env.CLEAN) await p.addStyleTag({ content: '#ui,#bubbles{visibility:hidden!important}' }); // judge the 3D motion alone
   await p.evaluate(async () => {
     await __dh.fx?.pipelineWarmup;
     // log every race event with its tick; synthesise "__overtake" when the player gains a place

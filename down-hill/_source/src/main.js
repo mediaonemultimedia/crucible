@@ -721,7 +721,7 @@ class App {
           v.count.className = 'count go';
         }
         A.play('dh-go');
-        for (const h of this.hv) { const k = R.karts[h.i]; this.fx.burst(k.x, k.y + 4, k.z, ['#ffc93a', '#3ff0c8', '#ff3b6b', '#9b5cff', '#2e9bff', '#ffffff'], 40, 11); }
+        for (const h of this.hv) { const k = R.karts[h.i], f = 14; this.fx.burst(k.x + Math.sin(k.yaw) * f, k.y + 8, k.z + Math.cos(k.yaw) * f, ['#ffc93a', '#3ff0c8', '#ff3b6b', '#9b5cff', '#2e9bff', '#ffffff'], 22, 9); }
         A.music(this.world.music || 'race', this.recording?.url);
         setTimeout(() => {
           for (const v of views) {
@@ -825,7 +825,7 @@ class App {
         if (near) { A.play('dh-boost', { gain: g(e.tier ? 0.9 : 0.7) }); A.play('dh-whoosh', { gain: g(e.tier === 3 || e.espresso ? 1 : 0.75) }); }
         if (e.tier) this.fx.sparks(K.x, K.y + 1, K.z, TIER_COLORS[e.tier], 16, 7, 1.0, 0.45);
         // a feather burst out the back
-        this.fx.tailBurst(K, e.tier === 3 ? '#4dffc3' : e.tier === 2 ? '#ffc93a' : '#ffffff', e.tier === 3 || e.espresso ? 22 : 14);
+        this.fx.tailBurst(K, e.tier === 3 ? '#4dffc3' : e.tier === 2 ? '#ffc93a' : '#ffffff', e.tier === 3 || e.espresso ? 14 : 9);
         if (mine) H.cam.punch = Math.max(H.cam.punch || 0, e.tier === 3 || e.espresso ? 1 : e.tier === 2 ? 0.8 : 0.6);
         if (mine && e.tier) { this.kpop(H, e.tier === 3 ? 'super-turbo' : 'mini-turbo'); A.play('dh-ding', { gain: 0.45, rate: 1 + e.tier * 0.18 }); }
         if (e.tier || e.espresso) V?.wheelie(e.tier === 3 || e.espresso ? 1 : 0.7);
@@ -854,8 +854,8 @@ class App {
       case 'trickBoost':
         if (mine) { this.toast(H, 'STYLE BOOST!', '#ffc93a'); H.cam.punch = Math.max(H.cam.punch || 0, 0.8); A.play('dh-whoosh', { gain: 0.9 }); }
         // gold feathers: the landing boost is clearly visible
-        this.fx.burst(K.x, K.y + 1.5, K.z, ['#ffc93a', '#ffe27a', '#fff2b0', '#ffffff'], 26, 8);
-        this.fx.tailBurst(K, '#ffc93a', 18);
+        this.fx.burst(K.x, K.y + 1.5, K.z, ['#ffc93a', '#ffe27a', '#fff2b0', '#ffffff'], 12, 8);
+        this.fx.tailBurst(K, '#ffc93a', 10);
         break;
       case 'taunt': {
         V.taunt(false);
@@ -1024,7 +1024,7 @@ class App {
     C.reveal = lerp(C.reveal || 0, reveal, Math.min(1, dt * 8));
     const lift = H.lookBack || H.lb || K.fish ? 0 : C.reveal;
     // overhaul: low and close, so the kart and its plush fill the frame (tv and the banister reveal as before)
-    const dist = ((5.9 + sp * 0.04) * (1 + intro * 2.5) + tv * 9.3 + punch * 2.2 + lift * 5.4) * C.size;
+    const dist = ((5.9 + sp * 0.04) * (1 + intro * 2.5) + tv * 9.3 + punch * 1.2 + lift * 5.4) * C.size;
     const h = (2.75 + intro * 9 + (K.air ? 0.9 : 0) + tv * 7.5 + lift * 6.1) * C.size;
     const fx = Math.sin(yaw), fz = Math.cos(yaw);
     const want = new THREE.Vector3(pose.x - fx * dist * back, pose.y + h, pose.z - fz * dist * back);
@@ -1050,7 +1050,7 @@ class App {
       look.x += fz * C.lean; look.z -= fx * C.lean;
     }
     C.look.lerp(look, Math.min(1, dt * 12));
-    const fov = (60 + Math.min(1.45, sp / top) * 9 + (K.boostT > 0 ? 9 : 0) + punch * 10) * (this.hv.length === 2 && !tv ? 0.82 : 1);
+    const fov = (60 + Math.min(1.45, sp / top) * 9 + (K.boostT > 0 ? 6 : 0) + punch * 7) * (this.hv.length === 2 && !tv ? 0.82 : 1);
     C.fov = lerp(C.fov, fov, Math.min(1, dt * 4));
     cam.fov = C.fov; cam.updateProjectionMatrix();
     cam.position.copy(C.pos);

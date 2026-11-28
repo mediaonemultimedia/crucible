@@ -100,7 +100,7 @@ export function addRim(group, rim = [1.0, 0.92, 0.78, 0.7, 2.4]) {
 }
 
 /* particles: never drawn closer than `d` to the eye */
-export function nearCull(m, d = 2.6) { m.userData.nearCull = d; markLook(m, 'near' + d); }
+export function nearCull(m, d = 4.2) { m.userData.nearCull = d; markLook(m, 'near' + d); }
 
 /* the blob shadow: a soft dark disc, one shared texture + material */
 let blobMat = null;

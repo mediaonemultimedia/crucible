@@ -250,7 +250,8 @@ export class RacerView {
     // pitch with the slope / the vertical speed in the air; roll with the steer
     const pitchT = K.air ? Math.max(-0.5, Math.min(0.45, -K.vy * 0.025)) : Math.max(-0.4, Math.min(0.4, -(K.slopeVy || 0) / Math.max(6, Math.abs(K.fwd)) * 0.9));
     const speed = Math.min(1.4, Math.abs(K.fwd) / (K.S?.top || 30));
-    const launchLean = this.racing && K.boostT > 0 && !K.air ? 0.095 : 0;
+    // overhaul: boosts lift the nose (negative pitch = nose up), the wheelie adds the pop on top
+    const launchLean = this.racing && K.boostT > 0 && !K.air ? -0.06 : 0;
     // overhaul: springs (substepped, so low frame rates can't make them ring) with a little overshoot
     const SP = this._sp || (this._sp = { p: { x: 0, v: 0 }, r: { x: 0, v: 0 } });
     SP.p.x = this.pitch; stepSpring(SP.p, pitchT + launchLean, 120, 0.45, dt, -0.7, 0.7); this.pitch = SP.p.x;

@@ -213,3 +213,7 @@ body.howto .kstrip{display:none}
 /* the header image is taller than the old text title: the player pills sit under it */
 body[data-screen=select] #players{top:calc(clamp(60px,9vh,96px) + 62px)!important}
 #s-flash{top:calc(clamp(60px,9vh,96px) + 128px)!important}
+body.howto .press{display:none}
+body.howto #title::after{content:"";position:absolute;inset:0;background:rgba(31,15,58,.45);z-index:11}
+/* the controls strip sits bottom-left, clear of the QR card bottom-right */
+.kstrip{left:24px!important;transform:none!important;bottom:22px!important}
