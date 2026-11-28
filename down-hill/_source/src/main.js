@@ -16,6 +16,8 @@
 import * as THREE from 'three/webgpu';
 import { makeRenderer } from './render/renderer.js';
 import { installLook, setGrade } from './render/look.js';
+import { installTypeArt, typeImg, placeImg, countImg, resultsButtons } from './ui/typeart.js';
+import { TIER_AT } from './race/sim.js';
 import { makeWorld } from './render/worlds.js';
 import { RacerView } from './render/racer.js';
 import { Fx, TIER_COLORS } from './render/fx.js';
@@ -98,17 +100,18 @@ const VIEW_HTML = `<div class="vdark"></div><div class="fabric"></div>
 <div class="islot"><div class="item"></div><div class="item-name"></div><div class="taunt-ic"><b>Taunt</b><kbd class="tk">T</kbd></div></div>
 <div class="tip"></div><div class="tprompt">TAUNT! <kbd class="tk">T</kbd></div><div class="warn">LOCKED ON — SPRING CUSHION!</div><div class="caption"></div>
 <div class="lap"><div class="l">Lap</div><div class="n">1/3</div><div class="tm">0:00.00</div></div>
-<canvas class="minimap" width="460" height="340"></canvas>
+<canvas class="minimap" width="400" height="400"></canvas>
 <div class="place">8<sup>th</sup></div>
 <div class="drift"><span>Drift</span><i></i><i></i><i></i></div>
-<div class="final">FINAL LAP!</div><div class="start-lights" aria-hidden="true"><i></i><i></i><i></i></div><div class="count"></div><div class="toast"></div>
+<div class="final">${typeImg('final-lap', 'FINAL LAP!')}</div><div class="start-lights" aria-hidden="true"><i></i><i></i><i></i></div><div class="count"></div><div class="toast"></div>
 <div class="wallop-hud"></div><div class="prop-cue" hidden><b></b><span></span></div>
-<div class="prop-cue gate-cue" hidden><b>Shortcut open</b><span></span></div><div class="wrong-way" hidden>WRONG WAY!</div><div class="lookback">Look back</div><div class="ptag"></div><div class="scare"></div><div class="wait"></div>`;
+<div class="prop-cue gate-cue" hidden><b>Shortcut open</b><span></span></div><div class="wrong-way" hidden>${typeImg('wrong-way', 'WRONG WAY!')}</div><div class="lookback">Look back</div><div class="ptag"></div><div class="scare"></div><div class="wait"></div>`;
 
 class App {
   constructor(renderer, canvas) {
     this.renderer = renderer; this.canvas = canvas;
     installLook(renderer);
+    installTypeArt();
     this.hold = Q.has('hold');
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(64, innerWidth / innerHeight, 0.3, 1400);
@@ -371,7 +374,7 @@ class App {
     const track = course.id === 'cup' ? CUP[0] : course.id;
     image.src = this.courseArt[track];
     image.alt = `Overhead view of ${TRACKS[track].name}`;
-    $('course-name').textContent = course.name;
+    $('course-name').innerHTML = typeImg(`c-${course.id}`, course.name);
     $('course-note').textContent = COURSE_NOTES[course.id];
     $('setup-start').textContent = course.id === 'cup' ? 'Start cup' : 'Start race';
     if (this.screen === 'setup') this.pads.paint(true);
@@ -693,7 +696,7 @@ class App {
     switch (e.k) {
       case 'count':
         for (const v of this.allViews()) {
-          v.count.textContent = e.n;
+          v.count.innerHTML = countImg(e.n);
           v.count.className = 'count';
           v.lights.dataset.phase = String(e.n);
         }
@@ -707,7 +710,7 @@ class App {
         const views = this.allViews();
         for (const v of views) {
           v.lights.dataset.phase = 'go';
-          v.count.textContent = 'GO!';
+          v.count.innerHTML = countImg('GO!');
           v.count.dataset.ink = 'GO!';
           v.count.className = 'count go';
         }
@@ -716,7 +719,7 @@ class App {
         setTimeout(() => {
           for (const v of views) {
             delete v.lights.dataset.phase;
-            if (v.count.textContent === 'GO!') {
+            if (v.count.dataset.ink === 'GO!') {
               v.count.textContent = '';
               delete v.count.dataset.ink;
             }
@@ -1107,8 +1110,12 @@ class App {
   /* ── HUD (one per human view) ── */
   _hud(H) {
     const R = this.race, K = R.karts[H.i];
-    H.place.innerHTML = `${K.place}<sup>${ORD(K.place).slice(-2)}</sup>`;
-    H.place.className = 'place' + (K.place === 1 ? ' p1' : '');
+    if (H.hud.place !== K.place) {
+      const was = H.hud.place;
+      H.hud.place = K.place;
+      H.place.innerHTML = placeImg(K.place);
+      H.place.className = 'place' + (K.place === 1 ? ' p1' : '') + (was ? (K.place < was ? ' gain' : ' lose') : ' bump');
+    }
     H.lap.textContent = `${R.lapOf(K)}/${R.laps}`;
     H.time.textContent = fmt(R.timeOf(K));
     // the item slot: the roulette spins through the icons, then lands
@@ -1144,6 +1151,10 @@ class App {
     set('warn', R.karts.some((O) => O.lock === K.i), (v) => H.warn.classList.toggle('on', v));
     // speed lines while a boost runs
     set('spd', K.boostT > 0 ? Math.min(1, K.boostT * 1.6).toFixed(1) : '0', (v) => { H.speed.style.opacity = v; });
+    set('dch', K.drift ? Math.min(1, K.charge / TIER_AT[3]).toFixed(2) + ':' + K.tier : '', (v) => {
+      if (!v) { delete H.islot.dataset.tier; H.islot.style.removeProperty('--charge'); return; }
+      const [c, t] = v.split(':'); H.islot.dataset.tier = t; H.islot.style.setProperty('--charge', c);
+    });
     const tiers = H.drift.querySelectorAll('i');
     tiers.forEach((el, j) => { el.className = K.drift && K.tier > j ? `t${K.tier}` : ''; });
     H.fabric.classList.toggle('on', K.caseT > 0);
@@ -1154,7 +1165,7 @@ class App {
 
   _minimapBase() {
     const T = this.T, c = document.createElement('canvas');
-    c.width = 460; c.height = 340;
+    c.width = 400; c.height = 400;
     let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
     for (let k = 0; k < T.N; k++) { x0 = Math.min(x0, T.x[k]); x1 = Math.max(x1, T.x[k]); z0 = Math.min(z0, T.z[k]); z1 = Math.max(z1, T.z[k]); }
     const s = Math.min((c.width - 50) / (x1 - x0), (c.height - 50) / (z1 - z0));
@@ -1216,7 +1227,7 @@ class App {
     }).join('') + cupHTML;
     $('board').classList.toggle('cupb', !!this.cup);
     const last = this.cup && this.cup.race >= this.cup.tracks.length;
-    $('again').textContent = this.cup ? (last ? 'Enter: the cup podium · Esc: pick a racer' : `Enter: race ${this.cup.race + 1} — ${TRACKS[this.cup.tracks[this.cup.race]].name} · Esc: quit the cup`) : 'Enter: race again · Esc: pick a racer';
+    resultsButtons($('again'), this.cup ? (last ? 'cup' : 'next') : 'race');
     this._podiumOf(R.finishOrder.slice(0, 3));
     this.bubble(-1, koLine(winner.id, winner.alt, this.raceN), 99);
     // the roast for last place, in the winner's voice

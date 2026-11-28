@@ -18,7 +18,7 @@ const result = await esbuild.build({
   define: { LOOKDEV_RACE: String(lookdev), RACE_REMESH: String(lookdev && process.argv.includes('--race-remesh')) },
   legalComments: 'none',
   // the SFX clips (src/audio/clips.js): inlined as base64 strings, decoded in the page
-  loader: { '.mp3': 'base64' },
+  loader: { '.mp3': 'base64', '.png': 'dataurl' },
   write: false,
   logLevel: 'info',
 });
@@ -56,6 +56,7 @@ ${typeLicenses} */
 @font-face{font-family:"Bungee";src:url(data:font/woff2;base64,${bungee}) format("woff2");font-display:block}
 @font-face{font-family:"Bolster Display";src:url(data:font/woff2;base64,${font2}) format("woff2");font-display:block}
 @font-face{font-family:"Bolster Condensed";src:url(data:font/woff2;base64,${cond}) format("woff2");font-weight:700;font-display:block}`;
+html = html.replace('</style>', () => fs.readFileSync(path.join(src, 'ui/kit.css'), 'utf8') + '\n</style>');
 html = html.replace('/*FONTFACE*/', () => face).replace('__TITLE_WORDMARK__', () => 'data:image/png;base64,' + wordmark);
 
 const courses = Object.fromEntries(['landing', 'laundry', 'park', 'hockey', 'dojo'].map((id) => [

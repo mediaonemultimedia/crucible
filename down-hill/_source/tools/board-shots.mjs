@@ -41,16 +41,16 @@ const tour = (track) => async () => {
 
 const SCENES = {
   'tour-landing': tour('landing'), 'tour-laundry': tour('laundry'), 'tour-hockey': tour('hockey'), 'tour-park': tour('park'), 'tour-dojo': tour('dojo'),
-  async title() { const p = await open('?hold'); await p.evaluate(() => __dh.step(2.5)); await snap(p, 'title'); await p.close(); },
+  async title() { const p = await open('?hold'); await p.evaluate(() => __dh.step(2.5)); await snap(p, 'title', 1600); await p.close(); },
   async select() {
     const p = await open('?hold&screen=select');
     await p.evaluate(async () => { await __dh.portraits(); __dh.pick(3); __dh.step(1.2); });
-    await snap(p, 'select'); await p.close();
+    await snap(p, 'select', 1200); await p.close();
   },
   async setup() {
     const p = await open('?hold&screen=select&noportraits');
     await p.evaluate(() => { __dh.toSetup(); __dh.step(1.2); });
-    await snap(p, 'setup'); await p.close();
+    await snap(p, 'setup', 1000); await p.close();
   },
   landing: race('landing'), laundry: race('laundry'), hockey: race('hockey'), park: race('park'), dojo: race('dojo'),
   async split4() {
@@ -81,7 +81,7 @@ const SCENES = {
   async results() {
     const p = await open('?hold&p1=sumaura&p1cpu=hard&seed=9&laps=1');
     await p.evaluate(() => { const A = __dh; for (let n = 0; n < 60 * 150 && A.screen === 'race'; n++) A.frame(1 / 60, false); A.step(2.5); });
-    await snap(p, 'results'); await p.close();
+    await snap(p, 'results', 2200); await p.close();
   },
 };
 

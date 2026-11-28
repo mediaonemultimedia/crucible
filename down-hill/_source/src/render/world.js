@@ -238,7 +238,7 @@ export class World {
   dispose() { this.root.removeFromParent(); this.lightsG.removeFromParent(); }
 
   build() {
-    this.scene.background = new THREE.Color('#0b0a1a');
+    this.scene.background = new THREE.Color(landingLookdev ? '#7fc9ff' : '#0b0a1a');
     this._lights();
     this._rooms();
     this._bed();
