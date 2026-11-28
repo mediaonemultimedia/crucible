@@ -295,7 +295,9 @@ export class RacerView {
       const go = Math.min(1, Math.abs(K.fwd) / 12);
       stepSpring(DS.z, -(K.steer || 0) * 0.2 * go + (K.drift ? K.drift * 0.14 : 0), 70, 0.3, dt, -0.6, 0.6);
       stepSpring(DS.x, (K.boostT > 0 ? -0.2 : 0) + (K.air ? -0.1 : 0) + Math.max(0, -this.squash) * 0.03, 85, 0.33, dt, -0.6, 0.6);
-      stepSpring(DS.y, (K.steer || 0) * 0.24 * go, 60, 0.4, dt, -0.7, 0.7);
+      // …and twists round to look back when someone's right on its tail
+      this.tailT = Math.max(0, Math.min(1, (this.tailT || 0) + (this.tail ? dt * 3 : -dt * 4)));
+      stepSpring(DS.y, (K.steer || 0) * 0.24 * go + (this.tailT > 0.5 ? 0.62 : 0), 60, 0.4, dt, -0.9, 0.9);
       d.rotation.set(DS.x.x, DS.y.x, DS.z.x);
       d.position.y += Math.abs(Math.sin(this.t * (7 + 5 * speed))) * 0.05 * speed * P.scale;
     }

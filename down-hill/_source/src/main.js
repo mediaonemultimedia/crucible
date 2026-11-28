@@ -1399,6 +1399,11 @@ class App {
         let best = vs[0].camera.position, bd = 1e18;
         for (const H of vs) { const d = (H.camera.position.x - pose.x) ** 2 + (H.camera.position.z - pose.z) ** 2 + (H.camera.position.y - pose.y) ** 2; if (d < bd) { bd = d; best = H.camera.position; } }
         near.copy(best);
+        // overhaul: a human's plush glances over its shoulder when a rival is right on its tail
+        if (this.race.humans.includes(i) && !K.fin) {
+          const fx = Math.sin(K.yaw), fz = Math.cos(K.yaw);
+          v.tail = R.karts.some((O) => O !== K && !O.fin && (O.x - K.x) * fx + (O.z - K.z) * fz < -1.5 && (O.x - K.x) * fx + (O.z - K.z) * fz > -9 && Math.abs((O.x - K.x) * fz - (O.z - K.z) * fx) < 3.5);
+        }
         v.update(this.paused ? 0 : rdt, K, pose, near, this.hv[0].camera.quaternion);
         if (!this.paused) this.fx.kartTrail(K, v, rdt);
       });

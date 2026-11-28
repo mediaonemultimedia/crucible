@@ -18,6 +18,7 @@
 
 import * as THREE from 'three/webgpu';
 import { nearCull } from './look.js';
+import { BOX_RESPAWN } from '../race/sim.js';
 import { rbox, pillowGeo, mat, glowMat, mesh, canvasTex, srand } from './geo.js';
 
 const TAU = Math.PI * 2;
@@ -515,10 +516,17 @@ export class Fx {
     R.boxes.forEach((B, i) => {
       const ph = this.boxPh[i];
       // a grabbed box pops and grows straight back
-      const s = B.dead ? Math.max(0.05, 1 - B.dead / 24) ** 0.7 : 1;
+      // overhaul: grabbed → a squash-pop (wide and flat, then gone); back → it springs up with an overshoot
+      const gone = B.dead ? BOX_RESPAWN - B.dead : 0, back = B.dead ? B.dead : 0;
+      let sx = 1, sy = 1;
+      if (B.dead && gone < 9) { const u = gone / 9; sx = 1 + 0.55 * Math.sin(u * Math.PI * 0.8); sy = Math.max(0.05, (1 - u) * (1 - 0.45 * Math.sin(u * Math.PI))); sx *= 1 - u * u; }
+      else if (B.dead && back < 16) { const u = 1 - back / 16, o = 1 + Math.sin(u * Math.PI * 1.5) * 0.35 * (1 - u); sx = u * o; sy = u * (2 - o); }
+      else if (B.dead) sx = sy = 0.02;
+      const spin = Math.sin(t * 1.25 + ph) * 0.18 + t * 0.9;
       P.set(B.x, B.y + 0.60 + Math.sin(t * 2.2 + ph) * 0.27, B.z);
-      Q.setFromEuler(E.set(0, this.boxYaw[i] + Math.sin(t * 1.25 + ph) * 0.18, Math.sin(t * 1.7 + ph) * 0.05));
-      M.compose(P, Q, S.set(s * 0.92, s, s * 0.92));
+      Q.setFromEuler(E.set(0, this.boxYaw[i] + spin, Math.sin(t * 1.7 + ph) * 0.08));
+      M.compose(P, Q, S.set(sx * 0.92, sy, sx * 0.92));
+      const s = Math.max(sx, sy);
       body.setMatrixAt(i, M);
       const hs = s * (5.1 + Math.sin(t * 3 + ph) * 0.35);
       M.compose(P, camQ, S.set(hs, hs, hs));
@@ -596,7 +604,9 @@ export class Fx {
       const tier = K.tier;
       for (const s of [-1, 1]) {
         const x = bx + rx * 1.2 * s, z = bz + rz * 1.2 * s;
-        if (tier === 0) { if (this.r() < 0.35) this.puff(x, by, z, '#8f88a8', 0.9, 0.35, 0.8); }
+        // overhaul: tyre smoke at every tier, a puff more as it charges
+        if (this.r() < 0.22 + tier * 0.06) this.puff(x, by, z, tier ? '#f3eefa' : '#c9c2dd', 1 + tier * 0.15, 0.4, 0.9);
+        if (tier === 0) { /* smoke only */ }
         else if (tier === 1) { this.feathers.add({ x, y: by + 0.3, z, vx: -fx * 3 + (this.r() - 0.5) * 4, vy: 2 + this.r() * 3, vz: -fz * 3 + (this.r() - 0.5) * 4, g: 6, drag: 2, sway: 4, ph: this.r() * 9, age: 0, life: 0.7, size: 0.55, rot: this.r() * TAU, spin: 5, c: '#ffffff' }); this.sparks(x, by, z, '#ffffff', 1, 3, 0.5); }
         else this.sparks(x, by, z, TIER_COLORS[tier], tier === 3 ? 3 : 2, 5, tier === 3 ? 0.9 : 0.7, 0.32);
       }
