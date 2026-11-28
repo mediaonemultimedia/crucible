@@ -180,3 +180,19 @@ body.howto .kstrip{display:none}
 .course-shot img{background:#7fc9ff!important}
 .again .k-btn.mint{animation:k-in .5s var(--k-pop) .9s both,k-press-btn 1.1s ease-in-out 1.5s infinite}
 .roast{background:linear-gradient(#fffdf2,#ffe7b5)!important;color:var(--k-ink)!important}
+
+/* the music carousel (race setup) */
+.setup-controls label{font-size:0!important;margin-right:0!important}
+.setup-controls label #race-music{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
+.k-music{display:flex;align-items:center;gap:10px;margin-right:auto}
+.k-music .k-btn{width:52px;height:52px;font-size:30px!important;padding:0!important;display:grid;place-items:center}
+.k-disc{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:12px;align-items:center;min-width:min(40vw,380px);padding:8px 18px 9px 10px;border:var(--k-o) solid var(--k-ink);border-radius:999px;background:linear-gradient(#fffdf2,#ffe7b5);box-shadow:0 5px 0 var(--k-ink);color:var(--k-ink);font-family:var(--k-live)}
+.k-disc i{grid-row:1/3;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:22px;color:#fff;background:radial-gradient(circle,#fff 0 12%,var(--k-berry) 13% 60%,var(--k-ink) 61% 66%,var(--k-berry-lo) 67%);border:3px solid var(--k-ink)}
+.k-disc.spin i{animation:k-disc .6s var(--k-pop)}
+.k-disc.spin span{animation:k-pop .4s var(--k-pop)}
+@keyframes k-disc{0%{transform:rotate(-200deg) scale(.6)}100%{transform:none}}
+.k-disc span{font-size:clamp(16px,1.5vw,22px);line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.k-disc small{font-size:13px;color:#7a3cff}
+#music-preview{font-size:15px!important}
+
+.k-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}

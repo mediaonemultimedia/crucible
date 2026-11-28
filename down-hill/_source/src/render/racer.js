@@ -319,6 +319,26 @@ export class RacerView {
       d.rotation.y += (u < 0.75 ? u / 0.75 : 1) * Math.PI * 2;
       d.scale.setScalar(P.scale * (1 + up * 0.12));
     } else d.scale.setScalar(P.scale);
+    // overhaul: podium celebrations — 1st hops and spins with a squash landing, 2nd rocks, 3rd bounces
+    if (this.cheer) {
+      const t = this.t, sc = P.scale;
+      if (this.cheer === 'win') {
+        const u = (t / 1.5) % 1, air = u < 0.45 ? Math.sin((u / 0.45) * Math.PI) : 0;
+        const land = u >= 0.45 && u < 0.62 ? Math.sin(((u - 0.45) / 0.17) * Math.PI) : 0;
+        d.position.y += air * 1.5 * sc;
+        d.rotation.y += u < 0.45 ? (u / 0.45) * Math.PI * 2 : 0;
+        d.scale.set(sc * (1 + land * 0.22 - air * 0.06), sc * (1 - land * 0.25 + air * 0.12), sc * (1 + land * 0.22 - air * 0.06));
+      } else if (this.cheer === 'wave') {
+        d.rotation.z += Math.sin(t * 5.5) * 0.28;
+        d.position.y += Math.abs(Math.sin(t * 5.5)) * 0.22 * sc;
+      } else if (this.cheer === 'bounce') {
+        const b = Math.abs(Math.sin(t * 6.5));
+        d.position.y += b * 0.45 * sc;
+        d.scale.set(sc * (1 + (1 - b) * 0.08), sc * (1 - (1 - b) * 0.1 + b * 0.04), sc * (1 + (1 - b) * 0.08));
+      } else if (this.cheer === 'sulk') {
+        d.rotation.x += 0.32; d.rotation.z += Math.sin(t * 0.8) * 0.05; d.position.y -= 0.12 * sc;
+      }
+    }
     // launched out of the seat: up high, flailing, and back down into it
     if (this.ejT > 0) {
       this.ejT = Math.max(0, this.ejT - dt);

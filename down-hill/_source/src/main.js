@@ -16,7 +16,7 @@
 import * as THREE from 'three/webgpu';
 import { makeRenderer } from './render/renderer.js';
 import { installLook, setGrade } from './render/look.js';
-import { installTypeArt, typeImg, placeImg, countImg, resultsButtons } from './ui/typeart.js';
+import { installTypeArt, typeImg, placeImg, countImg, resultsButtons, paintMusic } from './ui/typeart.js';
 import { TIER_AT } from './race/sim.js';
 import { makeWorld } from './render/worlds.js';
 import { RacerView } from './render/racer.js';
@@ -189,6 +189,7 @@ class App {
   setScreen(s) {
     this.screen = s;
     setGrade(s === 'race' ? this.trackId : 'menu');
+    if (s !== 'results' && s !== 'cup') for (const v of this.views.values()) v.cheer = null;
     if (raceMeshStyle) for (const v of this.views.values()) {
       v.setRaceMesh(s === 'race' && this.rviews.includes(v) ? raceMeshStyle : null);
     }
@@ -366,6 +367,7 @@ class App {
     this.audio.music('menu');
     $('music-preview').hidden = !this.recording;
     $('music-preview').textContent = 'Preview';
+    paintMusic();
   }
 
   _paintSetup() {
@@ -374,7 +376,7 @@ class App {
     const track = course.id === 'cup' ? CUP[0] : course.id;
     image.src = this.courseArt[track];
     image.alt = `Overhead view of ${TRACKS[track].name}`;
-    $('course-name').innerHTML = typeImg(`c-${course.id}`, course.name);
+    $('course-name').innerHTML = `${typeImg(`c-${course.id}`, '')}<span class="k-sr">${esc(course.name)}</span>`;
     $('course-note').textContent = COURSE_NOTES[course.id];
     $('setup-start').textContent = course.id === 'cup' ? 'Start cup' : 'Start race';
     if (this.screen === 'setup') this.pads.paint(true);
@@ -492,7 +494,11 @@ class App {
     this.audio.ui('confirm');
     p.locked = true;
     this._paintPicks();
-    if (this.players.every((q) => q.locked)) this.toSetup();
+    if (this.players.every((q) => q.locked)) {
+      // overhaul: the racer on the turntable hops and spins on lock-in, then on to setup
+      if (this.hold) this.toSetup();
+      else { if (this.turn) this.turn.cheer = 'win'; this._lockT = 0.75; }
+    }
   }
   flash(text) { const el = $('s-flash'); if (!el) return; el.textContent = text; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); }
 
@@ -1311,6 +1317,11 @@ class App {
     for (const P of this.podium) {
       const v = P.v, [x, y, z] = P.spot;
       const K = this.race.karts[P.i];
+      const rank = this.podium.indexOf(P);
+      v.cheer = ['win', 'wave', 'bounce'][rank] || 'sulk';
+      // confetti: a big pop as the podium appears, then a shower over the winner every couple of seconds
+      if (rank === 0 && (this.podT - dt < 0.35 && this.podT >= 0.35 || Math.floor(this.podT / 2.2) !== Math.floor((this.podT - dt) / 2.2)))
+        this.fx?.burst(x, y + 7, z, ['#ffc93a', '#3ff0c8', '#ff3b6b', '#9b5cff', '#2e9bff', '#ffffff'], 34, 9);
       v.update(dt, { ...K, fwd: 0, drift: 0, steer: 0, air: 0, spinT: 0, boostT: 0, caseT: 0, wobT: 0 }, { x, y, z, yaw: (I.podYaw ?? Math.PI * 0.08) + (P === this.podium[0] ? Math.sin(this.podT) * 0.15 : 0) }, this.camera.position, this.camera.quaternion);
       if (P === this.podium[0] && Math.floor(this.podT * 3) !== Math.floor((this.podT - dt) * 3)) this.fx?.sparks(x + (Math.random() - 0.5) * 8, y + 5 + Math.random() * 3, z, ['#ffc93a', '#3ff0c8', '#ff3b6b'][Math.floor(Math.random() * 3)], 6, 5, 0.8, 0.6);
     }
@@ -1328,6 +1339,7 @@ class App {
     dt = Math.min(dt, 0.1);
     this.t += dt;
     this._menuPads();
+    if (this._lockT > 0 && (this._lockT -= dt) <= 0) { if (this.screen === 'select' && this.players.every((q) => q.locked)) this.toSetup(); }
     this.pads.frame(dt);
     this._lostPhones();
     let rdt = dt;

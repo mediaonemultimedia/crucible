@@ -71,6 +71,7 @@ const ART = [
   ['c-laundry', 'Centre Court', 'label', 110, 'gold', { extrude: 9, outline: 10, tilt: 0.07 }],
   ['c-hockey', 'Rink 88', 'label', 110, 'sky', { extrude: 9, outline: 10, tilt: 0.07 }],
   ['c-park', "Rubberta's Rapids", 'label', 100, 'mint', { extrude: 9, outline: 10, tilt: 0.07 }],
+  ['c-cup', 'The Pillow Cup', 'label', 110, 'gold', { extrude: 9, outline: 10, tilt: 0.07 }],
   ['c-dojo', 'Midnight Dojo', 'label', 110, 'grape', { extrude: 9, outline: 10, tilt: 0.07 }],
   ...[['slick', 'Feather Slick'], ['missile', 'Pillow Missile'], ['espresso', 'Espresso Shot'], ['cuffs', 'Fuzzy Cuffs'], ['case', 'Pillowcase'],
     ['alarm', 'Alarm Clock'], ['sugar', 'Sugar Rush'], ['plane', 'Paper Plane'], ['wash', 'Hot Wash'], ['spring', 'Spring Cushion']]

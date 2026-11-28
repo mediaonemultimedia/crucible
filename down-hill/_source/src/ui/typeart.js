@@ -25,6 +25,20 @@ export function installTypeArt() {
     s.innerHTML = '<span><kbd>←</kbd><kbd>→</kbd> steer</span><span><kbd>↑</kbd> gas</span><span><kbd>K</kbd> drift</span><span><kbd>J</kbd> item</span><span><kbd>X</kbd> wallop</span><span><b>H</b> how to play</span>';
     title.appendChild(s);
   }
+  // race setup: music as a chunky carousel over the (hidden) select, which stays the source of truth
+  const sel = document.getElementById('race-music');
+  if (sel && !document.querySelector('.k-music')) {
+    const m = document.createElement('div');
+    m.className = 'k-music';
+    m.innerHTML = '<button type="button" class="k-btn" data-d="-1" aria-label="Previous music">‹</button><div class="k-disc"><i>♪</i><span></span><small></small></div><button type="button" class="k-btn" data-d="1" aria-label="Next music">›</button>';
+    sel.closest('label').after(m);
+    m.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-d]'); if (!b) return;
+      sel.selectedIndex = (sel.selectedIndex + Number(b.dataset.d) + sel.options.length) % sel.options.length;
+      sel.dispatchEvent(new Event('change'));
+    });
+    sel.addEventListener('change', paintMusic);
+  }
   // results: big buttons (Enter / Esc, or click)
   document.getElementById('again')?.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) dispatchEvent(new KeyboardEvent('keydown', { code: b.dataset.code, key: b.dataset.code })); });
   addEventListener('keydown', (e) => {
@@ -44,4 +58,15 @@ export function resultsButtons(el, mode) {
   el.innerHTML = mode === 'race' ? b('mint', 'Enter', 'b-retry', 'Retry', 'Enter') + b('', 'Escape', 'b-next', 'Next', 'Esc')
     : mode === 'next' ? b('mint', 'Enter', 'b-next', 'Next race', 'Enter') + b('berry', 'Escape', null, 'Quit cup', 'Esc')
     : b('mint', 'Enter', 'b-next', 'Cup podium', 'Enter') + b('', 'Escape', null, 'New racers', 'Esc');
+}
+
+/* the music carousel shows the select's current choice; spins its disc on every change */
+export function paintMusic() {
+  const sel = document.getElementById('race-music'), m = document.querySelector('.k-music');
+  if (!sel || !m) return;
+  const [title, artist] = (sel.options[sel.selectedIndex]?.text || '').split(' · ');
+  m.querySelector('span').textContent = title || '';
+  m.querySelector('small').textContent = artist || 'Fluffed & Furious';
+  m.querySelector('small').hidden = false;
+  const d = m.querySelector('.k-disc'); d.classList.remove('spin'); void d.offsetWidth; d.classList.add('spin');
 }
